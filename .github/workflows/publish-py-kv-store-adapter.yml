@@ -3,12 +3,6 @@ name: Publish py-kv-store-adapter to PyPI
 on:
   release:
     types: [created]
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:

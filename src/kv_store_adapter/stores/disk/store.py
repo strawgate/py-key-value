@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, overload
 
 from diskcache import Cache
@@ -20,15 +21,18 @@ class DiskStore(BaseManagedKVStore):
     def __init__(self, *, cache: Cache) -> None: ...
 
     @overload
-    def __init__(self, *, path: str, size_limit: int | None = None) -> None: ...
+    def __init__(self, *, path: Path | str, size_limit: int | None = None) -> None: ...
 
-    def __init__(self, *, cache: Cache | None = None, path: str | None = None, size_limit: int | None = None) -> None:
+    def __init__(self, *, cache: Cache | None = None, path: Path | str | None = None, size_limit: int | None = None) -> None:
         """Initialize the in-memory cache.
 
         Args:
             disk_cache: The disk cache to use.
             size_limit: The maximum size of the disk cache. Defaults to 1GB.
         """
+        if isinstance(path, Path):
+            path = str(object=path)
+
         self._cache = cache or Cache(directory=path, size_limit=size_limit or DEFAULT_DISK_STORE_SIZE_LIMIT)
 
         super().__init__()

@@ -1,14 +1,13 @@
 from typing import Any
 
-from kv_store_adapter.stores.base.unmanaged import BaseKVStore
-from kv_store_adapter.types import TTLInfo
+from kv_store_adapter.types import KVStoreProtocol
 
 
 class SingleCollectionAdapter:
-    """Adapter around a KV Store that only allows one collection."""
+    """Adapter around a KVStoreProtocol-compliant Store that only allows one collection."""
 
-    def __init__(self, store: BaseKVStore, collection: str) -> None:
-        self.store: BaseKVStore = store
+    def __init__(self, store: KVStoreProtocol, collection: str) -> None:
+        self.store: KVStoreProtocol = store
         self.collection: str = collection
 
     async def get(self, key: str) -> dict[str, Any] | None:
@@ -22,9 +21,3 @@ class SingleCollectionAdapter:
 
     async def exists(self, key: str) -> bool:
         return await self.store.exists(collection=self.collection, key=key)
-
-    async def keys(self) -> list[str]:
-        return await self.store.keys(collection=self.collection)
-
-    async def ttl(self, key: str) -> TTLInfo | None:
-        return await self.store.ttl(collection=self.collection, key=key)

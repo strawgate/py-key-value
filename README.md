@@ -77,9 +77,9 @@ For detailed configuration options and all available stores, see [DEVELOPING.md]
 We strive to support atomicity and consistency across all stores and operations in the KVStoreProtocol. That being said,
 there are operations available via the BaseKVStore class which are management operations like listing keys, listing collections, clearing collections, culling expired entries, etc. These operations may not be atomic, may be eventually consistent across stores, or may have other limitations (like limited to returning a certain number of keys).
 
-## Adapters
+## Protocol Adapters
 
-The library provides an adapter pattern simplifying the user of the protocol/store. Adapters themselves do not implement the `KVStoreProtocol` interface and cannot be nested. Adapters can be used with wrappers and stores interchangeably.
+The library provides an adapter pattern simplifying the use of the protocol/store. Adapters themselves do not implement the `KVStoreProtocol` interface and cannot be nested. Adapters can be used with anything that implements the `KVStoreProtocol` interface but do not comply with the full `BaseKVStore` interface and thus lack management operations like listing keys, listing collections, clearing collections, culling expired entries, etc.
 
 The following adapters are available:
 

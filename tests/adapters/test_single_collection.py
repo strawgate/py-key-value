@@ -26,14 +26,3 @@ class TestSingleCollectionAdapter:
         assert await adapter.exists(key="test")
         assert await adapter.delete(key="test")
         assert await adapter.exists(key="test") is False
-
-    async def test_put_keys(self, adapter: SingleCollectionAdapter):
-        await adapter.put(key="test", value={"test": "test"})
-        assert await adapter.keys() == ["test"]
-
-    async def test_put_keys_delete_keys_get(self, adapter: SingleCollectionAdapter):
-        await adapter.put(key="test", value={"test": "test"})
-        assert await adapter.keys() == ["test"]
-        assert await adapter.delete(key="test")
-        assert await adapter.keys() == []
-        assert await adapter.get(key="test") is None
