@@ -1,301 +1,225 @@
 # KV Store Adapter
 
-A pluggable interface for Key-Value stores with multiple backend implementations.
-
-## Overview
-
-This package provides a common protocol for Key-Value store operations with support for:
-- **Basic operations**: get, set, delete
-- **TTL (Time To Live)**: Automatic expiration of keys
-- **Namespaces/Collections**: Organize data into separate collections
-- **Pattern matching**: Find keys using wildcard patterns
-- **Multiple backends**: In-memory, disk-based, and Redis implementations
+A pluggable, async-first key-value store interface for Python applications with support for multiple backends and TTL (Time To Live) functionality.
 
 ## Features
 
-### Supported Operations
-- `get(key, namespace=None)` - Retrieve a value
-- `set(key, value, namespace=None, ttl=None)` - Store a value with optional TTL
-- `delete(key, namespace=None)` - Delete a key
-- `exists(key, namespace=None)` - Check if a key exists
-- `ttl(key, namespace=None)` - Get remaining time-to-live
-- `keys(namespace=None, pattern="*")` - List keys with pattern matching
-- `clear_namespace(namespace)` - Clear all keys in a namespace
-- `list_namespaces()` - List all available namespaces
-
-### Backend Implementations
-
-#### 1. Memory Store (`MemoryKVStore`)
-- Fast in-memory storage using Python dictionaries
-- Thread-safe with proper locking
-- Data lost when process ends
-- Perfect for caching and temporary storage
-
-#### 2. Disk Store (`DiskKVStore`) 
-- Persistent storage using the filesystem
-- Each namespace is a directory
-- Uses pickle for serialization and JSON for metadata
-- Survives process restarts
-
-#### 3. Redis Store (`RedisKVStore`)
-- Uses Redis as the backend
-- Leverages Redis's native TTL support
-- Requires `redis` package and Redis server
-- Scalable and production-ready
-
-## Installation
-
-```bash
-# Basic installation
-pip install kv-store-adapter
-
-# With Redis support
-pip install kv-store-adapter[redis]
-
-# Development installation
-pip install kv-store-adapter[dev]
-```
+- **Async-first**: Built from the ground up with `async`/`await` support
+- **Multiple backends**: Redis, Elasticsearch, In-memory, Disk, and more
+- **TTL support**: Automatic expiration handling across all store types
+- **Type-safe**: Full type hints with Protocol-based interfaces
+- **Adapters**: Pydantic, Single Collection, and more
+- **Wrappers**: Statistics tracking and extensible wrapper system
+- **Collection-based**: Organize keys into logical collections/namespaces
+- **Pluggable architecture**: Easy to add custom store implementations
 
 ## Quick Start
 
-```python
-from kv_store_adapter.memory import MemoryKVStore
-from kv_store_adapter.disk import DiskKVStore
-from kv_store_adapter.redis import RedisKVStore
-from datetime import timedelta
-
-# Memory store
-store = MemoryKVStore()
-
-# Disk store
-store = DiskKVStore("/path/to/data")
-
-# Redis store (requires Redis server)
-store = RedisKVStore(host="localhost", port=6379)
-
-# Basic operations
-store.set("user:1", {"name": "Alice", "age": 30})
-user = store.get("user:1")
-print(user)  # {'name': 'Alice', 'age': 30}
-
-# With TTL
-store.set("session:abc", {"user_id": 1}, ttl=timedelta(hours=1))
-
-# Using namespaces
-store.set("config", "production", namespace="app")
-store.set("config", "debug", namespace="test")
-
-config = store.get("config", namespace="app")  # "production"
-
-# Pattern matching
-store.set("user:1", "Alice")
-store.set("user:2", "Bob") 
-store.set("admin:1", "Charlie")
-
-users = store.keys(pattern="user:*")  # ["user:1", "user:2"]
-```
-
-## Detailed Examples
-
-### Working with Namespaces
-
-```python
-from kv_store_adapter.memory import MemoryKVStore
-
-store = MemoryKVStore()
-
-# Store data in different namespaces
-store.set("settings", {"theme": "dark"}, namespace="user:1")
-store.set("settings", {"theme": "light"}, namespace="user:2")
-store.set("cache", "some_value", namespace="temp")
-
-# Retrieve from specific namespace
-user1_settings = store.get("settings", namespace="user:1")
-
-# List keys in a namespace
-temp_keys = store.keys(namespace="temp")
-
-# List all namespaces
-namespaces = store.list_namespaces()
-print(namespaces)  # ['user:1', 'user:2', 'temp']
-
-# Clear a namespace
-cleared_count = store.clear_namespace("temp")
-```
-
-### TTL and Expiration
-
-```python
-import time
-from datetime import timedelta
-
-# Set with TTL in seconds
-store.set("session", {"user": "alice"}, ttl=30)
-
-# Set with timedelta
-store.set("cache", "data", ttl=timedelta(minutes=15))
-
-# Check remaining TTL
-remaining = store.ttl("session")
-print(f"Session expires in {remaining:.2f} seconds")
-
-# Key automatically expires
-time.sleep(31)
-exists = store.exists("session")  # False
-```
-
-### Error Handling
-
-```python
-from kv_store_adapter.exceptions import KeyNotFoundError
-
-try:
-    value = store.get("nonexistent_key")
-except KeyNotFoundError as e:
-    print(f"Key not found: {e}")
-
-# Safe existence check
-if store.exists("key"):
-    value = store.get("key")
-else:
-    print("Key does not exist")
-```
-
-### Disk Store Persistence
-
-```python
-from kv_store_adapter.disk import DiskKVStore
-
-# Create store with custom path
-store1 = DiskKVStore("/my/data/path")
-store1.set("persistent_key", "persistent_value")
-
-# Data persists across instances
-store2 = DiskKVStore("/my/data/path")
-value = store2.get("persistent_key")  # "persistent_value"
-```
-
-### Redis Store Configuration
-
-```python
-from kv_store_adapter.redis import RedisKVStore
-
-# Basic connection
-store = RedisKVStore()
-
-# Custom configuration
-store = RedisKVStore(
-    host="redis.example.com",
-    port=6379,
-    db=1,
-    password="secret",
-    socket_timeout=10
-)
-
-# All Redis connection parameters are supported
-```
-
-## Protocol Interface
-
-All implementations follow the `KVStoreProtocol` interface:
-
-```python
-from abc import ABC, abstractmethod
-from typing import Any, Optional, Union, List
-from datetime import timedelta
-
-class KVStoreProtocol(ABC):
-    @abstractmethod
-    def get(self, key: str, namespace: Optional[str] = None) -> Any: ...
-    
-    @abstractmethod
-    def set(self, key: str, value: Any, namespace: Optional[str] = None, 
-            ttl: Optional[Union[int, float, timedelta]] = None) -> None: ...
-    
-    @abstractmethod
-    def delete(self, key: str, namespace: Optional[str] = None) -> bool: ...
-    
-    @abstractmethod
-    def ttl(self, key: str, namespace: Optional[str] = None) -> Optional[float]: ...
-    
-    @abstractmethod
-    def exists(self, key: str, namespace: Optional[str] = None) -> bool: ...
-    
-    @abstractmethod
-    def keys(self, namespace: Optional[str] = None, pattern: str = "*") -> List[str]: ...
-    
-    @abstractmethod
-    def clear_namespace(self, namespace: str) -> int: ...
-    
-    @abstractmethod
-    def list_namespaces(self) -> List[str]: ...
-```
-
-## Thread Safety
-
-- **MemoryKVStore**: Thread-safe using `threading.RLock`
-- **DiskKVStore**: Thread-safe using `threading.RLock`  
-- **RedisKVStore**: Thread-safe (Redis handles concurrency)
-
-## Performance Characteristics
-
-| Implementation | Speed | Persistence | Memory Usage | Scalability |
-|----------------|-------|-------------|--------------|-------------|
-| Memory         | Fastest | No | High | Single process |
-| Disk           | Medium | Yes | Low | Single process |  
-| Redis          | Fast | Yes | Medium | Multi-process |
-
-## Testing
-
 ```bash
-# Run all tests
-pytest tests/
+pip install kv-store-adapter
 
-# Run specific implementation tests
-pytest tests/test_memory_store.py
-pytest tests/test_disk_store.py
+# With specific backend support
+pip install kv-store-adapter[redis]
+pip install kv-store-adapter[elasticsearch]
+pip install kv-store-adapter[memory]
+pip install kv-store-adapter[disk]
 
-# Run with coverage
-pytest tests/ --cov=kv_store_adapter
+# With all backends
+pip install kv-store-adapter[memory,disk,redis,elasticsearch]
+```
+
+# The KV Store Protocol
+
+The simplest way to get started is to use the `KVStoreProtocol` interface, which allows you to write code that works with any supported KV Store:
+
+```python
+from kv_store_adapter.types import KVStoreProtocol
+from typing import Any
+
+async def cache_user_data(store: KVStoreProtocol, user_id: str, data: dict[str, Any]) -> None:
+    """Cache user data with 1-hour TTL."""
+    await store.put("users", f"user:{user_id}", data, ttl=3600)
+
+async def get_cached_user(store: KVStoreProtocol, user_id: str) -> dict[str, Any] | None:
+    """Retrieve cached user data."""
+    return await store.get("users", f"user:{user_id}")
+
+# Works with any store implementation
+from kv_store_adapter import RedisStore, MemoryStore
+
+redis_store = RedisStore(url="redis://localhost:6379")
+memory_store = MemoryStore(max_entries=1000)
+
+# Same code works with both stores
+await cache_user_data(redis_store, "123", {"name": "Alice"})
+await cache_user_data(memory_store, "456", {"name": "Bob"})
+```
+
+## Store Implementations
+
+Choose the store that best fits your needs. All stores implement the same `KVStoreProtocol` interface:
+
+### Production Stores
+
+- **RedisStore**: `RedisStore(url="redis://localhost:6379/0")`
+- **ElasticsearchStore**: `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key")`
+- **DiskStore**: A sqlite-based store for local persistence `DiskStore(path="./cache")`
+- **MemoryStore**: A fast in-memory cache `MemoryStore()`
+
+### Development/Testing Stores  
+
+- **SimpleStore**: In-memory and inspectable for testing `SimpleStore()`
+- **NullStore**: No-op store for testing `NullStore()`
+
+For detailed configuration options and all available stores, see [DEVELOPING.md](DEVELOPING.md).
+
+## Atomicity / Consistency
+
+We strive to support atomicity and consistency across all stores and operations in the KVStoreProtocol. That being said,
+there are operations available via the BaseKVStore class which are management operations like listing keys, listing collections, clearing collections,
+culling expired entries, etc. These operations may not be atomic or may be eventually consistent across stores.
+
+### TTL (Time To Live)
+
+All stores support automatic expiration. Use TTL for session management, caching, and temporary data:
+
+```python
+from kv_store_adapter.types import KVStoreProtocol
+
+async def session_example(store: KVStoreProtocol):
+    # Store session with 1-hour expiration
+    session_data = {"user_id": 123, "role": "admin"}
+    await store.put("sessions", "session:abc123", session_data, ttl=3600)
+    
+    # Data automatically expires after 1 hour
+    session = await store.get("sessions", "session:abc123")
+    if session:
+        print(f"Active session for user {session['user_id']}")
+    else:
+        print("Session expired or not found")
+```
+
+### Collections
+
+Organize your data into logical namespaces:
+
+```python
+from kv_store_adapter.types import KVStoreProtocol
+
+async def organize_data(store: KVStoreProtocol):
+    # Same key in different collections - no conflicts
+    await store.put("users", "123", {"name": "Alice", "email": "alice@example.com"})
+    await store.put("products", "123", {"name": "Widget", "price": 29.99})
+    await store.put("orders", "123", {"user_id": 456, "total": 99.99})
+    
+    # Work with specific collections
+    user = await store.get("users", "123")
+    product = await store.get("products", "123")
+    
+    # List all keys in a collection
+    user_keys = await store.keys("users")
+    print(f"User keys: {user_keys}")
+```
+
+## Adapters
+
+The library provides an adapter pattern simplifying the user of the protocol/store. Adapters themselves do not implement the `KVStoreProtocol` interface and cannot be nested. Adapters can be used with wrappers and stores interchangeably.
+
+The following adapters are available:
+
+- **PydanticAdapter**: Converts data to and from a store using Pydantic models.
+- **SingleCollectionAdapter**: Provides KV operations that do not require a collection parameter.
+
+For example, the PydanticAdapter can be used to provide type-safe interactions with a store:
+
+```python
+from kv_store_adapter import PydanticAdapter, MemoryStore
+from pydantic import BaseModel
+
+class User(BaseModel):
+    name: str
+    email: str
+
+memory_store = MemoryStore()
+
+user_adapter = PydanticAdapter(memory_store, User)
+
+await user_adapter.put("users", "123", User(name="John Doe", email="john.doe@example.com"))
+user: User | None = await user_adapter.get("users", "123")
+```
+
+## Wrappers
+
+The library provides a wrapper pattern for adding functionality to a store. Wrappers themselves implement the `KVStoreProtocol` interface meaning that you can wrap any
+store with any wrapper, and chain wrappers together as needed.
+
+### Statistics Tracking
+
+Track operation statistics for any store:
+
+```python
+from kv_store_adapter import StatisticsWrapper, MemoryStore
+
+memory_store = MemoryStore()
+store = StatisticsWrapper(memory_store)
+
+# Use store normally - statistics are tracked automatically
+await store.put("users", "123", {"name": "Alice"})
+await store.get("users", "123")
+await store.get("users", "456")  # Cache miss
+
+# Access statistics
+stats = store.statistics
+user_stats = stats.get_collection("users")
+print(f"Total gets: {user_stats.get.count}")
+print(f"Cache hits: {user_stats.get.hit}")
+print(f"Cache misses: {user_stats.get.miss}")
+```
+
+Other wrappers that are available include:
+
+- **TTLClampWrapper**: Wraps a store and clamps the TTL to a given range.
+- **PassthroughWrapper**: Wraps two stores, using the primary store as a write-through cache for the secondary store. For example, you could use a RedisStore as a distributed primary store and a MemoryStore as the cache store.
+- **PrefixCollectionWrapper**: Wraps a store and prefixes all collections with a given prefix.
+- **PrefixKeyWrapper**: Wraps a store and prefixes all keys with a given prefix.
+- **SingleCollectionWrapper**: Wraps a store and forces all requests into a single collection.
+
+See [DEVELOPING.md](DEVELOPING.md) for more information on how to create your own wrappers.
+
+## Chaining Wrappers, Adapters, and Stores
+
+Imagine you have a service where you want to cache 3 pydantic models in a single collection. You can do this by wrapping the store in a PydanticAdapter and a SingleCollectionAdapter:
+
+```python
+from kv_store_adapter import PydanticAdapter, SingleCollectionAdapter, MemoryStore
+from pydantic import BaseModel
+
+class User(BaseModel):
+    name: str
+    email: str
+
+store = MemoryStore()
+
+users_store = PydanticAdapter(SingleCollectionWrapper(store, "users"), User)
+products_store = PydanticAdapter(SingleCollectionWrapper(store, "products"), Product)
+orders_store = PydanticAdapter(SingleCollectionWrapper(store, "orders"), Order)
+
+await users_store.put("123", User(name="John Doe", email="john.doe@example.com"))
+user: User | None = await users_store.get("123")
 ```
 
 ## Development
 
-```bash
-# Install in development mode
-pip install -e .
-
-# Install with development dependencies
-pip install -e .[dev]
-
-# Run tests
-pytest
-
-# Run example
-python examples/demo.py
-```
-
-## Requirements
-
-- Python >= 3.8
-- `redis` package (optional, for Redis implementation)
+See [DEVELOPING.md](DEVELOPING.md) for development setup, testing, and contribution guidelines.
 
 ## License
 
-MIT License - see LICENSE file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
+Contributions are welcome! Please read [DEVELOPING.md](DEVELOPING.md) for development setup and contribution guidelines.
 
 ## Changelog
 
-### v0.1.0
-- Initial release
-- Memory, Disk, and Redis implementations
-- Full protocol support with TTL and namespaces
-- Comprehensive test suite
+See [CHANGELOG.md](CHANGELOG.md) for version history and changes.
