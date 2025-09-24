@@ -1,0 +1,132 @@
+[project]
+name = "kv-store-adapter"
+version = "0.1.0"
+description = "A pluggable interface for KV Stores"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+]
+
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning>=0.7.0"]
+build-backend = "hatchling.build"
+
+[project.optional-dependencies]
+memory = ["cachetools>=6.0.0"]
+disk = ["diskcache>=5.6.0"]
+redis = ["redis>=6.0.0"]
+elasticsearch = ["elasticsearch>=9.0.0", "aiohttp>=3.12"]
+pydantic = ["pydantic>=2.11.9"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = ["--inline-snapshot=create,fix","-vv","-s"]
+markers = [
+    "skip_on_ci: Skip running the test when running on CI",
+]
+
+env_files = [".env"]
+
+[dependency-groups]
+dev = [
+    "kv-store-adapter[memory,disk,redis,elasticsearch]",
+    "kv-store-adapter[pydantic]",
+    "pytest",
+    "pytest-mock",
+    "pytest-asyncio",
+    "ruff",
+    "diskcache-stubs>=5.6.3.6.20240818",
+    "pytest-dotenv>=0.5.2",
+    "dirty-equals>=0.10.0",
+    "inline-snapshot>=0.29.0",
+    "pytest-redis>=3.1.3",
+    "basedpyright>=1.31.5",
+]
+lint = [
+  "ruff"
+]
+
+[tool.ruff]
+target-version = "py310"
+lint.fixable = ["ALL"]
+lint.ignore = [
+    "COM812",
+    "PLR0913", # Too many arguments, MCP Servers have a lot of arguments, OKAY?!
+]
+lint.extend-select = [
+    "A",
+    "ARG",
+    "B",
+    "C4",
+    "COM",
+    "DTZ",
+    "E",
+    "EM",
+    "F",
+    "FURB",
+    "I",
+    "LOG",
+    "N",
+    "PERF",
+    "PIE",
+    "PLR",
+    "PLW",
+    "PT",
+    "PTH",
+    "Q",
+    "RET",
+    "RSE",
+    "RUF",
+    "S",
+    "SIM",
+    "TC",
+    "TID",
+    "TRY",
+    "UP",
+    "W",
+]
+
+line-length = 140
+
+[tool.ruff.lint.extend-per-file-ignores]
+"**/tests/*.py" = [
+    "S101", # Ignore asserts
+    "DTZ005", # Ignore datetime.UTC
+    "PLR2004", # Ignore magic values
+    "E501", # Ignore line length
+    
+]
+"**/references/*" = ["ALL"]
+"template/*" = ["ALL"]
+"**/vendored/**" = ["ALL"]
+
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "recommended"
+extraPaths = ["src/"]
+include = ["src/"]
+exclude = [
+    "**/archive/**",
+    "**/node_modules/**",
+    "**/__pycache__/**",
+    "**/.venv/**",
+    ".venv",
+    "**/.pytest_cache/**",
+    "**/.ruff_cache/**",
+    "**/uv/python/**",
+    "**/clients/graphql/**",
+]
+reportMissingTypeStubs = false
+reportExplicitAny = false
+reportMissingModuleSource = false

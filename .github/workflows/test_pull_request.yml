@@ -1,0 +1,41 @@
+name: Publish Strawgate ESQL Tools MCP to PyPI
+
+on:
+  release:
+    types: [created]
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    environment: pypi
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@v6
+      
+      - name: "Install"
+        run: uv sync --locked --group dev
+
+      - name: "Lint"
+        run: uv run ruff check --exit-non-zero-on-fix --fix
+
+      - name: "Type Check"
+        run: uv run basedpyright
+
+      - name: "Format"
+        run: uv run ruff format
+
+      - name: "Test"
+        run: uv run pytest tests
+
+      - name: "Build"
+        run: uv build
