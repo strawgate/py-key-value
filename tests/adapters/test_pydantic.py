@@ -42,15 +42,15 @@ class TestPydanticAdapter:
 
     @pytest.fixture
     async def user_adapter(self, store: MemoryStore) -> PydanticAdapter[User]:
-        return PydanticAdapter[User](store=store, pydantic_model=User)
+        return PydanticAdapter[User](store_protocol=store, pydantic_model=User)
 
     @pytest.fixture
     async def product_adapter(self, store: MemoryStore) -> PydanticAdapter[Product]:
-        return PydanticAdapter[Product](store=store, pydantic_model=Product)
+        return PydanticAdapter[Product](store_protocol=store, pydantic_model=Product)
 
     @pytest.fixture
     async def order_adapter(self, store: MemoryStore) -> PydanticAdapter[Order]:
-        return PydanticAdapter[Order](store=store, pydantic_model=Order)
+        return PydanticAdapter[Order](store_protocol=store, pydantic_model=Order)
 
     async def test_simple_adapter(self, user_adapter: PydanticAdapter[User]):
         await user_adapter.put(collection="test", key="test", value=SAMPLE_USER)
