@@ -79,7 +79,7 @@ there are operations available via the BaseKVStore class which are management op
 
 ## Protocol Adapters
 
-The library provides an adapter pattern simplifying the use of the protocol/store. Adapters themselves do not implement the `KVStoreProtocol` interface and cannot be nested. Adapters can be used with anything that implements the `KVStoreProtocol` interface but do not compliant with the full `BaseKVStore` interface and thus lack management operations like listing keys, listing collections, clearing collections, culling expired entries, etc.
+The library provides an adapter pattern simplifying the use of the protocol/store. Adapters themselves do not implement the `KVStoreProtocol` interface and cannot be nested. Adapters can be used with anything that implements the `KVStoreProtocol` interface but do not comply with the full `BaseKVStore` interface and thus lack management operations like listing keys, listing collections, clearing collections, culling expired entries, etc.
 
 The following adapters are available:
 
