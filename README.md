@@ -33,26 +33,25 @@ pip install kv-store-adapter[memory,disk,redis,elasticsearch]
 The simplest way to get started is to use the `KVStoreProtocol` interface, which allows you to write code that works with any supported KV Store:
 
 ```python
+import asyncio
+
 from kv_store_adapter.types import KVStoreProtocol
-from typing import Any
+from kv_store_adapter.stores.redis import RedisStore
+from kv_store_adapter.stores.memory import MemoryStore
 
-async def cache_user_data(store: KVStoreProtocol, user_id: str, data: dict[str, Any]) -> None:
-    """Cache user data with 1-hour TTL."""
-    await store.put("users", f"user:{user_id}", data, ttl=3600)
+async def example():
+    # In-memory store
+    memory_store = MemoryStore()
+    await memory_store.put(collection="users", key="456", value={"name": "Bob"}, ttl=3600) # TTL is supported, but optional!
+    bob = await memory_store.get(collection="users", key="456")
+    await memory_store.delete(collection="users", key="456")
 
-async def get_cached_user(store: KVStoreProtocol, user_id: str) -> dict[str, Any] | None:
-    """Retrieve cached user data."""
-    return await store.get("users", f"user:{user_id}")
+    redis_store = RedisStore(url="redis://localhost:6379")
+    await redis_store.put(collection="products", key="123", value={"name": "Alice"})
+    alice = await redis_store.get(collection="products", key="123")
+    await redis_store.delete(collection="products", key="123")
 
-# Works with any store implementation
-from kv_store_adapter import RedisStore, MemoryStore
-
-redis_store = RedisStore(url="redis://localhost:6379")
-memory_store = MemoryStore(max_entries=1000)
-
-# Same code works with both stores
-await cache_user_data(redis_store, "123", {"name": "Alice"})
-await cache_user_data(memory_store, "456", {"name": "Bob"})
+asyncio.run(example())
 ```
 
 ## Store Implementations
@@ -76,50 +75,7 @@ For detailed configuration options and all available stores, see [DEVELOPING.md]
 ## Atomicity / Consistency
 
 We strive to support atomicity and consistency across all stores and operations in the KVStoreProtocol. That being said,
-there are operations available via the BaseKVStore class which are management operations like listing keys, listing collections, clearing collections,
-culling expired entries, etc. These operations may not be atomic or may be eventually consistent across stores.
-
-### TTL (Time To Live)
-
-All stores support automatic expiration. Use TTL for session management, caching, and temporary data:
-
-```python
-from kv_store_adapter.types import KVStoreProtocol
-
-async def session_example(store: KVStoreProtocol):
-    # Store session with 1-hour expiration
-    session_data = {"user_id": 123, "role": "admin"}
-    await store.put("sessions", "session:abc123", session_data, ttl=3600)
-    
-    # Data automatically expires after 1 hour
-    session = await store.get("sessions", "session:abc123")
-    if session:
-        print(f"Active session for user {session['user_id']}")
-    else:
-        print("Session expired or not found")
-```
-
-### Collections
-
-Organize your data into logical namespaces:
-
-```python
-from kv_store_adapter.types import KVStoreProtocol
-
-async def organize_data(store: KVStoreProtocol):
-    # Same key in different collections - no conflicts
-    await store.put("users", "123", {"name": "Alice", "email": "alice@example.com"})
-    await store.put("products", "123", {"name": "Widget", "price": 29.99})
-    await store.put("orders", "123", {"user_id": 456, "total": 99.99})
-    
-    # Work with specific collections
-    user = await store.get("users", "123")
-    product = await store.get("products", "123")
-    
-    # List all keys in a collection
-    user_keys = await store.keys("users")
-    print(f"User keys: {user_keys}")
-```
+there are operations available via the BaseKVStore class which are management operations like listing keys, listing collections, clearing collections, culling expired entries, etc. These operations may not be atomic, may be eventually consistent across stores, or may have other limitations (like limited to returning a certain number of keys).
 
 ## Adapters
 
@@ -133,8 +89,10 @@ The following adapters are available:
 For example, the PydanticAdapter can be used to provide type-safe interactions with a store:
 
 ```python
-from kv_store_adapter import PydanticAdapter, MemoryStore
 from pydantic import BaseModel
+
+from kv_store_adapter.adapters.pydantic import PydanticAdapter
+from kv_store_adapter.stores.memory import MemoryStore
 
 class User(BaseModel):
     name: str
@@ -142,10 +100,13 @@ class User(BaseModel):
 
 memory_store = MemoryStore()
 
-user_adapter = PydanticAdapter(memory_store, User)
+user_adapter = PydanticAdapter(store=memory_store, pydantic_model=User)
 
-await user_adapter.put("users", "123", User(name="John Doe", email="john.doe@example.com"))
-user: User | None = await user_adapter.get("users", "123")
+async def example():
+    await user_adapter.put(collection="users", key="123", value=User(name="John Doe", email="john.doe@example.com"))
+    user: User | None = await user_adapter.get(collection="users", key="123")
+
+asyncio.run(example())
 ```
 
 ## Wrappers
@@ -158,22 +119,28 @@ store with any wrapper, and chain wrappers together as needed.
 Track operation statistics for any store:
 
 ```python
-from kv_store_adapter import StatisticsWrapper, MemoryStore
+import asyncio
+
+from kv_store_adapter.stores.wrappers.statistics import StatisticsWrapper
+from kv_store_adapter.stores.memory import MemoryStore
 
 memory_store = MemoryStore()
-store = StatisticsWrapper(memory_store)
+store = StatisticsWrapper(store=memory_store)
 
-# Use store normally - statistics are tracked automatically
-await store.put("users", "123", {"name": "Alice"})
-await store.get("users", "123")
-await store.get("users", "456")  # Cache miss
+async def example():
+    # Use store normally - statistics are tracked automatically
+    await store.put("users", "123", {"name": "Alice"})
+    await store.get("users", "123")
+    await store.get("users", "456")  # Cache miss
 
-# Access statistics
-stats = store.statistics
-user_stats = stats.get_collection("users")
-print(f"Total gets: {user_stats.get.count}")
-print(f"Cache hits: {user_stats.get.hit}")
-print(f"Cache misses: {user_stats.get.miss}")
+    # Access statistics
+    stats = store.statistics
+    user_stats = stats.get_collection("users")
+    print(f"Total gets: {user_stats.get.count}")
+    print(f"Cache hits: {user_stats.get.hit}")
+    print(f"Cache misses: {user_stats.get.miss}")
+
+asyncio.run(example())
 ```
 
 Other wrappers that are available include:
@@ -188,10 +155,14 @@ See [DEVELOPING.md](DEVELOPING.md) for more information on how to create your ow
 
 ## Chaining Wrappers, Adapters, and Stores
 
-Imagine you have a service where you want to cache 3 pydantic models in a single collection. You can do this by wrapping the store in a PydanticAdapter and a SingleCollectionAdapter:
+Imagine you have a service where you want to cache 3 pydantic models in a single collection. You can do this by wrapping the store in a PydanticAdapter and a SingleCollectionWrapper:
 
 ```python
-from kv_store_adapter import PydanticAdapter, SingleCollectionAdapter, MemoryStore
+import asyncio
+
+from kv_store_adapter.adapters.pydantic import PydanticAdapter
+from kv_store_adapter.stores.wrappers.single_collection import SingleCollectionWrapper
+from kv_store_adapter.stores.memory import MemoryStore
 from pydantic import BaseModel
 
 class User(BaseModel):
@@ -204,9 +175,16 @@ users_store = PydanticAdapter(SingleCollectionWrapper(store, "users"), User)
 products_store = PydanticAdapter(SingleCollectionWrapper(store, "products"), Product)
 orders_store = PydanticAdapter(SingleCollectionWrapper(store, "orders"), Order)
 
-await users_store.put("123", User(name="John Doe", email="john.doe@example.com"))
-user: User | None = await users_store.get("123")
+async def example():
+    new_user: User = User(name="John Doe", email="john.doe@example.com")
+    await users_store.put(collection="allowed_users", key="123", value=new_user)
+
+    john_doe: User | None = await users_store.get(collection="allowed_users", key="123")
+
+asyncio.run(example())
 ```
+
+The SingleCollectionWrapper will result in writes to the `allowed_users` collection being redirected to the `users` collection but the keys will be prefixed with the original collection `allowed_users__` name. So the key `123` will be stored as `allowed_users__123` in the `users` collection.
 
 ## Development
 
