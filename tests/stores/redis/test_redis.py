@@ -14,15 +14,19 @@ REDIS_HOST = "localhost"
 REDIS_PORT = 6379
 REDIS_DB = 15  # Use a separate database for tests
 
+WAIT_FOR_REDIS_TIMEOUT = 30
 
 async def ping_redis() -> bool:
     client = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
-    return await client.ping()  # pyright: ignore[reportUnknownMemberType, reportAny]
+    try:
+        return await client.ping()  # pyright: ignore[reportUnknownMemberType, reportAny]
+    except Exception:
+        return False
 
 
 async def wait_redis() -> bool:
     # with a timeout of 10 seconds
-    for _ in range(10):
+    for _ in range(WAIT_FOR_REDIS_TIMEOUT):
         if await ping_redis():
             return True
         await asyncio.sleep(delay=1)

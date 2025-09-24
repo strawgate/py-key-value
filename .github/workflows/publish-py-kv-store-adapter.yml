@@ -1,4 +1,4 @@
-name: Publish Strawgate ESQL Tools MCP to PyPI
+name: Publish py-kv-store-adapter to PyPI
 
 on:
   release:
