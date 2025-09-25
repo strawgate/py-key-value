@@ -64,21 +64,23 @@ class ElasticsearchStore(BaseManagedKVStore):
     _index: str
 
     @overload
-    def __init__(self, *, client: AsyncElasticsearch, index: str) -> None: ...
+    def __init__(self, *, elasticsearch_client: AsyncElasticsearch, index: str) -> None: ...
 
     @overload
     def __init__(self, *, url: str, api_key: str, index: str) -> None: ...
 
-    def __init__(self, *, client: AsyncElasticsearch | None = None, url: str | None = None, api_key: str | None = None, index: str) -> None:
+    def __init__(
+        self, *, elasticsearch_client: AsyncElasticsearch | None = None, url: str | None = None, api_key: str | None = None, index: str
+    ) -> None:
         """Initialize the elasticsearch store.
 
         Args:
-            client: The elasticsearch client to use.
+            elasticsearch_client: The elasticsearch client to use.
             url: The url of the elasticsearch cluster.
             api_key: The api key to use.
             index: The index to use. Defaults to "kv-store".
         """
-        self._client = client or AsyncElasticsearch(hosts=[url], api_key=api_key)  # pyright: ignore[reportArgumentType]
+        self._client = elasticsearch_client or AsyncElasticsearch(hosts=[url], api_key=api_key, **ELASTICSEARCH_CLIENT_DEFAULTS)  # pyright: ignore[reportArgumentType]
         self._index = index or DEFAULT_INDEX
         super().__init__()
 

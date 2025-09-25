@@ -18,22 +18,34 @@ class DiskStore(BaseManagedKVStore):
     _cache: Cache
 
     @overload
-    def __init__(self, *, cache: Cache) -> None: ...
+    def __init__(self, *, disk_cache: Cache) -> None:
+        """Initialize the disk cache.
+
+        Args:
+            disk_cache: An existing diskcache Cache instance to use.
+        """
 
     @overload
-    def __init__(self, *, path: Path | str, size_limit: int | None = None) -> None: ...
+    def __init__(self, *, directory: Path | str, size_limit: int | None = None) -> None:
+        """Initialize the disk cache.
 
-    def __init__(self, *, cache: Cache | None = None, path: Path | str | None = None, size_limit: int | None = None) -> None:
+        Args:
+            directory: The directory to use for the disk cache.
+            size_limit: The maximum size of the disk cache. Defaults to 1GB.
+        """
+
+    def __init__(self, *, disk_cache: Cache | None = None, directory: Path | str | None = None, size_limit: int | None = None) -> None:
         """Initialize the in-memory cache.
 
         Args:
-            disk_cache: The disk cache to use.
+            disk_cache: An existing diskcache Cache instance to use.
+            directory: The directory to use for the disk cache.
             size_limit: The maximum size of the disk cache. Defaults to 1GB.
         """
-        if isinstance(path, Path):
-            path = str(object=path)
+        if isinstance(directory, Path):
+            directory = str(object=directory)
 
-        self._cache = cache or Cache(directory=path, size_limit=size_limit or DEFAULT_DISK_STORE_SIZE_LIMIT)
+        self._cache = disk_cache or Cache(directory=directory, size_limit=size_limit or DEFAULT_DISK_STORE_SIZE_LIMIT)
 
         super().__init__()
 
