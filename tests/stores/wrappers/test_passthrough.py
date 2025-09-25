@@ -16,7 +16,7 @@ class TestPrefixCollectionWrapper(BaseStoreTests):
     @pytest.fixture
     async def primary_store(self) -> AsyncGenerator[DiskStore, None]:
         with tempfile.TemporaryDirectory() as temp_dir:
-            yield DiskStore(path=temp_dir, size_limit=DISK_STORE_SIZE_LIMIT)
+            yield DiskStore(directory=temp_dir, size_limit=DISK_STORE_SIZE_LIMIT)
 
     @pytest.fixture
     async def cache_store(self) -> MemoryStore:
