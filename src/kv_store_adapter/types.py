@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 
 
 @dataclass
@@ -23,7 +23,8 @@ class TTLInfo:
         return self.expires_at <= datetime.now(tz=timezone.utc)
 
 
-class KVStoreProtocol(Protocol):
+@runtime_checkable
+class KVStore(Protocol):
     """Protocol defining the interface for key-value store implementations."""
 
     async def get(self, collection: str, key: str) -> dict[str, Any] | None:
@@ -40,4 +41,42 @@ class KVStoreProtocol(Protocol):
 
     async def exists(self, collection: str, key: str) -> bool:
         """Check if a key exists in the specified collection."""
+        ...
+
+
+@runtime_checkable
+class BulkKVStore(KVStore, Protocol):
+    """Protocol defining the interface for bulk key-value store implementations."""
+
+    async def get_many(self, collection: str, keys: list[str]) -> list[dict[str, Any]]:
+        """Retrieve multiple values by key from the specified collection."""
+        ...
+
+    async def put_many(self, collection: str, keys: list[str], values: list[dict[str, Any]]) -> None:
+        """Store multiple key-value pairs in the specified collection."""
+        ...
+
+    async def delete_many(self, collection: str, keys: list[str]) -> None:
+        """Delete multiple key-value pairs from the specified collection."""
+        ...
+
+
+@runtime_checkable
+class ManageKVStore(KVStore, Protocol):
+    """Protocol defining the interface for managed key-value store implementations."""
+
+    async def keys(self, collection: str) -> list[str]:
+        """List all keys in the specified collection."""
+        ...
+
+    async def collections(self) -> list[str]:
+        """List all available collection names (may include empty collections)."""
+        ...
+
+    async def delete_collection(self, collection: str) -> int:
+        """Clear all keys in a collection, returning the number of keys deleted."""
+        ...
+
+    async def cull(self) -> None:
+        """Remove all expired entries from the store."""
         ...

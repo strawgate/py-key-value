@@ -30,12 +30,12 @@ pip install kv-store-adapter[memory,disk,redis,elasticsearch]
 
 # The KV Store Protocol
 
-The simplest way to get started is to use the `KVStoreProtocol` interface, which allows you to write code that works with any supported KV Store:
+The simplest way to get started is to use the `KVStore` interface, which allows you to write code that works with any supported KV Store:
 
 ```python
 import asyncio
 
-from kv_store_adapter.types import KVStoreProtocol
+from kv_store_adapter.types import KVStore
 from kv_store_adapter.stores.redis import RedisStore
 from kv_store_adapter.stores.memory import MemoryStore
 
@@ -56,7 +56,7 @@ asyncio.run(example())
 
 ## Store Implementations
 
-Choose the store that best fits your needs. All stores implement the same `KVStoreProtocol` interface:
+Choose the store that best fits your needs. All stores implement the same `KVStore` interface:
 
 ### Production Stores
 
@@ -74,12 +74,12 @@ For detailed configuration options and all available stores, see [DEVELOPING.md]
 
 ## Atomicity / Consistency
 
-We strive to support atomicity and consistency across all stores and operations in the KVStoreProtocol. That being said,
+We strive to support atomicity and consistency across all stores and operations in the KVStore. That being said,
 there are operations available via the BaseKVStore class which are management operations like listing keys, listing collections, clearing collections, culling expired entries, etc. These operations may not be atomic, may be eventually consistent across stores, or may have other limitations (like limited to returning a certain number of keys).
 
 ## Protocol Adapters
 
-The library provides an adapter pattern simplifying the use of the protocol/store. Adapters themselves do not implement the `KVStoreProtocol` interface and cannot be nested. Adapters can be used with anything that implements the `KVStoreProtocol` interface but do not comply with the full `BaseKVStore` interface and thus lack management operations like listing keys, listing collections, clearing collections, culling expired entries, etc.
+The library provides an adapter pattern simplifying the use of the protocol/store. Adapters themselves do not implement the `KVStore` interface and cannot be nested. Adapters can be used with anything that implements the `KVStore` interface but do not comply with the full `BaseKVStore` interface and thus lack management operations like listing keys, listing collections, clearing collections, culling expired entries, etc.
 
 The following adapters are available:
 
@@ -111,7 +111,7 @@ asyncio.run(example())
 
 ## Wrappers
 
-The library provides a wrapper pattern for adding functionality to a store. Wrappers themselves implement the `KVStoreProtocol` interface meaning that you can wrap any
+The library provides a wrapper pattern for adding functionality to a store. Wrappers themselves implement the `KVStore` interface meaning that you can wrap any
 store with any wrapper, and chain wrappers together as needed.
 
 ### Statistics Tracking

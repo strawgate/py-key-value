@@ -1,5 +1,5 @@
 ## Architecture Overview
-The `py-kv-store-adapter` project provides a pluggable, async-first interface for various key-value (KV) store backends in Python. Its core purpose is to abstract away the underlying KV store implementation, offering a consistent `KVStoreProtocol` for interacting with different storage solutions like Redis, Elasticsearch, in-memory caches, and disk-based stores. The architecture distinguishes between two main store types: `Unmanaged Stores` (`BaseKVStore`) which handle their own TTL and collection management, and `Managed Stores` (`BaseManagedKVStore`) which automatically manage `ManagedEntry` objects for TTL and expiration. The system also supports `Adapters` for transforming data (e.g., Pydantic models) and `Wrappers` for adding cross-cutting concerns like statistics tracking or TTL clamping, which can be chained. Key concepts include collections for namespacing, compound keys for internal storage, and automatic TTL management.
+The `py-kv-store-adapter` project provides a pluggable, async-first interface for various key-value (KV) store backends in Python. Its core purpose is to abstract away the underlying KV store implementation, offering a consistent `KVStore` for interacting with different storage solutions like Redis, Elasticsearch, in-memory caches, and disk-based stores. The architecture distinguishes between two main store types: `Unmanaged Stores` (`BaseKVStore`) which handle their own TTL and collection management, and `Managed Stores` (`BaseManagedKVStore`) which automatically manage `ManagedEntry` objects for TTL and expiration. The system also supports `Adapters` for transforming data (e.g., Pydantic models) and `Wrappers` for adding cross-cutting concerns like statistics tracking or TTL clamping, which can be chained. Key concepts include collections for namespacing, compound keys for internal storage, and automatic TTL management.
 
 ## Code Style & Conventions
 - **Python Version**: Requires Python 3.10 or higher (`pyproject.toml:project.requires-python`).
@@ -52,13 +52,13 @@ The `py-kv-store-adapter` project provides a pluggable, async-first interface fo
 - **CI/CD**: GitHub Actions workflows (`.github/workflows/`) are configured to run tests, linting, type checking, and formatting on pull requests and pushes to `main` (`.github/workflows/test_pull_request.yml`). A separate workflow handles publishing to PyPI on release creation (`.github/workflows/publish-py-kv-store-adapter.yml`).
 
 ## API Surface Map
-The primary API surface is defined by the `KVStoreProtocol` (`src/kv_store_adapter/types.py:L26-L44`) and extended by `BaseKVStore` (`src/kv_store_adapter/stores/base/unmanaged.py:L11-L76`) and `BaseManagedKVStore` (`src/kv_store_adapter/stores/base/managed.py:L21-L122`).
+The primary API surface is defined by the `KVStore` (`src/kv_store_adapter/types.py:L26-L44`) and extended by `BaseKVStore` (`src/kv_store_adapter/stores/base/unmanaged.py:L11-L76`) and `BaseManagedKVStore` (`src/kv_store_adapter/stores/base/managed.py:L21-L122`).
 - **Core KV Operations**: `get(collection, key)`, `put(collection, key, value, ttl)`, `delete(collection, key)`, `exists(collection, key)`, `ttl(collection, key)`.
 - **Management Operations (BaseKVStore)**: `keys(collection)`, `clear_collection(collection)`, `list_collections()`, `cull()`.
 
 
 ## Onboarding Steps
-- **Understand Core Concepts**: Familiarize yourself with `KVStoreProtocol`, `BaseKVStore`, `BaseManagedKVStore`, `ManagedEntry`, `Collections`, `Compound Keys`, `TTL Management`, `Wrappers`, and `Adapters` by reading `README.md` and `DEVELOPING.md`.
+- **Understand Core Concepts**: Familiarize yourself with `KVStore`, `BaseKVStore`, `BaseManagedKVStore`, `ManagedEntry`, `Collections`, `Compound Keys`, `TTL Management`, `Wrappers`, and `Adapters` by reading `README.md` and `DEVELOPING.md`.
 - **Development Setup**: Follow the \"Development Setup\" in `DEVELOPING.md` to clone the repository, install `uv`, sync dependencies (`uv sync --group dev`), activate the virtual environment, and install pre-commit hooks.
 - **Testing**: Review `DEVELOPING.md`'s \"Testing\" section for how to run tests, set up test environments using Docker Compose, and write new tests using `BaseKVStoreTestCase` or `BaseManagedKVStoreTestCase` from `tests/cases.py`.
 - **Code Quality**: Understand the `ruff` and `pyright` configurations in `pyproject.toml` and how to run them (`uv run ruff check`, `uv run ruff format`, `pyright`).

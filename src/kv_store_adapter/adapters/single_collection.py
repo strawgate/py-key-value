@@ -1,13 +1,13 @@
 from typing import Any
 
-from kv_store_adapter.types import KVStoreProtocol
+from kv_store_adapter.types import KVStore
 
 
 class SingleCollectionAdapter:
-    """Adapter around a KVStoreProtocol-compliant Store that only allows one collection."""
+    """Adapter around a KVStore-compliant Store that only allows one collection."""
 
-    def __init__(self, store: KVStoreProtocol, collection: str) -> None:
-        self.store: KVStoreProtocol = store
+    def __init__(self, store: KVStore, collection: str) -> None:
+        self.store: KVStore = store
         self.collection: str = collection
 
     async def get(self, key: str) -> dict[str, Any] | None:

@@ -4,16 +4,16 @@ from pydantic import BaseModel, ValidationError
 from pydantic_core import PydanticSerializationError
 
 from kv_store_adapter.errors import DeserializationError, SerializationError
-from kv_store_adapter.types import KVStoreProtocol
+from kv_store_adapter.types import KVStore
 
 T = TypeVar("T", bound=BaseModel)
 
 
 class PydanticAdapter(Generic[T]):
-    """Adapter around a KVStoreProtocol-compliant Store that allows type-safe persistence of Pydantic models."""
+    """Adapter around a KVStore-compliant Store that allows type-safe persistence of Pydantic models."""
 
-    def __init__(self, store_protocol: KVStoreProtocol, pydantic_model: type[T]) -> None:
-        self.store_protocol: KVStoreProtocol = store_protocol
+    def __init__(self, store_protocol: KVStore, pydantic_model: type[T]) -> None:
+        self.store_protocol: KVStore = store_protocol
         self.pydantic_model: type[T] = pydantic_model
 
     async def get(self, collection: str, key: str) -> T | None:

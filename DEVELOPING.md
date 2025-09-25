@@ -65,7 +65,7 @@ tests/
 
 ## Store Configuration
 
-All stores implement the `KVStoreProtocol` interface. Here are detailed configuration options:
+All stores implement the `KVStore` interface. Here are detailed configuration options:
 
 ### Redis Store
 High-performance store with native TTL support:
