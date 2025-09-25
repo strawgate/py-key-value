@@ -35,7 +35,7 @@ class DiskStore(BaseManagedKVStore):
         """
 
     def __init__(self, *, disk_cache: Cache | None = None, directory: Path | str | None = None, size_limit: int | None = None) -> None:
-        """Initialize the in-memory cache.
+        """Initialize the disk cache.
 
         Args:
             disk_cache: An existing diskcache Cache instance to use.
