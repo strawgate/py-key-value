@@ -79,6 +79,27 @@ store = RedisStore(url="redis://localhost:6379/0")
 store = RedisStore(client=existing_redis_client)
 ```
 
+### DynamoDB Store
+AWS DynamoDB-based store with native TTL and auto-scaling:
+
+```python
+from kv_store_adapter import DynamoDBStore
+
+# Using AWS credentials (IAM role, environment variables, or AWS CLI)
+store = DynamoDBStore(table_name="my-kv-table", region_name="us-east-1")
+
+# Using explicit credentials
+store = DynamoDBStore(
+    table_name="my-kv-table",
+    region_name="us-west-2",
+    aws_access_key_id="your-access-key",
+    aws_secret_access_key="your-secret-key"
+)
+
+# Using existing boto3 client
+store = DynamoDBStore(table_name="my-kv-table", client=existing_dynamodb_client)
+```
+
 ### Memory Store
 In-memory TLRU (Time-aware Least Recently Used) cache:
 

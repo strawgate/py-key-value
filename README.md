@@ -5,7 +5,7 @@ A pluggable, async-first key-value store interface for Python applications with 
 ## Features
 
 - **Async-first**: Built from the ground up with `async`/`await` support
-- **Multiple backends**: Redis, Elasticsearch, In-memory, Disk, and more
+- **Multiple backends**: Redis, DynamoDB, Elasticsearch, In-memory, Disk, and more
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
 - **Adapters**: Pydantic, Single Collection, and more
@@ -20,12 +20,13 @@ pip install kv-store-adapter
 
 # With specific backend support
 pip install kv-store-adapter[redis]
+pip install kv-store-adapter[dynamodb]
 pip install kv-store-adapter[elasticsearch]
 pip install kv-store-adapter[memory]
 pip install kv-store-adapter[disk]
 
 # With all backends
-pip install kv-store-adapter[memory,disk,redis,elasticsearch]
+pip install kv-store-adapter[memory,disk,redis,dynamodb,elasticsearch]
 ```
 
 # The KV Store Protocol
@@ -37,6 +38,7 @@ import asyncio
 
 from kv_store_adapter.types import KVStoreProtocol
 from kv_store_adapter.stores.redis import RedisStore
+from kv_store_adapter.stores.dynamodb import DynamoDBStore
 from kv_store_adapter.stores.memory import MemoryStore
 
 async def example():
@@ -46,10 +48,17 @@ async def example():
     bob = await memory_store.get(collection="users", key="456")
     await memory_store.delete(collection="users", key="456")
 
+    # Redis store
     redis_store = RedisStore(url="redis://localhost:6379")
     await redis_store.put(collection="products", key="123", value={"name": "Alice"})
     alice = await redis_store.get(collection="products", key="123")
     await redis_store.delete(collection="products", key="123")
+    
+    # DynamoDB store
+    dynamodb_store = DynamoDBStore(table_name="my-kv-table", region_name="us-east-1")
+    await dynamodb_store.put(collection="sessions", key="abc123", value={"user_id": "789"}, ttl=3600)
+    session = await dynamodb_store.get(collection="sessions", key="abc123")
+    await dynamodb_store.delete(collection="sessions", key="abc123")
 
 asyncio.run(example())
 ```
@@ -61,6 +70,7 @@ Choose the store that best fits your needs. All stores implement the same `KVSto
 ### Production Stores
 
 - **RedisStore**: `RedisStore(url="redis://localhost:6379/0")`
+- **DynamoDBStore**: `DynamoDBStore(table_name="my-table", region_name="us-east-1")`
 - **ElasticsearchStore**: `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key")`
 - **DiskStore**: A sqlite-based store for local persistence `DiskStore(path="./cache")`
 - **MemoryStore**: A fast in-memory cache `MemoryStore()`
