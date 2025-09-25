@@ -1,10 +1,10 @@
 # KV Store Adapter
 
-A pluggable, async-first key-value store interface for Python applications with support for multiple backends and TTL (Time To Live) functionality.
+A pluggable, async-only key-value store interface for modern Python applications.
 
 ## Features
 
-- **Async-first**: Built from the ground up with `async`/`await` support
+- **Async-only**: Built from the ground up with `async`/`await` support
 - **Multiple backends**: Redis, Elasticsearch, In-memory, Disk, and more
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
