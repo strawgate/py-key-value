@@ -5,14 +5,15 @@ from dirty_equals import IsDatetime
 from typing_extensions import override
 
 from kv_store_adapter.stores.memory.store import MemoryStore
-from kv_store_adapter.stores.wrappers.clamp_ttl import TTLClampWrapper
-from tests.stores.conftest import BaseStoreTests, now, now_plus
+from kv_store_adapter.wrappers.clamp_ttl import TTLClampWrapper
+from tests.stores.conftest import now, now_plus
+from tests.stores.wrappers.conftest import BaseProtocolTests
 
 if TYPE_CHECKING:
     from kv_store_adapter.types import TTLInfo
 
 
-class TestTTLClampWrapper(BaseStoreTests):
+class TestTTLClampWrapper(BaseProtocolTests):
     @pytest.fixture
     async def memory_store(self) -> MemoryStore:
         return MemoryStore()
@@ -28,7 +29,8 @@ class TestTTLClampWrapper(BaseStoreTests):
         await ttl_clamp_store.put(collection="test", key="test", value={"test": "test"}, ttl=5)
         assert await ttl_clamp_store.get(collection="test", key="test") is not None
 
-        ttl_info: TTLInfo | None = await ttl_clamp_store.ttl(collection="test", key="test")
+        # Check the TTL through the underlying store since wrapper doesn't expose ttl() method
+        ttl_info: TTLInfo | None = await memory_store.ttl(collection="test", key="test")
         assert ttl_info is not None
         assert ttl_info.ttl == 50
 
@@ -44,7 +46,8 @@ class TestTTLClampWrapper(BaseStoreTests):
         await ttl_clamp_store.put(collection="test", key="test", value={"test": "test"}, ttl=1000)
         assert await ttl_clamp_store.get(collection="test", key="test") is not None
 
-        ttl_info: TTLInfo | None = await ttl_clamp_store.ttl(collection="test", key="test")
+        # Check the TTL through the underlying store since wrapper doesn't expose ttl() method
+        ttl_info: TTLInfo | None = await memory_store.ttl(collection="test", key="test")
         assert ttl_info is not None
         assert ttl_info.ttl == 100
 
@@ -60,7 +63,8 @@ class TestTTLClampWrapper(BaseStoreTests):
         await ttl_clamp_store.put(collection="test", key="test", value={"test": "test"}, ttl=None)
         assert await ttl_clamp_store.get(collection="test", key="test") is not None
 
-        ttl_info: TTLInfo | None = await ttl_clamp_store.ttl(collection="test", key="test")
+        # Check the TTL through the underlying store since wrapper doesn't expose ttl() method
+        ttl_info: TTLInfo | None = await memory_store.ttl(collection="test", key="test")
         assert ttl_info is not None
         assert ttl_info.ttl == 50
 

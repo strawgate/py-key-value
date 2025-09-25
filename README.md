@@ -161,7 +161,7 @@ Imagine you have a service where you want to cache 3 pydantic models in a single
 import asyncio
 
 from kv_store_adapter.adapters.pydantic import PydanticAdapter
-from kv_store_adapter.stores.wrappers.single_collection import SingleCollectionWrapper
+from kv_store_adapter.wrappers.single_collection import SingleCollectionWrapper
 from kv_store_adapter.stores.memory import MemoryStore
 from pydantic import BaseModel
 

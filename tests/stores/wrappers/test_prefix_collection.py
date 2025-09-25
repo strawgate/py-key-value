@@ -2,11 +2,11 @@ import pytest
 from typing_extensions import override
 
 from kv_store_adapter.stores.memory.store import MemoryStore
-from kv_store_adapter.stores.wrappers.prefix_collection import PrefixCollectionWrapper
-from tests.stores.conftest import BaseStoreTests
+from kv_store_adapter.wrappers.prefix_collection import PrefixCollectionWrapper
+from tests.stores.wrappers.conftest import BaseProtocolTests
 
 
-class TestPrefixCollectionWrapper(BaseStoreTests):
+class TestPrefixCollectionWrapper(BaseProtocolTests):
     @override
     @pytest.fixture
     async def store(self) -> PrefixCollectionWrapper:

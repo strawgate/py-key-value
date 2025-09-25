@@ -6,13 +6,13 @@ from typing_extensions import override
 
 from kv_store_adapter.stores.disk.store import DiskStore
 from kv_store_adapter.stores.memory.store import MemoryStore
-from kv_store_adapter.stores.wrappers.passthrough_cache import PassthroughCacheWrapper
-from tests.stores.conftest import BaseStoreTests
+from kv_store_adapter.wrappers.passthrough_cache import PassthroughCacheWrapper
+from tests.stores.wrappers.conftest import BaseProtocolTests
 
 DISK_STORE_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
 
 
-class TestPrefixCollectionWrapper(BaseStoreTests):
+class TestPassthroughCacheWrapper(BaseProtocolTests):
     @pytest.fixture
     async def primary_store(self) -> AsyncGenerator[DiskStore, None]:
         with tempfile.TemporaryDirectory() as temp_dir:
