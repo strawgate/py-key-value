@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
-from pydantic import BaseModel
+from pydantic import AnyHttpUrl, BaseModel
 
 from kv_store_adapter.adapters.pydantic import PydanticAdapter
 from kv_store_adapter.stores.memory.store import MemoryStore
@@ -17,6 +17,7 @@ class Product(BaseModel):
     name: str
     price: float
     quantity: int
+    url: AnyHttpUrl
 
 
 class Order(BaseModel):
@@ -31,7 +32,7 @@ FIXED_CREATED_AT: datetime = datetime(year=2021, month=1, day=1, hour=12, minute
 FIXED_UPDATED_AT: datetime = datetime(year=2021, month=1, day=1, hour=15, minute=0, second=0, tzinfo=timezone.utc)
 
 SAMPLE_USER: User = User(name="John Doe", email="john.doe@example.com", age=30)
-SAMPLE_PRODUCT: Product = Product(name="Widget", price=29.99, quantity=10)
+SAMPLE_PRODUCT: Product = Product(name="Widget", price=29.99, quantity=10, url=AnyHttpUrl("https://example.com"))
 SAMPLE_ORDER: Order = Order(created_at=datetime.now(), updated_at=datetime.now(), user=SAMPLE_USER, product=SAMPLE_PRODUCT, paid=False)
 
 
