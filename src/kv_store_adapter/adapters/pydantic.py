@@ -28,7 +28,7 @@ class PydanticAdapter(Generic[T]):
 
     async def put(self, collection: str, key: str, value: T, *, ttl: float | None = None) -> None:
         try:
-            value_dict: dict[str, Any] = value.model_dump()
+            value_dict: dict[str, Any] = value.model_dump(mode="json")
         except PydanticSerializationError as e:
             msg = f"Invalid Pydantic model: {e}"
             raise SerializationError(msg) from e
