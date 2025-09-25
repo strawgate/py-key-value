@@ -79,6 +79,18 @@ store = RedisStore(url="redis://localhost:6379/0")
 store = RedisStore(client=existing_redis_client)
 ```
 
+### Valkey Store
+High-performance Valkey-compatible store with native TTL support:
+
+```python
+from kv_store_adapter import ValkeyStore
+
+# Connection options
+store = ValkeyStore(host="localhost", port=6379, db=0, password="secret")
+store = ValkeyStore(url="valkey://localhost:6379/0")
+store = ValkeyStore(client=existing_valkey_client)
+```
+
 ### Memory Store
 In-memory TLRU (Time-aware Least Recently Used) cache:
 
