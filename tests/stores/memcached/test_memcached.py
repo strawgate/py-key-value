@@ -1,10 +1,12 @@
 import asyncio
+import contextlib
 from collections.abc import AsyncGenerator
 
 import pytest
 from pymemcache.client.base import Client
 from typing_extensions import override
 
+from kv_store_adapter.errors import StoreConnectionError
 from kv_store_adapter.stores.base.unmanaged import BaseKVStore
 from kv_store_adapter.stores.memcached import MemcachedStore
 from tests.stores.conftest import BaseStoreTests
@@ -22,9 +24,10 @@ async def ping_memcached() -> bool:
         client.set("__test__", "test_value", expire=1)
         result = client.get("__test__")
         client.delete("__test__")
-        return result is not None
     except Exception:
         return False
+    else:
+        return result is not None
 
 
 async def wait_memcached() -> bool:
@@ -48,10 +51,8 @@ class TestMemcachedStore(BaseStoreTests):
         yield store
 
         # Cleanup - flush all keys
-        try:
+        with contextlib.suppress(Exception):
             store._client.flush_all()
-        except Exception:
-            pass
 
     async def test_memcached_store_initialization(self):
         """Test that MemcachedStore can be initialized with different parameters."""
@@ -80,7 +81,7 @@ class TestMemcachedStore(BaseStoreTests):
         # This should work despite the long key
         await store.put(collection=long_collection, key=long_key, value=test_value)
         result = await store.get(collection=long_collection, key=long_key)
-        
+
         assert result == test_value
 
         # Cleanup
@@ -98,7 +99,7 @@ class TestMemcachedStore(BaseStoreTests):
         await store.put(collection="test", key="key1", value={"test": "value1"})
         await store.put(collection="test", key="key2", value={"test": "value2"})
 
-        # Test that keys() returns empty list (memcached limitation) 
+        # Test that keys() returns empty list (memcached limitation)
         keys = await store.keys(collection="test")
         assert keys == []
 
@@ -123,14 +124,14 @@ class TestMemcachedStore(BaseStoreTests):
 
         # Test with TTL
         await store.put(collection="test", key="ttl_key", value={"test": "value"}, ttl=2)
-        
+
         # Should exist immediately
         result = await store.get(collection="test", key="ttl_key")
         assert result == {"test": "value"}
 
         # Wait for expiration
         await asyncio.sleep(3)
-        
+
         # Should be expired now
         result = await store.get(collection="test", key="ttl_key")
         assert result is None
@@ -139,6 +140,6 @@ class TestMemcachedStore(BaseStoreTests):
         """Test that connection errors are properly handled."""
         # Create store with invalid port to test connection error
         store = MemcachedStore(host="localhost", port=99999)
-        
-        with pytest.raises(Exception):  # Should raise StoreConnectionError or similar
+
+        with pytest.raises(StoreConnectionError):
             await store.setup()

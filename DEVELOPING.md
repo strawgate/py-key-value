@@ -98,6 +98,22 @@ store = DiskStore(path="/path/to/cache", size_limit=1024*1024*1024)  # 1GB
 store = DiskStore(cache=existing_cache_instance)
 ```
 
+### Memcached Store
+High-performance distributed caching with Memcached:
+
+```python
+from kv_store_adapter import MemcachedStore
+
+# Connection options
+store = MemcachedStore(host="localhost", port=11211)
+store = MemcachedStore(client=existing_pymemcache_client)
+```
+
+**Limitations:**
+- `keys()`, `clear_collection()`, and `list_collections()` return empty results due to Memcached's lack of key enumeration
+- Keys longer than 250 characters are automatically hashed with MD5
+- TTL is handled natively by Memcached
+
 ### Elasticsearch Store
 Full-text searchable storage with Elasticsearch:
 

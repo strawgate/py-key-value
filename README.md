@@ -61,6 +61,7 @@ Choose the store that best fits your needs. All stores implement the same `KVSto
 ### Production Stores
 
 - **RedisStore**: `RedisStore(url="redis://localhost:6379/0")`
+- **MemcachedStore**: `MemcachedStore(host="localhost", port=11211)`
 - **ElasticsearchStore**: `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key")`
 - **DiskStore**: A sqlite-based store for local persistence `DiskStore(path="./cache")`
 - **MemoryStore**: A fast in-memory cache `MemoryStore()`

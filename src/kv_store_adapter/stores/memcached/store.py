@@ -1,3 +1,4 @@
+import hashlib
 from typing import Any, overload
 
 from pymemcache.client.base import Client
@@ -5,8 +6,11 @@ from typing_extensions import override
 
 from kv_store_adapter.errors import StoreConnectionError
 from kv_store_adapter.stores.base.managed import BaseManagedKVStore
-from kv_store_adapter.stores.utils.compound import compound_key, get_keys_from_compound_keys, uncompound_key
+from kv_store_adapter.stores.utils.compound import compound_key
 from kv_store_adapter.stores.utils.managed_entry import ManagedEntry
+
+# Memcached key length limit
+MEMCACHED_MAX_KEY_LENGTH = 250
 
 
 class MemcachedStore(BaseManagedKVStore):
@@ -41,32 +45,39 @@ class MemcachedStore(BaseManagedKVStore):
 
         super().__init__()
 
+    def _get_safe_key(self, combo_key: str) -> str:
+        """Get a safe key for memcached, hashing if necessary."""
+        if len(combo_key) > MEMCACHED_MAX_KEY_LENGTH:
+            # Use MD5 hash for long keys - this is not for security, just for key shortening
+            return hashlib.md5(combo_key.encode()).hexdigest()  # noqa: S324
+        return combo_key
+
+    def _test_connection(self) -> None:
+        """Test the memcached connection."""
+        test_key = "__memcached_test__"
+        self._client.set(test_key, "test_value", expire=1)
+        result = self._client.get(test_key)
+        if result is None:
+            msg = "Failed to connect to Memcached"
+            raise StoreConnectionError(message=msg)
+        # Clean up test key
+        self._client.delete(test_key)
+
     @override
     async def setup(self) -> None:
         # Test the connection by performing a simple operation
         try:
-            # Try to set and get a test key to verify connection
-            test_key = "__memcached_test__"
-            self._client.set(test_key, "test_value", expire=1)
-            result = self._client.get(test_key)
-            if result is None:
-                raise StoreConnectionError(message="Failed to connect to Memcached")
-            # Clean up test key
-            self._client.delete(test_key)
+            self._test_connection()
         except Exception as e:
-            raise StoreConnectionError(message=f"Failed to connect to Memcached: {e}") from e
+            msg = f"Failed to connect to Memcached: {e}"
+            raise StoreConnectionError(message=msg) from e
 
     @override
     async def get_entry(self, collection: str, key: str) -> ManagedEntry | None:
         combo_key: str = compound_key(collection=collection, key=key)
+        safe_key = self._get_safe_key(combo_key)
 
-        # Memcached keys must be strings and under 250 characters
-        # Use a hash if the key is too long
-        if len(combo_key) > 250:
-            import hashlib
-            combo_key = hashlib.md5(combo_key.encode()).hexdigest()
-
-        cache_entry: Any = self._client.get(combo_key)
+        cache_entry: Any = self._client.get(safe_key)
 
         if cache_entry is None:
             return None
@@ -76,7 +87,7 @@ class MemcachedStore(BaseManagedKVStore):
 
         # Convert bytes to string if necessary
         if isinstance(cache_entry, bytes):
-            cache_entry = cache_entry.decode('utf-8')
+            cache_entry = cache_entry.decode("utf-8")
 
         return ManagedEntry.from_json(json_str=cache_entry)
 
@@ -90,35 +101,25 @@ class MemcachedStore(BaseManagedKVStore):
         ttl: float | None = None,
     ) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
-
-        # Memcached keys must be strings and under 250 characters
-        # Use a hash if the key is too long
-        if len(combo_key) > 250:
-            import hashlib
-            combo_key = hashlib.md5(combo_key.encode()).hexdigest()
+        safe_key = self._get_safe_key(combo_key)
 
         json_value: str = cache_entry.to_json()
 
         if ttl is not None:
             # Memcached TTL must be an integer
             ttl = max(int(ttl), 1)
-            self._client.set(combo_key, json_value, expire=ttl)
+            self._client.set(safe_key, json_value, expire=ttl)
         else:
-            self._client.set(combo_key, json_value)
+            self._client.set(safe_key, json_value)
 
     @override
     async def delete(self, collection: str, key: str) -> bool:
         await self.setup_collection_once(collection=collection)
 
         combo_key: str = compound_key(collection=collection, key=key)
+        safe_key = self._get_safe_key(combo_key)
 
-        # Memcached keys must be strings and under 250 characters
-        # Use a hash if the key is too long
-        if len(combo_key) > 250:
-            import hashlib
-            combo_key = hashlib.md5(combo_key.encode()).hexdigest()
-
-        return self._client.delete(combo_key)
+        return self._client.delete(safe_key)
 
     @override
     async def keys(self, collection: str) -> list[str]:
