@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, overload
+from typing import overload
 
 import duckdb
 from typing_extensions import override
@@ -13,8 +13,8 @@ DEFAULT_DUCKDB_STORE_MAX_ENTRIES = 1000
 
 class DuckDBStore(BaseManagedKVStore):
     """A DuckDB-based store that uses SQL operations for key-value storage.
-    
-    DuckDB is an in-process SQL OLAP database management system that provides 
+
+    DuckDB is an in-process SQL OLAP database management system that provides
     excellent performance for analytical queries while supporting standard SQL operations.
     This store can operate in memory-only mode or persist data to disk.
     """
@@ -45,14 +45,14 @@ class DuckDBStore(BaseManagedKVStore):
                         If None, no limit is enforced.
         """
         self._max_entries = max_entries
-        
+
         if connection is not None:
             self._connection = connection
         else:
             # Convert Path to string if needed
             if isinstance(database_path, Path):
                 database_path = str(database_path)
-            
+
             # Use in-memory database if no path specified
             if database_path is None:
                 self._connection = duckdb.connect()
@@ -79,13 +79,13 @@ class DuckDBStore(BaseManagedKVStore):
 
         # Create index for efficient collection queries
         self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_kv_collection 
+            CREATE INDEX IF NOT EXISTS idx_kv_collection
             ON kv_entries(collection)
         """)
 
         # Create index for TTL-based queries (without WHERE clause)
         self._connection.execute("""
-            CREATE INDEX IF NOT EXISTS idx_kv_expires_at 
+            CREATE INDEX IF NOT EXISTS idx_kv_expires_at
             ON kv_entries(expires_at)
         """)
 
@@ -122,7 +122,7 @@ class DuckDBStore(BaseManagedKVStore):
 
         # Insert or replace the entry
         self._connection.execute("""
-            INSERT OR REPLACE INTO kv_entries 
+            INSERT OR REPLACE INTO kv_entries
             (collection, key, value_json, created_at, ttl, expires_at)
             VALUES (?, ?, ?, ?, ?, ?)
         """, [
@@ -152,11 +152,11 @@ class DuckDBStore(BaseManagedKVStore):
         # Remove oldest entries (by created_at, then by collection/key for deterministic ordering)
         entries_to_remove = current_count - self._max_entries
         self._connection.execute("""
-            DELETE FROM kv_entries 
+            DELETE FROM kv_entries
             WHERE (collection, key) IN (
-                SELECT collection, key 
-                FROM kv_entries 
-                ORDER BY created_at ASC, collection ASC, key ASC 
+                SELECT collection, key
+                FROM kv_entries
+                ORDER BY created_at ASC, collection ASC, key ASC
                 LIMIT ?
             )
         """, [entries_to_remove])
@@ -170,7 +170,7 @@ class DuckDBStore(BaseManagedKVStore):
             "DELETE FROM kv_entries WHERE collection = ? AND key = ? RETURNING key",
             [collection, key]
         )
-        
+
         # Check if any rows were deleted by counting returned rows
         deleted_rows = result.fetchall()
         return len(deleted_rows) > 0
@@ -181,10 +181,10 @@ class DuckDBStore(BaseManagedKVStore):
         await self.setup_collection_once(collection=collection)
 
         now = datetime.now(tz=timezone.utc)
-        
+
         result = self._connection.execute("""
-            SELECT key FROM kv_entries 
-            WHERE collection = ? 
+            SELECT key FROM kv_entries
+            WHERE collection = ?
             AND (expires_at IS NULL OR expires_at > ?)
             ORDER BY key
         """, [collection, now]).fetchall()
@@ -200,7 +200,7 @@ class DuckDBStore(BaseManagedKVStore):
             "DELETE FROM kv_entries WHERE collection = ? RETURNING key",
             [collection]
         )
-        
+
         # Count the number of deleted rows
         deleted_rows = result.fetchall()
         return len(deleted_rows)
@@ -211,9 +211,9 @@ class DuckDBStore(BaseManagedKVStore):
         await self.setup_once()
 
         now = datetime.now(tz=timezone.utc)
-        
+
         result = self._connection.execute("""
-            SELECT DISTINCT collection FROM kv_entries 
+            SELECT DISTINCT collection FROM kv_entries
             WHERE expires_at IS NULL OR expires_at > ?
             ORDER BY collection
         """, [now]).fetchall()
@@ -226,7 +226,7 @@ class DuckDBStore(BaseManagedKVStore):
         await self.setup_once()
 
         now = datetime.now(tz=timezone.utc)
-        
+
         self._connection.execute(
             "DELETE FROM kv_entries WHERE expires_at IS NOT NULL AND expires_at <= ?",
             [now]

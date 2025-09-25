@@ -14,8 +14,7 @@ class TestDuckDBStore(BaseStoreTests):
     @pytest.fixture
     async def store(self) -> AsyncGenerator[DuckDBStore, None]:
         """Test with in-memory DuckDB database."""
-        store = DuckDBStore()
-        yield store
+        return DuckDBStore()
         # DuckDB connection will be closed when store is garbage collected
 
 
@@ -36,8 +35,7 @@ class TestDuckDBStoreSpecific:
     @pytest.fixture
     async def store(self) -> AsyncGenerator[DuckDBStore, None]:
         """Provide DuckDB store instance."""
-        store = DuckDBStore()
-        yield store
+        return DuckDBStore()
 
     async def test_database_path_initialization(self):
         """Test that store can be initialized with different database path options."""
@@ -61,27 +59,27 @@ class TestDuckDBStoreSpecific:
         """Test that data persists across store instances when using file database."""
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "persist_test.db"
-            
+
             # Store data in first instance
             store1 = DuckDBStore(database_path=db_path)
             await store1.put(collection="test", key="persist_key", value={"data": "persistent"})
-            
+
             # Create second instance with same database file
             store2 = DuckDBStore(database_path=db_path)
             result = await store2.get(collection="test", key="persist_key")
-            
+
             assert result == {"data": "persistent"}
 
     async def test_sql_injection_protection(self, store: DuckDBStore):
         """Test that the store is protected against SQL injection attacks."""
         malicious_collection = "test'; DROP TABLE kv_entries; --"
         malicious_key = "key'; DELETE FROM kv_entries; --"
-        
+
         # These operations should not cause SQL injection
         await store.put(collection=malicious_collection, key=malicious_key, value={"safe": "data"})
         result = await store.get(collection=malicious_collection, key=malicious_key)
         assert result == {"safe": "data"}
-        
+
         # Verify the table still exists and other data is safe
         await store.put(collection="normal", key="normal_key", value={"normal": "data"})
         normal_result = await store.get(collection="normal", key="normal_key")
@@ -91,10 +89,10 @@ class TestDuckDBStoreSpecific:
         """Test storing and retrieving large data values."""
         # Create a large value (1MB of data)
         large_value = {"large_data": "x" * (1024 * 1024)}
-        
+
         await store.put(collection="test", key="large_key", value=large_value)
         result = await store.get(collection="test", key="large_key")
-        
+
         assert result == large_value
 
     async def test_unicode_support(self, store: DuckDBStore):
@@ -102,13 +100,13 @@ class TestDuckDBStoreSpecific:
         unicode_data = {
             "english": "Hello World",
             "chinese": "你好世界",
-            "japanese": "こんにちは世界", 
+            "japanese": "こんにちは世界",
             "arabic": "مرحبا بالعالم",
             "emoji": "🌍🚀💻",
             "special": "Special chars: !@#$%^&*()_+-={}[]|\\:;\"'<>?,./"
         }
-        
+
         await store.put(collection="unicode_test", key="unicode_key", value=unicode_data)
         result = await store.get(collection="unicode_test", key="unicode_key")
-        
+
         assert result == unicode_data
