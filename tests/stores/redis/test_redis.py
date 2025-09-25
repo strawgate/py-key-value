@@ -16,6 +16,7 @@ REDIS_DB = 15  # Use a separate database for tests
 
 WAIT_FOR_REDIS_TIMEOUT = 30
 
+
 async def ping_redis() -> bool:
     client = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
     try:
