@@ -112,6 +112,27 @@ store = ElasticsearchStore(
 store = ElasticsearchStore(client=existing_client, index="custom-index")
 ```
 
+### MongoDB Store
+Document-based storage with MongoDB:
+
+```python
+from kv_store_adapter.stores.mongodb import MongoStore
+
+# Connection options
+store = MongoStore(host="localhost", port=27017, database="kvstore")
+store = MongoStore(connection_string="mongodb://localhost:27017/kvstore")
+store = MongoStore(client=existing_motor_client, database="custom_db")
+
+# With authentication
+store = MongoStore(
+    host="localhost", 
+    port=27017, 
+    username="user", 
+    password="pass", 
+    database="secure_db"
+)
+```
+
 ### Simple Stores
 Dictionary-based stores for testing and development:
 

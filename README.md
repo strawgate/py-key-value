@@ -5,7 +5,7 @@ A pluggable, async-first key-value store interface for Python applications with 
 ## Features
 
 - **Async-first**: Built from the ground up with `async`/`await` support
-- **Multiple backends**: Redis, Elasticsearch, In-memory, Disk, and more
+- **Multiple backends**: Redis, Elasticsearch, MongoDB, In-memory, Disk, and more
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
 - **Adapters**: Pydantic, Single Collection, and more
@@ -21,11 +21,12 @@ pip install kv-store-adapter
 # With specific backend support
 pip install kv-store-adapter[redis]
 pip install kv-store-adapter[elasticsearch]
+pip install kv-store-adapter[mongodb]
 pip install kv-store-adapter[memory]
 pip install kv-store-adapter[disk]
 
 # With all backends
-pip install kv-store-adapter[memory,disk,redis,elasticsearch]
+pip install kv-store-adapter[memory,disk,redis,elasticsearch,mongodb]
 ```
 
 # The KV Store Protocol
