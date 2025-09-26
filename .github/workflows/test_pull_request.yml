@@ -13,7 +13,7 @@ jobs:
   publish:
     strategy:
       matrix:
-        python-version: [3.10, 3.11, 3.12, 3.13, 3.14]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
         platform: [ubuntu-22.04, ubuntu-latest, macos-14, macos-latest, windows-2022, windows-latest]
 
     runs-on: ${{ matrix.platform }}
