@@ -2,13 +2,18 @@ import asyncio
 from collections.abc import AsyncGenerator
 
 import pytest
+
+from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, detect_on_windows, should_skip_docker_tests
+
+pytestmark = pytest.mark.skipif(detect_on_windows(), reason="This test file requires Windows")
+
+# ruff: noqa: E402 # ignore non-top-level imports
 from glide.glide_client import GlideClient
 from glide_shared.config import GlideClientConfiguration, NodeAddress
 from typing_extensions import override
 
 from kv_store_adapter.stores.base import BaseStore
 from kv_store_adapter.stores.valkey import ValkeyStore
-from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, should_skip_docker_tests
 
 # Valkey test configuration
 VALKEY_HOST = "localhost"
@@ -48,6 +53,7 @@ class ValkeyFailedToStartError(Exception):
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
+@pytest.mark.skipif(detect_on_windows(), reason="Valkey is not supported on Windows")
 @pytest.mark.timeout(15)
 class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")

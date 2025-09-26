@@ -44,7 +44,8 @@ env_files = [".env"]
 
 [dependency-groups]
 dev = [
-    "kv-store-adapter[memory,disk,redis,elasticsearch,memcached,mongodb,valkey]",
+    "kv-store-adapter[memory,disk,redis,elasticsearch,memcached,mongodb]",
+    "kv-store-adapter[valkey]; platform_system != 'Windows'",
     "kv-store-adapter[pydantic]",
     "pytest",
     "pytest-mock",
