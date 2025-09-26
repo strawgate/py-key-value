@@ -14,8 +14,7 @@ from kv_store_adapter.utils.compound import compound_key, get_collections_from_c
 from kv_store_adapter.utils.managed_entry import ManagedEntry, load_from_json
 from kv_store_adapter.utils.time_to_live import seconds_to
 
-DEFAULT_SIMPLE_MANAGED_STORE_MAX_ENTRIES = 1000
-DEFAULT_SIMPLE_STORE_MAX_ENTRIES = 1000
+DEFAULT_SIMPLE_STORE_MAX_ENTRIES = 10000
 
 
 @dataclass
@@ -49,7 +48,14 @@ class SimpleStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDes
 
     _data: dict[str, SimpleStoreEntry]
 
-    def __init__(self, max_entries: int = DEFAULT_SIMPLE_MANAGED_STORE_MAX_ENTRIES, default_collection: str | None = None):
+    def __init__(self, max_entries: int = DEFAULT_SIMPLE_STORE_MAX_ENTRIES, default_collection: str | None = None):
+        """Initialize the simple store.
+
+        Args:
+            max_entries: The maximum number of entries to store. Defaults to 10000.
+            default_collection: The default collection to use if no collection is provided.
+        """
+
         self.max_entries = max_entries
 
         self._data = defaultdict[str, SimpleStoreEntry]()

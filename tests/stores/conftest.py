@@ -209,7 +209,7 @@ class BaseStoreTests(ABC):
         """Tests that the store can handle concurrent operations."""
 
         async def worker(store: BaseStore, worker_id: int):
-            for i in range(100):
+            for i in range(10):
                 assert await store.get(collection="test_collection", key=f"test_{worker_id}_{i}") is None
 
                 await store.put(collection="test_collection", key=f"test_{worker_id}_{i}", value={"test": f"test_{i}"})
@@ -221,7 +221,23 @@ class BaseStoreTests(ABC):
                 assert await store.delete(collection="test_collection", key=f"test_{worker_id}_{i}")
                 assert await store.get(collection="test_collection", key=f"test_{worker_id}_{i}") is None
 
-        _ = await asyncio.gather(*[worker(store, worker_id) for worker_id in range(1)])
+        _ = await asyncio.gather(*[worker(store, worker_id) for worker_id in range(5)])
+
+    @pytest.mark.timeout(15)
+    async def test_minimum_put_many_get_many_performance(self, store: BaseStore):
+        """Tests that the store meets minimum performance requirements."""
+        keys = [f"test_{i}" for i in range(10)]
+        values = [{"test": f"test_{i}"} for i in range(10)]
+        await store.put_many(collection="test_collection", keys=keys, values=values)
+        assert await store.get_many(collection="test_collection", keys=keys) == values
+
+    @pytest.mark.timeout(15)
+    async def test_minimum_put_many_delete_many_performance(self, store: BaseStore):
+        """Tests that the store meets minimum performance requirements."""
+        keys = [f"test_{i}" for i in range(10)]
+        values = [{"test": f"test_{i}"} for i in range(10)]
+        await store.put_many(collection="test_collection", keys=keys, values=values)
+        assert await store.delete_many(collection="test_collection", keys=keys) == 10
 
 
 class ContextManagerStoreTestMixin:

@@ -9,4 +9,4 @@ class TestSimpleStore(BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self) -> SimpleStore:
-        return SimpleStore()
+        return SimpleStore(max_entries=500)
