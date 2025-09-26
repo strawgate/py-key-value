@@ -43,6 +43,7 @@ class MongoDBFailedToStartError(Exception):
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
+@pytest.mark.timeout(15)
 class TestMongoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")
     async def setup_mongodb(self) -> AsyncGenerator[None, None]:

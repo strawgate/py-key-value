@@ -48,6 +48,7 @@ class ValkeyFailedToStartError(Exception):
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
+@pytest.mark.timeout(15)
 class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")
     async def setup_valkey(self) -> AsyncGenerator[None, None]:

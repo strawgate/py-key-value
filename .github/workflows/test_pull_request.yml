@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  lint_and_type_check:
+  static_analysis:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -31,7 +31,9 @@ jobs:
       - name: "Type Check"
         run: uv run basedpyright
 
-  test_small_subset_platforms:
+  test_quick:
+    needs:
+      - static_analysis
     timeout-minutes: 10
     strategy:
       matrix:
@@ -55,9 +57,9 @@ jobs:
       - name: "Build"
         run: uv build
 
-  test_all_platforms:
+  test_all:
     needs:
-      - test_small_subset_platforms
+      - test_quick
     
     timeout-minutes: 10
     strategy:
