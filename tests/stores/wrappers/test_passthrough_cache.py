@@ -16,7 +16,9 @@ class TestPassthroughCacheWrapper(BaseStoreTests):
     @pytest.fixture
     async def primary_store(self) -> AsyncGenerator[DiskStore, None]:
         with tempfile.TemporaryDirectory() as temp_dir:
-            yield DiskStore(directory=temp_dir, max_size=DISK_STORE_SIZE_LIMIT)
+            async with DiskStore(directory=temp_dir, max_size=DISK_STORE_SIZE_LIMIT) as disk_store:
+                yield disk_store
+
 
     @pytest.fixture
     async def cache_store(self, memory_store: MemoryStore) -> MemoryStore:

@@ -57,10 +57,22 @@ class DiskStore(BaseContextManagerStore, BaseStore):
             max_size: The maximum size of the disk cache. Defaults to 1GB.
             default_collection: The default collection to use if no collection is provided.
         """
-        if isinstance(directory, Path):
-            directory = str(object=directory)
+        if disk_cache is not None and directory is not None:
+            msg = "Either disk_cache or directory must be provided"
+            raise ValueError(msg)
 
-        self._cache = disk_cache or Cache(directory=directory, size_limit=max_size or DEFAULT_DISK_STORE_MAX_SIZE)
+        if disk_cache is None and directory is None:
+            msg = "Either disk_cache or directory must be provided"
+            raise ValueError(msg)
+
+        if disk_cache:
+            self._cache = disk_cache
+        elif directory:
+            directory = Path(directory)
+
+            directory.mkdir(parents=True, exist_ok=True)
+
+            self._cache = Cache(directory=directory, size_limit=max_size or DEFAULT_DISK_STORE_MAX_SIZE)
 
         super().__init__(default_collection=default_collection)
 

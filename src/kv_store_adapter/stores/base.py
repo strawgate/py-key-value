@@ -2,7 +2,6 @@
 Base abstract class for managed key-value store implementations.
 """
 
-import asyncio
 from abc import ABC, abstractmethod
 from asyncio.locks import Lock
 from collections import defaultdict
@@ -56,7 +55,7 @@ class BaseStore(KeyValueProtocol, ABC):
     """
 
     _setup_complete: bool
-    _setup_lock: asyncio.Lock
+    _setup_lock: Lock
 
     _setup_collection_locks: defaultdict[str, Lock]
     _setup_collection_complete: defaultdict[str, bool]
@@ -72,8 +71,8 @@ class BaseStore(KeyValueProtocol, ABC):
         """
 
         self._setup_complete = False
-        self._setup_lock = asyncio.Lock()
-        self._setup_collection_locks = defaultdict[str, asyncio.Lock](asyncio.Lock)
+        self._setup_lock = Lock()
+        self._setup_collection_locks = defaultdict[str, Lock](Lock)
         self._setup_collection_complete = defaultdict[str, bool](bool)
 
         self.default_collection = default_collection or DEFAULT_COLLECTION_NAME

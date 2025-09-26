@@ -88,7 +88,11 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
         def default_disk_cache_factory(collection: str) -> Cache:
             sanitized_collection: str = _sanitize_collection_for_filesystem(collection=collection)
 
-            return Cache(directory=self._base_directory / sanitized_collection, size_limit=self._max_size or DEFAULT_DISK_STORE_SIZE_LIMIT)
+            cache_directory: Path = self._base_directory / sanitized_collection
+
+            cache_directory.mkdir(parents=True, exist_ok=True)
+
+            return Cache(directory=cache_directory, size_limit=self._max_size or DEFAULT_DISK_STORE_SIZE_LIMIT)
 
         self._disk_cache_factory = disk_cache_factory or default_disk_cache_factory
 
