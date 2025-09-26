@@ -98,3 +98,6 @@ class DiskStore(BaseStore):
         combo_key: str = compound_key(collection=collection, key=key)
 
         return self._cache.delete(key=combo_key, retry=True)
+
+    def __del__(self) -> None:
+        self._cache.close()
