@@ -1,5 +1,7 @@
 import asyncio
 import hashlib
+import os
+import subprocess
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
@@ -22,6 +24,9 @@ def now_plus(seconds: int) -> datetime:
 def is_around(value: float, delta: float = 1) -> bool:
     return value - delta < value < value + delta
 
+def detect_docker() -> bool:
+    docker_ps = subprocess.run(["docker", "ps"], check=False, capture_output=True, text=True)  # noqa: S607
+    return docker_ps.returncode == 0
 
 class BaseStoreTests(ABC):
     async def eventually_consistent(self) -> None:  # noqa: B027
