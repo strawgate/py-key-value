@@ -42,19 +42,46 @@ src/kv_store_adapter/
 ├── __init__.py                 # Main package exports
 ├── types.py                    # Core types and protocols
 ├── errors.py                   # Exception hierarchy
+├── adapters/                   # Protocol adapters
+│   ├── __init__.py            # Adapter exports  
+│   ├── pydantic.py            # Pydantic model adapter
+│   └── raise_on_missing.py    # Raise-on-missing adapter
 ├── stores/                     # Store implementations
-│   ├── base/                   # Abstract base classes
-│   ├── redis/                  # Redis implementation
-│   ├── memory/                 # In-memory TLRU cache
-│   ├── disk/                   # Disk-based storage
-│   ├── elasticsearch/          # Elasticsearch implementation
-│   ├── simple/                 # Simple dict-based stores
-│   ├── null/                   # Null object pattern store
-│   ├── utils/                  # Utility functions
-│   │   ├── compound_keys.py    # Key composition utilities
-│   │   ├── managed_entry.py    # ManagedEntry dataclass
-│   │   └── time_to_live.py     # TTL calculation
-│   └── wrappers/               # Wrappers implementations
+│   ├── __init__.py            # Store exports
+│   ├── base.py                # Abstract base classes
+│   ├── redis/                 # Redis implementation
+│   │   ├── __init__.py        # Redis exports
+│   │   └── store.py           # RedisStore implementation
+│   ├── memory/                # In-memory TLRU cache
+│   │   ├── __init__.py        # Memory exports
+│   │   └── store.py           # MemoryStore implementation
+│   ├── disk/                  # Disk-based storage
+│   │   ├── __init__.py        # Disk exports
+│   │   ├── store.py           # DiskStore implementation
+│   │   └── multi_store.py     # Multi-disk store
+│   ├── elasticsearch/         # Elasticsearch implementation
+│   │   ├── __init__.py        # Elasticsearch exports
+│   │   ├── store.py           # ElasticsearchStore implementation
+│   │   └── utils.py           # Elasticsearch utilities
+│   ├── simple/                # Simple dict-based stores
+│   │   ├── __init__.py        # Simple store exports
+│   │   └── store.py           # SimpleStore implementation
+│   ├── null/                  # Null object pattern store
+│   │   ├── __init__.py        # Null store exports
+│   │   └── store.py           # NullStore implementation
+│   └── utils/                 # Utility functions
+│       ├── compound.py        # Key composition utilities
+│       ├── managed_entry.py   # ManagedEntry dataclass
+│       └── time_to_live.py    # TTL calculation
+├── wrappers/                  # Wrapper implementations
+│   ├── __init__.py            # Wrapper exports
+│   ├── base.py                # Base wrapper class
+│   ├── statistics.py          # Statistics tracking wrapper
+│   ├── clamp_ttl.py           # TTL clamping wrapper
+│   ├── passthrough_cache.py   # Passthrough cache wrapper
+│   ├── prefix_collections.py  # Collection prefix wrapper
+│   ├── prefix_keys.py         # Key prefix wrapper
+│   └── single_collection.py   # Single collection wrapper
 
 tests/
 ├── conftest.py                 # Test configuration
@@ -71,7 +98,7 @@ All stores implement the `KVStore` interface. Here are detailed configuration op
 High-performance store with native TTL support:
 
 ```python
-from kv_store_adapter import RedisStore
+from kv_store_adapter.stores.redis.store import RedisStore
 
 # Connection options
 store = RedisStore(host="localhost", port=6379, db=0, password="secret")
@@ -83,26 +110,26 @@ store = RedisStore(client=existing_redis_client)
 In-memory TLRU (Time-aware Least Recently Used) cache:
 
 ```python
-from kv_store_adapter import MemoryStore
+from kv_store_adapter.stores.memory.store import MemoryStore
 
-store = MemoryStore(max_entries=1000)  # Default: 1000 entries
+store = MemoryStore(max_entries_per_collection=1000)  # Default: 1000 entries per collection
 ```
 
 ### Disk Store
 Persistent disk-based storage using diskcache:
 
 ```python
-from kv_store_adapter import DiskStore
+from kv_store_adapter.stores.disk.store import DiskStore
 
-store = DiskStore(path="/path/to/cache", size_limit=1024*1024*1024)  # 1GB
-store = DiskStore(cache=existing_cache_instance)
+store = DiskStore(directory="/path/to/cache", size_limit=1024*1024*1024)  # 1GB
+store = DiskStore(disk_cache=existing_cache_instance)
 ```
 
 ### Elasticsearch Store
 Full-text searchable storage with Elasticsearch:
 
 ```python
-from kv_store_adapter import ElasticsearchStore
+from kv_store_adapter.stores.elasticsearch.store import ElasticsearchStore
 
 store = ElasticsearchStore(
     url="https://localhost:9200",
@@ -112,27 +139,21 @@ store = ElasticsearchStore(
 store = ElasticsearchStore(client=existing_client, index="custom-index")
 ```
 
-### Simple Stores
-Dictionary-based stores for testing and development:
+### Simple Store
+Dictionary-based store for testing and development:
 
 ```python
-from kv_store_adapter import SimpleStore, SimpleManagedStore, SimpleJSONStore
+from kv_store_adapter.stores.simple.store import SimpleStore
 
-# Basic dictionary store
+# Basic managed dictionary store
 store = SimpleStore(max_entries=1000)
-
-# Managed store with automatic entry wrapping  
-managed_store = SimpleManagedStore(max_entries=1000)
-
-# JSON-serialized storage
-json_store = SimpleJSONStore(max_entries=1000)
 ```
 
 ### Null Store
 Null object pattern store for testing:
 
 ```python
-from kv_store_adapter import NullStore
+from kv_store_adapter.stores.null.store import NullStore
 
 store = NullStore()  # Accepts all operations but stores nothing
 ```
@@ -141,24 +162,21 @@ store = NullStore()  # Accepts all operations but stores nothing
 
 ### Store Types
 
-The project supports two main store architectures:
+All stores now inherit from the unified `BaseStore` class which uses `ManagedEntry` objects:
 
-1. **Unmanaged Stores (`BaseKVStore`)**
-   - Handle their own TTL management
-   - Directly store user values
-   - Examples: `SimpleStore`, `NullStore`
-
-2. **Managed Stores (`BaseManagedKVStore`)**
-   - Use `ManagedEntry` wrapper objects
+1. **Managed Stores (`BaseStore`)**
+   - Use `ManagedEntry` wrapper objects for consistent TTL and metadata handling
    - Automatic TTL handling and expiration checking
-   - Examples: `RedisStore`, `MemoryStore`, `DiskStore`, `ElasticsearchStore`
+   - Consistent behavior across all store implementations
+   - Examples: `RedisStore`, `MemoryStore`, `DiskStore`, `ElasticsearchStore`, `SimpleStore`, `NullStore`
 
 ### Key Concepts
 
 - **Collections**: Logical namespaces for organizing keys
 - **Compound Keys**: Internal key format `collection::key` for flat stores
 - **TTL Management**: Automatic expiration handling with timezone-aware timestamps
-- **Wrappers**: Wrapper pattern for adding functionality (statistics, logging, etc.)
+- **Wrappers**: Wrapper pattern for adding functionality (statistics, TTL clamping, prefixing, etc.)
+- **Adapters**: Transform data to/from stores (Pydantic models, raise-on-missing behavior, etc.)
 
 ## Testing
 
@@ -219,17 +237,17 @@ Tests are organized by store type and use common test cases:
 ```python
 # tests/stores/mystore/test_mystore.py
 import pytest
-from kv_store_adapter.stores.mystore import MyStore
-from tests.cases import BaseKVStoreTestCase
+from kv_store_adapter.stores.mystore.store import MyStore
+from tests.stores.conftest import BaseStoreTests
 
-class TestMyStore(BaseKVStoreTestCase):
+class TestMyStore(BaseStoreTests):
     @pytest.fixture
     async def store(self):
         """Provide store instance for testing."""
         store = MyStore()
         yield store
         # Cleanup if needed
-        await store.clear_collection("test")
+        await store.destroy()
 ```
 
 #### Common Test Cases
@@ -237,14 +255,10 @@ class TestMyStore(BaseKVStoreTestCase):
 Use the provided base test cases for consistency:
 
 ```python
-from tests.cases import BaseKVStoreTestCase, BaseManagedKVStoreTestCase
+from tests.stores.conftest import BaseStoreTests
 
-class TestMyUnmanagedStore(BaseKVStoreTestCase):
+class TestMyStore(BaseStoreTests):
     # Inherits all standard KV store tests
-    pass
-
-class TestMyManagedStore(BaseManagedKVStoreTestCase):
-    # Inherits managed store specific tests
     pass
 ```
 
@@ -253,7 +267,7 @@ class TestMyManagedStore(BaseManagedKVStoreTestCase):
 Add store-specific tests as needed:
 
 ```python
-class TestRedisStore(BaseManagedKVStoreTestCase):
+class TestRedisStore(BaseStoreTests):
     async def test_redis_specific_feature(self, store):
         """Test Redis-specific functionality."""
         # Your test implementation
@@ -299,53 +313,83 @@ pyright src/kv_store_adapter/stores/redis/store.py
 
 ### 1. Choose Base Class
 
-Decide between `BaseKVStore` (unmanaged) or `BaseManagedKVStore` (managed):
+All stores inherit from the unified `BaseStore` class, which provides consistent TTL and metadata handling:
 
 ```python
-from kv_store_adapter.stores.base.unmanaged import BaseKVStore
-# or
-from kv_store_adapter.stores.base.managed import BaseManagedKVStore
+from kv_store_adapter.stores.base import BaseStore
 ```
+
+You can also inherit from specialized base classes for additional functionality:
+- `BaseEnumerateKeysStore` - Adds key enumeration support
+- `BaseEnumerateCollectionsStore` - Adds collection enumeration support  
+- `BaseDestroyStore` - Adds store destruction support
+- `BaseDestroyCollectionStore` - Adds collection destruction support
+- `BaseCullStore` - Adds expired entry culling support
 
 ### 2. Create Store Class
 
 ```python
 # src/kv_store_adapter/stores/mystore/store.py
-from typing import Any
-from kv_store_adapter.stores.base.managed import BaseManagedKVStore
+from typing_extensions import override
+from kv_store_adapter.stores.base import BaseStore
 from kv_store_adapter.stores.utils.managed_entry import ManagedEntry
 
-class MyStore(BaseManagedKVStore):
+class MyStore(BaseStore):
     """My custom key-value store implementation."""
     
-    def __init__(self, **kwargs):
+    def __init__(self, *, default_collection: str | None = None, **kwargs):
         """Initialize store with custom parameters."""
-        super().__init__()
+        super().__init__(default_collection=default_collection)
         # Your initialization code
     
-    async def setup(self) -> None:
+    async def _setup(self) -> None:
         """Initialize store (called once before first use)."""
         # Setup code (connect to database, etc.)
         pass
     
-    async def get_entry(self, collection: str, key: str) -> ManagedEntry | None:
-        """Retrieve a managed entry by key from the specified collection."""
+    @override
+    async def _get_managed_entry(self, *, collection: str, key: str) -> ManagedEntry | None:
+        """Retrieve a managed entry by key from the specified collection.
+        
+        Returns:
+            ManagedEntry if found, None if not found or expired.
+        """
         # Your implementation
         pass
     
-    async def put_entry(
+    @override
+    async def _put_managed_entry(
         self,
+        *,
         collection: str,
         key: str,
-        cache_entry: ManagedEntry,
-        *,
-        ttl: float | None = None
+        managed_entry: ManagedEntry,
     ) -> None:
-        """Store a managed entry by key in the specified collection."""
+        """Store a managed entry by key in the specified collection.
+        
+        Args:
+            collection: The collection to store in.
+            key: The key to store under.
+            managed_entry: The ManagedEntry containing value and metadata.
+        """
         # Your implementation
         pass
     
-    # Implement other required methods...
+    @override
+    async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
+        """Delete a managed entry by key from the specified collection.
+        
+        Args:
+            key: The key to delete.
+            collection: The collection to delete from.
+            
+        Returns:
+            True if the key was deleted, False if it didn't exist.
+        """
+        # Your implementation
+        pass
+    
+    # Implement other optional methods as needed...
 ```
 
 ### 3. Create Package Structure
@@ -368,10 +412,10 @@ __all__ = ["MyStore"]
 ```python
 # tests/stores/mystore/test_mystore.py
 import pytest
-from kv_store_adapter.stores.mystore import MyStore
-from tests.cases import BaseManagedKVStoreTestCase
+from kv_store_adapter.stores.mystore.store import MyStore
+from tests.stores.conftest import BaseStoreTests
 
-class TestMyStore(BaseManagedKVStoreTestCase):
+class TestMyStore(BaseStoreTests):
     @pytest.fixture
     async def store(self):
         store = MyStore()

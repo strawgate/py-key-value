@@ -2,13 +2,13 @@ import pytest
 from typing_extensions import override
 
 from kv_store_adapter.stores.memory.store import MemoryStore
-from kv_store_adapter.wrappers.prefix_keys import PrefixKeysWrapper
+from kv_store_adapter.wrappers.statistics import StatisticsWrapper
 from tests.stores.conftest import BaseStoreTests
 
 
-class TestPrefixKeyWrapper(BaseStoreTests):
+class TestStatisticsWrapper(BaseStoreTests):
     @override
     @pytest.fixture
-    async def store(self) -> PrefixKeysWrapper:
+    async def store(self) -> StatisticsWrapper:
         memory_store: MemoryStore = MemoryStore()
-        return PrefixKeysWrapper(store=memory_store, prefix="key_prefix")
+        return StatisticsWrapper(store=memory_store)

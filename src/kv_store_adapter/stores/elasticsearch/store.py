@@ -1,24 +1,37 @@
-from datetime import datetime, timezone
+import hashlib
 from typing import TYPE_CHECKING, Any, overload
 
-from elasticsearch import AsyncElasticsearch
 from typing_extensions import override
 
-from kv_store_adapter.stores.base.managed import BaseManagedKVStore
-from kv_store_adapter.stores.elasticsearch.utils import (
-    get_aggregations_from_body,
-    get_body_from_response,
-    get_first_value_from_field_in_hit,
-    get_hits_from_response,
-    get_source_from_body,
+from kv_store_adapter.stores.base import (
+    BaseCullStore,
+    BaseDestroyCollectionStore,
+    BaseEnumerateCollectionsStore,
+    BaseEnumerateKeysStore,
+    BaseStore,
 )
 from kv_store_adapter.stores.utils.compound import compound_key
-from kv_store_adapter.stores.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
+from kv_store_adapter.stores.utils.managed_entry import ManagedEntry, load_from_json
+from kv_store_adapter.stores.utils.time_to_live import now_as_epoch, try_parse_datetime
+
+try:
+    from elasticsearch import AsyncElasticsearch
+
+    from kv_store_adapter.stores.elasticsearch.utils import (
+        get_aggregations_from_body,
+        get_body_from_response,
+        get_first_value_from_field_in_hit,
+        get_hits_from_response,
+        get_source_from_body,
+    )
+except ImportError as e:
+    msg = "ElasticsearchStore requires py-kv-store-adapter[elasticsearch]"
+    raise ImportError(msg) from e
 
 if TYPE_CHECKING:
-    from elastic_transport import ObjectApiResponse
+    from datetime import datetime
 
-DEFAULT_DISK_STORE_SIZE_LIMIT = 1 * 1024 * 1024 * 1024  # 1GB
+    from elastic_transport import ObjectApiResponse
 
 ELASTICSEARCH_CLIENT_DEFAULTS = {
     "http_compress": True,
@@ -37,9 +50,6 @@ DEFAULT_MAPPING = {
         "expires_at": {
             "type": "date",
         },
-        "ttl": {
-            "type": "float",
-        },
         "collection": {
             "type": "keyword",
         },
@@ -55,8 +65,13 @@ DEFAULT_MAPPING = {
     },
 }
 
+DEFAULT_PAGE_SIZE = 10000
+PAGE_LIMIT = 10000
 
-class ElasticsearchStore(BaseManagedKVStore):
+MAX_KEY_LENGTH = 256
+
+
+class ElasticsearchStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCullStore, BaseStore):
     """A elasticsearch-based store."""
 
     _client: AsyncElasticsearch
@@ -64,13 +79,19 @@ class ElasticsearchStore(BaseManagedKVStore):
     _index: str
 
     @overload
-    def __init__(self, *, elasticsearch_client: AsyncElasticsearch, index: str) -> None: ...
+    def __init__(self, *, elasticsearch_client: AsyncElasticsearch, index: str, default_collection: str | None = None) -> None: ...
 
     @overload
-    def __init__(self, *, url: str, api_key: str, index: str) -> None: ...
+    def __init__(self, *, url: str, api_key: str, index: str, default_collection: str | None = None) -> None: ...
 
     def __init__(
-        self, *, elasticsearch_client: AsyncElasticsearch | None = None, url: str | None = None, api_key: str | None = None, index: str
+        self,
+        *,
+        elasticsearch_client: AsyncElasticsearch | None = None,
+        url: str | None = None,
+        api_key: str | None = None,
+        index: str,
+        default_collection: str | None = None,
     ) -> None:
         """Initialize the elasticsearch store.
 
@@ -78,11 +99,12 @@ class ElasticsearchStore(BaseManagedKVStore):
             elasticsearch_client: The elasticsearch client to use.
             url: The url of the elasticsearch cluster.
             api_key: The api key to use.
-            index: The index to use. Defaults to "kv-store".
+            index: The index to use.
+            default_collection: The default collection to use if no collection is provided.
         """
         self._client = elasticsearch_client or AsyncElasticsearch(hosts=[url], api_key=api_key, **ELASTICSEARCH_CLIENT_DEFAULTS)  # pyright: ignore[reportArgumentType]
         self._index = index or DEFAULT_INDEX
-        super().__init__()
+        super().__init__(default_collection=default_collection)
 
     @override
     async def setup(self) -> None:
@@ -95,14 +117,22 @@ class ElasticsearchStore(BaseManagedKVStore):
         )
 
     @override
-    async def setup_collection(self, collection: str) -> None:
+    async def _setup_collection(self, *, collection: str) -> None:
         pass
 
+    def sanitize_document_id(self, key: str) -> str:
+        if len(key) > MAX_KEY_LENGTH:
+            sha256_hash: str = hashlib.sha256(key.encode()).hexdigest()
+            return sha256_hash[:256]
+        return key
+
     @override
-    async def get_entry(self, collection: str, key: str) -> ManagedEntry | None:
+    async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        elasticsearch_response = await self._client.options(ignore_status=404).get(index=self._index, id=combo_key)
+        elasticsearch_response = await self._client.options(ignore_status=404).get(
+            index=self._index, id=self.sanitize_document_id(key=combo_key)
+        )
 
         body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
 
@@ -112,58 +142,48 @@ class ElasticsearchStore(BaseManagedKVStore):
         if not (value_str := source.get("value")) or not isinstance(value_str, str):
             return None
 
-        if not (created_at := source.get("created_at")) or not isinstance(created_at, str):
-            return None
-
-        ttl: Any | float | int | None = source.get("ttl")
-        expires_at: Any | str | None = source.get("expires_at")
-
-        if not isinstance(ttl, float | int | None):
-            return None
-
-        if not isinstance(expires_at, str | None):
-            return None
+        created_at: datetime | None = try_parse_datetime(value=source.get("created_at"))
+        expires_at: datetime | None = try_parse_datetime(value=source.get("expires_at"))
 
         return ManagedEntry(
-            collection=collection,
-            key=key,
             value=load_from_json(value_str),
-            created_at=datetime.fromisoformat(created_at),
-            ttl=float(ttl) if ttl else None,
-            expires_at=datetime.fromisoformat(expires_at) if expires_at else None,
+            created_at=created_at,
+            expires_at=expires_at,
         )
 
     @override
-    async def put_entry(
+    async def _put_managed_entry(
         self,
-        collection: str,
-        key: str,
-        cache_entry: ManagedEntry,
         *,
-        ttl: float | None = None,
+        key: str,
+        collection: str,
+        managed_entry: ManagedEntry,
     ) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
+        document: dict[str, Any] = {
+            "collection": collection,
+            "key": key,
+            "value": managed_entry.to_json(include_metadata=False),
+        }
+
+        if managed_entry.created_at:
+            document["created_at"] = managed_entry.created_at.isoformat()
+        if managed_entry.expires_at:
+            document["expires_at"] = managed_entry.expires_at.isoformat()
+
         _ = await self._client.index(
             index=self._index,
-            id=combo_key,
-            body={
-                "collection": collection,
-                "key": key,
-                "value": dump_to_json(cache_entry.value),
-                "created_at": cache_entry.created_at.isoformat() if cache_entry.created_at else None,
-                "expires_at": cache_entry.expires_at.isoformat() if cache_entry.expires_at else None,
-                "ttl": cache_entry.ttl,
-            },
+            id=self.sanitize_document_id(key=combo_key),
+            body=document,
         )
 
     @override
-    async def delete(self, collection: str, key: str) -> bool:
-        await self.setup_collection_once(collection=collection)
-
+    async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
+
         elasticsearch_response: ObjectApiResponse[Any] = await self._client.options(ignore_status=404).delete(
-            index=self._index, id=combo_key
+            index=self._index, id=self.sanitize_document_id(key=combo_key)
         )
 
         body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
@@ -174,9 +194,10 @@ class ElasticsearchStore(BaseManagedKVStore):
         return result == "deleted"
 
     @override
-    async def keys(self, collection: str) -> list[str]:
+    async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
         """Get up to 10,000 keys in the specified collection (eventually consistent)."""
-        await self.setup_collection_once(collection=collection)
+
+        limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
 
         result: ObjectApiResponse[Any] = await self._client.options(ignore_status=404).search(
             index=self._index,
@@ -189,7 +210,7 @@ class ElasticsearchStore(BaseManagedKVStore):
                 },
             },
             source_includes=[],
-            size=10000,
+            size=limit,
         )
 
         if not (hits := get_hits_from_response(response=result)):
@@ -206,9 +227,32 @@ class ElasticsearchStore(BaseManagedKVStore):
         return all_keys
 
     @override
-    async def clear_collection(self, collection: str) -> int:
-        await self.setup_collection_once(collection=collection)
+    async def _get_collection_names(self, *, limit: int | None = None) -> list[str]:
+        """List up to 10,000 collections in the elasticsearch store (eventually consistent)."""
 
+        limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
+
+        search_response: ObjectApiResponse[Any] = await self._client.options(ignore_status=404).search(
+            index=self._index,
+            aggregations={
+                "collections": {
+                    "terms": {
+                        "field": "collection",
+                    },
+                },
+            },
+            size=limit,
+        )
+
+        body: dict[str, Any] = get_body_from_response(response=search_response)
+        aggregations: dict[str, Any] = get_aggregations_from_body(body=body)
+
+        buckets: list[Any] = aggregations["collections"]["buckets"]  # pyright: ignore[reportAny]
+
+        return [bucket["key"] for bucket in buckets]  # pyright: ignore[reportAny]
+
+    @override
+    async def _delete_collection(self, *, collection: str) -> bool:
         result: ObjectApiResponse[Any] = await self._client.options(ignore_status=404).delete_by_query(
             index=self._index,
             body={
@@ -223,44 +267,18 @@ class ElasticsearchStore(BaseManagedKVStore):
         body: dict[str, Any] = get_body_from_response(response=result)
 
         if not (deleted := body.get("deleted")) or not isinstance(deleted, int):
-            return 0
+            return False
 
-        return deleted
-
-    @override
-    async def list_collections(self) -> list[str]:
-        """List up to 10,000 collections in the elasticsearch store (eventually consistent)."""
-        await self.setup_once()
-
-        result: ObjectApiResponse[Any] = await self._client.options(ignore_status=404).search(
-            index=self._index,
-            aggregations={
-                "collections": {
-                    "terms": {
-                        "field": "collection",
-                    },
-                },
-            },
-            size=10000,
-        )
-
-        body: dict[str, Any] = get_body_from_response(response=result)
-        aggregations: dict[str, Any] = get_aggregations_from_body(body=body)
-
-        buckets: list[Any] = aggregations["collections"]["buckets"]  # pyright: ignore[reportAny]
-
-        return [bucket["key"] for bucket in buckets]  # pyright: ignore[reportAny]
+        return deleted > 0
 
     @override
-    async def cull(self) -> None:
-        await self.setup_once()
-
+    async def _cull(self) -> None:
         _ = await self._client.options(ignore_status=404).delete_by_query(
             index=self._index,
             body={
                 "query": {
                     "range": {
-                        "expires_at": {"lt": datetime.now(tz=timezone.utc).timestamp()},
+                        "expires_at": {"lt": now_as_epoch()},
                     },
                 },
             },

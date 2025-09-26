@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ValidationError
@@ -12,31 +13,85 @@ T = TypeVar("T", bound=BaseModel)
 class PydanticAdapter(Generic[T]):
     """Adapter around a KVStore-compliant Store that allows type-safe persistence of Pydantic models."""
 
-    def __init__(self, store_protocol: KVStore, pydantic_model: type[T]) -> None:
-        self.store_protocol: KVStore = store_protocol
+    def __init__(self, kv_store: KVStore, pydantic_model: type[T]) -> None:
+        self.kv_store: KVStore = kv_store
         self.pydantic_model: type[T] = pydantic_model
 
-    async def get(self, collection: str, key: str) -> T | None:
-        if value := await self.store_protocol.get(collection=collection, key=key):
-            try:
-                return self.pydantic_model.model_validate(obj=value)
-            except ValidationError as e:
-                msg = f"Invalid Pydantic model: {e}"
-                raise DeserializationError(msg) from e
-
-        return None
-
-    async def put(self, collection: str, key: str, value: T, *, ttl: float | None = None) -> None:
+    def _validate_model(self, value: dict[str, Any]) -> T:
         try:
-            value_dict: dict[str, Any] = value.model_dump(mode="json")
+            return self.pydantic_model.model_validate(obj=value)
+        except ValidationError as e:
+            msg = f"Invalid Pydantic model: {e}"
+            raise DeserializationError(msg) from e
+
+    def _serialize_model(self, value: T) -> dict[str, Any]:
+        try:
+            return value.model_dump(mode="json")
         except PydanticSerializationError as e:
             msg = f"Invalid Pydantic model: {e}"
             raise SerializationError(msg) from e
 
-        await self.store_protocol.put(collection=collection, key=key, value=value_dict, ttl=ttl)
+    async def get(self, key: str, *, collection: str | None = None) -> T | None:
+        """Get and validate a model by key.
 
-    async def delete(self, collection: str, key: str) -> bool:
-        return await self.store_protocol.delete(collection=collection, key=key)
+        Returns the parsed model instance, or None if not present.
+        Raises DeserializationError if the stored data cannot be validated as the model.
+        """
+        if value := await self.kv_store.get(key=key, collection=collection):
+            return self._validate_model(value=value)
 
-    async def exists(self, collection: str, key: str) -> bool:
-        return await self.store_protocol.exists(collection=collection, key=key)
+        return None
+
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[T | None]:
+        """Batch get and validate models by keys, preserving order.
+
+        Each element is either a parsed model instance or None if missing.
+        """
+        values: list[dict[str, Any] | None] = await self.kv_store.get_many(keys=keys, collection=collection)
+
+        return [self._validate_model(value=value) if value else None for value in values]
+
+    async def put(self, key: str, value: T, *, collection: str | None = None, ttl: float | None = None) -> None:
+        """Serialize and store a model.
+
+        Propagates SerializationError if the model cannot be serialized.
+        """
+        value_dict: dict[str, Any] = self._serialize_model(value=value)
+
+        await self.kv_store.put(key=key, value=value_dict, collection=collection, ttl=ttl)
+
+    async def put_many(self, keys: Sequence[str], values: Sequence[T], *, collection: str | None = None, ttl: float | None = None) -> None:
+        """Serialize and store multiple models, preserving order alignment with keys."""
+        value_dicts: list[dict[str, Any]] = [self._serialize_model(value=value) for value in values]
+
+        await self.kv_store.put_many(keys=keys, values=value_dicts, collection=collection, ttl=ttl)
+
+    async def delete(self, key: str, *, collection: str | None = None) -> bool:
+        """Delete a model by key. Returns True if a value was deleted, else False."""
+        return await self.kv_store.delete(key=key, collection=collection)
+
+    async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
+        """Delete multiple models by key. Returns the count of deleted entries."""
+        return await self.kv_store.delete_many(keys=keys, collection=collection)
+
+    async def ttl(self, key: str, *, collection: str | None = None) -> tuple[T | None, float | None]:
+        """Get a model and its TTL seconds if present.
+
+        Returns (model, ttl_seconds) or (None, None) if missing.
+        """
+        entry: dict[str, Any] | None
+        ttl_info: float | None
+
+        entry, ttl_info = await self.kv_store.ttl(key=key, collection=collection)
+
+        if entry is not None:
+            model_validate: T = self._validate_model(value=entry)
+            return (model_validate, ttl_info)
+
+        return (None, None)
+
+    async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[T | None, float | None]]:
+        """Batch get models with TTLs. Each element is (model|None, ttl_seconds|None)."""
+        entries: list[tuple[dict[str, Any] | None, float | None]] = await self.kv_store.ttl_many(keys=keys, collection=collection)
+
+        return [(self._validate_model(value=entry) if entry else None, ttl_info) for entry, ttl_info in entries]

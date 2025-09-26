@@ -1,67 +1,90 @@
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, cast
 
 from typing_extensions import Self
 
 from kv_store_adapter.errors import DeserializationError, SerializationError
-from kv_store_adapter.types import TTLInfo
+from kv_store_adapter.stores.utils.time_to_live import now, now_plus, try_parse_datetime
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ManagedEntry:
-    """A managed cache entry containing value data and TTL metadata."""
+    """A managed cache entry containing value data and TTL metadata.
 
-    collection: str
-    key: str
+    The entry supports either TTL seconds or absolute expiration datetime. On init:
+    - If `ttl` is provided but `expires_at` is not, an `expires_at` will be computed.
+    - If `expires_at` is provided but `ttl` is not, a live TTL will be computed on access.
+    """
 
     value: dict[str, Any]
 
-    created_at: datetime | None
-    ttl: float | None
-    expires_at: datetime | None
+    created_at: datetime | None = field(default=None)
+    ttl: float | None = field(default=None)
+    expires_at: datetime | None = field(default=None)
+
+    def __post_init__(self) -> None:
+        if self.ttl is not None and self.expires_at is None:
+            self.expires_at = now_plus(seconds=self.ttl)
+
+        elif self.expires_at is not None and self.ttl is None:
+            self.recalculate_ttl()
 
     @property
     def is_expired(self) -> bool:
-        return self.to_ttl_info().is_expired
+        if self.expires_at is None:
+            return False
+        return self.expires_at <= now()
 
-    def to_ttl_info(self) -> TTLInfo:
-        return TTLInfo(collection=self.collection, key=self.key, created_at=self.created_at, ttl=self.ttl, expires_at=self.expires_at)
+    def recalculate_ttl(self) -> None:
+        if self.expires_at is not None and self.ttl is None:
+            self.ttl = (self.expires_at - now()).total_seconds()
 
-    def to_json(self) -> str:
-        return dump_to_json(
-            obj={
-                "created_at": self.created_at.isoformat() if self.created_at else None,
-                "ttl": self.ttl,
-                "expires_at": self.expires_at.isoformat() if self.expires_at else None,
-                "collection": self.collection,
-                "key": self.key,
-                "value": self.value,
-            }
-        )
+    def to_json(self, include_metadata: bool = True, include_expiration: bool = True, include_creation: bool = True) -> str:
+        data: dict[str, Any] = {}
+
+        if include_metadata:
+            data["value"] = self.value
+            if include_creation and self.created_at:
+                data["created_at"] = self.created_at.isoformat()
+            if include_expiration and self.expires_at:
+                data["expires_at"] = self.expires_at.isoformat()
+        else:
+            data = self.value
+
+        return dump_to_json(obj=data)
 
     @classmethod
-    def from_json(cls, json_str: str) -> Self:
+    def from_json(cls, json_str: str, includes_metadata: bool = True, ttl: float | None = None) -> Self:
         data: dict[str, Any] = load_from_json(json_str=json_str)
-        created_at: str | None = data.get("created_at")
-        expires_at: str | None = data.get("expires_at")
-        ttl: float | None = data.get("ttl")
+
+        if not includes_metadata:
+            return cls(
+                value=data,
+            )
+
+        created_at: datetime | None = try_parse_datetime(value=data.get("created_at"))
+        expires_at: datetime | None = try_parse_datetime(value=data.get("expires_at"))
+
+        value: dict[str, Any] | None = data.get("value")
+
+        if value is None:
+            msg = "Value is None"
+            raise DeserializationError(msg)
 
         return cls(
-            created_at=datetime.fromisoformat(created_at) if created_at else None,
+            created_at=created_at,
+            expires_at=expires_at,
             ttl=ttl,
-            expires_at=datetime.fromisoformat(expires_at) if expires_at else None,
-            collection=data["collection"],  # pyright: ignore[reportAny]
-            key=data["key"],  # pyright: ignore[reportAny]
-            value=data["value"],  # pyright: ignore[reportAny]
+            value=value,
         )
 
 
 def dump_to_json(obj: dict[str, Any]) -> str:
     try:
         return json.dumps(obj)
-    except json.JSONDecodeError as e:
+    except (json.JSONDecodeError, TypeError) as e:
         msg: str = f"Failed to serialize object to JSON: {e}"
         raise SerializationError(msg) from e
 

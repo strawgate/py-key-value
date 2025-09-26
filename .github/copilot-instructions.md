@@ -1,5 +1,5 @@
 ## Architecture Overview
-The `py-kv-store-adapter` project provides a pluggable, async-first interface for various key-value (KV) store backends in Python. Its core purpose is to abstract away the underlying KV store implementation, offering a consistent `KVStore` for interacting with different storage solutions like Redis, Elasticsearch, in-memory caches, and disk-based stores. The architecture distinguishes between two main store types: `Unmanaged Stores` (`BaseKVStore`) which handle their own TTL and collection management, and `Managed Stores` (`BaseManagedKVStore`) which automatically manage `ManagedEntry` objects for TTL and expiration. The system also supports `Adapters` for transforming data (e.g., Pydantic models) and `Wrappers` for adding cross-cutting concerns like statistics tracking or TTL clamping, which can be chained. Key concepts include collections for namespacing, compound keys for internal storage, and automatic TTL management.
+The `py-kv-store-adapter` project provides a pluggable, async-first interface for various key-value (KV) store backends in Python. Its core purpose is to abstract away the underlying KV store implementation, offering a consistent `KVStore` protocol for interacting with different storage solutions like Redis, Elasticsearch, in-memory caches, and disk-based stores. The architecture uses a unified `BaseStore` class that automatically manages `ManagedEntry` objects for consistent TTL and expiration handling across all store implementations. The system supports `Adapters` for transforming data (e.g., Pydantic models, raise-on-missing behavior) and `Wrappers` for adding cross-cutting concerns like statistics tracking, TTL clamping, key/collection prefixing, or single-collection mapping, which can be chained together. Key concepts include collections for namespacing, compound keys for internal storage in flat stores, automatic TTL management with timezone-aware timestamps, and a separation between adapters (which don't implement KVStore) and wrappers (which do implement KVStore and can be chained).
 
 ## Code Style & Conventions
 - **Python Version**: Requires Python 3.10 or higher (`pyproject.toml:project.requires-python`).
@@ -33,7 +33,7 @@ The `py-kv-store-adapter` project provides a pluggable, async-first interface fo
 ## Dependencies & Compatibility
 - **Critical Runtime Dependencies**:
     - `cachetools>=6.0.0` for `MemoryStore` (`pyproject.toml:L26`).
-    - `diskcache>=5.6.0` for `DiskStore` (`pyproject.toml:L27`).
+    - `diskcache>=5.6.0`, `pathvalidate>=3.3.1` for `DiskStore` (`pyproject.toml:L27`).
     - `redis>=6.0.0` for `RedisStore` (`pyproject.toml:L28`).
     - `elasticsearch>=9.0.0`, `aiohttp>=3.12` for `ElasticsearchStore` (`pyproject.toml:L29`).
     - `pydantic>=2.11.9` for `PydanticAdapter` (`pyproject.toml:L30`).
@@ -44,28 +44,30 @@ The `py-kv-store-adapter` project provides a pluggable, async-first interface fo
     - `ruff`: Linter and formatter (`pyproject.toml:L48`).
     - `basedpyright`: Type checker (`pyproject.toml:L54`).
 - **Observability**:
-    - The `StatisticsWrapper` (`src/kv_store_adapter/stores/wrappers/statistics.py`) provides in-memory tracking of operation counts, hits, and misses for `get`, `put`, `delete`, `exists`, `keys`, and `clear_collection` operations per collection. It can be enabled during initialization.
+    - The `StatisticsWrapper` (`src/kv_store_adapter/wrappers/statistics.py`) provides in-memory tracking of operation counts, hits, and misses for `get`, `put`, `delete`, and `ttl` operations per collection. It can be enabled during initialization.
 
 ## Unique Workflows
-- **Adding New Store Implementations**: Developers can extend the system by creating new store classes that inherit from either `BaseKVStore` (unmanaged) or `BaseManagedKVStore` (managed), implementing abstract methods for `get`, `put`, `delete`, `ttl`, `exists`, `keys`, `clear_collection`, and `list_collections` (`DEVELOPING.md:L298-L349`).
+- **Adding New Store Implementations**: Developers can extend the system by creating new store classes that inherit from the unified `BaseStore` class, implementing abstract methods `_get_managed_entry`, `_put_managed_entry`, and `_delete_managed_entry` (`DEVELOPING.md:L312-L399`).
 - **Wrapper/Adapter Chaining**: The design allows for chaining multiple wrappers and adapters to compose complex behaviors, such as `PydanticAdapter(SingleCollectionWrapper(store, \"users\"), User)` (`README.md:L174`).
-- **CI/CD**: GitHub Actions workflows (`.github/workflows/`) are configured to run tests, linting, type checking, and formatting on pull requests and pushes to `main` (`.github/workflows/test_pull_request.yml`). A separate workflow handles publishing to PyPI on release creation (`.github/workflows/publish-py-kv-store-adapter.yml`).
+- **CI/CD**: GitHub Actions workflows (`.github/workflows/`) are configured to run tests, linting, type checking, and formatting on pull requests and pushes to `main`.
 
 ## API Surface Map
-The primary API surface is defined by the `KVStore` (`src/kv_store_adapter/types.py:L26-L44`) and extended by `BaseKVStore` (`src/kv_store_adapter/stores/base/unmanaged.py:L11-L76`) and `BaseManagedKVStore` (`src/kv_store_adapter/stores/base/managed.py:L21-L122`).
-- **Core KV Operations**: `get(collection, key)`, `put(collection, key, value, ttl)`, `delete(collection, key)`, `exists(collection, key)`, `ttl(collection, key)`.
-- **Management Operations (BaseKVStore)**: `keys(collection)`, `clear_collection(collection)`, `list_collections()`, `cull()`.
+The primary API surface is defined by the `KVStore` protocol (`src/kv_store_adapter/types.py:L175-L180`) and implemented by the unified `BaseStore` class (`src/kv_store_adapter/stores/base.py:L29-L353`).
+- **Core KV Operations**: `get(key, *, collection=None)`, `put(key, value, *, collection=None, ttl=None)`, `delete(key, *, collection=None)`, `ttl(key, *, collection=None)`.
+- **Bulk Operations**: `get_many(keys, *, collection=None)`, `put_many(keys, values, *, collection=None, ttl=None)`, `delete_many(keys, *, collection=None)`, `ttl_many(keys, *, collection=None)`.
+- **Management Operations (Extended Stores)**: `keys(collection=None, *, limit=None)`, `collections(*, limit=None)`, `destroy()`, `destroy_collection(collection)`, `cull()`.
+- **Adapters**: `PydanticAdapter` for type-safe Pydantic model handling, `RaiseOnMissingAdapter` for optional exception-based missing key handling.
+- **Wrappers**: `StatisticsWrapper`, `ClampTTLWrapper`, `PassthroughCacheWrapper`, `PrefixKeysWrapper`, `PrefixCollectionsWrapper`, `SingleCollectionWrapper`.
 
 
 ## Onboarding Steps
-- **Understand Core Concepts**: Familiarize yourself with `KVStore`, `BaseKVStore`, `BaseManagedKVStore`, `ManagedEntry`, `Collections`, `Compound Keys`, `TTL Management`, `Wrappers`, and `Adapters` by reading `README.md` and `DEVELOPING.md`.
+- **Understand Core Concepts**: Familiarize yourself with `KVStore`, `BaseStore`, `ManagedEntry`, `Collections`, `Compound Keys`, `TTL Management`, `Wrappers`, and `Adapters` by reading `README.md` and `DEVELOPING.md`.
 - **Development Setup**: Follow the \"Development Setup\" in `DEVELOPING.md` to clone the repository, install `uv`, sync dependencies (`uv sync --group dev`), activate the virtual environment, and install pre-commit hooks.
-- **Testing**: Review `DEVELOPING.md`'s \"Testing\" section for how to run tests, set up test environments using Docker Compose, and write new tests using `BaseKVStoreTestCase` or `BaseManagedKVStoreTestCase` from `tests/cases.py`.
+- **Testing**: Review `DEVELOPING.md`'s \"Testing\" section for how to run tests, set up test environments using Docker Compose, and write new tests using `BaseStoreTests` from `tests/stores/conftest.py`.
 - **Code Quality**: Understand the `ruff` and `pyright` configurations in `pyproject.toml` and how to run them (`uv run ruff check`, `uv run ruff format`, `pyright`).
-- **Adding New Stores**: If extending the project, follow the \"Adding New Store Implementations\" guide in `DEVELOPING.md` for detailed steps on choosing a base class, creating the store, structuring the package, and adding tests.
+- **Adding New Stores**: If extending the project, follow the \"Adding New Store Implementations\" guide in `DEVELOPING.md` for detailed steps on creating stores that inherit from the unified `BaseStore` class.
 
 ## Getting Unstuck
 - **General Development Issues**: Refer to the \"Development Guide\" in [`DEVELOPING.md`](DEVELOPING.md) for setup, testing, and contribution guidelines.
 - **Integration Tests with External Services**: If integration tests fail, ensure Docker and Docker Compose are running and the necessary services (Redis, Elasticsearch) are started via `docker-compose up -d` as described in [`DEVELOPING.md:L181-L194`](DEVELOPING.md:L181-L194). Check `.env` file configuration for external services (`DEVELOPING.md:L197-L211`).
 - **Redis Test Failures**: The `tests/stores/redis/test_redis.py` fixture `setup_redis` attempts to manage a Dockerized Redis instance. If Redis fails to start, check Docker logs or manually ensure the `redis-test` container is running and accessible.
-- **SingleCollectionWrapper Limitations**: This wrapper does not support `clear_collection` or `list_collections` operations, raising `NotImplementedError` if called (`src/kv_store_adapter/stores/wrappers/single_collection.py:L47-L64`

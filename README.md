@@ -8,7 +8,7 @@ A pluggable, async-only key-value store interface for modern Python applications
 - **Multiple backends**: Redis, Elasticsearch, In-memory, Disk, and more
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
-- **Adapters**: Pydantic, Single Collection, and more
+- **Adapters**: Pydantic model support, raise-on-missing behavior, and more
 - **Wrappers**: Statistics tracking and extensible wrapper system
 - **Collection-based**: Organize keys into logical collections/namespaces
 - **Pluggable architecture**: Easy to add custom store implementations
@@ -23,9 +23,13 @@ pip install kv-store-adapter[redis]
 pip install kv-store-adapter[elasticsearch]
 pip install kv-store-adapter[memory]
 pip install kv-store-adapter[disk]
+pip install kv-store-adapter[memcached]
 
 # With all backends
-pip install kv-store-adapter[memory,disk,redis,elasticsearch]
+pip install kv-store-adapter[memory,disk,redis,elasticsearch,memcached]
+
+# With Pydantic adapter support
+pip install kv-store-adapter[pydantic]
 ```
 
 # The KV Store Protocol
@@ -36,20 +40,20 @@ The simplest way to get started is to use the `KVStore` interface, which allows 
 import asyncio
 
 from kv_store_adapter.types import KVStore
-from kv_store_adapter.stores.redis import RedisStore
-from kv_store_adapter.stores.memory import MemoryStore
+from kv_store_adapter.stores.redis.store import RedisStore
+from kv_store_adapter.stores.memory.store import MemoryStore
 
 async def example():
     # In-memory store
     memory_store = MemoryStore()
-    await memory_store.put(collection="users", key="456", value={"name": "Bob"}, ttl=3600) # TTL is supported, but optional!
-    bob = await memory_store.get(collection="users", key="456")
-    await memory_store.delete(collection="users", key="456")
+    await memory_store.put(key="456", value={"name": "Bob"}, collection="users", ttl=3600) # TTL is supported, but optional!
+    bob = await memory_store.get(key="456", collection="users")
+    await memory_store.delete(key="456", collection="users")
 
     redis_store = RedisStore(url="redis://localhost:6379")
-    await redis_store.put(collection="products", key="123", value={"name": "Alice"})
-    alice = await redis_store.get(collection="products", key="123")
-    await redis_store.delete(collection="products", key="123")
+    await redis_store.put(key="123", value={"name": "Alice"}, collection="products")
+    alice = await redis_store.get(key="123", collection="products")
+    await redis_store.delete(key="123", collection="products")
 
 asyncio.run(example())
 ```
@@ -62,8 +66,9 @@ Choose the store that best fits your needs. All stores implement the same `KVSto
 
 - **RedisStore**: `RedisStore(url="redis://localhost:6379/0")`
 - **ElasticsearchStore**: `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key")`
-- **DiskStore**: A sqlite-based store for local persistence `DiskStore(path="./cache")`
-- **MemoryStore**: A fast in-memory cache `MemoryStore()`
+- **MemcachedStore**: `MemcachedStore(host="localhost", port=11211")`
+- **DiskStore**: A disk-based store using diskcache `DiskStore(directory="./cache")`. Also see `MultiDiskStore` for a store that creates one disk store per collection.
+- **MemoryStore**: A fast in-memory TLRU cache `MemoryStore()`
 
 ### Development/Testing Stores  
 
@@ -75,16 +80,16 @@ For detailed configuration options and all available stores, see [DEVELOPING.md]
 ## Atomicity / Consistency
 
 We strive to support atomicity and consistency across all stores and operations in the KVStore. That being said,
-there are operations available via the BaseKVStore class which are management operations like listing keys, listing collections, clearing collections, culling expired entries, etc. These operations may not be atomic, may be eventually consistent across stores, or may have other limitations (like limited to returning a certain number of keys).
+there are operations available via the BaseStore class which are management operations like listing keys, listing collections, clearing collections, culling expired entries, etc. These operations may not be atomic, may be eventually consistent across stores, or may have other limitations (like limited to returning a certain number of keys).
 
 ## Protocol Adapters
 
-The library provides an adapter pattern simplifying the use of the protocol/store. Adapters themselves do not implement the `KVStore` interface and cannot be nested. Adapters can be used with anything that implements the `KVStore` interface but do not comply with the full `BaseKVStore` interface and thus lack management operations like listing keys, listing collections, clearing collections, culling expired entries, etc.
+The library provides an adapter pattern simplifying the use of the protocol/store. Adapters themselves do not implement the `KVStore` interface and cannot be nested. As a result, Adapters are the "outer" layer of the store. Adapters are primarily for improved type-safe operations.
 
 The following adapters are available:
 
-- **PydanticAdapter**: Converts data to and from a store using Pydantic models.
-- **SingleCollectionAdapter**: Provides KV operations that do not require a collection parameter.
+- **PydanticAdapter**: Type-safe storage and retrieval using Pydantic models with automatic serialization/deserialization.
+- **RaiseOnMissingAdapter**: Provides optional raise-on-missing behavior for get, get_many, ttl, and ttl_many operations.
 
 For example, the PydanticAdapter can be used to provide type-safe interactions with a store:
 
@@ -92,7 +97,7 @@ For example, the PydanticAdapter can be used to provide type-safe interactions w
 from pydantic import BaseModel
 
 from kv_store_adapter.adapters.pydantic import PydanticAdapter
-from kv_store_adapter.stores.memory import MemoryStore
+from kv_store_adapter.stores.memory.store import MemoryStore
 
 class User(BaseModel):
     name: str
@@ -100,19 +105,18 @@ class User(BaseModel):
 
 memory_store = MemoryStore()
 
-user_adapter = PydanticAdapter(store=memory_store, pydantic_model=User)
+user_adapter = PydanticAdapter(kv_store=memory_store, pydantic_model=User)
 
 async def example():
-    await user_adapter.put(collection="users", key="123", value=User(name="John Doe", email="john.doe@example.com"))
-    user: User | None = await user_adapter.get(collection="users", key="123")
+    await user_adapter.put(key="123", value=User(name="John Doe", email="john.doe@example.com"), collection="users")
+    user: User | None = await user_adapter.get(key="123", collection="users")
 
 asyncio.run(example())
 ```
 
 ## Wrappers
 
-The library provides a wrapper pattern for adding functionality to a store. Wrappers themselves implement the `KVStore` interface meaning that you can wrap any
-store with any wrapper, and chain wrappers together as needed.
+The library provides a wrapper pattern for adding functionality to a store. Wrappers themselves implement the `KVStore` interface meaning that you can wrap any store with any wrapper, and chain wrappers together as needed.
 
 ### Statistics Tracking
 
@@ -121,17 +125,17 @@ Track operation statistics for any store:
 ```python
 import asyncio
 
-from kv_store_adapter.stores.wrappers.statistics import StatisticsWrapper
-from kv_store_adapter.stores.memory import MemoryStore
+from kv_store_adapter.wrappers.statistics import StatisticsWrapper
+from kv_store_adapter.stores.memory.store import MemoryStore
 
 memory_store = MemoryStore()
 store = StatisticsWrapper(store=memory_store)
 
 async def example():
     # Use store normally - statistics are tracked automatically
-    await store.put("users", "123", {"name": "Alice"})
-    await store.get("users", "123")
-    await store.get("users", "456")  # Cache miss
+    await store.put(key="123", value={"name": "Alice"}, collection="users")
+    await store.get(key="123", collection="users")
+    await store.get(key="456", collection="users")  # Cache miss
 
     # Access statistics
     stats = store.statistics
@@ -145,10 +149,11 @@ asyncio.run(example())
 
 Other wrappers that are available include:
 
+- **ClampTTLWrapper**: Wraps a store and clamps the TTL to a given range.
 - **TTLClampWrapper**: Wraps a store and clamps the TTL to a given range.
-- **PassthroughWrapper**: Wraps two stores, using the primary store as a write-through cache for the secondary store. For example, you could use a RedisStore as a distributed primary store and a MemoryStore as the cache store.
-- **PrefixCollectionWrapper**: Wraps a store and prefixes all collections with a given prefix.
-- **PrefixKeyWrapper**: Wraps a store and prefixes all keys with a given prefix.
+- **PassthroughCacheWrapper**: Wraps two stores to provide a read-through cache. Reads go to the cache store first and fall back to the primary store, populating the cache with the primary's TTL; writes evict from the cache and then write to the primary. For example, use a RedisStore as the primary and a MemoryStore as the cache store.
+- **PrefixCollectionsWrapper**: Wraps a store and prefixes all collections with a given prefix.
+- **PrefixKeysWrapper**: Wraps a store and prefixes all keys with a given prefix.
 - **SingleCollectionWrapper**: Wraps a store and forces all requests into a single collection.
 
 See [DEVELOPING.md](DEVELOPING.md) for more information on how to create your own wrappers.
@@ -161,8 +166,8 @@ Imagine you have a service where you want to cache 3 pydantic models in a single
 import asyncio
 
 from kv_store_adapter.adapters.pydantic import PydanticAdapter
-from kv_store_adapter.stores.wrappers.single_collection import SingleCollectionWrapper
-from kv_store_adapter.stores.memory import MemoryStore
+from kv_store_adapter.wrappers.single_collection import SingleCollectionWrapper
+from kv_store_adapter.stores.memory.store import MemoryStore
 from pydantic import BaseModel
 
 class User(BaseModel):
@@ -171,20 +176,22 @@ class User(BaseModel):
 
 store = MemoryStore()
 
-users_store = PydanticAdapter(SingleCollectionWrapper(store, "users"), User)
-products_store = PydanticAdapter(SingleCollectionWrapper(store, "products"), Product)
-orders_store = PydanticAdapter(SingleCollectionWrapper(store, "orders"), Order)
+users_store = PydanticAdapter(kv_store=SingleCollectionWrapper(store=store, single_collection="users", default_collection="default"), pydantic_model=User)
+products_store = PydanticAdapter(kv_store=SingleCollectionWrapper(store=store, single_collection="products", default_collection="default"), pydantic_model=Product)
+orders_store = PydanticAdapter(kv_store=SingleCollectionWrapper(store=store, single_collection="orders", default_collection="default"), pydantic_model=Order)
 
 async def example():
     new_user: User = User(name="John Doe", email="john.doe@example.com")
-    await users_store.put(collection="allowed_users", key="123", value=new_user)
+    await users_store.put(key="123", value=new_user, collection="allowed_users")
 
-    john_doe: User | None = await users_store.get(collection="allowed_users", key="123")
+    john_doe: User | None = await users_store.get(key="123", collection="allowed_users")
 
 asyncio.run(example())
 ```
 
 The SingleCollectionWrapper will result in writes to the `allowed_users` collection being redirected to the `users` collection but the keys will be prefixed with the original collection `allowed_users__` name. So the key `123` will be stored as `allowed_users__123` in the `users` collection.
+
+Note: The above example shows the conceptual usage, but you would need to define `Product` and `Order` models as well for the complete example to work.
 
 ## Development
 

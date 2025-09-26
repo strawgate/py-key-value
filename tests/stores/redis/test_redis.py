@@ -5,7 +5,7 @@ import pytest
 from redis.asyncio import Redis
 from typing_extensions import override
 
-from kv_store_adapter.stores.base.unmanaged import BaseKVStore
+from kv_store_adapter.stores.base import BaseStore
 from kv_store_adapter.stores.redis import RedisStore
 from tests.stores.conftest import BaseStoreTests
 
@@ -85,4 +85,4 @@ class TestRedisStore(BaseStoreTests):
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
-    async def test_not_unbounded(self, store: BaseKVStore): ...
+    async def test_not_unbounded(self, store: BaseStore): ...

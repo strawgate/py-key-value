@@ -1,166 +1,98 @@
 from collections import defaultdict
-from datetime import datetime, timezone
-from typing import Any
+from dataclasses import dataclass
+from datetime import datetime
 
 from typing_extensions import override
 
-from kv_store_adapter.stores.base.managed import BaseManagedKVStore
-from kv_store_adapter.stores.base.unmanaged import BaseKVStore
+from kv_store_adapter.stores.base import (
+    BaseDestroyStore,
+    BaseEnumerateCollectionsStore,
+    BaseEnumerateKeysStore,
+    BaseStore,
+)
 from kv_store_adapter.stores.utils.compound import compound_key, get_collections_from_compound_keys, get_keys_from_compound_keys
-from kv_store_adapter.stores.utils.managed_entry import ManagedEntry
-from kv_store_adapter.stores.utils.time_to_live import calculate_expires_at
-from kv_store_adapter.types import TTLInfo
+from kv_store_adapter.stores.utils.managed_entry import ManagedEntry, load_from_json
+from kv_store_adapter.stores.utils.time_to_live import seconds_to
 
 DEFAULT_SIMPLE_MANAGED_STORE_MAX_ENTRIES = 1000
 DEFAULT_SIMPLE_STORE_MAX_ENTRIES = 1000
 
 
-class SimpleStore(BaseKVStore):
-    """Simple dictionary-based key-value store for testing and development."""
+@dataclass
+class SimpleStoreEntry:
+    json_str: str
 
-    max_entries: int
-    _data: dict[str, dict[str, Any]]
-    _expirations: dict[str, datetime]
+    created_at: datetime | None
+    expires_at: datetime | None
 
-    def __init__(self, max_entries: int = DEFAULT_SIMPLE_STORE_MAX_ENTRIES):
-        super().__init__()
-        self.max_entries = max_entries
-        self._data = defaultdict[str, dict[str, Any]](dict)
-        self._expirations = defaultdict[str, datetime]()
-
-    async def setup(self) -> None:
-        pass
-
-    @override
-    async def get(self, collection: str, key: str) -> dict[str, Any] | None:
-        combo_key: str = compound_key(collection=collection, key=key)
-
-        if not (data := self._data.get(combo_key)):
+    @property
+    def current_ttl(self) -> float | None:
+        if self.expires_at is None:
             return None
 
-        if not (expiration := self._expirations.get(combo_key)):
-            return data
+        return seconds_to(datetime=self.expires_at)
 
-        if expiration <= datetime.now(tz=timezone.utc):
-            del self._data[combo_key]
-            del self._expirations[combo_key]
-            return None
+    def to_managed_entry(self) -> ManagedEntry:
+        managed_entry: ManagedEntry = ManagedEntry(
+            value=load_from_json(json_str=self.json_str),
+            expires_at=self.expires_at,
+            created_at=self.created_at,
+        )
 
-        return data
-
-    @override
-    async def exists(self, collection: str, key: str) -> bool:
-        return await self.get(collection=collection, key=key) is not None
-
-    @override
-    async def put(self, collection: str, key: str, value: dict[str, Any], *, ttl: float | None = None) -> None:
-        combo_key: str = compound_key(collection=collection, key=key)
-
-        if len(self._data) >= self.max_entries:
-            _ = self._data.pop(next(iter(self._data)))
-
-        _ = self._data[combo_key] = value
-
-        if expires_at := calculate_expires_at(ttl=ttl):
-            _ = self._expirations[combo_key] = expires_at
-
-    @override
-    async def delete(self, collection: str, key: str) -> bool:
-        combo_key: str = compound_key(collection=collection, key=key)
-        return self._data.pop(combo_key, None) is not None
-
-    @override
-    async def ttl(self, collection: str, key: str) -> TTLInfo | None:
-        combo_key: str = compound_key(collection=collection, key=key)
-
-        if not (expiration := self._expirations.get(combo_key)):
-            return None
-
-        return TTLInfo(collection=collection, key=key, created_at=None, ttl=None, expires_at=expiration)
-
-    @override
-    async def keys(self, collection: str) -> list[str]:
-        return get_keys_from_compound_keys(compound_keys=list(self._data.keys()), collection=collection)
-
-    @override
-    async def clear_collection(self, collection: str) -> int:
-        keys: list[str] = get_keys_from_compound_keys(compound_keys=list(self._data.keys()), collection=collection)
-
-        for key in keys:
-            _ = self._data.pop(key)
-            _ = self._expirations.pop(key)
-
-        return len(keys)
-
-    @override
-    async def list_collections(self) -> list[str]:
-        return get_collections_from_compound_keys(compound_keys=list(self._data.keys()))
-
-    @override
-    async def cull(self) -> None:
-        for collection in await self.list_collections():
-            for key in get_keys_from_compound_keys(compound_keys=list(self._data.keys()), collection=collection):
-                if not (expiration := self._expirations.get(key)):
-                    continue
-
-                if expiration <= datetime.now(tz=timezone.utc):
-                    _ = self._data.pop(key)
-                    _ = self._expirations.pop(key)
+        return managed_entry
 
 
-class SimpleManagedStore(BaseManagedKVStore):
+class SimpleStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDestroyStore, BaseStore):
     """Simple managed dictionary-based key-value store for testing and development."""
 
     max_entries: int
-    _data: dict[str, ManagedEntry]
 
-    def __init__(self, max_entries: int = DEFAULT_SIMPLE_MANAGED_STORE_MAX_ENTRIES):
-        super().__init__()
+    _data: dict[str, SimpleStoreEntry]
+
+    def __init__(self, max_entries: int = DEFAULT_SIMPLE_MANAGED_STORE_MAX_ENTRIES, default_collection: str | None = None):
         self.max_entries = max_entries
-        self._data = defaultdict[str, ManagedEntry]()
+
+        self._data = defaultdict[str, SimpleStoreEntry]()
+
+        super().__init__(default_collection=default_collection)
 
     @override
-    async def setup(self) -> None:
-        pass
-
-    @override
-    async def get_entry(self, collection: str, key: str) -> ManagedEntry | None:
+    async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         combo_key: str = compound_key(collection=collection, key=key)
-        return self._data.get(combo_key)
+
+        store_entry: SimpleStoreEntry | None = self._data.get(combo_key)
+
+        if store_entry is None:
+            return None
+
+        return store_entry.to_managed_entry()
 
     @override
-    async def put_entry(self, collection: str, key: str, cache_entry: ManagedEntry, *, ttl: float | None = None) -> None:
+    async def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
         if len(self._data) >= self.max_entries:
             _ = self._data.pop(next(iter(self._data)))
 
-        self._data[combo_key] = cache_entry
+        self._data[combo_key] = SimpleStoreEntry(
+            json_str=managed_entry.to_json(include_metadata=False), expires_at=managed_entry.expires_at, created_at=managed_entry.created_at
+        )
 
     @override
-    async def delete(self, collection: str, key: str) -> bool:
+    async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
+
         return self._data.pop(combo_key, None) is not None
 
     @override
-    async def keys(self, collection: str) -> list[str]:
+    async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
         return get_keys_from_compound_keys(compound_keys=list(self._data.keys()), collection=collection)
 
     @override
-    async def clear_collection(self, collection: str) -> int:
-        keys: list[str] = get_keys_from_compound_keys(compound_keys=list(self._data.keys()), collection=collection)
-
-        for key in keys:
-            _ = self._data.pop(key)
-
-        return len(keys)
-
-    @override
-    async def list_collections(self) -> list[str]:
+    async def _get_collection_names(self, *, limit: int | None = None) -> list[str]:
         return get_collections_from_compound_keys(compound_keys=list(self._data.keys()))
 
     @override
-    async def cull(self) -> None:
-        for collection in await self.list_collections():
-            for key in get_keys_from_compound_keys(compound_keys=list(self._data.keys()), collection=collection):
-                _ = await self.get_entry(collection=collection, key=key)
+    async def _delete_store(self) -> bool:
+        self._data.clear()
+        return True

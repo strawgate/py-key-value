@@ -1,109 +1,170 @@
 import sys
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
-from cachetools import TLRUCache
-from typing_extensions import override
+from typing_extensions import Self, override
 
-from kv_store_adapter.stores.base.managed import BaseManagedKVStore
-from kv_store_adapter.stores.utils.compound import compound_key, uncompound_key
+from kv_store_adapter.stores.base import (
+    BaseDestroyCollectionStore,
+    BaseDestroyStore,
+    BaseEnumerateCollectionsStore,
+    BaseEnumerateKeysStore,
+)
 from kv_store_adapter.stores.utils.managed_entry import ManagedEntry
+from kv_store_adapter.stores.utils.time_to_live import epoch_to_datetime
+
+try:
+    from cachetools import TLRUCache
+except ImportError as e:
+    msg = "MemoryStore requires py-kv-store-adapter[memory]"
+    raise ImportError(msg) from e
 
 
-def _memory_cache_ttu(_key: Any, value: ManagedEntry, now: float) -> float:  # pyright: ignore[reportAny]
+@dataclass
+class MemoryCacheEntry:
+    json_str: str
+
+    expires_at: datetime | None
+
+    ttl_at_insert: float | None = field(default=None)
+
+    @classmethod
+    def from_managed_entry(cls, managed_entry: ManagedEntry, ttl: float | None = None) -> Self:
+        return cls(
+            json_str=managed_entry.to_json(),
+            expires_at=managed_entry.expires_at,
+            ttl_at_insert=ttl,
+        )
+
+    def to_managed_entry(self) -> ManagedEntry:
+        return ManagedEntry.from_json(json_str=self.json_str)
+
+
+def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, now: float) -> float:  # pyright: ignore[reportAny]
     """Calculate time-to-use for cache entries based on their TTL."""
-    return now + value.ttl if value.ttl else sys.maxsize
+    if value.ttl_at_insert is None:
+        return sys.maxsize
+
+    expiration_epoch: float = now + value.ttl_at_insert
+
+    value.expires_at = epoch_to_datetime(epoch=expiration_epoch)
+
+    return expiration_epoch
 
 
-def _memory_cache_getsizeof(value: ManagedEntry) -> int:  # pyright: ignore[reportUnusedParameter]  # noqa: ARG001
+def _memory_cache_getsizeof(value: MemoryCacheEntry) -> int:  # pyright: ignore[reportUnusedParameter]  # noqa: ARG001
     """Return size of cache entry (always 1 for entry counting)."""
     return 1
 
 
 DEFAULT_MEMORY_CACHE_LIMIT = 1000
 
+DEFAULT_PAGE_SIZE = 10000
+PAGE_LIMIT = 10000
 
-class MemoryStore(BaseManagedKVStore):
-    """In-memory key-value store using TLRU (Time-aware Least Recently Used) cache."""
 
-    max_entries: int
-    _cache: TLRUCache[str, ManagedEntry]
+class MemoryCollection:
+    _cache: TLRUCache[str, MemoryCacheEntry]
 
     def __init__(self, max_entries: int = DEFAULT_MEMORY_CACHE_LIMIT):
-        """Initialize the in-memory cache.
-
-        Args:
-            max_entries: The maximum number of entries to store in the cache. Defaults to 1000.
-        """
-        self.max_entries = max_entries
-        self._cache = TLRUCache[str, ManagedEntry](
+        self._cache = TLRUCache[str, MemoryCacheEntry](
             maxsize=max_entries,
             ttu=_memory_cache_ttu,
             getsizeof=_memory_cache_getsizeof,
         )
 
-        super().__init__()
+    def get(self, key: str) -> ManagedEntry | None:
+        managed_entry_str: MemoryCacheEntry | None = self._cache.get(key)
+
+        if managed_entry_str is None:
+            return None
+
+        managed_entry: ManagedEntry = managed_entry_str.to_managed_entry()
+
+        return managed_entry
+
+    def put(self, key: str, value: ManagedEntry) -> None:
+        self._cache[key] = MemoryCacheEntry.from_managed_entry(managed_entry=value, ttl=value.ttl)
+
+    def delete(self, key: str) -> bool:
+        return self._cache.pop(key, None) is not None
+
+    def keys(self, *, limit: int | None = None) -> list[str]:
+        limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
+        return list(self._cache.keys())[:limit]
+
+
+class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseEnumerateKeysStore):
+    """In-memory key-value store using TLRU (Time-aware Least Recently Used) cache."""
+
+    max_entries_per_collection: int
+
+    _cache: dict[str, MemoryCollection]
+
+    def __init__(self, *, max_entries_per_collection: int = DEFAULT_MEMORY_CACHE_LIMIT, default_collection: str | None = None):
+        """Initialize the in-memory cache.
+
+        Args:
+            max_entries_per_collection: The maximum number of entries per collection. Defaults to 1000.
+        """
+
+        self.max_entries_per_collection = max_entries_per_collection
+
+        self._cache = {}
+
+        super().__init__(default_collection=default_collection)
 
     @override
-    async def setup(self) -> None:
-        pass
+    async def _setup_collection(self, *, collection: str) -> None:
+        self._cache[collection] = MemoryCollection(max_entries=self.max_entries_per_collection)
 
     @override
-    async def get_entry(self, collection: str, key: str) -> ManagedEntry | None:
-        combo_key: str = compound_key(collection=collection, key=key)
+    async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
+        collection_cache: MemoryCollection = self._cache[collection]
 
-        if cache_entry := self._cache.get(combo_key):
-            return cache_entry
-
-        return None
+        return collection_cache.get(key=key)
 
     @override
-    async def put_entry(
+    async def _put_managed_entry(
         self,
-        collection: str,
-        key: str,
-        cache_entry: ManagedEntry,
         *,
-        ttl: float | None = None,
+        key: str,
+        collection: str,
+        managed_entry: ManagedEntry,
     ) -> None:
-        combo_key: str = compound_key(collection=collection, key=key)
-        self._cache[combo_key] = cache_entry
+        collection_cache: MemoryCollection = self._cache[collection]
+
+        collection_cache.put(key=key, value=managed_entry)
 
     @override
-    async def delete(self, collection: str, key: str) -> bool:
-        combo_key: str = compound_key(collection=collection, key=key)
-        return self._cache.pop(combo_key, None) is not None
+    async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
+        collection_cache: MemoryCollection = self._cache[collection]
+
+        return collection_cache.delete(key=key)
 
     @override
-    async def keys(self, collection: str) -> list[str]:
-        keys: list[str] = []
+    async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
+        collection_cache: MemoryCollection = self._cache[collection]
 
-        for key in self._cache:
-            entry_collection, entry_key = uncompound_key(key=key)
-            if entry_collection == collection:
-                keys.append(entry_key)
-
-        return keys
+        return collection_cache.keys(limit=limit)
 
     @override
-    async def clear_collection(self, collection: str) -> int:
-        cleared_count: int = 0
-
-        for key in await self.keys(collection=collection):
-            _ = await self.delete(collection=collection, key=key)
-            cleared_count += 1
-
-        return cleared_count
+    async def _get_collection_names(self, *, limit: int | None = None) -> list[str]:
+        limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
+        return list(self._cache.keys())[:limit]
 
     @override
-    async def list_collections(self) -> list[str]:
-        collections: set[str] = set()
-        for key in self._cache:
-            entry_collection, _ = uncompound_key(key=key)
-            collections.add(entry_collection)
-        return list(collections)
+    async def _delete_collection(self, *, collection: str) -> bool:
+        if collection not in self._cache:
+            return False
+
+        del self._cache[collection]
+
+        return True
 
     @override
-    async def cull(self) -> None:
-        for collection in await self.list_collections():
-            for key in await self.keys(collection=collection):
-                _ = await self.get_entry(collection=collection, key=key)
+    async def _delete_store(self) -> bool:
+        self._cache.clear()
+
+        return True

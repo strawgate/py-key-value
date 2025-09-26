@@ -42,9 +42,12 @@ def prefix_key(key: str, prefix: str, separator: str | None = None) -> str:
     return compound_string(first=prefix, second=key, separator=separator)
 
 
-def unprefix_key(key: str, separator: str | None = None) -> str:
+def unprefix_key(key: str, prefix: str, separator: str | None = None) -> str:
     separator = separator or DEFAULT_PREFIX_SEPARATOR
-    return uncompound_string(string=key, separator=separator)[1]
+    if not key.startswith(prefix + separator):
+        msg = f"Key {key} is not prefixed with {prefix}"
+        raise ValueError(msg)
+    return key[len(prefix + separator) :]
 
 
 def prefix_collection(collection: str, prefix: str, separator: str | None = None) -> str:
@@ -52,18 +55,21 @@ def prefix_collection(collection: str, prefix: str, separator: str | None = None
     return compound_string(first=prefix, second=collection, separator=separator)
 
 
-def unprefix_collection(collection: str, separator: str | None = None) -> str:
+def unprefix_collection(collection: str, prefix: str, separator: str | None = None) -> str:
     separator = separator or DEFAULT_PREFIX_SEPARATOR
-    return uncompound_string(string=collection, separator=separator)[1]
+    if not collection.startswith(prefix + separator):
+        msg = f"Collection {collection} is not prefixed with {prefix}"
+        raise ValueError(msg)
+    return collection[len(prefix + separator) :]
 
 
 def get_collections_from_compound_keys(compound_keys: list[str], separator: str | None = None) -> list[str]:
-    """Returns a unique list of collections from a list of compound keys."""
+    """Return a unique list of collections from a list of compound keys."""
     separator = separator or DEFAULT_COMPOUND_SEPARATOR
     return list({key_collection for key_collection, _ in uncompound_strings(strings=compound_keys)})
 
 
 def get_keys_from_compound_keys(compound_keys: list[str], collection: str, separator: str | None = None) -> list[str]:
-    """Returns a list of keys from a list of compound keys for a given collection."""
+    """Return all keys from a list of compound keys for a given collection."""
     separator = separator or DEFAULT_COMPOUND_SEPARATOR
     return [key for key_collection, key in uncompound_strings(strings=compound_keys) if key_collection == collection]

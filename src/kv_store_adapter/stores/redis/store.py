@@ -1,33 +1,43 @@
 from typing import Any, overload
 from urllib.parse import urlparse
 
-from redis.asyncio import Redis
 from typing_extensions import override
 
-from kv_store_adapter.errors import StoreConnectionError
-from kv_store_adapter.stores.base.managed import BaseManagedKVStore
-from kv_store_adapter.stores.utils.compound import compound_key, get_keys_from_compound_keys, uncompound_key
+from kv_store_adapter.stores.base import BaseDestroyStore, BaseEnumerateKeysStore, BaseStore
+from kv_store_adapter.stores.utils.compound import compound_key, get_keys_from_compound_keys
 from kv_store_adapter.stores.utils.managed_entry import ManagedEntry
 
+try:
+    from redis.asyncio import Redis
+except ImportError as e:
+    msg = "RedisStore requires py-kv-store-adapter[redis]"
+    raise ImportError(msg) from e
 
-class RedisStore(BaseManagedKVStore):
+DEFAULT_PAGE_SIZE = 10000
+PAGE_LIMIT = 10000
+
+
+class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseStore):
     """Redis-based key-value store."""
 
     _client: Redis
 
     @overload
-    def __init__(self, *, client: Redis) -> None: ...
+    def __init__(self, *, client: Redis, default_collection: str | None = None) -> None: ...
 
     @overload
-    def __init__(self, *, url: str) -> None: ...
+    def __init__(self, *, url: str, default_collection: str | None = None) -> None: ...
 
     @overload
-    def __init__(self, *, host: str = "localhost", port: int = 6379, db: int = 0, password: str | None = None) -> None: ...
+    def __init__(
+        self, *, host: str = "localhost", port: int = 6379, db: int = 0, password: str | None = None, default_collection: str | None = None
+    ) -> None: ...
 
     def __init__(
         self,
         *,
         client: Redis | None = None,
+        default_collection: str | None = None,
         url: str | None = None,
         host: str = "localhost",
         port: int = 6379,
@@ -43,6 +53,7 @@ class RedisStore(BaseManagedKVStore):
             port: Redis port. Defaults to 6379.
             db: Redis database number. Defaults to 0.
             password: Redis password. Defaults to None.
+            default_collection: The default collection to use if no collection is provided.
         """
         if client:
             self._client = client
@@ -64,95 +75,60 @@ class RedisStore(BaseManagedKVStore):
                 decode_responses=True,
             )
 
-        super().__init__()
+        super().__init__(default_collection=default_collection)
 
     @override
-    async def setup(self) -> None:
-        if not await self._client.ping():  # pyright: ignore[reportUnknownMemberType]
-            raise StoreConnectionError(message="Failed to connect to Redis")
-
-    @override
-    async def get_entry(self, collection: str, key: str) -> ManagedEntry | None:
+    async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        cache_entry: Any = await self._client.get(name=combo_key)  # pyright: ignore[reportAny]
+        redis_response: Any = await self._client.get(name=combo_key)  # pyright: ignore[reportAny]
 
-        if cache_entry is None:
+        if not isinstance(redis_response, str):
             return None
 
-        if not isinstance(cache_entry, str):
-            return None
+        managed_entry: ManagedEntry = ManagedEntry.from_json(json_str=redis_response)
 
-        return ManagedEntry.from_json(json_str=cache_entry)
+        return managed_entry
 
     @override
-    async def put_entry(
+    async def _put_managed_entry(
         self,
-        collection: str,
-        key: str,
-        cache_entry: ManagedEntry,
         *,
-        ttl: float | None = None,
+        key: str,
+        collection: str,
+        managed_entry: ManagedEntry,
     ) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        json_value: str = cache_entry.to_json()
+        json_value: str = managed_entry.to_json()
 
-        if ttl is not None:
+        if managed_entry.ttl is not None:
             # Redis does not support <= 0 TTLs
-            ttl = max(int(ttl), 1)
+            ttl = max(int(managed_entry.ttl), 1)
 
             _ = await self._client.setex(name=combo_key, time=ttl, value=json_value)  # pyright: ignore[reportAny]
         else:
             _ = await self._client.set(name=combo_key, value=json_value)  # pyright: ignore[reportAny]
 
     @override
-    async def delete(self, collection: str, key: str) -> bool:
-        await self.setup_collection_once(collection=collection)
-
+    async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
+
         return await self._client.delete(combo_key) != 0  # pyright: ignore[reportAny]
 
     @override
-    async def keys(self, collection: str) -> list[str]:
-        await self.setup_collection_once(collection=collection)
-
-        pattern = compound_key(collection=collection, key="*")
-        compound_keys: list[str] = await self._client.keys(pattern)  # pyright: ignore[reportUnknownMemberType, reportAny]
-
-        return get_keys_from_compound_keys(compound_keys=compound_keys, collection=collection)
-
-    @override
-    async def clear_collection(self, collection: str) -> int:
-        await self.setup_collection_once(collection=collection)
+    async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
+        limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
 
         pattern = compound_key(collection=collection, key="*")
 
-        deleted_count: int = 0
+        # redis.asyncio scan returns tuple(cursor, keys)
+        _cursor: int
+        keys: list[str]
+        _cursor, keys = await self._client.scan(cursor=0, match=pattern, count=limit)  # pyright: ignore[reportUnknownMemberType, reportAny]
 
-        async for key in self._client.scan_iter(name=pattern):  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            if not isinstance(key, str):
-                continue
-
-            deleted_count += await self._client.delete(key)  # pyright: ignore[reportAny]
-
-        return deleted_count
+        return get_keys_from_compound_keys(compound_keys=keys, collection=collection)
 
     @override
-    async def list_collections(self) -> list[str]:
-        await self.setup_once()
-
-        pattern: str = compound_key(collection="*", key="*")
-
-        collections: set[str] = set()
-
-        async for key in self._client.scan_iter(name=pattern):  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            if not isinstance(key, str):
-                continue
-
-            collections.add(uncompound_key(key=key)[0])
-
-        return list[str](collections)
-
-    @override
-    async def cull(self) -> None: ...
+    async def _delete_store(self) -> bool:
+        return await self._client.flushdb()  # pyright: ignore[reportUnknownMemberType, reportAny]

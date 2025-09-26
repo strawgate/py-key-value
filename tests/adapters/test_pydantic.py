@@ -32,7 +32,7 @@ FIXED_CREATED_AT: datetime = datetime(year=2021, month=1, day=1, hour=12, minute
 FIXED_UPDATED_AT: datetime = datetime(year=2021, month=1, day=1, hour=15, minute=0, second=0, tzinfo=timezone.utc)
 
 SAMPLE_USER: User = User(name="John Doe", email="john.doe@example.com", age=30)
-SAMPLE_PRODUCT: Product = Product(name="Widget", price=29.99, quantity=10, url=AnyHttpUrl("https://example.com"))
+SAMPLE_PRODUCT: Product = Product(name="Widget", price=29.99, quantity=10, url=AnyHttpUrl(url="https://example.com"))
 SAMPLE_ORDER: Order = Order(created_at=datetime.now(), updated_at=datetime.now(), user=SAMPLE_USER, product=SAMPLE_PRODUCT, paid=False)
 
 
@@ -43,15 +43,15 @@ class TestPydanticAdapter:
 
     @pytest.fixture
     async def user_adapter(self, store: MemoryStore) -> PydanticAdapter[User]:
-        return PydanticAdapter[User](store_protocol=store, pydantic_model=User)
+        return PydanticAdapter[User](kv_store=store, pydantic_model=User)
 
     @pytest.fixture
     async def product_adapter(self, store: MemoryStore) -> PydanticAdapter[Product]:
-        return PydanticAdapter[Product](store_protocol=store, pydantic_model=Product)
+        return PydanticAdapter[Product](kv_store=store, pydantic_model=Product)
 
     @pytest.fixture
     async def order_adapter(self, store: MemoryStore) -> PydanticAdapter[Order]:
-        return PydanticAdapter[Order](store_protocol=store, pydantic_model=Order)
+        return PydanticAdapter[Order](kv_store=store, pydantic_model=Order)
 
     async def test_simple_adapter(self, user_adapter: PydanticAdapter[User]):
         await user_adapter.put(collection="test", key="test", value=SAMPLE_USER)

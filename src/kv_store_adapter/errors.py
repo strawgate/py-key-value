@@ -22,6 +22,16 @@ class KVStoreAdapterError(Exception):
         super().__init__(": ".join(message_parts))
 
 
+class MissingKeyError(KVStoreAdapterError):
+    """Raised when a key is missing from the store."""
+
+    def __init__(self, operation: str, collection: str | None = None, key: str | None = None):
+        super().__init__(
+            message="A key was requested that was required but not found in the store.",
+            extra_info={"operation": operation, "collection": collection or "default", "key": key},
+        )
+
+
 class SetupError(KVStoreAdapterError):
     """Raised when a store setup fails."""
 
