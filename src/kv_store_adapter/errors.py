@@ -1,6 +1,6 @@
 from typing import Any
 
-ExtraInfoType = dict[str, Any]
+ExtraInfoType = dict[str, str | int | float | bool | None]
 
 
 class KVStoreAdapterError(Exception):
@@ -13,7 +13,7 @@ class KVStoreAdapterError(Exception):
             message_parts.append(message)
 
         if extra_info:
-            extra_info_str = ";".join(f"{k}: {v}" for k, v in extra_info.items())  # pyright: ignore[reportAny]
+            extra_info_str = ";".join(f"{k}: {v}" for k, v in extra_info.items())
             if message:
                 extra_info_str = "(" + extra_info_str + ")"
 
@@ -29,6 +29,16 @@ class MissingKeyError(KVStoreAdapterError):
         super().__init__(
             message="A key was requested that was required but not found in the store.",
             extra_info={"operation": operation, "collection": collection or "default", "key": key},
+        )
+
+
+class InvalidTTLError(KVStoreAdapterError):
+    """Raised when a TTL is invalid."""
+
+    def __init__(self, ttl: float):
+        super().__init__(
+            message="A TTL is invalid.",
+            extra_info={"ttl": ttl},
         )
 
 

@@ -6,7 +6,7 @@ from typing import Any, cast
 from typing_extensions import Self
 
 from kv_store_adapter.errors import DeserializationError, SerializationError
-from kv_store_adapter.stores.utils.time_to_live import now, now_plus, try_parse_datetime
+from kv_store_adapter.utils.time_to_live import now, now_plus, try_parse_datetime_str
 
 
 @dataclass(kw_only=True)
@@ -64,8 +64,8 @@ class ManagedEntry:
                 value=data,
             )
 
-        created_at: datetime | None = try_parse_datetime(value=data.get("created_at"))
-        expires_at: datetime | None = try_parse_datetime(value=data.get("expires_at"))
+        created_at: datetime | None = try_parse_datetime_str(value=data.get("created_at"))
+        expires_at: datetime | None = try_parse_datetime_str(value=data.get("expires_at"))
 
         value: dict[str, Any] | None = data.get("value")
 

@@ -3,9 +3,9 @@ from urllib.parse import urlparse
 
 from typing_extensions import override
 
-from kv_store_adapter.stores.base import BaseDestroyStore, BaseEnumerateKeysStore, BaseStore
-from kv_store_adapter.stores.utils.compound import compound_key, get_keys_from_compound_keys
-from kv_store_adapter.stores.utils.managed_entry import ManagedEntry
+from kv_store_adapter.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseEnumerateKeysStore, BaseStore
+from kv_store_adapter.utils.compound import compound_key, get_keys_from_compound_keys
+from kv_store_adapter.utils.managed_entry import ManagedEntry
 
 try:
     from redis.asyncio import Redis
@@ -17,7 +17,7 @@ DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
 
 
-class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseStore):
+class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):
     """Redis-based key-value store."""
 
     _client: Redis
@@ -132,3 +132,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseStore):
     @override
     async def _delete_store(self) -> bool:
         return await self._client.flushdb()  # pyright: ignore[reportUnknownMemberType, reportAny]
+
+    @override
+    async def _close(self) -> None:
+        await self._client.close()

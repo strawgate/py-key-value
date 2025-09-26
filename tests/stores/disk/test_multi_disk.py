@@ -16,4 +16,6 @@ class TestMultiDiskStore(BaseStoreTests):
     @pytest.fixture
     async def store(self) -> AsyncGenerator[MultiDiskStore, None]:
         with tempfile.TemporaryDirectory() as temp_dir:
-            yield MultiDiskStore(base_directory=Path(temp_dir), max_size=TEST_SIZE_LIMIT)
+            disk_store = MultiDiskStore(base_directory=Path(temp_dir), max_size=TEST_SIZE_LIMIT)
+
+            yield disk_store

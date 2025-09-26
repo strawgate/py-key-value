@@ -8,7 +8,7 @@ from typing_extensions import override
 
 from kv_store_adapter.stores.base import BaseStore
 from kv_store_adapter.stores.memcached import MemcachedStore
-from tests.stores.conftest import BaseStoreTests, detect_docker
+from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, should_skip_docker_tests
 
 # Memcached test configuration
 MEMCACHED_HOST = "localhost"
@@ -43,8 +43,8 @@ class MemcachedFailedToStartError(Exception):
     pass
 
 
-@pytest.mark.skipif(not detect_docker(), reason="Docker is not available")
-class TestMemcachedStore(BaseStoreTests):
+@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
+class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")
     async def setup_memcached(self) -> AsyncGenerator[None, None]:
         _ = await asyncio.create_subprocess_exec("docker", "stop", "memcached-test")

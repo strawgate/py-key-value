@@ -7,13 +7,12 @@ from abc import ABC, abstractmethod
 from asyncio.locks import Lock
 from collections import defaultdict
 from collections.abc import Sequence
+from types import TracebackType
 from typing import Any
 
-from typing_extensions import override
+from typing_extensions import Self, override
 
-from kv_store_adapter.errors import SetupError
-from kv_store_adapter.stores.utils.managed_entry import ManagedEntry
-from kv_store_adapter.stores.utils.time_to_live import now
+from kv_store_adapter.errors import InvalidTTLError, SetupError
 from kv_store_adapter.types import (
     CullProtocol,
     DestroyCollectionProtocol,
@@ -22,8 +21,26 @@ from kv_store_adapter.types import (
     EnumerateKeysProtocol,
     KeyValueProtocol,
 )
+from kv_store_adapter.utils.managed_entry import ManagedEntry
+from kv_store_adapter.utils.time_to_live import now
 
 DEFAULT_COLLECTION_NAME = "default_collection"
+
+
+def validate_one_ttl(t: float | None, raise_error: bool = False) -> bool:
+    if t is None:
+        return True
+    if t <= 0:
+        if raise_error:
+            raise InvalidTTLError(ttl=t)
+        return False
+    return True
+
+
+def validate_ttls(t: list[float | None] | float | None, raise_error: bool = False) -> bool:
+    if not isinstance(t, (Sequence)):
+        t = [t]
+    return all(validate_one_ttl(t=ttl, raise_error=raise_error) for ttl in t)
 
 
 class BaseStore(KeyValueProtocol, ABC):
@@ -188,6 +205,8 @@ class BaseStore(KeyValueProtocol, ABC):
         collection = collection or self.default_collection
         await self.setup_collection(collection=collection)
 
+        _ = validate_ttls(t=ttl, raise_error=True)
+
         managed_entry: ManagedEntry = ManagedEntry(value=value, ttl=ttl, created_at=now())
 
         await self._put_managed_entry(
@@ -220,13 +239,13 @@ class BaseStore(KeyValueProtocol, ABC):
         ttl_for_entries: list[float | None] = []
 
         if ttl is None:
-            ttl_for_entries = [None for _ in range(len(keys))]
+            ttl_for_entries = [None] * len(keys)
+        elif isinstance(ttl, Sequence):
+            ttl_for_entries = list(ttl)
+        elif isinstance(ttl, float):
+            ttl_for_entries = [ttl] * len(keys)
 
-        if isinstance(ttl, Sequence):
-            ttl_for_entries.extend(ttl)
-
-        if isinstance(ttl, float):
-            ttl_for_entries.extend([ttl for _ in range(len(keys))])
+        _ = validate_ttls(t=ttl_for_entries, raise_error=True)
 
         managed_entries: list[ManagedEntry] = []
 
@@ -285,6 +304,27 @@ class BaseEnumerateKeysStore(BaseStore, EnumerateKeysProtocol, ABC):
     @abstractmethod
     async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
         """List all keys in the specified collection."""
+
+
+class BaseContextManagerStore(BaseStore, ABC):
+    """An abstract base class for context manager stores."""
+
+    async def __aenter__(self) -> Self:
+        await self.setup()
+        return self
+
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        await self._close()
+
+    async def close(self) -> None:
+        await self._close()
+
+    @abstractmethod
+    async def _close(self) -> None:
+        """Close the store."""
+        ...
 
 
 class BaseEnumerateCollectionsStore(BaseStore, EnumerateCollectionsProtocol, ABC):

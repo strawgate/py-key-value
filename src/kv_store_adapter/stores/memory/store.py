@@ -11,8 +11,8 @@ from kv_store_adapter.stores.base import (
     BaseEnumerateCollectionsStore,
     BaseEnumerateKeysStore,
 )
-from kv_store_adapter.stores.utils.managed_entry import ManagedEntry
-from kv_store_adapter.stores.utils.time_to_live import epoch_to_datetime
+from kv_store_adapter.utils.managed_entry import ManagedEntry
+from kv_store_adapter.utils.time_to_live import epoch_to_datetime
 
 try:
     from cachetools import TLRUCache

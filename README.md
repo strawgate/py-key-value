@@ -5,10 +5,10 @@ A pluggable, async-only key-value store interface for modern Python applications
 ## Features
 
 - **Async-only**: Built from the ground up with `async`/`await` support
-- **Multiple backends**: Redis, Elasticsearch, In-memory, Disk, and more
+- **Multiple backends**: Elasticsearch, Memcached, MongoDB, Redis, Valkey, and In-memory, Disk, etc
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
-- **Adapters**: Pydantic model support, raise-on-missing behavior, and more
+- **Adapters**: Pydantic model support, raise-on-missing behavior, etc
 - **Wrappers**: Statistics tracking and extensible wrapper system
 - **Collection-based**: Organize keys into logical collections/namespaces
 - **Pluggable architecture**: Easy to add custom store implementations
@@ -24,9 +24,11 @@ pip install kv-store-adapter[elasticsearch]
 pip install kv-store-adapter[memory]
 pip install kv-store-adapter[disk]
 pip install kv-store-adapter[memcached]
+pip install kv-store-adapter[mongodb]
+pip install kv-store-adapter[valkey]
 
 # With all backends
-pip install kv-store-adapter[memory,disk,redis,elasticsearch,memcached]
+pip install kv-store-adapter[memory,disk,redis,elasticsearch,memcached,mongodb,valkey]
 
 # With Pydantic adapter support
 pip install kv-store-adapter[pydantic]
@@ -64,9 +66,11 @@ Choose the store that best fits your needs. All stores implement the same `KVSto
 
 ### Production Stores
 
-- **RedisStore**: `RedisStore(url="redis://localhost:6379/0")`
 - **ElasticsearchStore**: `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key")`
-- **MemcachedStore**: `MemcachedStore(host="localhost", port=11211")`
+- **RedisStore**: `RedisStore(url="redis://localhost:6379/0")`
+- **MongoDBStore**: `MongoDBStore(url="mongodb://localhost:27017/test")`
+- **ValkeyStore**: `ValkeyStore(host="localhost", port=6379)`
+- **MemcachedStore**: `MemcachedStore(host="localhost", port=11211)`
 - **DiskStore**: A disk-based store using diskcache `DiskStore(directory="./cache")`. Also see `MultiDiskStore` for a store that creates one disk store per collection.
 - **MemoryStore**: A fast in-memory TLRU cache `MemoryStore()`
 
@@ -79,8 +83,7 @@ For detailed configuration options and all available stores, see [DEVELOPING.md]
 
 ## Atomicity / Consistency
 
-We strive to support atomicity and consistency across all stores and operations in the KVStore. That being said,
-there are operations available via the BaseStore class which are management operations like listing keys, listing collections, clearing collections, culling expired entries, etc. These operations may not be atomic, may be eventually consistent across stores, or may have other limitations (like limited to returning a certain number of keys).
+We strive to support atomicity and consistency across basic key-value operations across all stores and operations in the KVStore. That being said, each store may have different guarantees for consistency and atomicity. Especially with distributed stores like MongoDB, Redis, etc and especially with bulk/management operations.
 
 ## Protocol Adapters
 
@@ -151,10 +154,11 @@ Other wrappers that are available include:
 
 - **ClampTTLWrapper**: Wraps a store and clamps the TTL to a given range.
 - **TTLClampWrapper**: Wraps a store and clamps the TTL to a given range.
-- **PassthroughCacheWrapper**: Wraps two stores to provide a read-through cache. Reads go to the cache store first and fall back to the primary store, populating the cache with the primary's TTL; writes evict from the cache and then write to the primary. For example, use a RedisStore as the primary and a MemoryStore as the cache store.
+- **PassthroughCacheWrapper**: Wraps two stores to provide a read-through cache. Reads go to the cache store first and fall back to the primary store, populating the cache with the entry from the primary; writes evict from the cache and then write to the primary. For example, use a RedisStore as the primary and a MemoryStore as the cache store. Or a DiskStore as the primary and a MemoryStore as the cache store.
 - **PrefixCollectionsWrapper**: Wraps a store and prefixes all collections with a given prefix.
 - **PrefixKeysWrapper**: Wraps a store and prefixes all keys with a given prefix.
 - **SingleCollectionWrapper**: Wraps a store and forces all requests into a single collection.
+- **StatisticsWrapper**: Wraps a store and tracks hit/miss statistics for the store.
 
 See [DEVELOPING.md](DEVELOPING.md) for more information on how to create your own wrappers.
 

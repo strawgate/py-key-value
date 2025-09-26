@@ -4,8 +4,8 @@ from typing import Any
 from typing_extensions import override
 
 from kv_store_adapter.stores.base import DEFAULT_COLLECTION_NAME
-from kv_store_adapter.stores.utils.compound import prefix_collection, unprefix_collection
 from kv_store_adapter.types import KVStore
+from kv_store_adapter.utils.compound import prefix_collection, unprefix_collection
 from kv_store_adapter.wrappers.base import BaseWrapper
 
 

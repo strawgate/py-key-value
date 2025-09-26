@@ -26,6 +26,8 @@ build-backend = "hatchling.build"
 memory = ["cachetools>=6.0.0"]
 disk = ["diskcache>=5.6.0", "pathvalidate>=3.3.1",]
 redis = ["redis>=6.0.0"]
+mongodb = ["pymongo>=4.15.0"]
+valkey = ["valkey-glide>=2.1.0"]
 memcached = ["aiomcache>=0.8.0"]
 elasticsearch = ["elasticsearch>=9.0.0", "aiohttp>=3.12"]
 pydantic = ["pydantic>=2.11.9"]
@@ -42,7 +44,7 @@ env_files = [".env"]
 
 [dependency-groups]
 dev = [
-    "kv-store-adapter[memory,disk,redis,elasticsearch,memcached]",
+    "kv-store-adapter[memory,disk,redis,elasticsearch,memcached,mongodb,valkey]",
     "kv-store-adapter[pydantic]",
     "pytest",
     "pytest-mock",
@@ -54,6 +56,7 @@ dev = [
     "inline-snapshot>=0.29.0",
     "pytest-redis>=3.1.3",
     "basedpyright>=1.31.5",
+    "pytest-timeout>=2.4.0",
 ]
 lint = [
   "ruff"

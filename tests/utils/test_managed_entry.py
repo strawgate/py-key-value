@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 
-from kv_store_adapter.stores.utils.managed_entry import dump_to_json, load_from_json
+from kv_store_adapter.utils.managed_entry import dump_to_json, load_from_json
 from tests.cases import DICTIONARY_TO_JSON_TEST_CASES, DICTIONARY_TO_JSON_TEST_CASES_NAMES
 
 FIXED_DATETIME = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)

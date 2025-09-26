@@ -3,8 +3,8 @@ from typing import Any
 
 from typing_extensions import override
 
-from kv_store_adapter.stores.utils.compound import prefix_key, unprefix_key
 from kv_store_adapter.types import KVStore
+from kv_store_adapter.utils.compound import prefix_key, unprefix_key
 from kv_store_adapter.wrappers.base import BaseWrapper
 
 

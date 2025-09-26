@@ -3,9 +3,9 @@ from typing import overload
 
 from typing_extensions import override
 
-from kv_store_adapter.stores.base import BaseDestroyStore, BaseStore
-from kv_store_adapter.stores.utils.compound import compound_key
-from kv_store_adapter.stores.utils.managed_entry import ManagedEntry
+from kv_store_adapter.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseStore
+from kv_store_adapter.utils.compound import compound_key
+from kv_store_adapter.utils.managed_entry import ManagedEntry
 
 try:
     from aiomcache import Client
@@ -16,7 +16,7 @@ except ImportError as e:
 MAX_KEY_LENGTH = 240
 
 
-class MemcachedStore(BaseDestroyStore, BaseStore):
+class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
     """Memcached-based key-value store using aiomcache."""
 
     _client: Client
@@ -102,3 +102,7 @@ class MemcachedStore(BaseDestroyStore, BaseStore):
     async def _delete_store(self) -> bool:
         _ = await self._client.flush_all()
         return True
+
+    @override
+    async def _close(self) -> None:
+        await self._client.close()

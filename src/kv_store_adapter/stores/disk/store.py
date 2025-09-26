@@ -4,9 +4,9 @@ from typing import overload
 
 from typing_extensions import override
 
-from kv_store_adapter.stores.base import BaseStore
-from kv_store_adapter.stores.utils.compound import compound_key
-from kv_store_adapter.stores.utils.managed_entry import ManagedEntry
+from kv_store_adapter.stores.base import BaseContextManagerStore, BaseStore
+from kv_store_adapter.utils.compound import compound_key
+from kv_store_adapter.utils.managed_entry import ManagedEntry
 
 try:
     from diskcache import Cache
@@ -17,7 +17,7 @@ except ImportError as e:
 DEFAULT_DISK_STORE_MAX_SIZE = 1 * 1024 * 1024 * 1024  # 1GB
 
 
-class DiskStore(BaseStore):
+class DiskStore(BaseContextManagerStore, BaseStore):
     """A disk-based store that uses the diskcache library to store data."""
 
     _cache: Cache
@@ -98,6 +98,10 @@ class DiskStore(BaseStore):
         combo_key: str = compound_key(collection=collection, key=key)
 
         return self._cache.delete(key=combo_key, retry=True)
+
+    @override
+    async def _close(self) -> None:
+        self._cache.close()
 
     def __del__(self) -> None:
         self._cache.close()

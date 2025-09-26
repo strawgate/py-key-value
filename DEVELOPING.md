@@ -332,7 +332,7 @@ You can also inherit from specialized base classes for additional functionality:
 # src/kv_store_adapter/stores/mystore/store.py
 from typing_extensions import override
 from kv_store_adapter.stores.base import BaseStore
-from kv_store_adapter.stores.utils.managed_entry import ManagedEntry
+from kv_store_adapter.utils.managed_entry import ManagedEntry
 
 class MyStore(BaseStore):
     """My custom key-value store implementation."""

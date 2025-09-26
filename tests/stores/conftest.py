@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import os
 import subprocess
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
@@ -8,8 +9,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from pydantic import AnyHttpUrl
 
-from kv_store_adapter.errors import SerializationError
-from kv_store_adapter.stores.base import BaseStore
+from kv_store_adapter.errors import InvalidTTLError, SerializationError
+from kv_store_adapter.stores.base import BaseContextManagerStore, BaseStore
 
 
 def now() -> datetime:
@@ -31,6 +32,28 @@ def detect_docker() -> bool:
         return False
     else:
         return result.returncode == 0
+
+
+def detect_on_ci() -> bool:
+    return os.getenv("CI", "false") == "true"
+
+
+def detect_on_windows() -> bool:
+    return os.name == "nt"
+
+
+def detect_on_macos() -> bool:
+    return os.name == "darwin"
+
+
+def should_run_docker_tests() -> bool:
+    if detect_on_ci():
+        return all([detect_docker(), not detect_on_windows(), not detect_on_macos()])
+    return detect_docker()
+
+
+def should_skip_docker_tests() -> bool:
+    return not should_run_docker_tests()
 
 
 class BaseStoreTests(ABC):
@@ -137,11 +160,13 @@ class BaseStoreTests(ABC):
 
     async def test_negative_ttl(self, store: BaseStore):
         """Tests that a negative ttl will return None when getting the key."""
-        await store.put(collection="test", key="test", value={"test": "test"}, ttl=-100)
+        with pytest.raises(InvalidTTLError):
+            await store.put(collection="test", key="test", value={"test": "test"}, ttl=-100)
 
     async def test_put_expired_get_none(self, store: BaseStore):
         """Tests that a put call with a negative ttl will return None when getting the key."""
-        await store.put(collection="test_collection", key="test_key", value={"test": "test"}, ttl=-100)
+        await store.put(collection="test_collection", key="test_key", value={"test": "test"}, ttl=1)
+        await asyncio.sleep(3)
         assert await store.get(collection="test_collection", key="test_key") is None
 
     async def test_long_collection_name(self, store: BaseStore):
@@ -191,3 +216,18 @@ class BaseStoreTests(ABC):
                 assert await store.get(collection="test_collection", key=f"test_{worker_id}_{i}") is None
 
         _ = await asyncio.gather(*[worker(store, worker_id) for worker_id in range(1)])
+
+
+class ContextManagerStoreTestMixin:
+    @pytest.fixture(params=[True, False], ids=["with_ctx_manager", "no_ctx_manager"], autouse=True)
+    async def enter_exit_store(
+        self, request: pytest.FixtureRequest, store: BaseContextManagerStore
+    ) -> AsyncGenerator[BaseContextManagerStore, None]:
+        context_manager = request.param  # pyright: ignore[reportAny]
+
+        if context_manager:
+            async with store:
+                yield store
+        else:
+            yield store
+            await store.close()

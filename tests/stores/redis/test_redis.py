@@ -7,7 +7,7 @@ from typing_extensions import override
 
 from kv_store_adapter.stores.base import BaseStore
 from kv_store_adapter.stores.redis import RedisStore
-from tests.stores.conftest import BaseStoreTests, detect_docker
+from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, should_skip_docker_tests
 
 # Redis test configuration
 REDIS_HOST = "localhost"
@@ -39,8 +39,8 @@ class RedisFailedToStartError(Exception):
     pass
 
 
-@pytest.mark.skipif(not detect_docker(), reason="Docker is not running")
-class TestRedisStore(BaseStoreTests):
+@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
+class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")
     async def setup_redis(self) -> AsyncGenerator[None, None]:
         _ = await asyncio.create_subprocess_exec("docker", "stop", "redis-test")

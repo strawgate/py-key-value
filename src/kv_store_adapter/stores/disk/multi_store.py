@@ -5,9 +5,9 @@ from typing import overload
 
 from typing_extensions import override
 
-from kv_store_adapter.stores.base import BaseStore
-from kv_store_adapter.stores.utils.compound import compound_key
-from kv_store_adapter.stores.utils.managed_entry import ManagedEntry
+from kv_store_adapter.stores.base import BaseContextManagerStore, BaseStore
+from kv_store_adapter.utils.compound import compound_key
+from kv_store_adapter.utils.managed_entry import ManagedEntry
 
 try:
     from diskcache import Cache
@@ -27,7 +27,7 @@ def _sanitize_collection_for_filesystem(collection: str) -> str:
     return sanitize_filename(filename=collection)
 
 
-class MultiDiskStore(BaseStore):
+class MultiDiskStore(BaseContextManagerStore, BaseStore):
     """A disk-based store that uses the diskcache library to store data. The MultiDiskStore creates one diskcache Cache
     instance per collection."""
 
@@ -134,3 +134,14 @@ class MultiDiskStore(BaseStore):
         combo_key: str = compound_key(collection=collection, key=key)
 
         return self._cache[collection].delete(key=combo_key, retry=True)
+
+    def _sync_close(self) -> None:
+        for cache in self._cache.values():
+            cache.close()
+
+    @override
+    async def _close(self) -> None:
+        self._sync_close()
+
+    def __del__(self) -> None:
+        self._sync_close()

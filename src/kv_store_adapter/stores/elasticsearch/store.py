@@ -4,15 +4,16 @@ from typing import TYPE_CHECKING, Any, overload
 from typing_extensions import override
 
 from kv_store_adapter.stores.base import (
+    BaseContextManagerStore,
     BaseCullStore,
     BaseDestroyCollectionStore,
     BaseEnumerateCollectionsStore,
     BaseEnumerateKeysStore,
     BaseStore,
 )
-from kv_store_adapter.stores.utils.compound import compound_key
-from kv_store_adapter.stores.utils.managed_entry import ManagedEntry, load_from_json
-from kv_store_adapter.stores.utils.time_to_live import now_as_epoch, try_parse_datetime
+from kv_store_adapter.utils.compound import compound_key
+from kv_store_adapter.utils.managed_entry import ManagedEntry, load_from_json
+from kv_store_adapter.utils.time_to_live import now_as_epoch, try_parse_datetime_str
 
 try:
     from elasticsearch import AsyncElasticsearch
@@ -32,13 +33,6 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from elastic_transport import ObjectApiResponse
-
-ELASTICSEARCH_CLIENT_DEFAULTS = {
-    "http_compress": True,
-    "timeout": 10,
-    "retry_on_timeout": True,
-    "max_retries": 3,
-}
 
 DEFAULT_INDEX = "kv-store"
 
@@ -71,7 +65,9 @@ PAGE_LIMIT = 10000
 MAX_KEY_LENGTH = 256
 
 
-class ElasticsearchStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCullStore, BaseStore):
+class ElasticsearchStore(
+    BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCullStore, BaseContextManagerStore, BaseStore
+):
     """A elasticsearch-based store."""
 
     _client: AsyncElasticsearch
@@ -102,7 +98,18 @@ class ElasticsearchStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, 
             index: The index to use.
             default_collection: The default collection to use if no collection is provided.
         """
-        self._client = elasticsearch_client or AsyncElasticsearch(hosts=[url], api_key=api_key, **ELASTICSEARCH_CLIENT_DEFAULTS)  # pyright: ignore[reportArgumentType]
+        if elasticsearch_client is None and url is None:
+            msg = "Either elasticsearch_client or url must be provided"
+            raise ValueError(msg)
+
+        if elasticsearch_client:
+            self._client = elasticsearch_client
+        elif url:
+            self._client = AsyncElasticsearch(hosts=[url], api_key=api_key, http_compress=True, request_timeout=10, retry_on_timeout=True, max_retries=3)
+        else:
+            msg = "Either elasticsearch_client or url must be provided"
+            raise ValueError(msg)
+
         self._index = index or DEFAULT_INDEX
         super().__init__(default_collection=default_collection)
 
@@ -142,8 +149,8 @@ class ElasticsearchStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, 
         if not (value_str := source.get("value")) or not isinstance(value_str, str):
             return None
 
-        created_at: datetime | None = try_parse_datetime(value=source.get("created_at"))
-        expires_at: datetime | None = try_parse_datetime(value=source.get("expires_at"))
+        created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
+        expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
 
         return ManagedEntry(
             value=load_from_json(value_str),
@@ -283,3 +290,7 @@ class ElasticsearchStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, 
                 },
             },
         )
+
+    @override
+    async def _close(self) -> None:
+        await self._client.close()

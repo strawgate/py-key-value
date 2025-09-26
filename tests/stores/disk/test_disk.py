@@ -5,14 +5,16 @@ import pytest
 from typing_extensions import override
 
 from kv_store_adapter.stores.disk import DiskStore
-from tests.stores.conftest import BaseStoreTests
+from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin
 
 TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
 
 
-class TestDiskStore(BaseStoreTests):
+class TestDiskStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self) -> AsyncGenerator[DiskStore, None]:
         with tempfile.TemporaryDirectory() as temp_dir:
-            yield DiskStore(directory=temp_dir, max_size=TEST_SIZE_LIMIT)
+            store = DiskStore(directory=temp_dir, max_size=TEST_SIZE_LIMIT)
+
+            yield store

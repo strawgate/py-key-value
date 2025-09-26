@@ -28,7 +28,11 @@ def now_plus(seconds: float) -> datetime:
     return datetime.now(tz=timezone.utc) + timedelta(seconds=seconds)
 
 
-def try_parse_datetime(value: Any) -> datetime | None:  # pyright: ignore[reportAny]
-    if isinstance(value, str):
-        return datetime.fromisoformat(value)
+def try_parse_datetime_str(value: Any) -> datetime | None:  # pyright: ignore[reportAny]
+    try:
+        if isinstance(value, str):
+            return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
     return None

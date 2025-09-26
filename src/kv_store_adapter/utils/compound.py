@@ -45,7 +45,7 @@ def prefix_key(key: str, prefix: str, separator: str | None = None) -> str:
 def unprefix_key(key: str, prefix: str, separator: str | None = None) -> str:
     separator = separator or DEFAULT_PREFIX_SEPARATOR
     if not key.startswith(prefix + separator):
-        msg = f"Key {key} is not prefixed with {prefix}"
+        msg = f"Key {key} is not prefixed with {prefix}{separator}"
         raise ValueError(msg)
     return key[len(prefix + separator) :]
 
@@ -58,7 +58,7 @@ def prefix_collection(collection: str, prefix: str, separator: str | None = None
 def unprefix_collection(collection: str, prefix: str, separator: str | None = None) -> str:
     separator = separator or DEFAULT_PREFIX_SEPARATOR
     if not collection.startswith(prefix + separator):
-        msg = f"Collection {collection} is not prefixed with {prefix}"
+        msg = f"Collection {collection} is not prefixed with {prefix}{separator}"
         raise ValueError(msg)
     return collection[len(prefix + separator) :]
 

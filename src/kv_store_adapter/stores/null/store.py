@@ -1,7 +1,7 @@
 from typing_extensions import override
 
 from kv_store_adapter.stores.base import BaseStore
-from kv_store_adapter.stores.utils.managed_entry import ManagedEntry
+from kv_store_adapter.utils.managed_entry import ManagedEntry
 
 
 class NullStore(BaseStore):

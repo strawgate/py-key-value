@@ -10,9 +10,9 @@ from kv_store_adapter.stores.base import (
     BaseEnumerateKeysStore,
     BaseStore,
 )
-from kv_store_adapter.stores.utils.compound import compound_key, get_collections_from_compound_keys, get_keys_from_compound_keys
-from kv_store_adapter.stores.utils.managed_entry import ManagedEntry, load_from_json
-from kv_store_adapter.stores.utils.time_to_live import seconds_to
+from kv_store_adapter.utils.compound import compound_key, get_collections_from_compound_keys, get_keys_from_compound_keys
+from kv_store_adapter.utils.managed_entry import ManagedEntry, load_from_json
+from kv_store_adapter.utils.time_to_live import seconds_to
 
 DEFAULT_SIMPLE_MANAGED_STORE_MAX_ENTRIES = 1000
 DEFAULT_SIMPLE_STORE_MAX_ENTRIES = 1000
