@@ -9,6 +9,5 @@ from tests.stores.conftest import BaseStoreTests
 class TestStatisticsWrapper(BaseStoreTests):
     @override
     @pytest.fixture
-    async def store(self) -> StatisticsWrapper:
-        memory_store: MemoryStore = MemoryStore()
+    async def store(self, memory_store: MemoryStore) -> StatisticsWrapper:
         return StatisticsWrapper(store=memory_store)

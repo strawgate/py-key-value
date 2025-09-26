@@ -9,7 +9,7 @@ from kv_store_adapter.stores.memory.store import MemoryStore
 from kv_store_adapter.wrappers.passthrough_cache import PassthroughCacheWrapper
 from tests.stores.conftest import BaseStoreTests
 
-DISK_STORE_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
+DISK_STORE_SIZE_LIMIT = 100 * 1024  # 100KB
 
 
 class TestPassthroughCacheWrapper(BaseStoreTests):
@@ -19,8 +19,8 @@ class TestPassthroughCacheWrapper(BaseStoreTests):
             yield DiskStore(directory=temp_dir, max_size=DISK_STORE_SIZE_LIMIT)
 
     @pytest.fixture
-    async def cache_store(self) -> MemoryStore:
-        return MemoryStore()
+    async def cache_store(self, memory_store: MemoryStore) -> MemoryStore:
+        return memory_store
 
     @override
     @pytest.fixture

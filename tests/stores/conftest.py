@@ -11,6 +11,12 @@ from pydantic import AnyHttpUrl
 
 from kv_store_adapter.errors import InvalidTTLError, SerializationError
 from kv_store_adapter.stores.base import BaseContextManagerStore, BaseStore
+from kv_store_adapter.stores.memory.store import MemoryStore
+
+
+@pytest.fixture
+def memory_store() -> MemoryStore:
+    return MemoryStore(max_entries_per_collection=500)
 
 
 def now() -> datetime:

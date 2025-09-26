@@ -58,7 +58,7 @@ def _memory_cache_getsizeof(value: MemoryCacheEntry) -> int:  # pyright: ignore[
     return 1
 
 
-DEFAULT_MEMORY_CACHE_LIMIT = 1000
+DEFAULT_MAX_ENTRIES_PER_COLLECTION = 10000
 
 DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
@@ -67,7 +67,7 @@ PAGE_LIMIT = 10000
 class MemoryCollection:
     _cache: TLRUCache[str, MemoryCacheEntry]
 
-    def __init__(self, max_entries: int = DEFAULT_MEMORY_CACHE_LIMIT):
+    def __init__(self, max_entries: int = DEFAULT_MAX_ENTRIES_PER_COLLECTION):
         self._cache = TLRUCache[str, MemoryCacheEntry](
             maxsize=max_entries,
             ttu=_memory_cache_ttu,
@@ -102,11 +102,12 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
 
     _cache: dict[str, MemoryCollection]
 
-    def __init__(self, *, max_entries_per_collection: int = DEFAULT_MEMORY_CACHE_LIMIT, default_collection: str | None = None):
+    def __init__(self, *, max_entries_per_collection: int = DEFAULT_MAX_ENTRIES_PER_COLLECTION, default_collection: str | None = None):
         """Initialize the in-memory cache.
 
         Args:
-            max_entries_per_collection: The maximum number of entries per collection. Defaults to 1000.
+            max_entries_per_collection: The maximum number of entries per collection. Defaults to 10000.
+            default_collection: The default collection to use if no collection is provided.
         """
 
         self.max_entries_per_collection = max_entries_per_collection

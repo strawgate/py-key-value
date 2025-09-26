@@ -9,4 +9,4 @@ class TestMemoryStore(BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self) -> MemoryStore:
-        return MemoryStore()
+        return MemoryStore(max_entries_per_collection=500)

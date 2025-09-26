@@ -9,6 +9,5 @@ from tests.stores.conftest import BaseStoreTests
 class TestPrefixCollectionWrapper(BaseStoreTests):
     @override
     @pytest.fixture
-    async def store(self) -> PrefixCollectionsWrapper:
-        memory_store: MemoryStore = MemoryStore()
+    async def store(self, memory_store: MemoryStore) -> PrefixCollectionsWrapper:
         return PrefixCollectionsWrapper(store=memory_store, prefix="collection_prefix")

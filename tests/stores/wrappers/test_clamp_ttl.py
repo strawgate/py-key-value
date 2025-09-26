@@ -8,10 +8,6 @@ from tests.stores.conftest import BaseStoreTests
 
 
 class TestTTLClampWrapper(BaseStoreTests):
-    @pytest.fixture
-    async def memory_store(self) -> MemoryStore:
-        return MemoryStore()
-
     @override
     @pytest.fixture
     async def store(self, memory_store: MemoryStore) -> TTLClampWrapper:
