@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from pydantic import AnyHttpUrl
 
-from kv_store_adapter.adapters.sync import SyncAdapter
 from kv_store_adapter.errors import InvalidTTLError, SerializationError
 from kv_store_adapter.stores.base import BaseContextManagerStore, BaseStore
 
@@ -217,6 +216,7 @@ class BaseStoreTests(ABC):
                 assert await store.get(collection="test_collection", key=f"test_{worker_id}_{i}") is None
 
         _ = await asyncio.gather(*[worker(store, worker_id) for worker_id in range(1)])
+
 
 class ContextManagerStoreTestMixin:
     @pytest.fixture(params=[True, False], ids=["with_ctx_manager", "no_ctx_manager"], autouse=True)
