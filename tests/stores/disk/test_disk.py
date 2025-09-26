@@ -15,4 +15,4 @@ class TestDiskStore(BaseStoreTests):
     @pytest.fixture
     async def store(self) -> AsyncGenerator[DiskStore, None]:
         with tempfile.TemporaryDirectory() as temp_dir:
-            yield DiskStore(directory=(temp_dir), max_size=TEST_SIZE_LIMIT)
+            yield DiskStore(directory=temp_dir, max_size=TEST_SIZE_LIMIT)

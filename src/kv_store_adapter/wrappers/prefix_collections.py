@@ -3,6 +3,7 @@ from typing import Any
 
 from typing_extensions import override
 
+from kv_store_adapter.stores.base import DEFAULT_COLLECTION_NAME
 from kv_store_adapter.stores.utils.compound import prefix_collection, unprefix_collection
 from kv_store_adapter.types import KVStore
 from kv_store_adapter.wrappers.base import BaseWrapper
@@ -11,7 +12,7 @@ from kv_store_adapter.wrappers.base import BaseWrapper
 class PrefixCollectionsWrapper(BaseWrapper):
     """A wrapper that prefixes collection names before delegating to the underlying store."""
 
-    def __init__(self, store: KVStore, prefix: str, default_collection: str) -> None:
+    def __init__(self, store: KVStore, prefix: str, default_collection: str | None = None) -> None:
         """Initialize the prefix collections wrapper.
 
         Args:
@@ -21,7 +22,7 @@ class PrefixCollectionsWrapper(BaseWrapper):
         """
         self.store: KVStore = store
         self.prefix: str = prefix
-        self.default_collection: str = default_collection
+        self.default_collection: str = default_collection or DEFAULT_COLLECTION_NAME
         super().__init__()
 
     def _prefix_collection(self, collection: str | None) -> str:

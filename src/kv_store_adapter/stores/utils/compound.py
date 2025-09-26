@@ -66,10 +66,10 @@ def unprefix_collection(collection: str, prefix: str, separator: str | None = No
 def get_collections_from_compound_keys(compound_keys: list[str], separator: str | None = None) -> list[str]:
     """Return a unique list of collections from a list of compound keys."""
     separator = separator or DEFAULT_COMPOUND_SEPARATOR
-    return list({key_collection for key_collection, _ in uncompound_strings(strings=compound_keys)})
+    return list({key_collection for key_collection, _ in uncompound_strings(strings=compound_keys, separator=separator)})
 
 
 def get_keys_from_compound_keys(compound_keys: list[str], collection: str, separator: str | None = None) -> list[str]:
     """Return all keys from a list of compound keys for a given collection."""
     separator = separator or DEFAULT_COMPOUND_SEPARATOR
-    return [key for key_collection, key in uncompound_strings(strings=compound_keys) if key_collection == collection]
+    return [key for key_collection, key in uncompound_strings(strings=compound_keys, separator=separator) if key_collection == collection]

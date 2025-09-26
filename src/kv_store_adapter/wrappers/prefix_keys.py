@@ -9,7 +9,7 @@ from kv_store_adapter.wrappers.base import BaseWrapper
 
 
 class PrefixKeysWrapper(BaseWrapper):
-    """A wrapper for prefixing keys in a KVStore."""
+    """A wrapper that prefixes key names before delegating to the underlying store."""
 
     def __init__(self, store: KVStore, prefix: str) -> None:
         """Initialize the prefix keys wrapper.

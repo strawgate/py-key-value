@@ -50,7 +50,7 @@ class MemcachedStore(BaseDestroyStore, BaseStore):
     def sanitize_key(self, key: str) -> str:
         if len(key) > MAX_KEY_LENGTH:
             sha256_hash: str = hashlib.sha256(key.encode()).hexdigest()
-            return sha256_hash[:256]
+            return sha256_hash[:64]
         return key
 
     @override

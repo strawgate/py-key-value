@@ -11,4 +11,4 @@ class TestSingleCollectionWrapper(BaseStoreTests):
     @pytest.fixture
     async def store(self) -> SingleCollectionWrapper:
         memory_store: MemoryStore = MemoryStore()
-        return SingleCollectionWrapper(store=memory_store, single_collection="test", default_collection="test")
+        return SingleCollectionWrapper(store=memory_store, single_collection="test")

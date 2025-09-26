@@ -25,8 +25,12 @@ def is_around(value: float, delta: float = 1) -> bool:
 
 
 def detect_docker() -> bool:
-    docker_ps = subprocess.run(["docker", "ps"], check=False, capture_output=True, text=True)  # noqa: S607
-    return docker_ps.returncode == 0
+    try:
+        result = subprocess.run(["docker", "ps"], check=False, capture_output=True, text=True)  # noqa: S607
+    except Exception:
+        return False
+    else:
+        return result.returncode == 0
 
 
 class BaseStoreTests(ABC):
