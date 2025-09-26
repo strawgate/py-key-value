@@ -38,6 +38,7 @@ async def wait_redis() -> bool:
 class RedisFailedToStartError(Exception):
     pass
 
+
 @pytest.mark.skipif(not detect_docker(), reason="Docker is not running")
 class TestRedisStore(BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")
@@ -61,14 +62,14 @@ class TestRedisStore(BaseStoreTests):
         """Create a Redis store for testing."""
         # Create the store with test database
         redis_store = RedisStore(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
-        _ = await redis_store._client.flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType]
+        _ = await redis_store._client.flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
         return redis_store
 
     async def test_redis_url_connection(self):
         """Test Redis store creation with URL."""
         redis_url = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
         store = RedisStore(url=redis_url)
-        _ = await store._client.flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType]
+        _ = await store._client.flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
         await store.put(collection="test", key="url_test", value={"test": "value"})
         result = await store.get(collection="test", key="url_test")
         assert result == {"test": "value"}
@@ -78,7 +79,7 @@ class TestRedisStore(BaseStoreTests):
         client = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
         store = RedisStore(client=client)
 
-        _ = await store._client.flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType]
+        _ = await store._client.flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
         await store.put(collection="test", key="client_test", value={"test": "value"})
         result = await store.get(collection="test", key="client_test")
         assert result == {"test": "value"}

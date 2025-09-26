@@ -36,6 +36,7 @@ addopts = ["--inline-snapshot=create,fix","-vv","-s"]
 markers = [
     "skip_on_ci: Skip running the test when running on CI",
 ]
+timeout = 5
 
 env_files = [".env"]
 

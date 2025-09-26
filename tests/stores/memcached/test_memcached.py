@@ -42,6 +42,7 @@ async def wait_memcached() -> bool:
 class MemcachedFailedToStartError(Exception):
     pass
 
+
 @pytest.mark.skipif(not detect_docker(), reason="Docker is not available")
 class TestMemcachedStore(BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")
