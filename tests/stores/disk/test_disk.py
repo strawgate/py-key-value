@@ -7,7 +7,7 @@ from typing_extensions import override
 from kv_store_adapter.stores.disk import DiskStore
 from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin
 
-TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
+TEST_SIZE_LIMIT = 100 * 1024  # 100KB
 
 
 class TestDiskStore(ContextManagerStoreTestMixin, BaseStoreTests):

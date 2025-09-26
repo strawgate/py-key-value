@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from pydantic import AnyHttpUrl
 
+from kv_store_adapter.adapters.sync import SyncAdapter
 from kv_store_adapter.errors import InvalidTTLError, SerializationError
 from kv_store_adapter.stores.base import BaseContextManagerStore, BaseStore
 
@@ -192,12 +193,12 @@ class BaseStoreTests(ABC):
     async def test_not_unbounded(self, store: BaseStore):
         """Tests that the store is not unbounded."""
 
-        for i in range(5000):
+        for i in range(1000):
             value = hashlib.sha256(f"test_{i}".encode()).hexdigest()
             await store.put(collection="test_collection", key=f"test_key_{i}", value={"test": value})
 
         assert await store.get(collection="test_collection", key="test_key_0") is None
-        assert await store.get(collection="test_collection", key="test_key_4999") is not None
+        assert await store.get(collection="test_collection", key="test_key_999") is not None
 
     async def test_concurrent_operations(self, store: BaseStore):
         """Tests that the store can handle concurrent operations."""
@@ -216,7 +217,6 @@ class BaseStoreTests(ABC):
                 assert await store.get(collection="test_collection", key=f"test_{worker_id}_{i}") is None
 
         _ = await asyncio.gather(*[worker(store, worker_id) for worker_id in range(1)])
-
 
 class ContextManagerStoreTestMixin:
     @pytest.fixture(params=[True, False], ids=["with_ctx_manager", "no_ctx_manager"], autouse=True)
