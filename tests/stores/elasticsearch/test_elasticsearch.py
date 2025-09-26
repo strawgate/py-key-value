@@ -7,7 +7,7 @@ from typing_extensions import override
 
 from kv_store_adapter.stores.base import BaseStore
 from kv_store_adapter.stores.elasticsearch import ElasticsearchStore
-from tests.stores.conftest import BaseStoreTests
+from tests.stores.conftest import BaseStoreTests, detect_docker
 
 TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
 
@@ -28,6 +28,7 @@ async def elasticsearch_client() -> AsyncGenerator[AsyncElasticsearch, None]:
 
 
 @pytest.mark.skipif(os.getenv("ES_URL") is None, reason="Elasticsearch is not configured")
+@pytest.mark.skipif(not detect_docker(), reason="Docker is not available")
 class TestElasticsearchStore(BaseStoreTests):
     @override
     @pytest.fixture
