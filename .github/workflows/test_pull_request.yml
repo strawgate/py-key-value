@@ -10,6 +10,27 @@ on:
   workflow_dispatch:
 
 jobs:
+  lint_and_type_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@v6
+      
+      - name: "Install"
+        run: uv sync --locked --group dev
+
+      - name: "Lint"
+        run: uv run ruff check --exit-non-zero-on-fix --fix
+
+      - name: "Format"
+        run: uv run ruff format --check
+
+      - name: "Type Check"
+        run: uv run basedpyright
+
   test_small_subset_platforms:
     timeout-minutes: 10
     strategy:
@@ -28,15 +49,6 @@ jobs:
       - name: "Install"
         run: uv sync --locked --group dev --python ${{ matrix.python-version }}
 
-      - name: "Lint"
-        run: uv run ruff check --exit-non-zero-on-fix --fix
-
-      - name: "Type Check"
-        run: uv run basedpyright
-
-      - name: "Format"
-        run: uv run ruff format
-
       - name: "Test"
         run: uv run pytest tests
 
@@ -44,6 +56,9 @@ jobs:
         run: uv build
 
   test_all_platforms:
+    needs:
+      - test_small_subset_platforms
+    
     timeout-minutes: 10
     strategy:
       matrix:

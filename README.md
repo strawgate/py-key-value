@@ -2,9 +2,8 @@
 
 A pluggable, async-only key-value store interface for modern Python applications.
 
-## Features
+## Why use this library?
 
-- **Async-only**: Built from the ground up with `async`/`await` support
 - **Multiple backends**: Elasticsearch, Memcached, MongoDB, Redis, Valkey, and In-memory, Disk, etc
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
@@ -13,19 +12,25 @@ A pluggable, async-only key-value store interface for modern Python applications
 - **Collection-based**: Organize keys into logical collections/namespaces
 - **Pluggable architecture**: Easy to add custom store implementations
 
+## Why not use this library?
+
+- **Async-only**: Built from the ground up with `async`/`await` support
+- **Managed Entries**: Raw values are not stored in backends, a wrapper object is stored instead. This wrapper object contains the value, sometimes metadata like the TTL, and the creation timestamp. Most often it is serialized to and from JSON.
+- **No Live Objects**: Even when using the in-memory store, "live" objects are never returned from the store. You get a dictionary or a Pydantic model, hopefully a copy of what you stored, but never the same instance in memory.
+
 ## Quick Start
 
 ```bash
 pip install kv-store-adapter
 
 # With specific backend support
-pip install kv-store-adapter[redis]
 pip install kv-store-adapter[elasticsearch]
-pip install kv-store-adapter[memory]
-pip install kv-store-adapter[disk]
+pip install kv-store-adapter[redis]
 pip install kv-store-adapter[memcached]
 pip install kv-store-adapter[mongodb]
 pip install kv-store-adapter[valkey]
+pip install kv-store-adapter[memory]
+pip install kv-store-adapter[disk]
 
 # With all backends
 pip install kv-store-adapter[memory,disk,redis,elasticsearch,memcached,mongodb,valkey]

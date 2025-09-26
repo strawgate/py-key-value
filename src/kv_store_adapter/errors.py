@@ -1,5 +1,3 @@
-from typing import Any
-
 ExtraInfoType = dict[str, str | int | float | bool | None]
 
 

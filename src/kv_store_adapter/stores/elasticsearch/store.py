@@ -105,7 +105,9 @@ class ElasticsearchStore(
         if elasticsearch_client:
             self._client = elasticsearch_client
         elif url:
-            self._client = AsyncElasticsearch(hosts=[url], api_key=api_key, http_compress=True, request_timeout=10, retry_on_timeout=True, max_retries=3)
+            self._client = AsyncElasticsearch(
+                hosts=[url], api_key=api_key, http_compress=True, request_timeout=10, retry_on_timeout=True, max_retries=3
+            )
         else:
             msg = "Either elasticsearch_client or url must be provided"
             raise ValueError(msg)
