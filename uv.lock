@@ -6,6 +6,12 @@ resolution-markers = [
     "sys_platform == 'win32'",
 ]
 
+[manifest]
+members = [
+    "py-key-value",
+    "py-key-value-aio",
+]
+
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.6.1"
@@ -148,6 +154,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c6/78/7d432127c41b50bccba979505f272c16cbcadcc33645d5fa3a738110ae75/anyio-4.11.0.tar.gz", hash = "sha256:82a8d0b81e318cc5ce71a5f1f8b5c4e63619620b63141ef8c995fa0db95a57c4", size = 219094, upload-time = "2025-09-23T09:19:12.58Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/15/b3/9b1a8074496371342ec1e796a96f99c82c945a339cd81a8e73de28b4cf9e/anyio-4.11.0-py3-none-any.whl", hash = "sha256:0287e96f4d26d4149305414d4e3bc32f0dcd0862365a4bddea19d7a1ec38c4fc", size = 109097, upload-time = "2025-09-23T09:19:10.601Z" },
+]
+
+[[package]]
+name = "ast-comments"
+version = "1.2.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/54/9f/be024de83c52e7aecb7d3871c3e4c24bc0df377fb752fa65745c36b8f35f/ast_comments-1.2.3.tar.gz", hash = "sha256:f9d003e9608b54195bd822b1d359a18e24573d2d8beff0307d7dc6f9d0cd0ba6", size = 5360, upload-time = "2025-06-29T09:53:20.08Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3a/c3/85f81c3fe2f7a2bd634239056bffac4bfb4324761c787845f78dc264082c/ast_comments-1.2.3-py3-none-any.whl", hash = "sha256:2b2319312027a523dd4b30381a7662da8fdd16210786db3402d8e1b1df12a886", size = 5840, upload-time = "2025-06-29T09:53:19.211Z" },
 ]
 
 [[package]]
@@ -439,93 +454,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/2f/76/b48796a7b97a6f328
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f2/46/1938d92fca179c0c81268c68073bef6339054be5779cf3f7de00bad6bf91/inline_snapshot-0.29.1-py3-none-any.whl", hash = "sha256:3fd02adb25be551a6245c9787c90fea33a578e051524804ef92fab5017cf4f16", size = 70763, upload-time = "2025-09-24T19:47:14.589Z" },
 ]
-
-[[package]]
-name = "kv-store-adapter"
-version = "0.2.0"
-source = { editable = "." }
-
-[package.optional-dependencies]
-disk = [
-    { name = "diskcache" },
-    { name = "pathvalidate" },
-]
-elasticsearch = [
-    { name = "aiohttp" },
-    { name = "elasticsearch" },
-]
-memcached = [
-    { name = "aiomcache" },
-]
-memory = [
-    { name = "cachetools" },
-]
-mongodb = [
-    { name = "pymongo" },
-]
-pydantic = [
-    { name = "pydantic" },
-]
-redis = [
-    { name = "redis" },
-]
-valkey = [
-    { name = "valkey-glide" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "basedpyright" },
-    { name = "dirty-equals" },
-    { name = "diskcache-stubs" },
-    { name = "inline-snapshot" },
-    { name = "kv-store-adapter", extra = ["disk", "elasticsearch", "memcached", "memory", "mongodb", "pydantic", "redis"] },
-    { name = "kv-store-adapter", extra = ["valkey"], marker = "sys_platform != 'win32'" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-dotenv" },
-    { name = "pytest-mock" },
-    { name = "pytest-redis" },
-    { name = "pytest-timeout" },
-    { name = "ruff" },
-]
-lint = [
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
-    { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
-    { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
-    { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
-    { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
-    { name = "pathvalidate", marker = "extra == 'disk'", specifier = ">=3.3.1" },
-    { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
-    { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.15.0" },
-    { name = "redis", marker = "extra == 'redis'", specifier = ">=6.0.0" },
-    { name = "valkey-glide", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
-]
-provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "memcached", "elasticsearch", "pydantic"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "basedpyright", specifier = ">=1.31.5" },
-    { name = "dirty-equals", specifier = ">=0.10.0" },
-    { name = "diskcache-stubs", specifier = ">=5.6.3.6.20240818" },
-    { name = "inline-snapshot", specifier = ">=0.29.0" },
-    { name = "kv-store-adapter", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb"] },
-    { name = "kv-store-adapter", extras = ["pydantic"] },
-    { name = "kv-store-adapter", extras = ["valkey"], marker = "sys_platform != 'win32'" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-dotenv", specifier = ">=0.5.2" },
-    { name = "pytest-mock" },
-    { name = "pytest-redis", specifier = ">=3.1.3" },
-    { name = "pytest-timeout", specifier = ">=2.4.0" },
-    { name = "ruff" },
-]
-lint = [{ name = "ruff" }]
 
 [[package]]
 name = "markdown-it-py"
@@ -832,6 +760,100 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/bf/e9/b44c4f697276a7a95b8e94d0e320a7bf7f3318521b23de69035540b39838/psutil-7.1.0-cp37-abi3-win_amd64.whl", hash = "sha256:57f5e987c36d3146c0dd2528cd42151cf96cd359b9d67cfff836995cc5df9a3d", size = 247965, upload-time = "2025-09-17T20:15:09.673Z" },
     { url = "https://files.pythonhosted.org/packages/26/65/1070a6e3c036f39142c2820c4b52e9243246fcfc3f96239ac84472ba361e/psutil-7.1.0-cp37-abi3-win_arm64.whl", hash = "sha256:6937cb68133e7c97b6cc9649a570c9a18ba0efebed46d8c5dae4c07fa1b67a07", size = 244971, upload-time = "2025-09-17T20:15:12.262Z" },
 ]
+
+[[package]]
+name = "py-key-value"
+version = "0.2.0"
+source = { virtual = "." }
+
+[[package]]
+name = "py-key-value-aio"
+version = "0.2.0"
+source = { editable = "key-value/key-value-aio" }
+
+[package.optional-dependencies]
+disk = [
+    { name = "diskcache" },
+    { name = "pathvalidate" },
+]
+elasticsearch = [
+    { name = "aiohttp" },
+    { name = "elasticsearch" },
+]
+memcached = [
+    { name = "aiomcache" },
+]
+memory = [
+    { name = "cachetools" },
+]
+mongodb = [
+    { name = "pymongo" },
+]
+pydantic = [
+    { name = "pydantic" },
+]
+redis = [
+    { name = "redis" },
+]
+valkey = [
+    { name = "valkey-glide" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ast-comments" },
+    { name = "basedpyright" },
+    { name = "dirty-equals" },
+    { name = "diskcache-stubs" },
+    { name = "inline-snapshot" },
+    { name = "py-key-value-aio", extra = ["disk", "elasticsearch", "memcached", "memory", "mongodb", "pydantic", "redis"] },
+    { name = "py-key-value-aio", extra = ["valkey"], marker = "sys_platform != 'win32'" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-dotenv" },
+    { name = "pytest-mock" },
+    { name = "pytest-redis" },
+    { name = "pytest-timeout" },
+    { name = "ruff" },
+]
+lint = [
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
+    { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
+    { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
+    { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
+    { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
+    { name = "pathvalidate", marker = "extra == 'disk'", specifier = ">=3.3.1" },
+    { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
+    { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.15.0" },
+    { name = "redis", marker = "extra == 'redis'", specifier = ">=6.0.0" },
+    { name = "valkey-glide", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
+]
+provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "memcached", "elasticsearch", "pydantic"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "ast-comments", specifier = ">=1.2.3" },
+    { name = "basedpyright", specifier = ">=1.31.5" },
+    { name = "dirty-equals", specifier = ">=0.10.0" },
+    { name = "diskcache-stubs", specifier = ">=5.6.3.6.20240818" },
+    { name = "inline-snapshot", specifier = ">=0.29.0" },
+    { name = "py-key-value-aio", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb"] },
+    { name = "py-key-value-aio", extras = ["pydantic"] },
+    { name = "py-key-value-aio", extras = ["valkey"], marker = "sys_platform != 'win32'" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-dotenv", specifier = ">=0.5.2" },
+    { name = "pytest-mock" },
+    { name = "pytest-redis", specifier = ">=3.1.3" },
+    { name = "pytest-timeout", specifier = ">=2.4.0" },
+    { name = "ruff" },
+]
+lint = [{ name = "ruff" }]
 
 [[package]]
 name = "pydantic"

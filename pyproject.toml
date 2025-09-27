@@ -1,66 +1,28 @@
 [project]
-name = "kv-store-adapter"
+name = "py-key-value"
 version = "0.2.0"
-description = "A pluggable interface for KV Stores"
+description = "Key-Value Store Project"
 readme = "README.md"
 requires-python = ">=3.10"
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
-]
-dependencies = [
+
+
+[tool.uv.workspace]
+members = [
+    "key-value/key-value-aio",
 ]
 
-[build-system]
-requires = ["hatchling", "uv-dynamic-versioning>=0.7.0"]
-build-backend = "hatchling.build"
-
-[project.optional-dependencies]
-memory = ["cachetools>=6.0.0"]
-disk = ["diskcache>=5.6.0", "pathvalidate>=3.3.1",]
-redis = ["redis>=6.0.0"]
-mongodb = ["pymongo>=4.15.0"]
-valkey = ["valkey-glide>=2.1.0"]
-memcached = ["aiomcache>=0.8.0"]
-elasticsearch = ["elasticsearch>=9.0.0", "aiohttp>=3.12"]
-pydantic = ["pydantic>=2.11.9"]
-
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-addopts = ["--inline-snapshot=create,fix","-vv","-s"]
-markers = [
-    "skip_on_ci: Skip running the test when running on CI",
-]
-timeout = 5
-
-env_files = [".env"]
-
-[dependency-groups]
-dev = [
-    "kv-store-adapter[memory,disk,redis,elasticsearch,memcached,mongodb]",
-    "kv-store-adapter[valkey]; platform_system != 'Windows'",
-    "kv-store-adapter[pydantic]",
-    "pytest",
-    "pytest-mock",
-    "pytest-asyncio",
-    "ruff",
-    "diskcache-stubs>=5.6.3.6.20240818",
-    "pytest-dotenv>=0.5.2",
-    "dirty-equals>=0.10.0",
-    "inline-snapshot>=0.29.0",
-    "pytest-redis>=3.1.3",
-    "basedpyright>=1.31.5",
-    "pytest-timeout>=2.4.0",
-]
-lint = [
-  "ruff"
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "strict"
+reportExplicitAny = false
+reportMissingTypeStubs = false
+include = ["**/tests/**", "**/src/**"]
+exclude = [
+    "**/playground/**",
+    "**/examples/**",
+    "**/references/**",
+    "**/docs/**",
+    "**/.venv/**",
 ]
 
 [tool.ruff]
@@ -111,28 +73,4 @@ line-length = 140
     "DTZ005", # Ignore datetime.UTC
     "PLR2004", # Ignore magic values
     "E501", # Ignore line length
-    
 ]
-"**/references/*" = ["ALL"]
-"template/*" = ["ALL"]
-"**/vendored/**" = ["ALL"]
-
-[tool.pyright]
-pythonVersion = "3.10"
-typeCheckingMode = "recommended"
-extraPaths = ["src/"]
-include = ["src/"]
-exclude = [
-    "**/archive/**",
-    "**/node_modules/**",
-    "**/__pycache__/**",
-    "**/.venv/**",
-    ".venv",
-    "**/.pytest_cache/**",
-    "**/.ruff_cache/**",
-    "**/uv/python/**",
-    "**/clients/graphql/**",
-]
-reportMissingTypeStubs = false
-reportExplicitAny = false
-reportMissingModuleSource = false
