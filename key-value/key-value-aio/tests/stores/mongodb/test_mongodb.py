@@ -10,6 +10,7 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.mongodb import MongoDBStore
+from tests.conftest import docker_container
 from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, should_skip_docker_tests
 
 # MongoDB test configuration
@@ -46,20 +47,12 @@ class MongoDBFailedToStartError(Exception):
 class TestMongoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")
     async def setup_mongodb(self) -> AsyncGenerator[None, None]:
-        _ = await asyncio.create_subprocess_exec("docker", "stop", "mongodb-test")
-        _ = await asyncio.create_subprocess_exec("docker", "rm", "-f", "mongodb-test")
+        with docker_container("mongodb-test", "mongo:7", {"27017": 27017}):
+            if not await wait_mongodb():
+                msg = "MongoDB failed to start"
+                raise MongoDBFailedToStartError(msg)
 
-        process = await asyncio.create_subprocess_exec(
-            "docker", "run", "-d", "--name", "mongodb-test", "-p", f"{MONGODB_HOST_PORT}:27017", "mongo:7"
-        )
-        _ = await process.wait()
-        if not await wait_mongodb():
-            msg = "MongoDB failed to start"
-            raise MongoDBFailedToStartError(msg)
-        try:
             yield
-        finally:
-            _ = await asyncio.create_subprocess_exec("docker", "rm", "-f", "mongodb-test")
 
     @override
     @pytest.fixture

@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.redis import RedisStore
+from tests.conftest import docker_container, docker_stop
 from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, should_skip_docker_tests
 
 # Redis test configuration
@@ -28,7 +29,8 @@ async def ping_redis() -> bool:
 async def wait_redis() -> bool:
     # with a timeout of 10 seconds
     for _ in range(WAIT_FOR_REDIS_TIMEOUT):
-        if await ping_redis():
+        result = await asyncio.wait_for(ping_redis(), timeout=1)
+        if result:
             return True
         await asyncio.sleep(delay=1)
 
@@ -43,18 +45,15 @@ class RedisFailedToStartError(Exception):
 class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")
     async def setup_redis(self) -> AsyncGenerator[None, None]:
-        _ = await asyncio.create_subprocess_exec("docker", "stop", "redis-test")
-        _ = await asyncio.create_subprocess_exec("docker", "rm", "-f", "redis-test")
+        # Double-check that the Valkey test container is stopped
+        docker_stop("valkey-test", raise_on_error=False)
 
-        process = await asyncio.create_subprocess_exec("docker", "run", "-d", "--name", "redis-test", "-p", "6379:6379", "redis")
-        _ = await process.wait()
-        if not await wait_redis():
-            msg = "Redis failed to start"
-            raise RedisFailedToStartError(msg)
-        try:
+        with docker_container("redis-test", "redis", {"6379": 6379}):
+            if not await wait_redis():
+                msg = "Redis failed to start"
+                raise RedisFailedToStartError(msg)
+
             yield
-        finally:
-            _ = await asyncio.create_subprocess_exec("docker", "rm", "-f", "redis-test")
 
     @override
     @pytest.fixture

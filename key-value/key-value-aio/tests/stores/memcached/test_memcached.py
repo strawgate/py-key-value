@@ -8,6 +8,7 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.memcached import MemcachedStore
+from tests.conftest import docker_container
 from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, should_skip_docker_tests
 
 # Memcached test configuration
@@ -33,7 +34,8 @@ async def ping_memcached() -> bool:
 
 async def wait_memcached() -> bool:
     for _ in range(WAIT_FOR_MEMCACHED_TIMEOUT):
-        if await ping_memcached():
+        result = await asyncio.wait_for(ping_memcached(), timeout=1)
+        if result:
             return True
         await asyncio.sleep(delay=1)
     return False
@@ -47,20 +49,13 @@ class MemcachedFailedToStartError(Exception):
 class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")
     async def setup_memcached(self) -> AsyncGenerator[None, None]:
-        _ = await asyncio.create_subprocess_exec("docker", "stop", "memcached-test")
-        _ = await asyncio.create_subprocess_exec("docker", "rm", "-f", "memcached-test")
+        await wait_memcached()
+        with docker_container("memcached-test", "memcached:1.6-alpine", {"11211": 11211}):
+            if not await wait_memcached():
+                msg = "Memcached failed to start"
+                raise MemcachedFailedToStartError(msg)
 
-        process = await asyncio.create_subprocess_exec(
-            "docker", "run", "-d", "--name", "memcached-test", "-p", "11211:11211", "memcached:1.6-alpine"
-        )
-        _ = await process.wait()
-        if not await wait_memcached():
-            msg = "Memcached failed to start"
-            raise MemcachedFailedToStartError(msg)
-        try:
             yield
-        finally:
-            _ = await asyncio.create_subprocess_exec("docker", "rm", "-f", "memcached-test")
 
     @override
     @pytest.fixture

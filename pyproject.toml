@@ -74,3 +74,8 @@ line-length = 140
     "PLR2004", # Ignore magic values
     "E501", # Ignore line length
 ]
+
+[dependency-groups]
+dev = [
+    "docker>=7.1.0",
+]

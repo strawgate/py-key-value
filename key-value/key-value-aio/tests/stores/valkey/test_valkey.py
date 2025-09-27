@@ -5,7 +5,7 @@ import pytest
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
-from tests.conftest import try_import
+from tests.conftest import docker_container, docker_stop, try_import
 from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, detect_on_windows, should_skip_docker_tests
 
 with try_import() as has_valkey:
@@ -49,27 +49,23 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     async def wait_valkey(self) -> bool:
         for _ in range(WAIT_FOR_VALKEY_TIMEOUT):
-            if await self.ping_valkey():
+            result = await asyncio.wait_for(self.ping_valkey(), timeout=1)
+            if result:
                 return True
             await asyncio.sleep(delay=1)
         return False
 
-    @pytest.fixture(autouse=True, scope="session")
+    @pytest.fixture(scope="session")
     async def setup_valkey(self) -> AsyncGenerator[None, None]:
-        _ = await asyncio.create_subprocess_exec("docker", "stop", "valkey-test")
-        _ = await asyncio.create_subprocess_exec("docker", "rm", "-f", "valkey-test")
+        # Double-check that the Redis test container is stopped
+        docker_stop("redis-test", raise_on_error=False)
 
-        process = await asyncio.create_subprocess_exec(
-            "docker", "run", "-d", "--name", "valkey-test", "-p", f"{VALKEY_PORT}:6379", "valkey/valkey:latest"
-        )
-        _ = await process.wait()
-        if not await self.wait_valkey():
-            msg = "Valkey failed to start"
-            raise ValkeyFailedToStartError(msg)
-        try:
+        with docker_container("valkey-test", "valkey/valkey:latest", {"6379": 6379}):
+            if not await self.wait_valkey():
+                msg = "Valkey failed to start"
+                raise ValkeyFailedToStartError(msg)
+
             yield
-        finally:
-            _ = await asyncio.create_subprocess_exec("docker", "rm", "-f", "valkey-test")
 
     @override
     @pytest.fixture

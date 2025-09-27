@@ -1,5 +1,13 @@
+import logging
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+
+import pytest
+from docker import DockerClient
+
+logger = logging.getLogger(__name__)
+
+logging.basicConfig(level=logging.INFO)
 
 
 @contextmanager
@@ -15,3 +23,89 @@ def try_import() -> Iterator[Callable[[], bool]]:
         pass
     else:
         import_success = True
+
+
+def get_docker_client() -> DockerClient:
+    return DockerClient.from_env()
+
+
+@pytest.fixture(scope="session")
+def docker_client() -> DockerClient:
+    return get_docker_client()
+
+
+def docker_pull(image: str, raise_on_error: bool = False) -> bool:
+    logger.info(f"Pulling image {image}")
+    client = get_docker_client()
+    try:
+        client.images.pull(image)
+    except Exception:
+        logger.info(f"Image {image} failed to pull")
+        if raise_on_error:
+            raise
+        return False
+    return True
+
+
+def docker_stop(name: str, raise_on_error: bool = False) -> bool:
+    logger.info(f"Stopping container {name}")
+    client = get_docker_client()
+    try:
+        client.containers.get(name).stop()
+    except Exception:
+        logger.info(f"Container {name} failed to stop")
+        if raise_on_error:
+            raise
+        return False
+    logger.info(f"Container {name} stopped")
+    return True
+
+
+def docker_rm(name: str, raise_on_error: bool = False) -> bool:
+    logger.info(f"Removing container {name}")
+    client = get_docker_client()
+    try:
+        client.containers.get(container_id=name).remove()
+    except Exception:
+        logger.info(f"Container {name} failed to remove")
+        if raise_on_error:
+            raise
+        return False
+    logger.info(f"Container {name} removed")
+    return True
+
+
+def docker_run(name: str, image: str, ports: dict[str, int], raise_on_error: bool = False) -> bool:
+    logger.info(f"Running container {name} with image {image} and ports {ports}")
+    client = get_docker_client()
+    try:
+        client.containers.run(name=name, image=image, ports=ports, detach=True)
+    except Exception:
+        logger.info(f"Container {name} failed to run")
+        if raise_on_error:
+            raise
+        return False
+    logger.info(f"Container {name} running")
+    return True
+
+
+@contextmanager
+def docker_container(name: str, image: str, ports: dict[str, int], raise_on_error: bool = True) -> Iterator[None]:
+    logger.info(f"Creating container {name} with image {image} and ports {ports}")
+    try:
+        docker_pull(image, raise_on_error=True)
+        docker_stop(name, raise_on_error=False)
+        docker_rm(name, raise_on_error=False)
+        docker_run(name, image, ports, raise_on_error=True)
+        logger.info(f"Container {name} created")
+        yield
+    except Exception:
+        logger.info(f"Container {name} failed to create")
+        if raise_on_error:
+            raise
+        return
+    finally:
+        docker_stop(name, raise_on_error=False)
+        docker_rm(name, raise_on_error=False)
+    logger.info(f"Container {name} stopped and removed")
+    return
