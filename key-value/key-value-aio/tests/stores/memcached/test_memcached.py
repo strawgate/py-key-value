@@ -1,16 +1,15 @@
-import asyncio
 import contextlib
 from collections.abc import AsyncGenerator
 
 import pytest
 from aiomcache import Client
+from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.memcached import MemcachedStore
-from key_value.aio.utils.acompat import asleep
-from tests.conftest import docker_container
-from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, should_skip_docker_tests
+from tests.conftest import docker_container, should_skip_docker_tests
+from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # Memcached test configuration
 MEMCACHED_HOST = "localhost"
@@ -33,15 +32,6 @@ async def ping_memcached() -> bool:
             await client.close()
 
 
-async def wait_memcached() -> bool:
-    for _ in range(WAIT_FOR_MEMCACHED_TIMEOUT):
-        result = await asyncio.wait_for(ping_memcached(), timeout=1)
-        if result:
-            return True
-        await asleep(1)
-    return False
-
-
 class MemcachedFailedToStartError(Exception):
     pass
 
@@ -50,9 +40,8 @@ class MemcachedFailedToStartError(Exception):
 class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")
     async def setup_memcached(self) -> AsyncGenerator[None, None]:
-        await wait_memcached()
         with docker_container("memcached-test", "memcached:1.6-alpine", {"11211": 11211}):
-            if not await wait_memcached():
+            if not await async_wait_for_true(bool_fn=ping_memcached, tries=30, wait_time=1):
                 msg = "Memcached failed to start"
                 raise MemcachedFailedToStartError(msg)
 

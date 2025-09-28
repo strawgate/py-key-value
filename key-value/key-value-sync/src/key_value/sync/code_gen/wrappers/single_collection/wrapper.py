@@ -4,11 +4,11 @@
 from collections.abc import Sequence
 from typing import Any
 
+from key_value.shared.utils.compound import DEFAULT_PREFIX_SEPARATOR, prefix_key, unprefix_key
 from typing_extensions import override
 
 from key_value.sync.code_gen.protocols.key_value import KeyValue
 from key_value.sync.code_gen.stores.base import DEFAULT_COLLECTION_NAME
-from key_value.sync.code_gen.utils.compound import DEFAULT_PREFIX_SEPARATOR, prefix_key, unprefix_key
 from key_value.sync.code_gen.wrappers.base import BaseWrapper
 
 

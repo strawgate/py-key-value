@@ -2,13 +2,14 @@ import os
 from collections.abc import AsyncGenerator
 
 import pytest
-from elasticsearch import Elasticsearch
+from elasticsearch import AsyncElasticsearch
+from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.elasticsearch import ElasticsearchStore
 from tests.conftest import docker_container
-from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, wait_for_store
+from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
 ES_HOST = "localhost"
@@ -18,14 +19,15 @@ ES_VERSION = "9.1.4"
 ES_IMAGE = f"docker.elastic.co/elasticsearch/elasticsearch:{ES_VERSION}"
 
 
-def get_elasticsearch_client() -> Elasticsearch:
-    return Elasticsearch(hosts=[ES_URL])
+def get_elasticsearch_client() -> AsyncElasticsearch:
+    return AsyncElasticsearch(hosts=[ES_URL])
 
 
-def ping_elasticsearch() -> bool:
-    es_client: Elasticsearch = get_elasticsearch_client()
+async def ping_elasticsearch() -> bool:
+    es_client: AsyncElasticsearch = get_elasticsearch_client()
 
-    return es_client.ping()
+    async with es_client:
+        return await es_client.ping()
 
 
 class ElasticsearchFailedToStartError(Exception):
@@ -39,7 +41,7 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         with docker_container(
             "elasticsearch-test", ES_IMAGE, {"9200": 9200}, {"discovery.type": "single-node", "xpack.security.enabled": "false"}
         ):
-            if not wait_for_store(wait_fn=ping_elasticsearch, max_time=30):
+            if not await async_wait_for_true(bool_fn=ping_elasticsearch, tries=30, wait_time=1):
                 msg = "Elasticsearch failed to start"
                 raise ElasticsearchFailedToStartError(msg)
 
@@ -47,10 +49,11 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @override
     @pytest.fixture
-    async def store(self) -> ElasticsearchStore:
+    async def store(self) -> AsyncGenerator[ElasticsearchStore, None]:
         es_client = get_elasticsearch_client()
-        _ = es_client.options(ignore_status=404).indices.delete(index="kv-store-e2e-test")
-        return ElasticsearchStore(url=ES_URL, index="kv-store-e2e-test")
+        _ = await es_client.options(ignore_status=404).indices.delete(index="kv-store-e2e-test")
+        async with ElasticsearchStore(url=ES_URL, index="kv-store-e2e-test") as store:
+            yield store
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override

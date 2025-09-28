@@ -2,9 +2,9 @@
 # from the original file 'test_raise.py'
 # DO NOT CHANGE! Change the original file instead.
 import pytest
+from key_value.shared.errors import MissingKeyError
 
 from key_value.sync.code_gen.adapters.raise_on_missing import RaiseOnMissingAdapter
-from key_value.sync.code_gen.errors import MissingKeyError
 from key_value.sync.code_gen.stores.memory.store import MemoryStore
 
 

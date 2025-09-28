@@ -7,7 +7,7 @@ from typing_extensions import override
 from key_value.aio.stores.disk.store import DiskStore
 from key_value.aio.stores.memory.store import MemoryStore
 from key_value.aio.wrappers.passthrough_cache import PassthroughCacheWrapper
-from tests.stores.conftest import BaseStoreTests
+from tests.stores.base import BaseStoreTests
 
 DISK_STORE_SIZE_LIMIT = 100 * 1024  # 100KB
 

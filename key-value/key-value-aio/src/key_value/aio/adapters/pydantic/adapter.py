@@ -1,10 +1,10 @@
 from collections.abc import Sequence
 from typing import Any, Generic, TypeVar
 
+from key_value.shared.errors import DeserializationError, SerializationError
 from pydantic import BaseModel, ValidationError
 from pydantic_core import PydanticSerializationError
 
-from key_value.aio.errors import DeserializationError, SerializationError
 from key_value.aio.protocols.key_value import AsyncKeyValue
 
 T = TypeVar("T", bound=BaseModel)

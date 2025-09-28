@@ -3,6 +3,8 @@
 # DO NOT CHANGE! Change the original file instead.
 import asyncio
 import logging
+import os
+import subprocess
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
@@ -127,3 +129,34 @@ def async_running_in_event_loop() -> bool:
 
 def running_in_event_loop() -> bool:
     return False
+
+
+def detect_docker() -> bool:
+    try:
+        result = subprocess.run(["docker", "ps"], check=False, capture_output=True, text=True)  # noqa: S607
+    except Exception:
+        return False
+    else:
+        return result.returncode == 0
+
+
+def detect_on_ci() -> bool:
+    return os.getenv("CI", "false") == "true"
+
+
+def detect_on_windows() -> bool:
+    return os.name == "nt"
+
+
+def detect_on_macos() -> bool:
+    return os.name == "darwin"
+
+
+def should_run_docker_tests() -> bool:
+    if detect_on_ci():
+        return all([detect_docker(), not detect_on_windows(), not detect_on_macos()])
+    return detect_docker()
+
+
+def should_skip_docker_tests() -> bool:
+    return not should_run_docker_tests()

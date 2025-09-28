@@ -4,7 +4,8 @@
 from collections.abc import Sequence
 from typing import Any, Literal, overload
 
-from key_value.sync.code_gen.errors import MissingKeyError
+from key_value.shared.errors import MissingKeyError
+
 from key_value.sync.code_gen.protocols.key_value import KeyValue
 
 

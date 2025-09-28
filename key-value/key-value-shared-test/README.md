@@ -1,0 +1,1 @@
+Shared data for tests between key-value-aio and key-value-sync

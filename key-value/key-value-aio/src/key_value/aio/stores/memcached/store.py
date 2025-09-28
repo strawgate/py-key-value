@@ -1,11 +1,11 @@
 import hashlib
 from typing import overload
 
+from key_value.shared.utils.compound import compound_key
+from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseStore
-from key_value.aio.utils.compound import compound_key
-from key_value.aio.utils.managed_entry import ManagedEntry
 
 try:
     from aiomcache import Client

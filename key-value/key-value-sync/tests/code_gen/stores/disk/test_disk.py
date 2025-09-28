@@ -8,7 +8,7 @@ import pytest
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.disk import DiskStore
-from tests.code_gen.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin
+from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 TEST_SIZE_LIMIT = 100 * 1024  # 100KB
 

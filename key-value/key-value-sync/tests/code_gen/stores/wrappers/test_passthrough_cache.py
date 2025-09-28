@@ -10,7 +10,7 @@ from typing_extensions import override
 from key_value.sync.code_gen.stores.disk.store import DiskStore
 from key_value.sync.code_gen.stores.memory.store import MemoryStore
 from key_value.sync.code_gen.wrappers.passthrough_cache import PassthroughCacheWrapper
-from tests.code_gen.stores.conftest import BaseStoreTests
+from tests.code_gen.stores.base import BaseStoreTests
 
 DISK_STORE_SIZE_LIMIT = 100 * 1024  # 100KB
 

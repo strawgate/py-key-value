@@ -10,6 +10,8 @@ resolution-markers = [
 members = [
     "py-key-value",
     "py-key-value-aio",
+    "py-key-value-shared",
+    "py-key-value-shared-test",
     "py-key-value-sync",
 ]
 
@@ -929,18 +931,25 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "basedpyright" },
     { name = "docker" },
 ]
 
 [package.metadata]
 
 [package.metadata.requires-dev]
-dev = [{ name = "docker", specifier = ">=7.1.0" }]
+dev = [
+    { name = "basedpyright", specifier = ">=1.31.5" },
+    { name = "docker", specifier = ">=7.1.0" },
+]
 
 [[package]]
 name = "py-key-value-aio"
 version = "0.2.0"
 source = { editable = "key-value/key-value-aio" }
+dependencies = [
+    { name = "py-key-value-shared" },
+]
 
 [package.optional-dependencies]
 disk = [
@@ -980,6 +989,7 @@ dev = [
     { name = "inline-snapshot" },
     { name = "py-key-value-aio", extra = ["disk", "elasticsearch", "memcached", "memory", "mongodb", "pydantic", "redis"] },
     { name = "py-key-value-aio", extra = ["valkey"], marker = "sys_platform != 'win32'" },
+    { name = "py-key-value-shared-test" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-dotenv" },
@@ -1000,6 +1010,7 @@ requires-dist = [
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
     { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
     { name = "pathvalidate", marker = "extra == 'disk'", specifier = ">=3.3.1" },
+    { name = "py-key-value-shared", editable = "key-value/key-value-shared" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
     { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.15.0" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=6.0.0" },
@@ -1018,6 +1029,7 @@ dev = [
     { name = "py-key-value-aio", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb"] },
     { name = "py-key-value-aio", extras = ["pydantic"] },
     { name = "py-key-value-aio", extras = ["valkey"], marker = "sys_platform != 'win32'" },
+    { name = "py-key-value-shared-test", editable = "key-value/key-value-shared-test" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-dotenv", specifier = ">=0.5.2" },
@@ -1029,11 +1041,63 @@ dev = [
 lint = [{ name = "ruff" }]
 
 [[package]]
+name = "py-key-value-shared"
+version = "0.2.0"
+source = { editable = "key-value/key-value-shared" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "basedpyright" },
+    { name = "dirty-equals" },
+    { name = "inline-snapshot" },
+    { name = "py-key-value-shared-test" },
+    { name = "pytest" },
+    { name = "pytest-dotenv" },
+    { name = "pytest-mock" },
+    { name = "pytest-timeout" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basedpyright", specifier = ">=1.31.5" },
+    { name = "dirty-equals", specifier = ">=0.10.0" },
+    { name = "inline-snapshot", specifier = ">=0.29.0" },
+    { name = "py-key-value-shared-test", editable = "key-value/key-value-shared-test" },
+    { name = "pytest" },
+    { name = "pytest-dotenv", specifier = ">=0.5.2" },
+    { name = "pytest-mock" },
+    { name = "pytest-timeout", specifier = ">=2.4.0" },
+    { name = "ruff" },
+]
+
+[[package]]
+name = "py-key-value-shared-test"
+version = "0.2.0"
+source = { editable = "key-value/key-value-shared-test" }
+
+[package.dev-dependencies]
+dev = [
+    { name = "basedpyright" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basedpyright", specifier = ">=1.31.5" },
+    { name = "ruff" },
+]
+
+[[package]]
 name = "py-key-value-sync"
 version = "0.2.0"
 source = { editable = "key-value/key-value-sync" }
 dependencies = [
-    { name = "py-key-value-aio" },
+    { name = "py-key-value-shared" },
 ]
 
 [package.optional-dependencies]
@@ -1071,6 +1135,7 @@ dev = [
     { name = "dirty-equals" },
     { name = "diskcache-stubs" },
     { name = "inline-snapshot" },
+    { name = "py-key-value-shared-test" },
     { name = "py-key-value-sync", extra = ["disk", "elasticsearch", "memcached", "memory", "mongodb", "pydantic", "redis"] },
     { name = "py-key-value-sync", extra = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "pytest" },
@@ -1093,7 +1158,7 @@ requires-dist = [
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
     { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
     { name = "pathvalidate", marker = "extra == 'disk'", specifier = ">=3.3.1" },
-    { name = "py-key-value-aio", editable = "key-value/key-value-aio" },
+    { name = "py-key-value-shared", editable = "key-value/key-value-shared" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
     { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.15.0" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=6.0.0" },
@@ -1108,6 +1173,7 @@ dev = [
     { name = "dirty-equals", specifier = ">=0.10.0" },
     { name = "diskcache-stubs", specifier = ">=5.6.3.6.20240818" },
     { name = "inline-snapshot", specifier = ">=0.29.0" },
+    { name = "py-key-value-shared-test", editable = "key-value/key-value-shared-test" },
     { name = "py-key-value-sync", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb"] },
     { name = "py-key-value-sync", extras = ["pydantic"] },
     { name = "py-key-value-sync", extras = ["valkey"], marker = "sys_platform != 'win32'" },

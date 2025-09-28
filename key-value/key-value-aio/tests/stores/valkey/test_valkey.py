@@ -1,11 +1,15 @@
 from collections.abc import AsyncGenerator
 
 import pytest
+from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
-from tests.conftest import docker_container, docker_stop
-from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, detect_on_windows, should_skip_docker_tests, wait_for_store
+from tests.conftest import detect_on_windows, docker_container, docker_stop, should_skip_docker_tests
+from tests.stores.base import (
+    BaseStoreTests,
+    ContextManagerStoreTestMixin,
+)
 
 # Valkey test configuration
 VALKEY_HOST = "localhost"
@@ -22,19 +26,19 @@ class ValkeyFailedToStartError(Exception):
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
 @pytest.mark.skipif(detect_on_windows(), reason="Valkey is not supported on Windows")
 class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    def get_valkey_client(self):
+    async def get_valkey_client(self):
+        from glide.glide_client import GlideClient
         from glide_shared.config import GlideClientConfiguration, NodeAddress
-        from glide_sync.glide_client import GlideClient
 
         client_config: GlideClientConfiguration = GlideClientConfiguration(
             addresses=[NodeAddress(host=VALKEY_HOST, port=VALKEY_PORT)], database_id=VALKEY_DB
         )
-        return GlideClient.create(config=client_config)
+        return await GlideClient.create(config=client_config)
 
-    def ping_valkey(self) -> bool:
+    async def ping_valkey(self) -> bool:
         try:
-            client = self.get_valkey_client()
-            _ = client.ping()
+            client = await self.get_valkey_client()
+            _ = await client.ping()
         except Exception:
             return False
 
@@ -46,7 +50,7 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
         docker_stop("redis-test", raise_on_error=False)
 
         with docker_container("valkey-test", "valkey/valkey:latest", {"6379": 6379}):
-            if not wait_for_store(wait_fn=self.ping_valkey):
+            if not await async_wait_for_true(bool_fn=self.ping_valkey, tries=30, wait_time=1):
                 msg = "Valkey failed to start"
                 raise ValkeyFailedToStartError(msg)
 
@@ -60,8 +64,8 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
         store: ValkeyStore = ValkeyStore(host=VALKEY_HOST, port=VALKEY_PORT, db=VALKEY_DB)
 
         # This is a syncronous client
-        client = self.get_valkey_client()
-        _ = client.flushdb()
+        client = await self.get_valkey_client()
+        _ = await client.flushdb()
 
         return store
 

@@ -1,6 +1,9 @@
 import hashlib
 from typing import TYPE_CHECKING, Any, overload
 
+from key_value.shared.utils.compound import compound_key
+from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json
+from key_value.shared.utils.time_to_live import now_as_epoch, try_parse_datetime_str
 from typing_extensions import override
 
 from key_value.aio.stores.base import (
@@ -11,9 +14,6 @@ from key_value.aio.stores.base import (
     BaseEnumerateKeysStore,
     BaseStore,
 )
-from key_value.aio.utils.compound import compound_key
-from key_value.aio.utils.managed_entry import ManagedEntry, load_from_json
-from key_value.aio.utils.time_to_live import now_as_epoch, try_parse_datetime_str
 
 try:
     from elasticsearch import AsyncElasticsearch
@@ -71,6 +71,8 @@ class ElasticsearchStore(
 
     _client: AsyncElasticsearch
 
+    _is_serverless: bool
+
     _index: str
 
     @overload
@@ -112,6 +114,8 @@ class ElasticsearchStore(
             raise ValueError(msg)
 
         self._index = index or DEFAULT_INDEX
+        self._is_serverless = False
+
         super().__init__(default_collection=default_collection)
 
     @override
@@ -119,9 +123,14 @@ class ElasticsearchStore(
         if await self._client.options(ignore_status=404).indices.exists(index=self._index):
             return
 
+        cluster_info = await self._client.options(ignore_status=404).info()
+
+        self._is_serverless = cluster_info.get("version", {}).get("build_flavor") == "serverless"
+
         _ = await self._client.options(ignore_status=404).indices.create(
             index=self._index,
             mappings=DEFAULT_MAPPING,
+            settings={},
         )
 
     @override
@@ -159,6 +168,10 @@ class ElasticsearchStore(
             expires_at=expires_at,
         )
 
+    @property
+    def _should_refresh_on_put(self) -> bool:
+        return not self._is_serverless
+
     @override
     async def _put_managed_entry(
         self,
@@ -184,6 +197,7 @@ class ElasticsearchStore(
             index=self._index,
             id=self.sanitize_document_id(key=combo_key),
             body=document,
+            refresh=self._should_refresh_on_put,
         )
 
     @override

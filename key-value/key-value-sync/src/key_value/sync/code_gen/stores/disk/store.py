@@ -5,11 +5,11 @@ import time
 from pathlib import Path
 from typing import overload
 
+from key_value.shared.utils.compound import compound_key
+from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseContextManagerStore, BaseStore
-from key_value.sync.code_gen.utils.compound import compound_key
-from key_value.sync.code_gen.utils.managed_entry import ManagedEntry
 
 try:
     from diskcache import Cache

@@ -15,6 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
+    "py-key-value-shared>=0.2.0",
 ]
 
 
@@ -24,6 +25,10 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-name = "key_value.aio"
+
+[tool.uv.sources]
+py-key-value-shared = { workspace = true }
+py-key-value-shared-test = { workspace = true }
 
 [project.optional-dependencies]
 memory = ["cachetools>=6.0.0"]
@@ -63,6 +68,8 @@ dev = [
     "pytest-timeout>=2.4.0",
     "ast-comments>=1.2.3",
     "docker>=7.1.0",
+    "py-key-value-shared-test>=0.2.0",
+    
 ]
 lint = [
   "ruff"

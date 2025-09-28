@@ -1,12 +1,14 @@
 from collections.abc import AsyncGenerator
 
 import pytest
+from key_value.shared.stores.wait import async_wait_for_true
+from redis.asyncio.client import Redis
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.redis import RedisStore
-from tests.conftest import docker_container, docker_stop
-from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, should_skip_docker_tests, wait_for_store
+from tests.conftest import docker_container, docker_stop, should_skip_docker_tests
+from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # Redis test configuration
 REDIS_HOST = "localhost"
@@ -16,10 +18,8 @@ REDIS_DB = 15  # Use a separate database for tests
 WAIT_FOR_REDIS_TIMEOUT = 30
 
 
-def ping_redis() -> bool:
-    from redis import Redis
-
-    client = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
+async def ping_redis() -> bool:
+    client: Redis = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
     try:
         return client.ping()  # pyright: ignore[reportUnknownMemberType, reportAny, reportReturnType]
     except Exception:
@@ -38,7 +38,7 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         docker_stop("valkey-test", raise_on_error=False)
 
         with docker_container("redis-test", "redis", {"6379": 6379}):
-            if not wait_for_store(wait_fn=ping_redis):
+            if not await async_wait_for_true(bool_fn=ping_redis, tries=30, wait_time=1):
                 msg = "Redis failed to start"
                 raise RedisFailedToStartError(msg)
 

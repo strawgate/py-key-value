@@ -3,7 +3,7 @@ from typing_extensions import override
 
 from key_value.aio.stores.memory.store import MemoryStore
 from key_value.aio.wrappers.statistics import StatisticsWrapper
-from tests.stores.conftest import BaseStoreTests
+from tests.stores.base import BaseStoreTests
 
 
 class TestStatisticsWrapper(BaseStoreTests):

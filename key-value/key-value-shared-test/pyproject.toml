@@ -1,0 +1,42 @@
+[project]
+name = "py-key-value-shared-test"
+version = "0.2.0"
+description = "Shared Key-Value Test"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+
+
+[build-system]
+requires = ["uv_build>=0.8.2,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "key_value.shared_test"
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "basedpyright>=1.31.5",
+]
+
+[tool.ruff]
+extend="../../pyproject.toml"
+
+[tool.pyright]
+extends = "../../pyproject.toml"
+
+executionEnvironments = [
+  { root = "tests", reportPrivateUsage = false, extraPaths = ["src"]},
+  { root = "src" }
+]

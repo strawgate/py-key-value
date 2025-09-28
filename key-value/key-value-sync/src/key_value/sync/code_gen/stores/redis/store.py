@@ -4,11 +4,11 @@
 from typing import Any, overload
 from urllib.parse import urlparse
 
+from key_value.shared.utils.compound import compound_key, get_keys_from_compound_keys
+from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseEnumerateKeysStore, BaseStore
-from key_value.sync.code_gen.utils.compound import compound_key, get_keys_from_compound_keys
-from key_value.sync.code_gen.utils.managed_entry import ManagedEntry
 
 try:
     from redis import Redis

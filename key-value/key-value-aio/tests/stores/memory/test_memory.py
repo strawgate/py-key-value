@@ -2,7 +2,7 @@ import pytest
 from typing_extensions import override
 
 from key_value.aio.stores.memory.store import MemoryStore
-from tests.stores.conftest import BaseStoreTests
+from tests.stores.base import BaseStoreTests
 
 
 class TestMemoryStore(BaseStoreTests):

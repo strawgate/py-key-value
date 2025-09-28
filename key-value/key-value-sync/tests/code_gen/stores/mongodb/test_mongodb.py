@@ -7,13 +7,14 @@ from typing import Any
 
 import pytest
 from inline_snapshot import snapshot
+from key_value.shared.stores.wait import wait_for_true
 from pymongo import MongoClient
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
 from key_value.sync.code_gen.stores.mongodb import MongoDBStore
-from tests.code_gen.conftest import docker_container
-from tests.code_gen.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, should_skip_docker_tests, wait_for_store
+from tests.code_gen.conftest import docker_container, should_skip_docker_tests
+from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # MongoDB test configuration
 MONGODB_HOST = "localhost"
@@ -42,7 +43,7 @@ class TestMongoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")
     def setup_mongodb(self) -> Generator[None, None, None]:
         with docker_container("mongodb-test", "mongo:7", {"27017": 27017}):
-            if not wait_for_store(wait_fn=ping_mongodb):
+            if not wait_for_true(bool_fn=ping_mongodb, tries=30, wait_time=1):
                 msg = "MongoDB failed to start"
                 raise MongoDBFailedToStartError(msg)
 

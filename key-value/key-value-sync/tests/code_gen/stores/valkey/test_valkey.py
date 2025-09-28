@@ -4,17 +4,12 @@
 from collections.abc import Generator
 
 import pytest
+from key_value.shared.stores.wait import wait_for_true
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
-from tests.code_gen.conftest import docker_container, docker_stop
-from tests.code_gen.stores.conftest import (
-    BaseStoreTests,
-    ContextManagerStoreTestMixin,
-    detect_on_windows,
-    should_skip_docker_tests,
-    wait_for_store,
-)
+from tests.code_gen.conftest import detect_on_windows, docker_container, docker_stop, should_skip_docker_tests
+from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # Valkey test configuration
 VALKEY_HOST = "localhost"
@@ -55,7 +50,7 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
         docker_stop("redis-test", raise_on_error=False)
 
         with docker_container("valkey-test", "valkey/valkey:latest", {"6379": 6379}):
-            if not wait_for_store(wait_fn=self.ping_valkey):
+            if not wait_for_true(bool_fn=self.ping_valkey, tries=30, wait_time=1):
                 msg = "Valkey failed to start"
                 raise ValkeyFailedToStartError(msg)
 

@@ -10,20 +10,8 @@ requires-python = ">=3.10"
 members = [
     "key-value/key-value-aio",
     "key-value/key-value-sync",
-]
-
-[tool.pyright]
-pythonVersion = "3.10"
-typeCheckingMode = "strict"
-reportExplicitAny = false
-reportMissingTypeStubs = false
-include = ["**/tests/**", "**/src/**"]
-exclude = [
-    "**/playground/**",
-    "**/examples/**",
-    "**/references/**",
-    "**/docs/**",
-    "**/.venv/**",
+    "key-value/key-value-shared",
+    "key-value/key-value-shared-test",
 ]
 
 [tool.ruff]
@@ -79,7 +67,18 @@ line-length = 140
 [dependency-groups]
 dev = [
     "docker>=7.1.0",
+    "basedpyright>=1.31.5",
 ]
 
-[tool.pytest.ini_options]
-consider_namespace_packages = true
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "strict"
+reportExplicitAny = false
+reportMissingTypeStubs = false
+exclude = [
+    "**/playground/**",
+    "**/examples/**",
+    "**/references/**",
+    "**/docs/**",
+    "**/.venv/**",
+]

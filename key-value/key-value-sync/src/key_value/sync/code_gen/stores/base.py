@@ -12,9 +12,11 @@ from threading import Lock
 from types import TracebackType
 from typing import Any
 
+from key_value.shared.errors import InvalidTTLError, StoreSetupError
+from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.time_to_live import now
 from typing_extensions import Self, override
 
-from key_value.sync.code_gen.errors import InvalidTTLError, StoreSetupError
 from key_value.sync.code_gen.protocols.key_value import (
     CullProtocol,
     DestroyCollectionProtocol,
@@ -23,8 +25,6 @@ from key_value.sync.code_gen.protocols.key_value import (
     EnumerateKeysProtocol,
     KeyValueProtocol,
 )
-from key_value.sync.code_gen.utils.managed_entry import ManagedEntry
-from key_value.sync.code_gen.utils.time_to_live import now
 
 DEFAULT_COLLECTION_NAME = "default_collection"
 

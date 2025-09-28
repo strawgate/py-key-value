@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.time_to_live import epoch_to_datetime
 from typing_extensions import Self, override
 
 from key_value.aio.stores.base import (
@@ -11,8 +13,6 @@ from key_value.aio.stores.base import (
     BaseEnumerateCollectionsStore,
     BaseEnumerateKeysStore,
 )
-from key_value.aio.utils.managed_entry import ManagedEntry
-from key_value.aio.utils.time_to_live import epoch_to_datetime
 
 try:
     from cachetools import TLRUCache

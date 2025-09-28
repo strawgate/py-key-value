@@ -15,13 +15,12 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "py-key-value-aio>=0.2.0",
+    "py-key-value-shared>=0.2.0",
 ]
 
 [tool.uv.sources]
-py-key-value-aio = { workspace = true }
-
-
+py-key-value-shared = { workspace = true }
+py-key-value-shared-test = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.8.2,<0.9.0"]
@@ -48,7 +47,6 @@ markers = [
 ]
 timeout = 10
 
-
 env_files = [".env"]
 
 [dependency-groups]
@@ -68,6 +66,7 @@ dev = [
     "basedpyright>=1.31.5",
     "pytest-timeout>=2.4.0",
     "ast-comments>=1.2.3",
+    "py-key-value-shared-test>=0.2.0",
 ]
 lint = [
   "ruff"

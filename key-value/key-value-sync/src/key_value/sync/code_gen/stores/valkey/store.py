@@ -6,11 +6,11 @@ from typing import overload
 from glide_shared.commands.core_options import ExpirySet, ExpiryType
 from glide_shared.config import GlideClientConfiguration, NodeAddress, ServerCredentials
 from glide_sync.glide_client import BaseClient
+from key_value.shared.utils.compound import compound_key
+from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseContextManagerStore, BaseStore
-from key_value.sync.code_gen.utils.compound import compound_key
-from key_value.sync.code_gen.utils.managed_entry import ManagedEntry
 
 try:
     # Use redis-py asyncio client to communicate with a Valkey server (protocol compatible)

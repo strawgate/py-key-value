@@ -6,7 +6,7 @@ from typing_extensions import override
 
 from key_value.sync.code_gen.stores.memory.store import MemoryStore
 from key_value.sync.code_gen.wrappers.prefix_collections import PrefixCollectionsWrapper
-from tests.code_gen.stores.conftest import BaseStoreTests
+from tests.code_gen.stores.base import BaseStoreTests
 
 
 class TestPrefixCollectionWrapper(BaseStoreTests):

@@ -5,7 +5,7 @@ import pytest
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.simple.store import SimpleStore
-from tests.code_gen.stores.conftest import BaseStoreTests
+from tests.code_gen.stores.base import BaseStoreTests
 
 
 class TestSimpleStore(BaseStoreTests):

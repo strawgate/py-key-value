@@ -197,6 +197,7 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
         "tests.stores.conftest": "tests.code_gen.stores.conftest",
         "tests.conftest": "tests.code_gen.conftest",
         "tests.cases": "tests.code_gen.cases",
+        "tests.stores.base": "tests.code_gen.stores.base",
     }
     names_map: ClassVar[dict[str, str]] = {
         "__aenter__": "__enter__",
@@ -221,6 +222,8 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
         "asyncio.sleep": "time.sleep",
         "async_running_in_event_loop": "running_in_event_loop",
         "asleep": "sleep",
+        "async_wait_for_true": "wait_for_true",
+        "async_gather": "gather",
     }
     _skip_imports: ClassVar[dict[str, set[str]]] = {
         "acompat": {"alist", "anext"},

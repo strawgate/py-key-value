@@ -4,6 +4,9 @@
 import hashlib
 from typing import TYPE_CHECKING, Any, overload
 
+from key_value.shared.utils.compound import compound_key
+from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json
+from key_value.shared.utils.time_to_live import now_as_epoch, try_parse_datetime_str
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import (
@@ -14,12 +17,10 @@ from key_value.sync.code_gen.stores.base import (
     BaseEnumerateKeysStore,
     BaseStore,
 )
-from key_value.sync.code_gen.utils.compound import compound_key
-from key_value.sync.code_gen.utils.managed_entry import ManagedEntry, load_from_json
-from key_value.sync.code_gen.utils.time_to_live import now_as_epoch, try_parse_datetime_str
 
 try:
     from elasticsearch import Elasticsearch
+
     from key_value.sync.code_gen.stores.elasticsearch.utils import (
         get_aggregations_from_body,
         get_body_from_response,
@@ -60,6 +61,8 @@ class ElasticsearchStore(
     """A elasticsearch-based store."""
 
     _client: Elasticsearch
+
+    _is_serverless: bool
 
     _index: str
 
@@ -102,6 +105,8 @@ class ElasticsearchStore(
             raise ValueError(msg)
 
         self._index = index or DEFAULT_INDEX
+        self._is_serverless = False
+
         super().__init__(default_collection=default_collection)
 
     @override
@@ -109,7 +114,11 @@ class ElasticsearchStore(
         if self._client.options(ignore_status=404).indices.exists(index=self._index):
             return
 
-        _ = self._client.options(ignore_status=404).indices.create(index=self._index, mappings=DEFAULT_MAPPING)
+        cluster_info = self._client.options(ignore_status=404).info()
+
+        self._is_serverless = cluster_info.get("version", {}).get("build_flavor") == "serverless"
+
+        _ = self._client.options(ignore_status=404).indices.create(index=self._index, mappings=DEFAULT_MAPPING, settings={})
 
     @override
     def _setup_collection(self, *, collection: str) -> None:
@@ -140,6 +149,10 @@ class ElasticsearchStore(
 
         return ManagedEntry(value=load_from_json(value_str), created_at=created_at, expires_at=expires_at)
 
+    @property
+    def _should_refresh_on_put(self) -> bool:
+        return not self._is_serverless
+
     @override
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
@@ -151,7 +164,9 @@ class ElasticsearchStore(
         if managed_entry.expires_at:
             document["expires_at"] = managed_entry.expires_at.isoformat()
 
-        _ = self._client.index(index=self._index, id=self.sanitize_document_id(key=combo_key), body=document)
+        _ = self._client.index(
+            index=self._index, id=self.sanitize_document_id(key=combo_key), body=document, refresh=self._should_refresh_on_put
+        )
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:

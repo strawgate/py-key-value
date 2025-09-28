@@ -6,7 +6,7 @@ import pytest
 from typing_extensions import override
 
 from key_value.aio.stores.disk.multi_store import MultiDiskStore
-from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin
+from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 TEST_SIZE_LIMIT = 100 * 1024  # 100KB
 

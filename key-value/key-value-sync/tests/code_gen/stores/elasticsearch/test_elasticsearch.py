@@ -6,12 +6,13 @@ from collections.abc import Generator
 
 import pytest
 from elasticsearch import Elasticsearch
+from key_value.shared.stores.wait import wait_for_true
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
 from key_value.sync.code_gen.stores.elasticsearch import ElasticsearchStore
 from tests.code_gen.conftest import docker_container
-from tests.code_gen.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, wait_for_store
+from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
 ES_HOST = "localhost"
@@ -28,7 +29,8 @@ def get_elasticsearch_client() -> Elasticsearch:
 def ping_elasticsearch() -> bool:
     es_client: Elasticsearch = get_elasticsearch_client()
 
-    return es_client.ping()
+    with es_client:
+        return es_client.ping()
 
 
 class ElasticsearchFailedToStartError(Exception):
@@ -42,7 +44,7 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         with docker_container(
             "elasticsearch-test", ES_IMAGE, {"9200": 9200}, {"discovery.type": "single-node", "xpack.security.enabled": "false"}
         ):
-            if not wait_for_store(wait_fn=ping_elasticsearch):
+            if not wait_for_true(bool_fn=ping_elasticsearch, tries=30, wait_time=1):
                 msg = "Elasticsearch failed to start"
                 raise ElasticsearchFailedToStartError(msg)
 
@@ -50,10 +52,11 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @override
     @pytest.fixture
-    def store(self) -> ElasticsearchStore:
+    def store(self) -> Generator[ElasticsearchStore, None, None]:
         es_client = get_elasticsearch_client()
         _ = es_client.options(ignore_status=404).indices.delete(index="kv-store-e2e-test")
-        return ElasticsearchStore(url=ES_URL, index="kv-store-e2e-test")
+        with ElasticsearchStore(url=ES_URL, index="kv-store-e2e-test") as store:
+            yield store
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
