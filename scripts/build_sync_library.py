@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# ruff: noqa: N802
 """Convert async code in the project to sync code.
 
 Note: the version of Python used to run this script affects the output.
@@ -133,30 +134,30 @@ def tree_to_str(tree: ast.AST, filepath: Path) -> str:
 
 
 class AsyncToSync(ast.NodeTransformer):  # type: ignore
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AST:  # noqa: N802
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AST:
         new_node: ast.FunctionDef = ast.FunctionDef(**node.__dict__)
         ast.copy_location(new_node, old_node=node)
         self.visit(node=new_node)
         return new_node
 
-    def visit_AsyncFor(self, node: ast.AsyncFor) -> ast.AST:  # noqa: N802
+    def visit_AsyncFor(self, node: ast.AsyncFor) -> ast.AST:
         new_node: ast.For = ast.For(**node.__dict__)
         ast.copy_location(new_node, old_node=node)
         self.visit(node=new_node)
         return new_node
 
-    def visit_AsyncWith(self, node: ast.AsyncWith) -> ast.AST:  # noqa: N802
+    def visit_AsyncWith(self, node: ast.AsyncWith) -> ast.AST:
         new_node: ast.With = ast.With(**node.__dict__)
         ast.copy_location(new_node, old_node=node)
         self.visit(node=new_node)
         return new_node
 
-    def visit_Await(self, node: ast.Await) -> ast.AST:  # noqa: N802
+    def visit_Await(self, node: ast.Await) -> ast.AST:
         new_node: ast.expr = node.value
         self.visit(new_node)
         return new_node
 
-    def visit_If(self, node: ast.If) -> ast.AST:  # noqa: N802
+    def visit_If(self, node: ast.If) -> ast.AST:
         # Drop `if is_async()` branch.
         #
         # Assume that the test guards an async object becoming sync and remove
@@ -229,12 +230,12 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
         "acompat": {"alist", "anext"},
     }
 
-    def visit_Module(self, node: ast.Module) -> ast.AST:  # noqa: N802
+    def visit_Module(self, node: ast.Module) -> ast.AST:
         self._fix_docstring(node.body)
         self.generic_visit(node)
         return node
 
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AST:  # noqa: N802
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> ast.AST:
         self._fix_docstring(node.body)
         node.name = self.names_map.get(node.name, node.name)
         for arg in node.args.args:
@@ -274,6 +275,8 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
                 doc = doc.replace("Async", "")
                 doc = doc.replace("(async", "(sync")
                 body[0].value.value = doc
+            case _:
+                pass
 
     def _fix_decorator(self, decorator_list: Sequence[ast.AST]) -> None:
         for dec in decorator_list:
@@ -285,21 +288,24 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
                     elts = dec.keywords[0].value.elts
                     for i, elt in enumerate(elts):
                         elts[i] = self._convert_if_literal_string(elt)
+                case _:
+                    pass
 
     def _convert_if_literal_string(self, node: ast.AST) -> ast.AST:
         value: str
         match node:
             case ast.Constant(value=str(value)):
                 node.value = self._visit_type_string(value)
+            case _:
+                pass
 
         return node
 
     def _visit_type_string(self, source: str) -> str:
         # Convert the string to tree, visit, and convert it back to string
-        tree = ast.parse(source, type_comments=False)
+        tree = ast.parse(source, type_comments=False)  # pyright: ignore[reportUnknownMemberType]
         tree = async_to_sync(tree)
-        rv = unparse(tree)
-        return rv
+        return unparse(tree)
 
     def visit_ClassDef(self, node: ast.ClassDef) -> ast.AST:
         self._fix_docstring(node.body)
@@ -325,7 +331,7 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
 
         return node
 
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> ast.AST | None:  # noqa: N802
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> ast.AST | None:
         if node.module:
             # Remove import of async utils eclypsing builtins
             if skips := self._skip_imports.get(node.module):
@@ -352,18 +358,18 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
 
         return node
 
-    def visit_Name(self, node: ast.Name) -> ast.AST:  # noqa: N802
+    def visit_Name(self, node: ast.Name) -> ast.AST:
         if node.id in self.names_map:
             node.id = self.names_map[node.id]
         return node
 
-    def visit_Attribute(self, node: ast.Attribute) -> ast.AST:  # noqa: N802
+    def visit_Attribute(self, node: ast.Attribute) -> ast.AST:
         if node.attr in self.names_map:
             node.attr = self.names_map[node.attr]
         self.generic_visit(node)
         return node
 
-    def visit_Subscript(self, node: ast.Subscript) -> ast.AST:  # noqa: N802
+    def visit_Subscript(self, node: ast.Subscript) -> ast.AST:
         # Manage AsyncGenerator[X, Y] -> Generator[X, None, Y]
         self._manage_async_generator(node)
         # # Won't result in a recursion because we change the args number
@@ -379,6 +385,8 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
                 node.slice.elts.insert(1, deepcopy(node.slice.elts[1]))
                 self.generic_visit(node)
                 return node
+            case _:
+                pass
         return None
 
 

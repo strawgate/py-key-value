@@ -1,8 +1,13 @@
-import hashlib
 from typing import TYPE_CHECKING, Any, overload
 
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json
+from key_value.shared.utils.sanitize import (
+    ALPHANUMERIC_CHARACTERS,
+    LOWERCASE_ALPHABET,
+    NUMBERS,
+    sanitize_string,
+)
 from key_value.shared.utils.time_to_live import now_as_epoch, try_parse_datetime_str
 from typing_extensions import override
 
@@ -33,7 +38,7 @@ if TYPE_CHECKING:
 
     from elastic_transport import ObjectApiResponse
 
-DEFAULT_INDEX = "kv-store"
+DEFAULT_INDEX_PREFIX = "kv_store"
 
 DEFAULT_MAPPING = {
     "properties": {
@@ -62,6 +67,10 @@ DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
 
 MAX_KEY_LENGTH = 256
+ALLOWED_KEY_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
+
+MAX_INDEX_LENGTH = 240
+ALLOWED_INDEX_CHARACTERS: str = LOWERCASE_ALPHABET + NUMBERS + "_" + "-" + "."
 
 
 class ElasticsearchStore(
@@ -76,10 +85,10 @@ class ElasticsearchStore(
     _index: str
 
     @overload
-    def __init__(self, *, elasticsearch_client: AsyncElasticsearch, index: str, default_collection: str | None = None) -> None: ...
+    def __init__(self, *, elasticsearch_client: AsyncElasticsearch, index_prefix: str, default_collection: str | None = None) -> None: ...
 
     @overload
-    def __init__(self, *, url: str, api_key: str | None = None, index: str, default_collection: str | None = None) -> None: ...
+    def __init__(self, *, url: str, api_key: str | None = None, index_prefix: str, default_collection: str | None = None) -> None: ...
 
     def __init__(
         self,
@@ -87,7 +96,7 @@ class ElasticsearchStore(
         elasticsearch_client: AsyncElasticsearch | None = None,
         url: str | None = None,
         api_key: str | None = None,
-        index: str,
+        index_prefix: str,
         default_collection: str | None = None,
     ) -> None:
         """Initialize the elasticsearch store.
@@ -96,7 +105,7 @@ class ElasticsearchStore(
             elasticsearch_client: The elasticsearch client to use.
             url: The url of the elasticsearch cluster.
             api_key: The api key to use.
-            index: The index to use.
+            index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
             default_collection: The default collection to use if no collection is provided.
         """
         if elasticsearch_client is None and url is None:
@@ -113,42 +122,49 @@ class ElasticsearchStore(
             msg = "Either elasticsearch_client or url must be provided"
             raise ValueError(msg)
 
-        self._index = index or DEFAULT_INDEX
+        self._index_prefix = index_prefix
         self._is_serverless = False
 
         super().__init__(default_collection=default_collection)
 
     @override
     async def _setup(self) -> None:
-        if await self._client.options(ignore_status=404).indices.exists(index=self._index):
-            return
-
         cluster_info = await self._client.options(ignore_status=404).info()
 
         self._is_serverless = cluster_info.get("version", {}).get("build_flavor") == "serverless"
 
-        _ = await self._client.options(ignore_status=404).indices.create(
-            index=self._index,
-            mappings=DEFAULT_MAPPING,
-            settings={},
-        )
-
     @override
     async def _setup_collection(self, *, collection: str) -> None:
-        pass
+        index_name = self._sanitize_index_name(collection=collection)
 
-    def sanitize_document_id(self, key: str) -> str:
-        if len(key) > MAX_KEY_LENGTH:
-            sha256_hash: str = hashlib.sha256(key.encode()).hexdigest()
-            return sha256_hash[:64]
-        return key
+        if await self._client.options(ignore_status=404).indices.exists(index=index_name):
+            return
+
+        _ = await self._client.options(ignore_status=404).indices.create(index=index_name, mappings=DEFAULT_MAPPING, settings={})
+
+    def _sanitize_index_name(self, collection: str) -> str:
+        sanitized_collection = sanitize_string(
+            value=collection,
+            replacement_character="_",
+            max_length=MAX_INDEX_LENGTH,
+            allowed_characters=ALLOWED_INDEX_CHARACTERS,
+        )
+        return f"{self._index_prefix}-{sanitized_collection}"
+
+    def _sanitize_document_id(self, key: str) -> str:
+        return sanitize_string(
+            value=key,
+            replacement_character="_",
+            max_length=MAX_KEY_LENGTH,
+            allowed_characters=ALLOWED_KEY_CHARACTERS,
+        )
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         combo_key: str = compound_key(collection=collection, key=key)
 
         elasticsearch_response = await self._client.options(ignore_status=404).get(
-            index=self._index, id=self.sanitize_document_id(key=combo_key)
+            index=self._index, id=self._sanitize_document_id(key=combo_key)
         )
 
         body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
@@ -194,8 +210,8 @@ class ElasticsearchStore(
             document["expires_at"] = managed_entry.expires_at.isoformat()
 
         _ = await self._client.index(
-            index=self._index,
-            id=self.sanitize_document_id(key=combo_key),
+            index=self._sanitize_index_name(collection=collection),
+            id=self._sanitize_document_id(key=combo_key),
             body=document,
             refresh=self._should_refresh_on_put,
         )
@@ -205,7 +221,7 @@ class ElasticsearchStore(
         combo_key: str = compound_key(collection=collection, key=key)
 
         elasticsearch_response: ObjectApiResponse[Any] = await self._client.options(ignore_status=404).delete(
-            index=self._index, id=self.sanitize_document_id(key=combo_key)
+            index=self._sanitize_index_name(collection=collection), id=self._sanitize_document_id(key=combo_key)
         )
 
         body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
@@ -222,7 +238,7 @@ class ElasticsearchStore(
         limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
 
         result: ObjectApiResponse[Any] = await self._client.options(ignore_status=404).search(
-            index=self._index,
+            index=self._sanitize_index_name(collection=collection),
             fields=[{"key": None}],
             body={
                 "query": {
@@ -255,7 +271,7 @@ class ElasticsearchStore(
         limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
 
         search_response: ObjectApiResponse[Any] = await self._client.options(ignore_status=404).search(
-            index=self._index,
+            index=f"{self._index_prefix}-*",
             aggregations={
                 "collections": {
                     "terms": {
@@ -276,7 +292,7 @@ class ElasticsearchStore(
     @override
     async def _delete_collection(self, *, collection: str) -> bool:
         result: ObjectApiResponse[Any] = await self._client.options(ignore_status=404).delete_by_query(
-            index=self._index,
+            index=self._sanitize_index_name(collection=collection),
             body={
                 "query": {
                     "term": {
@@ -296,7 +312,7 @@ class ElasticsearchStore(
     @override
     async def _cull(self) -> None:
         _ = await self._client.options(ignore_status=404).delete_by_query(
-            index=self._index,
+            index=f"{self._index_prefix}-*",
             body={
                 "query": {
                     "range": {

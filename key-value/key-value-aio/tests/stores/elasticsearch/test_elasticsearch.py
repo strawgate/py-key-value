@@ -51,8 +51,8 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture
     async def store(self) -> AsyncGenerator[ElasticsearchStore, None]:
         es_client = get_elasticsearch_client()
-        _ = await es_client.options(ignore_status=404).indices.delete(index="kv-store-e2e-test")
-        async with ElasticsearchStore(url=ES_URL, index="kv-store-e2e-test") as store:
+        _ = await es_client.options(ignore_status=404).indices.delete(index="kv-store-e2e-test-*")
+        async with ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test") as store:
             yield store
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
