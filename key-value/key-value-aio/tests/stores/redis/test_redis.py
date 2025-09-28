@@ -21,7 +21,7 @@ WAIT_FOR_REDIS_TIMEOUT = 30
 async def ping_redis() -> bool:
     client: Redis = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
     try:
-        return client.ping()  # pyright: ignore[reportUnknownMemberType, reportAny, reportReturnType]
+        return await client.ping()  # pyright: ignore[reportUnknownMemberType, reportAny, reportReturnType]
     except Exception:
         return False
 
