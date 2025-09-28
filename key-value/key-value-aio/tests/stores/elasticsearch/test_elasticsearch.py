@@ -47,11 +47,18 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
             yield
 
+    @pytest.fixture
+    async def es_client(self) -> AsyncGenerator[AsyncElasticsearch, None]:
+        async with AsyncElasticsearch(hosts=[ES_URL]) as es_client:
+            yield es_client
+
     @override
     @pytest.fixture
     async def store(self) -> AsyncGenerator[ElasticsearchStore, None]:
         es_client = get_elasticsearch_client()
-        _ = await es_client.options(ignore_status=404).indices.delete(index="kv-store-e2e-test-*")
+        indices = await es_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
+        for index in indices:
+            _ = await es_client.options(ignore_status=404).indices.delete(index=index)
         async with ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test") as store:
             yield store
 
@@ -62,3 +69,14 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.mark.skip(reason="Skip concurrent tests on distributed caches")
     @override
     async def test_concurrent_operations(self, store: BaseStore): ...
+
+    async def test_put_put_two_indices(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
+        await store.put(collection="test_collection", key="test_key", value={"test": "test"})
+        await store.put(collection="test_collection_2", key="test_key", value={"test": "test"})
+        assert await store.get(collection="test_collection", key="test_key") == {"test": "test"}
+        assert await store.get(collection="test_collection_2", key="test_key") == {"test": "test"}
+
+        indices = await es_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
+        assert len(indices.body) == 2
+        assert "kv-store-e2e-test-test_collection" in indices
+        assert "kv-store-e2e-test-test_collection_2" in indices

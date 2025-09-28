@@ -430,8 +430,7 @@ class BlanksInserter(ast.NodeTransformer):  # type: ignore
 
 def unparse(tree: ast.AST) -> str:
     rv: str = Unparser().visit(tree)
-    rv = _fix_comment_on_decorators(rv)
-    return rv
+    return _fix_comment_on_decorators(source=rv)
 
 
 def _fix_comment_on_decorators(source: str) -> str:
@@ -479,7 +478,7 @@ class Unparser(ast._Unparser):  # type: ignore
 
     # Beware: private method. Tested with in Python 3.10, 3.11.
     def _write_constant(self, value: Any) -> None:
-        if isinstance(value, str) and len(value) > 50:
+        if isinstance(value, str) and len(value) > 50:  # noqa: PLR2004
             self._write_str_avoiding_backslashes(value)
         else:
             super()._write_constant(value)

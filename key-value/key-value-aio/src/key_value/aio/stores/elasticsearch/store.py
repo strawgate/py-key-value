@@ -82,7 +82,7 @@ class ElasticsearchStore(
 
     _is_serverless: bool
 
-    _index: str
+    _index_prefix: str
 
     @overload
     def __init__(self, *, elasticsearch_client: AsyncElasticsearch, index_prefix: str, default_collection: str | None = None) -> None: ...
@@ -143,13 +143,12 @@ class ElasticsearchStore(
         _ = await self._client.options(ignore_status=404).indices.create(index=index_name, mappings=DEFAULT_MAPPING, settings={})
 
     def _sanitize_index_name(self, collection: str) -> str:
-        sanitized_collection = sanitize_string(
-            value=collection,
+        return sanitize_string(
+            value=self._index_prefix + "-" + collection,
             replacement_character="_",
             max_length=MAX_INDEX_LENGTH,
             allowed_characters=ALLOWED_INDEX_CHARACTERS,
         )
-        return f"{self._index_prefix}-{sanitized_collection}"
 
     def _sanitize_document_id(self, key: str) -> str:
         return sanitize_string(
@@ -164,7 +163,7 @@ class ElasticsearchStore(
         combo_key: str = compound_key(collection=collection, key=key)
 
         elasticsearch_response = await self._client.options(ignore_status=404).get(
-            index=self._index, id=self._sanitize_document_id(key=combo_key)
+            index=self._sanitize_index_name(collection=collection), id=self._sanitize_document_id(key=combo_key)
         )
 
         body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
