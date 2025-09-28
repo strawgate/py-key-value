@@ -1,4 +1,12 @@
+from datetime import datetime, timezone
 from typing import Any
+
+FIXED_DATETIME = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+FIXED_TIME = FIXED_DATETIME.time()
+
+LARGE_STRING: str = "a" * 10000  # 10KB
+LARGE_INT: int = 1 * 10**18  # 18 digits
+LARGE_FLOAT: float = 1.0 * 10**63  # 63 digits
 
 SIMPLE_CASE: dict[str, Any] = {
     "key_1": "value_1",
@@ -18,10 +26,18 @@ DICTIONARY_TO_JSON_TEST_CASES: list[tuple[dict[str, Any], str]] = [
     ({"key": 1}, '{"key": 1}'),
     ({"key": 1.0}, '{"key": 1.0}'),
     ({"key": [1, 2, 3]}, '{"key": [1, 2, 3]}'),
+    # ({"key": (1, 2, 3)}, '{"key": [1, 2, 3]}'),
     ({"key": {"nested": "value"}}, '{"key": {"nested": "value"}}'),
     ({"key": True}, '{"key": true}'),
     ({"key": False}, '{"key": false}'),
     ({"key": None}, '{"key": null}'),
+    (
+        {"key": {"int": 1, "float": 1.0, "list": [1, 2, 3], "dict": {"nested": "value"}, "bool": True, "null": None}},
+        '{"key": {"int": 1, "float": 1.0, "list": [1, 2, 3], "dict": {"nested": "value"}, "bool": true, "null": null}}',
+    ),
+    ({"key": LARGE_STRING}, f'{{"key": "{LARGE_STRING}"}}'),
+    ({"key": LARGE_INT}, f'{{"key": {LARGE_INT}}}'),
+    ({"key": LARGE_FLOAT}, f'{{"key": {LARGE_FLOAT}}}'),
 ]
 
 DICTIONARY_TO_JSON_TEST_CASES_NAMES: list[str] = [
@@ -29,10 +45,15 @@ DICTIONARY_TO_JSON_TEST_CASES_NAMES: list[str] = [
     "int",
     "float",
     "list",
+    # "tuple",
     "dict",
-    "bool-false",
     "bool-true",
+    "bool-false",
     "null",
+    "dict-nested",
+    "large-string",
+    "large-int",
+    "large-float",
 ]
 
 OBJECT_TEST_CASES: list[dict[str, Any]] = [test_case[0] for test_case in DICTIONARY_TO_JSON_TEST_CASES]

@@ -10,7 +10,7 @@ from key_value.aio.utils.managed_entry import ManagedEntry
 try:
     from redis.asyncio import Redis
 except ImportError as e:
-    msg = "RedisStore requires py-kv-store-adapter[redis]"
+    msg = "RedisStore requires py-key-value-aio[redis]"
     raise ImportError(msg) from e
 
 DEFAULT_PAGE_SIZE = 10000

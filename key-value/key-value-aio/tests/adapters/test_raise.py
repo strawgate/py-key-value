@@ -12,7 +12,7 @@ async def store() -> MemoryStore:
 
 @pytest.fixture
 async def adapter(store: MemoryStore) -> RaiseOnMissingAdapter:
-    return RaiseOnMissingAdapter(kv_store=store)
+    return RaiseOnMissingAdapter(key_value=store)
 
 
 async def test_get(adapter: RaiseOnMissingAdapter):

@@ -1,0 +1,18 @@
+import asyncio
+import time
+from collections.abc import Coroutine
+from typing import Any
+
+
+def asleep(seconds: float) -> Coroutine[Any, Any, None]:
+    """
+    Equivalent to asyncio.sleep(), converted to time.sleep() by async_to_sync.
+    """
+    return asyncio.sleep(seconds)
+
+
+def sleep(seconds: float) -> None:
+    """
+    Equivalent to time.sleep(), converted to asyncio.sleep() by async_to_sync.
+    """
+    time.sleep(seconds)

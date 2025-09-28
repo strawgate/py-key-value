@@ -1,17 +1,16 @@
-import asyncio
 import contextlib
 from collections.abc import AsyncGenerator
 from typing import Any
 
 import pytest
 from inline_snapshot import snapshot
-from pymongo import AsyncMongoClient
+from pymongo import MongoClient
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.mongodb import MongoDBStore
 from tests.conftest import docker_container
-from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, should_skip_docker_tests
+from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, should_skip_docker_tests, wait_for_store
 
 # MongoDB test configuration
 MONGODB_HOST = "localhost"
@@ -21,22 +20,14 @@ MONGODB_TEST_DB = "kv-store-adapter-tests"
 WAIT_FOR_MONGODB_TIMEOUT = 30
 
 
-async def ping_mongodb() -> bool:
+def ping_mongodb() -> bool:
     try:
-        client: AsyncMongoClient[Any] = AsyncMongoClient[Any](host=MONGODB_HOST, port=MONGODB_HOST_PORT)
-        _ = await client.list_database_names()
+        client: MongoClient[Any] = MongoClient[Any](host=MONGODB_HOST, port=MONGODB_HOST_PORT)
+        _ = client.list_database_names()
     except Exception:
         return False
 
     return True
-
-
-async def wait_mongodb() -> bool:
-    for _ in range(WAIT_FOR_MONGODB_TIMEOUT):
-        if await ping_mongodb():
-            return True
-        await asyncio.sleep(delay=1)
-    return False
 
 
 class MongoDBFailedToStartError(Exception):
@@ -48,7 +39,7 @@ class TestMongoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")
     async def setup_mongodb(self) -> AsyncGenerator[None, None]:
         with docker_container("mongodb-test", "mongo:7", {"27017": 27017}):
-            if not await wait_mongodb():
+            if not wait_for_store(wait_fn=ping_mongodb):
                 msg = "MongoDB failed to start"
                 raise MongoDBFailedToStartError(msg)
 

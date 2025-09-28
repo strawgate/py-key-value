@@ -3,7 +3,7 @@ from typing import Any
 
 from typing_extensions import override
 
-from key_value.aio.types import AsyncKeyValue
+from key_value.aio.protocols.key_value import AsyncKeyValue
 
 
 class BaseWrapper(AsyncKeyValue):

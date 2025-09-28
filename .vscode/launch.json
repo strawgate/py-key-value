@@ -28,7 +28,7 @@
             "envFile": "${workspaceFolder}/.env"
         },
         {
-            "name": "Python: Build Sync Library",
+            "name": "Compile Sync Library",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/build_sync_library.py",
@@ -36,6 +36,16 @@
             "justMyCode": false,
             "envFile": "${workspaceFolder}/.env",
             "args": []
+        },
+        {
+            "name": "Compile Sync Library - Single File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/build_sync_library.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "envFile": "${workspaceFolder}/.env",
+            "args": ["${workspaceFolder}/key-value/key-value-aio/src/key_value/aio/stores/memcached/__init__.py"]
         }
     ]
 }

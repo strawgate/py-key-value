@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -75,11 +76,11 @@ def docker_rm(name: str, raise_on_error: bool = False) -> bool:
     return True
 
 
-def docker_run(name: str, image: str, ports: dict[str, int], raise_on_error: bool = False) -> bool:
+def docker_run(name: str, image: str, ports: dict[str, int], environment: dict[str, str], raise_on_error: bool = False) -> bool:
     logger.info(f"Running container {name} with image {image} and ports {ports}")
     client = get_docker_client()
     try:
-        client.containers.run(name=name, image=image, ports=ports, detach=True)
+        client.containers.run(name=name, image=image, ports=ports, environment=environment, detach=True)
     except Exception:
         logger.info(f"Container {name} failed to run")
         if raise_on_error:
@@ -90,13 +91,15 @@ def docker_run(name: str, image: str, ports: dict[str, int], raise_on_error: boo
 
 
 @contextmanager
-def docker_container(name: str, image: str, ports: dict[str, int], raise_on_error: bool = True) -> Iterator[None]:
+def docker_container(
+    name: str, image: str, ports: dict[str, int], environment: dict[str, str] | None = None, raise_on_error: bool = True
+) -> Iterator[None]:
     logger.info(f"Creating container {name} with image {image} and ports {ports}")
     try:
-        docker_pull(image, raise_on_error=True)
-        docker_stop(name, raise_on_error=False)
-        docker_rm(name, raise_on_error=False)
-        docker_run(name, image, ports, raise_on_error=True)
+        docker_pull(image=image, raise_on_error=True)
+        docker_stop(name=name, raise_on_error=False)
+        docker_rm(name=name, raise_on_error=False)
+        docker_run(name=name, image=image, ports=ports, environment=environment or {}, raise_on_error=True)
         logger.info(f"Container {name} created")
         yield
     except Exception:
@@ -109,3 +112,15 @@ def docker_container(name: str, image: str, ports: dict[str, int], raise_on_erro
         docker_rm(name, raise_on_error=False)
     logger.info(f"Container {name} stopped and removed")
     return
+
+
+def async_running_in_event_loop() -> bool:
+    try:
+        asyncio.get_event_loop()
+    except RuntimeError:
+        return False
+    return True
+
+
+def running_in_event_loop() -> bool:
+    return False

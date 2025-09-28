@@ -10,7 +10,7 @@ from key_value.aio.utils.managed_entry import ManagedEntry
 try:
     from aiomcache import Client
 except ImportError as e:
-    msg = "MemcachedStore requires py-kv-store-adapter[memcached]"
+    msg = "MemcachedStore requires py-key-value-aio[memcached]"
     raise ImportError(msg) from e
 
 MAX_KEY_LENGTH = 240

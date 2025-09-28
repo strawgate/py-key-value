@@ -11,8 +11,8 @@ from typing import Any
 
 from typing_extensions import Self, override
 
-from key_value.aio.errors import InvalidTTLError, SetupError
-from key_value.aio.types import (
+from key_value.aio.errors import InvalidTTLError, StoreSetupError
+from key_value.aio.protocols.key_value import (
     AsyncCullProtocol,
     AsyncDestroyCollectionProtocol,
     AsyncDestroyStoreProtocol,
@@ -92,7 +92,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
                     try:
                         await self._setup()
                     except Exception as e:
-                        raise SetupError(message=f"Failed to setup store: {e}", extra_info={"store": self.__class__.__name__}) from e
+                        raise StoreSetupError(message=f"Failed to setup store: {e}", extra_info={"store": self.__class__.__name__}) from e
                     self._setup_complete = True
 
     async def setup_collection(self, *, collection: str) -> None:
@@ -104,7 +104,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
                     try:
                         await self._setup_collection(collection=collection)
                     except Exception as e:
-                        raise SetupError(message=f"Failed to setup collection: {e}", extra_info={"collection": collection}) from e
+                        raise StoreSetupError(message=f"Failed to setup collection: {e}", extra_info={"collection": collection}) from e
                     self._setup_collection_complete[collection] = True
 
     @abstractmethod

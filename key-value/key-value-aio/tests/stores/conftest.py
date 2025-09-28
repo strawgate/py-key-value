@@ -3,8 +3,9 @@ import hashlib
 import os
 import subprocess
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import pytest
 from dirty_equals import IsFloat
@@ -13,6 +14,9 @@ from pydantic import AnyHttpUrl
 from key_value.aio.errors import InvalidTTLError, SerializationError
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
 from key_value.aio.stores.memory.store import MemoryStore
+from key_value.aio.utils.acompat import asleep, sleep
+from tests.cases import DICTIONARY_TO_JSON_TEST_CASES_NAMES, OBJECT_TEST_CASES
+from tests.conftest import async_running_in_event_loop
 
 
 @pytest.fixture
@@ -63,6 +67,14 @@ def should_skip_docker_tests() -> bool:
     return not should_run_docker_tests()
 
 
+def wait_for_store(wait_fn: Callable[[], bool], max_time: int = 10) -> bool:
+    for _ in range(max_time):
+        if wait_fn():
+            return True
+        sleep(seconds=1)
+    return False
+
+
 class BaseStoreTests(ABC):
     async def eventually_consistent(self) -> None:  # noqa: B027
         """Subclasses can override this to wait for eventually consistent operations."""
@@ -95,6 +107,11 @@ class BaseStoreTests(ABC):
         await store.put(collection="test", key="test", value={"test": "test"})
         assert await store.get(collection="test", key="test") == {"test": "test"}
 
+    @pytest.mark.parametrize(argnames="value", argvalues=OBJECT_TEST_CASES, ids=DICTIONARY_TO_JSON_TEST_CASES_NAMES)
+    async def test_get_complex_put_get(self, store: BaseStore, value: dict[str, Any]):
+        await store.put(collection="test", key="test", value=value)
+        assert await store.get(collection="test", key="test") == value
+
     async def test_put_many_get(self, store: BaseStore):
         await store.put_many(collection="test", keys=["test", "test_2"], values=[{"test": "test"}, {"test": "test_2"}])
         assert await store.get(collection="test", key="test") == {"test": "test"}
@@ -119,6 +136,12 @@ class BaseStoreTests(ABC):
         assert await store.get(collection="test", key="test") == {"test": "test"}
         assert await store.delete(collection="test", key="test")
         assert await store.get(collection="test", key="test") is None
+
+    async def test_put_many_get_get_delete_many_get_many(self, store: BaseStore):
+        await store.put_many(collection="test", keys=["test", "test_2"], values=[{"test": "test"}, {"test": "test_2"}])
+        assert await store.get_many(collection="test", keys=["test", "test_2"]) == [{"test": "test"}, {"test": "test_2"}]
+        assert await store.delete_many(collection="test", keys=["test", "test_2"]) == 2
+        assert await store.get_many(collection="test", keys=["test", "test_2"]) == [None, None]
 
     async def test_put_many_get_many_delete_many_get_many(self, store: BaseStore):
         await store.put_many(collection="test", keys=["test", "test_2"], values=[{"test": "test"}, {"test": "test_2"}])
@@ -175,7 +198,7 @@ class BaseStoreTests(ABC):
     async def test_put_expired_get_none(self, store: BaseStore):
         """Tests that a put call with a negative ttl will return None when getting the key."""
         await store.put(collection="test_collection", key="test_key", value={"test": "test"}, ttl=1)
-        await asyncio.sleep(3)
+        await asleep(seconds=3)
         assert await store.get(collection="test_collection", key="test_key") is None
 
     async def test_long_collection_name(self, store: BaseStore):
@@ -209,6 +232,7 @@ class BaseStoreTests(ABC):
         assert await store.get(collection="test_collection", key="test_key_0") is None
         assert await store.get(collection="test_collection", key="test_key_999") is not None
 
+    @pytest.mark.skipif(condition=not async_running_in_event_loop(), reason="Cannot run concurrent operations in event loop")
     async def test_concurrent_operations(self, store: BaseStore):
         """Tests that the store can handle concurrent operations."""
 

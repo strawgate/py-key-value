@@ -11,7 +11,7 @@ from key_value.aio.utils.managed_entry import ManagedEntry
 try:
     from diskcache import Cache
 except ImportError as e:
-    msg = "DiskStore requires py-kv-store-adapter[disk]"
+    msg = "DiskStore requires py-key-value-aio[disk]"
     raise ImportError(msg) from e
 
 DEFAULT_DISK_STORE_MAX_SIZE = 1 * 1024 * 1024 * 1024  # 1GB

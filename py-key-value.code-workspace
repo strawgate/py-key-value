@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"name": "key-value-aio",
+			"path": "key-value/key-value-aio",
+		},
+		{
+			"name": "key-value-sync",
+			"path": "key-value/key-value-sync"
+		},
+		{
+			"name": "root",
+			"path": "."
+		}
+	],
+	"settings": {}
+}

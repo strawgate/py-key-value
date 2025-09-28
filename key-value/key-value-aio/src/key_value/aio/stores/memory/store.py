@@ -17,7 +17,7 @@ from key_value.aio.utils.time_to_live import epoch_to_datetime
 try:
     from cachetools import TLRUCache
 except ImportError as e:
-    msg = "MemoryStore requires py-kv-store-adapter[memory]"
+    msg = "MemoryStore requires py-key-value-aio[memory]"
     raise ImportError(msg) from e
 
 

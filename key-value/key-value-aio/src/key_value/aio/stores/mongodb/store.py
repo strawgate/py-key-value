@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 try:
     from pymongo import AsyncMongoClient
 except ImportError as e:
-    msg = "MongoDBStore requires py-kv-store-adapter[mongodb]"
+    msg = "MongoDBStore requires py-key-value-aio[mongodb]"
     raise ImportError(msg) from e
 
 

@@ -30,15 +30,15 @@ jobs:
         working-directory: ${{ matrix.project }}
 
       - name: "Lint"
-        run: uv run ruff check --exit-non-zero-on-fix --fix
+        run: uv run ruff check --exit-non-zero-on-fix --fix .
         working-directory: ${{ matrix.project }}
 
       - name: "Format"
-        run: uv run ruff format --check
+        run: uv run ruff format --check . 
         working-directory: ${{ matrix.project }}
 
       - name: "Type Check"
-        run: uv run basedpyright
+        run: uv run basedpyright .
         working-directory: ${{ matrix.project }}
 
   test_quick:
@@ -66,11 +66,11 @@ jobs:
         working-directory: ${{ matrix.project }}
 
       - name: "Test"
-        run: uv run pytest tests
+        run: uv run pytest tests .
         working-directory: ${{ matrix.project }}
 
       - name: "Build"
-        run: uv build
+        run: uv build .
         working-directory: ${{ matrix.project }}
 
   test_all:
@@ -108,9 +108,9 @@ jobs:
         working-directory: ${{ matrix.project }}
 
       - name: "Test"
-        run: uv run pytest tests
+        run: uv run pytest tests .
         working-directory: ${{ matrix.project }}
 
       - name: "Build"
-        run: uv build
+        run: uv build .
         working-directory: ${{ matrix.project }}

@@ -17,7 +17,6 @@ from key_value.aio.utils.time_to_live import now_as_epoch, try_parse_datetime_st
 
 try:
     from elasticsearch import AsyncElasticsearch
-
     from key_value.aio.stores.elasticsearch.utils import (
         get_aggregations_from_body,
         get_body_from_response,
@@ -26,7 +25,7 @@ try:
         get_source_from_body,
     )
 except ImportError as e:
-    msg = "ElasticsearchStore requires py-kv-store-adapter[elasticsearch]"
+    msg = "ElasticsearchStore requires py-key-value-aio[elasticsearch]"
     raise ImportError(msg) from e
 
 if TYPE_CHECKING:
@@ -78,7 +77,7 @@ class ElasticsearchStore(
     def __init__(self, *, elasticsearch_client: AsyncElasticsearch, index: str, default_collection: str | None = None) -> None: ...
 
     @overload
-    def __init__(self, *, url: str, api_key: str, index: str, default_collection: str | None = None) -> None: ...
+    def __init__(self, *, url: str, api_key: str | None = None, index: str, default_collection: str | None = None) -> None: ...
 
     def __init__(
         self,
@@ -116,7 +115,7 @@ class ElasticsearchStore(
         super().__init__(default_collection=default_collection)
 
     @override
-    async def setup(self) -> None:
+    async def _setup(self) -> None:
         if await self._client.options(ignore_status=404).indices.exists(index=self._index):
             return
 
@@ -210,7 +209,7 @@ class ElasticsearchStore(
 
         result: ObjectApiResponse[Any] = await self._client.options(ignore_status=404).search(
             index=self._index,
-            fields=["key"],  # pyright: ignore[reportArgumentType]
+            fields=[{"key": None}],
             body={
                 "query": {
                     "term": {

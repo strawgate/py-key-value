@@ -8,6 +8,7 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.memcached import MemcachedStore
+from key_value.aio.utils.acompat import asleep
 from tests.conftest import docker_container
 from tests.stores.conftest import BaseStoreTests, ContextManagerStoreTestMixin, should_skip_docker_tests
 
@@ -37,7 +38,7 @@ async def wait_memcached() -> bool:
         result = await asyncio.wait_for(ping_memcached(), timeout=1)
         if result:
             return True
-        await asyncio.sleep(delay=1)
+        await asleep(1)
     return False
 
 

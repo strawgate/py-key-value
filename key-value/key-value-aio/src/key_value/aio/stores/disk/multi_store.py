@@ -13,7 +13,7 @@ try:
     from diskcache import Cache
     from pathvalidate import sanitize_filename
 except ImportError as e:
-    msg = "DiskStore requires py-kv-store-adapter[disk]"
+    msg = "DiskStore requires py-key-value-aio[disk]"
     raise ImportError(msg) from e
 
 DEFAULT_DISK_STORE_SIZE_LIMIT = 1 * 1024 * 1024 * 1024  # 1GB

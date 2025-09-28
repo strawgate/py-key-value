@@ -9,6 +9,7 @@ requires-python = ">=3.10"
 [tool.uv.workspace]
 members = [
     "key-value/key-value-aio",
+    "key-value/key-value-sync",
 ]
 
 [tool.pyright]
@@ -79,3 +80,6 @@ line-length = 140
 dev = [
     "docker>=7.1.0",
 ]
+
+[tool.pytest.ini_options]
+consider_namespace_packages = true
