@@ -3,21 +3,21 @@ name: Publish to PyPI
 on:
   release:
     types: [created]
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
-  publish:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      id-token: write
-    environment: pypi
 
     strategy:
       matrix:
         project:
           - "key-value/key-value-aio"
-    #          - "kv-store-sync"
+          - "key-value/key-value-shared"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,7 +32,31 @@ jobs:
       - name: "Test"
         run: uv run pytest tests
         working-directory: ${{ matrix.project }}
-  
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+    environment: pypi
+
+    strategy:
+      matrix:
+        project:
+          - "key-value/key-value-aio"
+          - "key-value/key-value-shared"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@v6
+
+      - name: "Install"
+        run: uv sync --locked --group dev
+        working-directory: ${{ matrix.project }}
+
       - name: "Build"
         run: uv build
         working-directory: ${{ matrix.project }}
