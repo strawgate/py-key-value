@@ -1,0 +1,82 @@
+[project]
+name = "py-key-value-aio"
+version = "0.2.0"
+description = "Async Key-Value"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "py-key-value-shared>=0.2.0",
+]
+
+
+[build-system]
+requires = ["uv_build>=0.8.2,<0.9.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "key_value.aio"
+
+[tool.uv.sources]
+py-key-value-shared = { workspace = true }
+py-key-value-shared-test = { workspace = true }
+
+[project.optional-dependencies]
+memory = ["cachetools>=6.0.0"]
+disk = ["diskcache>=5.6.0", "pathvalidate>=3.3.1",]
+redis = ["redis>=6.0.0"]
+mongodb = ["pymongo>=4.15.0"]
+valkey = ["valkey-glide>=2.1.0"]
+memcached = ["aiomcache>=0.8.0"]
+elasticsearch = ["elasticsearch>=9.0.0", "aiohttp>=3.12"]
+pydantic = ["pydantic>=2.11.9"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = ["--inline-snapshot=disable","-vv","-s"]
+markers = [
+    "skip_on_ci: Skip running the test when running on CI",
+]
+timeout = 10
+
+env_files = [".env"]
+
+[dependency-groups]
+dev = [
+    "py-key-value-aio[memory,disk,redis,elasticsearch,memcached,mongodb]",
+    "py-key-value-aio[valkey]; platform_system != 'Windows'",
+    "py-key-value-aio[pydantic]",
+    "pytest",
+    "pytest-mock",
+    "pytest-asyncio",
+    "ruff",
+    "diskcache-stubs>=5.6.3.6.20240818",
+    "pytest-dotenv>=0.5.2",
+    "dirty-equals>=0.10.0",
+    "inline-snapshot>=0.29.0",
+    "pytest-redis>=3.1.3",
+    "basedpyright>=1.31.5",
+    "pytest-timeout>=2.4.0",
+    "ast-comments>=1.2.3",
+    "docker>=7.1.0",
+    "py-key-value-shared-test>=0.2.0",
+    
+]
+lint = [
+  "ruff"
+]
+
+[tool.ruff]
+extend="../../pyproject.toml"
+
+[tool.pyright]
+extends = "../../pyproject.toml"

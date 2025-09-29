@@ -1,203 +1,221 @@
-# KV Store Adapter
+# Python Key-Value Libraries
 
-A pluggable, async-first key-value store interface for Python applications with support for multiple backends and TTL (Time To Live) functionality.
+This monorepo contains two libraries:
 
-## Features
+- `py-key-value-aio`: Async key-value store library (supported).
+- `py-key-value-sync`: Sync key-value store library (under development; generated from the async API).
 
-- **Async-first**: Built from the ground up with `async`/`await` support
-- **Multiple backends**: Redis, Elasticsearch, In-memory, Disk, and more
+## Why use this library?
+
+- **Multiple backends**: Elasticsearch, Memcached, MongoDB, Redis, Valkey, and In-memory, Disk, etc
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
-- **Adapters**: Pydantic, Single Collection, and more
+- **Adapters**: Pydantic model support, raise-on-missing behavior, etc
 - **Wrappers**: Statistics tracking and extensible wrapper system
 - **Collection-based**: Organize keys into logical collections/namespaces
 - **Pluggable architecture**: Easy to add custom store implementations
 
-## Quick Start
+## Why not use this library?
+
+- **Async-only**: While a code-gen'd synchronous library is under development, the async library is the primary focus at the moment.
+- **Managed Entries**: Raw values are not stored in backends, a wrapper object is stored instead. This wrapper object contains the value, sometimes metadata like the TTL, and the creation timestamp. Most often it is serialized to and from JSON.
+- **No Live Objects**: Even when using the in-memory store, "live" objects are never returned from the store. You get a dictionary or a Pydantic model, hopefully a copy of what you stored, but never the same instance in memory.
+
+## Installation
+
+## Quick start for Async library
+
+Install the library with the backends you need.
 
 ```bash
-pip install kv-store-adapter
+# Async library
+pip install py-key-value-aio
 
-# With specific backend support
-pip install kv-store-adapter[redis]
-pip install kv-store-adapter[elasticsearch]
-pip install kv-store-adapter[memory]
-pip install kv-store-adapter[disk]
-
-# With all backends
-pip install kv-store-adapter[memory,disk,redis,elasticsearch]
+# With specific backend extras
+pip install py-key-value-aio[memory]
+pip install py-key-value-aio[disk]
+pip install py-key-value-aio[elasticsearch]
+# or: redis, mongodb, memcached, valkey, see below for all options
 ```
-
-# The KV Store Protocol
-
-The simplest way to get started is to use the `KVStoreProtocol` interface, which allows you to write code that works with any supported KV Store:
 
 ```python
 import asyncio
 
-from kv_store_adapter.types import KVStoreProtocol
-from kv_store_adapter.stores.redis import RedisStore
-from kv_store_adapter.stores.memory import MemoryStore
+from key_value.aio.protocols.key_value import AsyncKeyValue
+from key_value.aio.stores.memory import MemoryStore
 
-async def example():
-    # In-memory store
+
+async def example(store: AsyncKeyValue) -> None:
+    await store.put(key="123", value={"name": "Alice"}, collection="users", ttl=3600)
+    value = await store.get(key="123", collection="users")
+    await store.delete(key="123", collection="users")
+
+
+async def main():
     memory_store = MemoryStore()
-    await memory_store.put(collection="users", key="456", value={"name": "Bob"}, ttl=3600) # TTL is supported, but optional!
-    bob = await memory_store.get(collection="users", key="456")
-    await memory_store.delete(collection="users", key="456")
+    await example(memory_store)
 
-    redis_store = RedisStore(url="redis://localhost:6379")
-    await redis_store.put(collection="products", key="123", value={"name": "Alice"})
-    alice = await redis_store.get(collection="products", key="123")
-    await redis_store.delete(collection="products", key="123")
-
-asyncio.run(example())
+asyncio.run(main())
 ```
 
-## Store Implementations
+## Introduction to py-key-value
 
-Choose the store that best fits your needs. All stores implement the same `KVStoreProtocol` interface:
+### Protocols
 
-### Production Stores
+- **Async**: `key_value.aio.protocols.AsyncKeyValue` — async `get/put/delete/ttl` and bulk variants; optional protocol segments for culling, destroying stores/collections, and enumerating keys/collections implemented by capable stores.
+- **Sync**: `key_value.sync.protocols.KeyValue` — sync mirror of the async protocol, generated from the async library.
 
-- **RedisStore**: `RedisStore(url="redis://localhost:6379/0")`
-- **ElasticsearchStore**: `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key")`
-- **DiskStore**: A sqlite-based store for local persistence `DiskStore(path="./cache")`
-- **MemoryStore**: A fast in-memory cache `MemoryStore()`
-
-### Development/Testing Stores  
-
-- **SimpleStore**: In-memory and inspectable for testing `SimpleStore()`
-- **NullStore**: No-op store for testing `NullStore()`
-
-For detailed configuration options and all available stores, see [DEVELOPING.md](DEVELOPING.md).
-
-## Atomicity / Consistency
-
-We strive to support atomicity and consistency across all stores and operations in the KVStoreProtocol. That being said,
-there are operations available via the BaseKVStore class which are management operations like listing keys, listing collections, clearing collections, culling expired entries, etc. These operations may not be atomic, may be eventually consistent across stores, or may have other limitations (like limited to returning a certain number of keys).
-
-## Protocol Adapters
-
-The library provides an adapter pattern simplifying the use of the protocol/store. Adapters themselves do not implement the `KVStoreProtocol` interface and cannot be nested. Adapters can be used with anything that implements the `KVStoreProtocol` interface but do not comply with the full `BaseKVStore` interface and thus lack management operations like listing keys, listing collections, clearing collections, culling expired entries, etc.
-
-The following adapters are available:
-
-- **PydanticAdapter**: Converts data to and from a store using Pydantic models.
-- **SingleCollectionAdapter**: Provides KV operations that do not require a collection parameter.
-
-For example, the PydanticAdapter can be used to provide type-safe interactions with a store:
+The protocols offer a simple interface for your application to interact with the store:
 
 ```python
+get(key: str, collection: str | None = None) -> dict[str, Any] | None:
+get_many(keys: list[str], collection: str | None = None) -> list[dict[str, Any] | None]:
+
+put(key: str, value: dict[str, Any], collection: str | None = None, ttl: float | None = None) -> None:
+put_many(keys: list[str], values: Sequence[dict[str, Any]], collection: str | None = None, ttl: Sequence[float | None] | float | None = None) -> None:
+
+delete(key: str, collection: str | None = None) -> bool:
+delete_many(keys: list[str], collection: str | None = None) -> int:
+
+ttl(key: str, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
+ttl_many(keys: list[str], collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+```
+
+### Stores
+
+The library provides a variety of stores that implement the protocol:
+
+| Local Stores     | Async | Sync | Example |
+|------------------|:-----:|:----:|:-------|
+| Memory           |  ✅  |  ✅  | `MemoryStore()` |
+| Disk             |  ✅  |  ✅  | `DiskStore(directory="./cache")` |
+| Disk (Per-Collection) |  ✅  |  ✅  | `MultiDiskStore(directory="./cache")` |
+| Simple (test)    |  ✅  |  ✅  | `SimpleStore()` |
+| Null (test)      |  ✅  |  ✅  | `NullStore()` |
+
+| Distributed Stores | Async | Sync | Example |
+|------------------|:-----:|:----:|:-------|
+| Elasticsearch    |  ✅  |  ✅  | `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key", index="kv-store")` |
+| Memcached        |  ✅  |      | `MemcachedStore(host="127.0.0.1", port=11211")` |
+| MongoDB          |  ✅  |  ✅  | `MongoDBStore(url="mongodb://localhost:27017/test")` |
+| Redis            |  ✅  |  ✅  | `RedisStore(url="redis://localhost:6379/0")` |
+| Valkey           |  ✅  |  ✅  | `ValkeyStore(host="localhost", port=6379)` |
+
+
+### Adapters
+
+Adapters "wrap" any protocol-compliant store but do not themselves implement the protocol.
+
+They simplify your applications interactions with stores and provide additional functionality. While your application will accept an instance that implements the protocol, your application code might be simplified by using an adapter.
+
+| Adapter | Description | Example |
+|---------|-------------|---------|
+| PydanticAdapter | Type-safe storage/retrieval of Pydantic models with transparent serialization/deserialization. | `PydanticAdapter(store=memory_store, pydantic_model=User)` |
+| RaiseOnMissingAdapter | Optional raise-on-missing behavior for `get`, `get_many`, `ttl`, and `ttl_many`. | `RaiseOnMissingAdapter(store=memory_store)` |
+
+For example, the PydanticAdapter allows you to store and retrieve Pydantic models with transparent serialization/deserialization:
+
+```python
+import asyncio
 from pydantic import BaseModel
 
-from kv_store_adapter.adapters.pydantic import PydanticAdapter
-from kv_store_adapter.stores.memory import MemoryStore
+from key_value.aio.adapters.pydantic import PydanticAdapter
+from key_value.aio.stores.memory import MemoryStore
 
 class User(BaseModel):
     name: str
     email: str
 
-memory_store = MemoryStore()
-
-user_adapter = PydanticAdapter(store=memory_store, pydantic_model=User)
-
 async def example():
-    await user_adapter.put(collection="users", key="123", value=User(name="John Doe", email="john.doe@example.com"))
-    user: User | None = await user_adapter.get(collection="users", key="123")
+    memory_store: MemoryStore = MemoryStore()
 
-asyncio.run(example())
-```
+    user_adapter: PydanticAdapter[User] = PydanticAdapter(
+        key_value=memory_store,
+        pydantic_model=User,
+        default_collection="users",
+    )
 
-## Wrappers
-
-The library provides a wrapper pattern for adding functionality to a store. Wrappers themselves implement the `KVStoreProtocol` interface meaning that you can wrap any
-store with any wrapper, and chain wrappers together as needed.
-
-### Statistics Tracking
-
-Track operation statistics for any store:
-
-```python
-import asyncio
-
-from kv_store_adapter.stores.wrappers.statistics import StatisticsWrapper
-from kv_store_adapter.stores.memory import MemoryStore
-
-memory_store = MemoryStore()
-store = StatisticsWrapper(store=memory_store)
-
-async def example():
-    # Use store normally - statistics are tracked automatically
-    await store.put("users", "123", {"name": "Alice"})
-    await store.get("users", "123")
-    await store.get("users", "456")  # Cache miss
-
-    # Access statistics
-    stats = store.statistics
-    user_stats = stats.get_collection("users")
-    print(f"Total gets: {user_stats.get.count}")
-    print(f"Cache hits: {user_stats.get.hit}")
-    print(f"Cache misses: {user_stats.get.miss}")
-
-asyncio.run(example())
-```
-
-Other wrappers that are available include:
-
-- **TTLClampWrapper**: Wraps a store and clamps the TTL to a given range.
-- **PassthroughWrapper**: Wraps two stores, using the primary store as a write-through cache for the secondary store. For example, you could use a RedisStore as a distributed primary store and a MemoryStore as the cache store.
-- **PrefixCollectionWrapper**: Wraps a store and prefixes all collections with a given prefix.
-- **PrefixKeyWrapper**: Wraps a store and prefixes all keys with a given prefix.
-- **SingleCollectionWrapper**: Wraps a store and forces all requests into a single collection.
-
-See [DEVELOPING.md](DEVELOPING.md) for more information on how to create your own wrappers.
-
-## Chaining Wrappers, Adapters, and Stores
-
-Imagine you have a service where you want to cache 3 pydantic models in a single collection. You can do this by wrapping the store in a PydanticAdapter and a SingleCollectionWrapper:
-
-```python
-import asyncio
-
-from kv_store_adapter.adapters.pydantic import PydanticAdapter
-from kv_store_adapter.stores.wrappers.single_collection import SingleCollectionWrapper
-from kv_store_adapter.stores.memory import MemoryStore
-from pydantic import BaseModel
-
-class User(BaseModel):
-    name: str
-    email: str
-
-store = MemoryStore()
-
-users_store = PydanticAdapter(SingleCollectionWrapper(store, "users"), User)
-products_store = PydanticAdapter(SingleCollectionWrapper(store, "products"), Product)
-orders_store = PydanticAdapter(SingleCollectionWrapper(store, "orders"), Order)
-
-async def example():
     new_user: User = User(name="John Doe", email="john.doe@example.com")
-    await users_store.put(collection="allowed_users", key="123", value=new_user)
+    
+    # Directly store the User model
+    await user_adapter.put(
+        key="john-doe",
+        value=new_user,
+    )
 
-    john_doe: User | None = await users_store.get(collection="allowed_users", key="123")
+    # Retrieve the User model
+    existing_user: User | None = await user_adapter.get(
+        key="john-doe",
+    )
 
 asyncio.run(example())
 ```
 
-The SingleCollectionWrapper will result in writes to the `allowed_users` collection being redirected to the `users` collection but the keys will be prefixed with the original collection `allowed_users__` name. So the key `123` will be stored as `allowed_users__123` in the `users` collection.
+### Wrappers
 
-## Development
+The library provides a wrapper pattern for adding functionality to a store. Wrappers themselves implement the protocol meaning that you can wrap any store with any wrapper, and chain wrappers together as needed.
 
-See [DEVELOPING.md](DEVELOPING.md) for development setup, testing, and contribution guidelines.
+The following wrappers are available:
 
-## License
+| Wrapper | Description | Example |
+|---------|---------------|-----|
+| StatisticsWrapper | Track operation statistics for the store. | `StatisticsWrapper(store=memory_store)` |
+| TTLClampWrapper | Clamp the TTL to a given range. | `TTLClampWrapper(store=memory_store, min_ttl=60, max_ttl=3600)` |
+| PassthroughCacheWrapper | Wrap two stores to provide a read-through cache. | `PassthroughCacheWrapper(store=memory_store, cache_store=memory_store)` |
+| PrefixCollectionsWrapper | Prefix all collections with a given prefix. | `PrefixCollectionsWrapper(store=memory_store, prefix="users")` |
+| PrefixKeysWrapper | Prefix all keys with a given prefix. | `PrefixKeysWrapper(store=memory_store, prefix="users")` |
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+### Atomicity / Consistency
 
-## Contributing
+We aim for consistent semantics across basic key-value operations. Guarantees may vary by backend (especially distributed systems) and for bulk or management operations.
 
-Contributions are welcome! Please read [DEVELOPING.md](DEVELOPING.md) for development setup and contribution guidelines.
 
-## Changelog
+## Advanced Patterns
 
-See [CHANGELOG.md](CHANGELOG.md) for version history and changes.
+Adapters, stores, and wrappers can be combined in a variety of ways as needed.
+
+The following example simulates a consumer of your service providing an Elasticsearch store and forcing all data into a single collection. They pass this wrapped store to your service and you further wrap it in a statistics wrapper (for metrics/monitoring) and a pydantic adapter, to simplify the application's usage.
+
+```python
+import asyncio
+from pydantic import BaseModel
+
+from key_value.aio.adapters.pydantic import PydanticAdapter
+from key_value.aio.wrappers.single_collection import SingleCollectionWrapper
+from key_value.aio.wrappers.statistics import StatisticsWrapper
+from key_value.aio.stores.elasticsearch import ElasticsearchStore
+
+
+class User(BaseModel):
+    name: str
+    email: str
+
+elasticsearch_store: ElasticsearchStore = ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key", index="kv-store")
+
+single_collection: SingleCollectionWrapper = SingleCollectionWrapper(store=elasticsearch_store, single_collection="users", default_collection="one-collection")
+
+
+async def main(store: AsyncKeyValue):
+    statistics_wrapper = StatisticsWrapper(store=store)
+    users = PydanticAdapter(key_value=wrapped, pydantic_model=User)
+
+    await users.put(key="u1", value=User(name="Jane", email="j@example.com"), collection="ignored")
+    user = await users.get(key="u1", collection="ignored")
+    _ = statistics_wrapper.statistics  # access metrics
+
+
+asyncio.run(main(store=single_collection))
+```
+
+## Sync library status
+
+The sync library is under development and mirrors the async library. The goal is to code gen the vast majority of the syncronous library from the async library.
+
+## Project links
+
+- Async README: `key-value/key-value-aio/README.md`
+- Sync README: `key-value/key-value-sync/README.md`
+
+Contributions welcome but may not be accepted. File an issue before submitting a pull request. If you do not get agreement on your proposal before making a pull request you may have a bad time.
+
+MIT licensed.
