@@ -231,7 +231,7 @@ class ElasticsearchStore(
         limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
 
         search_response: ObjectApiResponse[Any] = self._client.options(ignore_status=404).search(
-            index=f"{self._index_prefix}-*", aggregations={"collections": {"terms": {"field": "collection"}}}, size=limit
+            index=f"{self._index_prefix}-*", aggregations={"collections": {"terms": {"field": "collection", "size": limit}}}, size=limit
         )
 
         body: dict[str, Any] = get_body_from_response(response=search_response)
@@ -256,8 +256,9 @@ class ElasticsearchStore(
 
     @override
     def _cull(self) -> None:
+        ms_epoch = int(now_as_epoch() * 1000)
         _ = self._client.options(ignore_status=404).delete_by_query(
-            index=f"{self._index_prefix}-*", body={"query": {"range": {"expires_at": {"lt": now_as_epoch()}}}}
+            index=f"{self._index_prefix}-*", body={"query": {"range": {"expires_at": {"lt": ms_epoch}}}}
         )
 
     @override

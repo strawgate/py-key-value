@@ -8,6 +8,7 @@ from typing import Any
 from typing_extensions import override
 
 from key_value.sync.code_gen.protocols.key_value import KeyValue
+from key_value.sync.code_gen.stores.base import DEFAULT_COLLECTION_NAME
 from key_value.sync.code_gen.wrappers.base import BaseWrapper
 
 
@@ -97,9 +98,6 @@ class KVStoreStatistics:
         return self.collections[collection]
 
 
-DEFAULT_COLLECTION_NAME = "__no_collection__"
-
-
 class StatisticsWrapper(BaseWrapper):
     """Statistics wrapper around a KV Store that tracks operation statistics.
 
@@ -160,7 +158,7 @@ class StatisticsWrapper(BaseWrapper):
         return False
 
     @override
-    def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         collection = collection or DEFAULT_COLLECTION_NAME
 
         results: list[dict[str, Any] | None] = self.store.get_many(keys=keys, collection=collection)
@@ -176,7 +174,7 @@ class StatisticsWrapper(BaseWrapper):
     @override
     def put_many(
         self,
-        keys: Sequence[str],
+        keys: list[str],
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
@@ -189,7 +187,7 @@ class StatisticsWrapper(BaseWrapper):
         self.statistics.get_collection(collection=collection).put.increment(increment=len(keys))
 
     @override
-    def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
+    def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
         collection = collection or DEFAULT_COLLECTION_NAME
 
         deleted_count: int = self.store.delete_many(keys=keys, collection=collection)
@@ -203,7 +201,7 @@ class StatisticsWrapper(BaseWrapper):
         return deleted_count
 
     @override
-    def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         collection = collection or DEFAULT_COLLECTION_NAME
 
         results: list[tuple[dict[str, Any] | None, float | None]] = self.store.ttl_many(keys=keys, collection=collection)

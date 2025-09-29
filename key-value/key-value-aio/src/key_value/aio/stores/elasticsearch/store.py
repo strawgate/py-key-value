@@ -275,6 +275,7 @@ class ElasticsearchStore(
                 "collections": {
                     "terms": {
                         "field": "collection",
+                        "size": limit,
                     },
                 },
             },
@@ -310,12 +311,13 @@ class ElasticsearchStore(
 
     @override
     async def _cull(self) -> None:
+        ms_epoch = int(now_as_epoch() * 1000)
         _ = await self._client.options(ignore_status=404).delete_by_query(
             index=f"{self._index_prefix}-*",
             body={
                 "query": {
                     "range": {
-                        "expires_at": {"lt": now_as_epoch()},
+                        "expires_at": {"lt": ms_epoch},
                     },
                 },
             },

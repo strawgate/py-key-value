@@ -1,3 +1,5 @@
+from typing import Any
+
 from key_value.shared.errors.base import BaseKeyValueError
 
 
@@ -26,8 +28,18 @@ class MissingKeyError(KeyValueOperationError):
 class InvalidTTLError(KeyValueOperationError):
     """Raised when a TTL is invalid."""
 
-    def __init__(self, ttl: float):
+    def __init__(self, ttl: Any):
         super().__init__(
             message="A TTL is invalid.",
             extra_info={"ttl": ttl},
+        )
+
+
+class IncorrectTTLCountError(KeyValueOperationError):
+    """Raised when the number of TTLs is incorrect."""
+
+    def __init__(self, ttl: Any, count: int):
+        super().__init__(
+            message="The number of TTLs is incorrect.",
+            extra_info={"ttl": ttl, "count": count},
         )

@@ -69,16 +69,16 @@ The protocols offer a simple interface for your application to interact with the
 
 ```python
 get(key: str, collection: str | None = None) -> dict[str, Any] | None:
-get_many(keys: Sequence[str], collection: str | None = None) -> list[dict[str, Any] | None]:
+get_many(keys: list[str], collection: str | None = None) -> list[dict[str, Any] | None]:
 
 put(key: str, value: dict[str, Any], collection: str | None = None, ttl: float | None = None) -> None:
-put_many(keys: Sequence[str], values: Sequence[dict[str, Any]], collection: str | None = None, ttl: Sequence[float | None] | float | None = None) -> None:
+put_many(keys: list[str], values: Sequence[dict[str, Any]], collection: str | None = None, ttl: Sequence[float | None] | float | None = None) -> None:
 
 delete(key: str, collection: str | None = None) -> bool:
-delete_many(keys: Sequence[str], collection: str | None = None) -> int:
+delete_many(keys: list[str], collection: str | None = None) -> int:
 
 ttl(key: str, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
-ttl_many(keys: Sequence[str], collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+ttl_many(keys: list[str], collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
 ```
 
 ### Stores

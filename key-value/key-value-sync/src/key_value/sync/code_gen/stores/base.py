@@ -12,9 +12,10 @@ from threading import Lock
 from types import TracebackType
 from typing import Any
 
-from key_value.shared.errors import InvalidTTLError, StoreSetupError
+from key_value.shared.constants import DEFAULT_COLLECTION_NAME
+from key_value.shared.errors import StoreSetupError
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.time_to_live import now
+from key_value.shared.utils.time_to_live import now, prepare_ttls, validate_ttl
 from typing_extensions import Self, override
 
 from key_value.sync.code_gen.protocols.key_value import (
@@ -25,24 +26,6 @@ from key_value.sync.code_gen.protocols.key_value import (
     EnumerateKeysProtocol,
     KeyValueProtocol,
 )
-
-DEFAULT_COLLECTION_NAME = "default_collection"
-
-
-def validate_one_ttl(t: float | None, raise_error: bool = False) -> bool:
-    if t is None:
-        return True
-    if t <= 0:
-        if raise_error:
-            raise InvalidTTLError(ttl=t)
-        return False
-    return True
-
-
-def validate_ttls(t: list[float | None] | float | None, raise_error: bool = False) -> bool:
-    if not isinstance(t, Sequence):
-        t = [t]
-    return all(validate_one_ttl(t=ttl, raise_error=raise_error) for ttl in t)
 
 
 class BaseStore(KeyValueProtocol, ABC):
@@ -114,7 +97,7 @@ class BaseStore(KeyValueProtocol, ABC):
     def _get_managed_entry(self, *, collection: str, key: str) -> ManagedEntry | None:
         """Retrieve a cache entry by key from the specified collection."""
 
-    def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
+    def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
         """Retrieve multiple managed entries by key from the specified collection."""
 
         return [self._get_managed_entry(collection=collection, key=key) for key in keys]
@@ -144,7 +127,7 @@ class BaseStore(KeyValueProtocol, ABC):
         return managed_entry.value
 
     @override
-    def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         collection = collection or self.default_collection
         self.setup_collection(collection=collection)
 
@@ -164,7 +147,7 @@ class BaseStore(KeyValueProtocol, ABC):
         return (managed_entry.value, managed_entry.ttl)
 
     @override
-    def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         """Retrieve multiple values and TTLs by key from the specified collection.
 
         Returns a list of tuples of the form (value, ttl_seconds). Missing or expired
@@ -181,7 +164,7 @@ class BaseStore(KeyValueProtocol, ABC):
         """Store a managed entry by key in the specified collection."""
         ...
 
-    def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
         """Store multiple managed entries by key in the specified collection."""
 
         for key, managed_entry in zip(keys, managed_entries, strict=True):
@@ -193,16 +176,14 @@ class BaseStore(KeyValueProtocol, ABC):
         collection = collection or self.default_collection
         self.setup_collection(collection=collection)
 
-        _ = validate_ttls(t=ttl, raise_error=True)
-
-        managed_entry: ManagedEntry = ManagedEntry(value=value, ttl=ttl, created_at=now())
+        managed_entry: ManagedEntry = ManagedEntry(value=value, ttl=validate_ttl(t=ttl), created_at=now())
 
         self._put_managed_entry(collection=collection, key=key, managed_entry=managed_entry)
 
     @override
     def put_many(
         self,
-        keys: Sequence[str],
+        keys: list[str],
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
@@ -220,16 +201,7 @@ class BaseStore(KeyValueProtocol, ABC):
         collection = collection or self.default_collection
         self.setup_collection(collection=collection)
 
-        ttl_for_entries: list[float | None] = []
-
-        if ttl is None:
-            ttl_for_entries = [None] * len(keys)
-        elif isinstance(ttl, Sequence):
-            ttl_for_entries = list(ttl)
-        elif isinstance(ttl, float):
-            ttl_for_entries = [ttl] * len(keys)
-
-        _ = validate_ttls(t=ttl_for_entries, raise_error=True)
+        ttl_for_entries: list[float | None] = prepare_ttls(t=ttl, count=len(keys))
 
         managed_entries: list[ManagedEntry] = []
 
@@ -243,7 +215,7 @@ class BaseStore(KeyValueProtocol, ABC):
         """Delete a managed entry by key from the specified collection."""
         ...
 
-    def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
+    def _delete_managed_entries(self, *, keys: list[str], collection: str) -> int:
         """Delete multiple managed entries by key from the specified collection."""
 
         deleted_count: int = 0
@@ -262,7 +234,7 @@ class BaseStore(KeyValueProtocol, ABC):
         return self._delete_managed_entry(key=key, collection=collection)
 
     @override
-    def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
+    def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
         """Delete multiple managed entries by key from the specified collection."""
         collection = collection or self.default_collection
         self.setup_collection(collection=collection)

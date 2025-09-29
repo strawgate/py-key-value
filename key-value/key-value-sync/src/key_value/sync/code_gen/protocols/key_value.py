@@ -55,7 +55,7 @@ class KeyValueProtocol(Protocol):
         """
         ...
 
-    def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         """Retrieve multiple values by key from the specified collection.
 
         Args:
@@ -67,7 +67,7 @@ class KeyValueProtocol(Protocol):
         """
         ...
 
-    def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         """Retrieve multiple values and TTL information by key from the specified collection.
 
         Args:
@@ -82,7 +82,7 @@ class KeyValueProtocol(Protocol):
 
     def put_many(
         self,
-        keys: Sequence[str],
+        keys: list[str],
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
@@ -99,7 +99,7 @@ class KeyValueProtocol(Protocol):
         """
         ...
 
-    def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
+    def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
         """Delete multiple key-value pairs from the specified collection.
 
         Args:

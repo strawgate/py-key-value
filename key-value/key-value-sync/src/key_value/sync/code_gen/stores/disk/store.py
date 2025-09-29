@@ -61,7 +61,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
             default_collection: The default collection to use if no collection is provided.
         """
         if disk_cache is not None and directory is not None:
-            msg = "Either disk_cache or directory must be provided"
+            msg = "Provide only one of disk_cache or directory"
             raise ValueError(msg)
 
         if disk_cache is None and directory is None:
@@ -100,7 +100,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        _ = self._cache.set(key=combo_key, value=managed_entry.to_json(), expire=managed_entry.ttl)
+        _ = self._cache.set(key=combo_key, value=managed_entry.to_json(include_expiration=False), expire=managed_entry.ttl)
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:

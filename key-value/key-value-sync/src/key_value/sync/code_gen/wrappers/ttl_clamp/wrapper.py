@@ -4,6 +4,7 @@
 from collections.abc import Sequence
 from typing import Any, overload
 
+from key_value.shared.utils.time_to_live import validate_ttl
 from typing_extensions import override
 
 from key_value.sync.code_gen.protocols.key_value import KeyValue
@@ -39,6 +40,8 @@ class TTLClampWrapper(BaseWrapper):
         if ttl is None:
             return self.missing_ttl
 
+        ttl = validate_ttl(t=ttl)
+
         return max(self.min_ttl, min(ttl, self.max_ttl))
 
     @override
@@ -48,17 +51,16 @@ class TTLClampWrapper(BaseWrapper):
     @override
     def put_many(
         self,
-        keys: Sequence[str],
+        keys: list[str],
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[float | None] | float | None = None,
     ) -> None:
-        clamped_ttl: Sequence[float | None] | float | None = None
+        if isinstance(ttl, (float, int)):
+            ttl = self._ttl_clamp(ttl=ttl)
 
         if isinstance(ttl, Sequence):
-            clamped_ttl = [self._ttl_clamp(ttl=t) for t in ttl]
-        elif isinstance(ttl, float):
-            clamped_ttl = self._ttl_clamp(ttl=ttl)
+            ttl = [self._ttl_clamp(ttl=t) for t in ttl]
 
-        self.store.put_many(keys=keys, values=values, collection=collection, ttl=clamped_ttl)
+        self.store.put_many(keys=keys, values=values, collection=collection, ttl=ttl)

@@ -1,0 +1,45 @@
+{
+  // Simple VS Code tasks that call Makefile targets
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Bump version (make)",
+      "type": "shell",
+      "command": "make",
+      "args": [
+        "bump-version",
+        "VERSION=${input:newVersion}"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Bump version (dry-run) (make)",
+      "type": "shell",
+      "command": "make",
+      "args": [
+        "bump-version-dry",
+        "VERSION=${input:newVersion}"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Build sync library (make)",
+      "type": "shell",
+      "command": "make",
+      "args": [
+        "build-sync"
+      ],
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "newVersion",
+      "type": "promptString",
+      "description": "Enter new version (e.g. 1.2.3)",
+      "default": "0.0.0"
+    }
+  ]
+}
+
+

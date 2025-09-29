@@ -37,7 +37,7 @@ class PrefixCollectionsWrapper(BaseWrapper):
         return await self.store.get(key=key, collection=new_collection)
 
     @override
-    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         new_collection: str = self._prefix_collection(collection=collection)
         return await self.store.get_many(keys=keys, collection=new_collection)
 
@@ -47,7 +47,7 @@ class PrefixCollectionsWrapper(BaseWrapper):
         return await self.store.ttl(key=key, collection=new_collection)
 
     @override
-    async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    async def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         new_collection: str = self._prefix_collection(collection=collection)
         return await self.store.ttl_many(keys=keys, collection=new_collection)
 
@@ -59,7 +59,7 @@ class PrefixCollectionsWrapper(BaseWrapper):
     @override
     async def put_many(
         self,
-        keys: Sequence[str],
+        keys: list[str],
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
@@ -74,6 +74,6 @@ class PrefixCollectionsWrapper(BaseWrapper):
         return await self.store.delete(key=key, collection=new_collection)
 
     @override
-    async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
+    async def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
         new_collection: str = self._prefix_collection(collection=collection)
         return await self.store.delete_many(keys=keys, collection=new_collection)

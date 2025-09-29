@@ -59,13 +59,13 @@ class PassthroughCacheWrapper(BaseWrapper):
         return uncached_entry
 
     @override
-    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         key_to_value: dict[str, dict[str, Any] | None] = dict.fromkeys(keys, None)
 
         # First check the cache store for the entries
         cached_entries: list[dict[str, Any] | None] = await self.cache_store.get_many(collection=collection, keys=keys)
 
-        for i, key in enumerate(iterable=keys):
+        for i, key in enumerate(keys):
             key_to_value[key] = cached_entries[i]
 
         uncached_keys = [key for key, value in key_to_value.items() if value is None]
@@ -78,7 +78,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         entries_to_cache_keys: list[str] = []
         entries_to_cache_ttls: list[float | None] = []
 
-        for i, key in enumerate(iterable=uncached_keys):
+        for i, key in enumerate(uncached_keys):
             entry, ttl = uncached_entries[i]
             if entry is not None:
                 entries_to_cache_keys.append(key)
@@ -114,13 +114,13 @@ class PassthroughCacheWrapper(BaseWrapper):
         return uncached_entry, ttl
 
     @override
-    async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    async def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         key_to_value: dict[str, tuple[dict[str, Any] | None, float | None]] = dict.fromkeys(keys, (None, None))  # type: ignore
 
         # First check the cache store for the entries
         cached_entries: list[tuple[dict[str, Any] | None, float | None]] = await self.cache_store.ttl_many(collection=collection, keys=keys)
 
-        for i, key in enumerate(iterable=keys):
+        for i, key in enumerate(keys):
             key_to_value[key] = (cached_entries[i][0], cached_entries[i][1])
 
         uncached_keys = [key for key, value in key_to_value.items() if value == (None, None)]
@@ -133,7 +133,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         entries_to_cache_keys: list[str] = []
         entries_to_cache_ttls: list[float | None] = []
 
-        for i, key in enumerate(iterable=uncached_keys):
+        for i, key in enumerate(uncached_keys):
             entry, ttl = uncached_entries[i]
             if entry is not None:
                 entries_to_cache_keys.append(key)
@@ -161,7 +161,7 @@ class PassthroughCacheWrapper(BaseWrapper):
     @override
     async def put_many(
         self,
-        keys: Sequence[str],
+        keys: list[str],
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
@@ -178,7 +178,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         return await self.store.delete(collection=collection, key=key)
 
     @override
-    async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
+    async def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
         _ = await self.cache_store.delete_many(collection=collection, keys=keys)
 
         return await self.store.delete_many(collection=collection, keys=keys)

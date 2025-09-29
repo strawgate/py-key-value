@@ -64,12 +64,28 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         db_name: str | None = None,
         coll_name: str | None = None,
         default_collection: str | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Initialize the MongoDB store.
+
+        Args:
+            client: The MongoDB client to use.
+            db_name: The name of the MongoDB database.
+            coll_name: The name of the MongoDB collection.
+            default_collection: The default collection to use if no collection is provided.
+        """
 
     @overload
     def __init__(
         self, *, url: str, db_name: str | None = None, coll_name: str | None = None, default_collection: str | None = None
-    ) -> None: ...
+    ) -> None:
+        """Initialize the MongoDB store.
+
+        Args:
+            url: The url of the MongoDB cluster.
+            db_name: The name of the MongoDB database.
+            coll_name: The name of the MongoDB collection.
+            default_collection: The default collection to use if no collection is provided.
+        """
 
     def __init__(
         self,
@@ -80,12 +96,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         coll_name: str | None = None,
         default_collection: str | None = None,
     ) -> None:
-        """Initialize the MongoDB store.
-
-        The store uses a single MongoDB collection to persist entries for all adapter collections.
-        We store compound keys "{collection}::{key}" and a JSON string payload. Optional TTL is persisted
-        as ISO timestamps in the JSON payload itself to maintain consistent semantics across backends.
-        """
+        """Initialize the MongoDB store."""
 
         if client:
             self._client = client
@@ -124,6 +135,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         matching_collections: list[str] = self._db.list_collection_names(filter=collection_filter)
 
         if matching_collections:
+            self._collections_by_name[collection] = self._db[collection]
             return
 
         new_collection: Collection[dict[str, Any]] = self._db.create_collection(name=collection)
@@ -187,8 +199,10 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         collection = self._sanitize_collection_name(collection=collection)
 
         _ = self._db.drop_collection(name_or_collection=collection)
+        if collection in self._collections_by_name:
+            del self._collections_by_name[collection]
         return True
 
     @override
     def _close(self) -> None:
-        pass
+        self._client.close()
