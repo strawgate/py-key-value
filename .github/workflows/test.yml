@@ -17,7 +17,8 @@ jobs:
       matrix:
         project:
           - "key-value/key-value-aio"
-    #          - "kv-store-sync"
+          - "key-value/key-value-shared"
+          - "key-value/key-value-sync"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -51,7 +52,8 @@ jobs:
         platform: [ubuntu-latest, macos-latest, windows-latest]
         project:
           - "key-value/key-value-aio"
-    #          - "kv-store-sync"
+          - "key-value/key-value-shared"
+          - "key-value/key-value-sync"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -92,7 +94,8 @@ jobs:
           ]
         project:
           - "key-value/key-value-aio"
-    #          - "kv-store-sync"
+          - "key-value/key-value-shared"
+          - "key-value/key-value-sync"
 
     runs-on: ${{ matrix.platform }}
 

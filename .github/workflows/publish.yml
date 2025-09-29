@@ -17,7 +17,8 @@ jobs:
       matrix:
         project:
           - "key-value/key-value-aio"
-    #          - "kv-store-sync"
+          - "key-value/key-value-shared"
+          - "key-value/key-value-sync"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
