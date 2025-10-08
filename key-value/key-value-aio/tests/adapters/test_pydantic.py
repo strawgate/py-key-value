@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
+from key_value.shared.errors import DeserializationError
 from pydantic import AnyHttpUrl, BaseModel
 
 from key_value.aio.adapters.pydantic import PydanticAdapter
@@ -11,6 +12,10 @@ class User(BaseModel):
     name: str
     age: int
     email: str
+
+
+class UpdatedUser(User):
+    is_admin: bool
 
 
 class Product(BaseModel):
@@ -46,6 +51,10 @@ class TestPydanticAdapter:
         return PydanticAdapter[User](key_value=store, pydantic_model=User)
 
     @pytest.fixture
+    async def updated_user_adapter(self, store: MemoryStore) -> PydanticAdapter[UpdatedUser]:
+        return PydanticAdapter[UpdatedUser](key_value=store, pydantic_model=UpdatedUser)
+
+    @pytest.fixture
     async def product_adapter(self, store: MemoryStore) -> PydanticAdapter[Product]:
         return PydanticAdapter[Product](key_value=store, pydantic_model=Product)
 
@@ -62,6 +71,22 @@ class TestPydanticAdapter:
 
         cached_user = await user_adapter.get(collection="test", key="test")
         assert cached_user is None
+
+    async def test_simple_adapter_with_validation_error_ignore(
+        self, user_adapter: PydanticAdapter[User], updated_user_adapter: PydanticAdapter[UpdatedUser]
+    ):
+        await user_adapter.put(collection="test", key="test", value=SAMPLE_USER)
+
+        updated_user = await updated_user_adapter.get(collection="test", key="test")
+        assert updated_user is None
+
+    async def test_simple_adapter_with_validation_error_raise(
+        self, user_adapter: PydanticAdapter[User], updated_user_adapter: PydanticAdapter[UpdatedUser]
+    ):
+        await user_adapter.put(collection="test", key="test", value=SAMPLE_USER)
+        updated_user_adapter.raise_on_validation_error = True
+        with pytest.raises(DeserializationError):
+            await updated_user_adapter.get(collection="test", key="test")
 
     async def test_complex_adapter(self, order_adapter: PydanticAdapter[Order]):
         await order_adapter.put(collection="test", key="test", value=SAMPLE_ORDER, ttl=10)

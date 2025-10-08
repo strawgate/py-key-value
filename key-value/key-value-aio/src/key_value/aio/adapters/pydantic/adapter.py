@@ -13,17 +13,35 @@ T = TypeVar("T", bound=BaseModel)
 class PydanticAdapter(Generic[T]):
     """Adapter around a KVStore-compliant Store that allows type-safe persistence of Pydantic models."""
 
-    def __init__(self, key_value: AsyncKeyValue, pydantic_model: type[T], default_collection: str | None = None) -> None:
+    def __init__(
+        self,
+        key_value: AsyncKeyValue,
+        pydantic_model: type[T],
+        default_collection: str | None = None,
+        raise_on_validation_error: bool = False,
+    ) -> None:
+        """Create a new PydanticAdapter.
+
+        Args:
+            key_value: The KVStore to use.
+            pydantic_model: The Pydantic model to use.
+            default_collection: The default collection to use.
+            raise_on_validation_error: Whether to raise a ValidationError if the model is invalid.
+        """
+
         self.key_value: AsyncKeyValue = key_value
         self.pydantic_model: type[T] = pydantic_model
         self.default_collection: str | None = default_collection
+        self.raise_on_validation_error: bool = raise_on_validation_error
 
-    def _validate_model(self, value: dict[str, Any]) -> T:
+    def _validate_model(self, value: dict[str, Any]) -> T | None:
         try:
             return self.pydantic_model.model_validate(obj=value)
         except ValidationError as e:
-            msg = f"Invalid Pydantic model: {e}"
-            raise DeserializationError(msg) from e
+            if self.raise_on_validation_error:
+                msg = f"Invalid Pydantic model: {value}"
+                raise DeserializationError(msg) from e
+            return None
 
     def _serialize_model(self, value: T) -> dict[str, Any]:
         try:
@@ -35,8 +53,12 @@ class PydanticAdapter(Generic[T]):
     async def get(self, key: str, *, collection: str | None = None) -> T | None:
         """Get and validate a model by key.
 
-        Returns the parsed model instance, or None if not present.
-        Raises DeserializationError if the stored data cannot be validated as the model.
+        Returns:
+            The parsed model instance, or None if not present.
+
+        Raises:
+            DeserializationError if the stored data cannot be validated as the model and the PydanticAdapter is configured to
+            raise on validation error.
         """
         collection = collection or self.default_collection
 
@@ -48,7 +70,12 @@ class PydanticAdapter(Generic[T]):
     async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[T | None]:
         """Batch get and validate models by keys, preserving order.
 
-        Each element is either a parsed model instance or None if missing.
+        Returns:
+            A list of parsed model instances, or None if missing.
+
+        Raises:
+            DeserializationError if the stored data cannot be validated as the model and the PydanticAdapter is configured to
+            raise on validation error.
         """
         collection = collection or self.default_collection
 
