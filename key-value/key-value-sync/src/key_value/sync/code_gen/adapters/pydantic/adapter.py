@@ -125,9 +125,11 @@ class PydanticAdapter(Generic[T]):
 
         (entry, ttl_info) = self.key_value.ttl(key=key, collection=collection)
 
-        if entry is not None:
-            model_validate: T = self._validate_model(value=entry)
-            return (model_validate, ttl_info)
+        if entry is None:
+            return (None, None)
+
+        if validated_model := self._validate_model(value=entry):
+            return (validated_model, ttl_info)
 
         return (None, None)
 
