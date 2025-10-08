@@ -4,7 +4,7 @@
 from typing import overload
 
 from glide_shared.commands.core_options import ExpirySet, ExpiryType
-from glide_shared.config import GlideClientConfiguration, NodeAddress, ServerCredentials
+from glide_sync.config import GlideClientConfiguration, NodeAddress, ServerCredentials
 from glide_sync.glide_client import BaseClient
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry

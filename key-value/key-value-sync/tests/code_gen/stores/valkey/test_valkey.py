@@ -27,7 +27,7 @@ class ValkeyFailedToStartError(Exception):
 @pytest.mark.skipif(detect_on_windows(), reason="Valkey is not supported on Windows")
 class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
     def get_valkey_client(self):
-        from glide_shared.config import GlideClientConfiguration, NodeAddress
+        from glide_sync.config import GlideClientConfiguration, NodeAddress
         from glide_sync.glide_client import GlideClient
 
         client_config: GlideClientConfiguration = GlideClientConfiguration(
