@@ -908,7 +908,7 @@ dev = [
 
 [[package]]
 name = "py-key-value-aio"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "key-value/key-value-aio" }
 dependencies = [
     { name = "py-key-value-shared" },
@@ -999,7 +999,7 @@ dev = [
 
 [[package]]
 name = "py-key-value-shared"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "key-value/key-value-shared" }
 dependencies = [
     { name = "typing-extensions" },
@@ -1036,7 +1036,7 @@ dev = [
 
 [[package]]
 name = "py-key-value-shared-test"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "key-value/key-value-shared-test" }
 
 [package.dev-dependencies]
@@ -1055,7 +1055,7 @@ dev = [
 
 [[package]]
 name = "py-key-value-sync"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "key-value/key-value-sync" }
 dependencies = [
     { name = "py-key-value-shared" },
