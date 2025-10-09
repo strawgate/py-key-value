@@ -210,6 +210,7 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
         "AsyncCollection": "Collection",
         "AsyncMongoClient": "MongoClient",
         "redis.asyncio": "redis",
+        "redis.asyncio.client": "redis.client",
         "glide_shared.config": "glide_sync.config",
         "glide.glide_client": "glide_sync.glide_client",
         "asynccontextmanager": "contextmanager",

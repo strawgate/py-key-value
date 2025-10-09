@@ -5,7 +5,7 @@ from collections.abc import Generator
 
 import pytest
 from key_value.shared.stores.wait import wait_for_true
-from redis.asyncio.client import Redis
+from redis.client import Redis
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
