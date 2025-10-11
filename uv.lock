@@ -1148,6 +1148,9 @@ elasticsearch = [
     { name = "aiohttp" },
     { name = "elasticsearch" },
 ]
+libsecret = [
+    { name = "secretstorage" },
+]
 memcached = [
     { name = "aiomcache" },
 ]
@@ -1198,9 +1201,10 @@ requires-dist = [
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
     { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.15.0" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=6.0.0" },
+    { name = "secretstorage", marker = "extra == 'libsecret'", specifier = ">=3.4.0" },
     { name = "valkey-glide-sync", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "memcached", "elasticsearch", "pydantic"]
+provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "memcached", "elasticsearch", "libsecret", "pydantic"]
 
 [package.metadata.requires-dev]
 dev = [
