@@ -90,6 +90,7 @@ The library provides a variety of stores that implement the protocol:
 | Memory           |  ✅  |  ✅  | `MemoryStore()` |
 | Disk             |  ✅  |  ✅  | `DiskStore(directory="./cache")` |
 | Disk (Per-Collection) |  ✅  |  ✅  | `MultiDiskStore(directory="./cache")` |
+| macOS Keychain   |  ✅  |      | `KeychainStore(service_name="py-key-value")` |
 | Simple (test)    |  ✅  |  ✅  | `SimpleStore()` |
 | Null (test)      |  ✅  |  ✅  | `NullStore()` |
 
