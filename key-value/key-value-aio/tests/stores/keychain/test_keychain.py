@@ -19,10 +19,7 @@ class TestKeychainStore(BaseStoreTests):
         store = KeychainStore(service_name="py-key-value-test")
         await store.setup()
 
-        # Clean up any existing test data
-        await store._delete_store()
+        return store
 
-        yield store
-
-        # Clean up after tests
-        await store._delete_store()
+        # Note: Cleanup is manual - keychain entries must be removed via macOS Keychain Access
+        # or by manually deleting each test key

@@ -1,13 +1,12 @@
 """macOS Keychain-based key-value store."""
 
-from contextlib import suppress
 from typing import overload
 
-from key_value.shared.utils.compound import compound_key, get_collections_from_compound_keys, get_keys_from_compound_keys
+from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
 
-from key_value.aio.stores.base import BaseDestroyStore, BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseStore
+from key_value.aio.stores.base import BaseStore
 
 try:
     import keyring
@@ -19,7 +18,7 @@ except ImportError as e:
 DEFAULT_KEYCHAIN_SERVICE = "py-key-value"
 
 
-class KeychainStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDestroyStore, BaseStore):
+class KeychainStore(BaseStore):
     """macOS Keychain-based key-value store using keyring library.
 
     This store uses the macOS Keychain to persist key-value pairs. Each entry is stored
@@ -27,10 +26,12 @@ class KeychainStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseD
 
     Note: TTL is not natively supported by macOS Keychain, so TTL information is stored
     within the JSON payload and checked at retrieval time.
+
+    Note: This store does not support enumeration of keys or collections as the keyring
+    library does not provide these capabilities.
     """
 
     _service_name: str
-    _key_index: set[str]  # Track all compound keys for enumeration
 
     @overload
     def __init__(self, *, service_name: str = DEFAULT_KEYCHAIN_SERVICE, default_collection: str | None = None) -> None: ...
@@ -48,27 +49,8 @@ class KeychainStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseD
             default_collection: The default collection to use if no collection is provided.
         """
         self._service_name = service_name
-        self._key_index = set()
 
         super().__init__(default_collection=default_collection)
-
-    @override
-    async def _setup(self) -> None:
-        """Initialize the store by loading existing keys."""
-        # Note: keyring doesn't provide a way to enumerate all keys for a service,
-        # so we maintain an index of keys in a special keychain entry
-        try:
-            index_data = keyring.get_password(self._service_name, "__index__")
-            if index_data:
-                self._key_index = set(index_data.split("\n"))
-        except Exception:  # noqa: S110
-            # If we can't load the index, start fresh
-            pass
-
-    def _save_index(self) -> None:
-        """Save the key index to the keychain."""
-        index_data = "\n".join(sorted(self._key_index))
-        keyring.set_password(self._service_name, "__index__", index_data)
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -92,10 +74,6 @@ class KeychainStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseD
 
         keyring.set_password(self._service_name, combo_key, json_str)
 
-        # Update the index
-        self._key_index.add(combo_key)
-        self._save_index()
-
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
@@ -105,29 +83,4 @@ class KeychainStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseD
         except PasswordDeleteError:
             return False
         else:
-            self._key_index.discard(combo_key)
-            self._save_index()
             return True
-
-    @override
-    async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
-        return get_keys_from_compound_keys(compound_keys=list(self._key_index), collection=collection)
-
-    @override
-    async def _get_collection_names(self, *, limit: int | None = None) -> list[str]:
-        return get_collections_from_compound_keys(compound_keys=list(self._key_index))
-
-    @override
-    async def _delete_store(self) -> bool:
-        """Delete all entries from the store."""
-        # Delete all indexed keys
-        for combo_key in list(self._key_index):
-            with suppress(PasswordDeleteError):
-                keyring.delete_password(self._service_name, combo_key)
-
-        # Clear the index
-        self._key_index.clear()
-        with suppress(PasswordDeleteError):
-            keyring.delete_password(self._service_name, "__index__")
-
-        return True
