@@ -35,7 +35,8 @@ pip install py-key-value-aio
 pip install py-key-value-aio[memory]
 pip install py-key-value-aio[disk]
 pip install py-key-value-aio[elasticsearch]
-# or: redis, mongodb, memcached, valkey, see below for all options
+# or: redis, mongodb, memcached, valkey, windows
+# See below for all options
 ```
 
 ```python
@@ -92,6 +93,7 @@ The library provides a variety of stores that implement the protocol:
 | Disk (Per-Collection) |  ✅  |  ✅  | `MultiDiskStore(directory="./cache")` |
 | Simple (test)    |  ✅  |  ✅  | `SimpleStore()` |
 | Null (test)      |  ✅  |  ✅  | `NullStore()` |
+| Windows Credential Manager |  ✅  |  ✅  | `WindowsStore(service_name="my-app")` |
 
 | Distributed Stores | Async | Sync | Example |
 |------------------|:-----:|:----:|:-------|

@@ -1234,6 +1234,9 @@ redis = [
 valkey = [
     { name = "valkey-glide-sync" },
 ]
+windows = [
+    { name = "keyring" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1261,6 +1264,7 @@ requires-dist = [
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
     { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
+    { name = "keyring", marker = "extra == 'windows'", specifier = ">=25.0.0" },
     { name = "pathvalidate", marker = "extra == 'disk'", specifier = ">=3.3.1" },
     { name = "py-key-value-shared", editable = "key-value/key-value-shared" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
@@ -1268,7 +1272,7 @@ requires-dist = [
     { name = "redis", marker = "extra == 'redis'", specifier = ">=6.0.0" },
     { name = "valkey-glide-sync", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "memcached", "elasticsearch", "pydantic"]
+provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "memcached", "elasticsearch", "pydantic", "windows"]
 
 [package.metadata.requires-dev]
 dev = [
