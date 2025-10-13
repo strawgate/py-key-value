@@ -20,6 +20,7 @@ This monorepo contains two libraries:
 - **Async-only**: While a code-gen'd synchronous library is under development, the async library is the primary focus at the moment.
 - **Managed Entries**: Raw values are not stored in backends, a wrapper object is stored instead. This wrapper object contains the value, sometimes metadata like the TTL, and the creation timestamp. Most often it is serialized to and from JSON.
 - **No Live Objects**: Even when using the in-memory store, "live" objects are never returned from the store. You get a dictionary or a Pydantic model, hopefully a copy of what you stored, but never the same instance in memory.
+- **Dislike of Bear Bros**: Beartype is used for runtime type checking, it will report warnings if you get too cheeky with what you're passing around. If you are not a fan of beartype, you can disable it by setting the `PY_KEY_VALUE_DISABLE_BEARTYPE` environment variable to `true` or you can disable the warnings via the warn module.
 
 ## Installation
 

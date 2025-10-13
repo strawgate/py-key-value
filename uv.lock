@@ -1015,6 +1015,7 @@ name = "py-key-value-shared"
 version = "0.2.1"
 source = { editable = "key-value/key-value-shared" }
 dependencies = [
+    { name = "beartype" },
     { name = "typing-extensions" },
 ]
 
@@ -1032,7 +1033,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "typing-extensions", specifier = ">=4.15.0" }]
+requires-dist = [
+    { name = "beartype", specifier = ">=0.22.2" },
+    { name = "typing-extensions", specifier = ">=4.15.0" },
+]
 
 [package.metadata.requires-dev]
 dev = [

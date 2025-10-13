@@ -16,6 +16,7 @@ classifiers = [
 ]
 dependencies = [
     "typing-extensions>=4.15.0",
+    "beartype>=0.22.2",
 ]
 
 
