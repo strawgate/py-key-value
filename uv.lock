@@ -922,6 +922,7 @@ name = "py-key-value-aio"
 version = "0.2.1"
 source = { editable = "key-value/key-value-aio" }
 dependencies = [
+    { name = "beartype" },
     { name = "py-key-value-shared" },
 ]
 
@@ -966,7 +967,6 @@ dev = [
     { name = "py-key-value-shared-test" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
-    { name = "pytest-beartype" },
     { name = "pytest-dotenv" },
     { name = "pytest-mock" },
     { name = "pytest-timeout" },
@@ -977,6 +977,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
+    { name = "beartype", specifier = ">=0.22.2" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
     { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
@@ -1003,7 +1004,6 @@ dev = [
     { name = "py-key-value-shared-test", editable = "key-value/key-value-shared-test" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
-    { name = "pytest-beartype", specifier = ">=0.2.0" },
     { name = "pytest-dotenv", specifier = ">=0.5.2" },
     { name = "pytest-mock" },
     { name = "pytest-timeout", specifier = ">=2.4.0" },
@@ -1025,7 +1025,6 @@ dev = [
     { name = "inline-snapshot" },
     { name = "py-key-value-shared-test" },
     { name = "pytest" },
-    { name = "pytest-beartype" },
     { name = "pytest-dotenv" },
     { name = "pytest-mock" },
     { name = "pytest-timeout" },
@@ -1042,7 +1041,6 @@ dev = [
     { name = "inline-snapshot", specifier = ">=0.29.0" },
     { name = "py-key-value-shared-test", editable = "key-value/key-value-shared-test" },
     { name = "pytest" },
-    { name = "pytest-beartype", specifier = ">=0.2.0" },
     { name = "pytest-dotenv", specifier = ">=0.5.2" },
     { name = "pytest-mock" },
     { name = "pytest-timeout", specifier = ">=2.4.0" },
@@ -1073,6 +1071,7 @@ name = "py-key-value-sync"
 version = "0.2.1"
 source = { editable = "key-value/key-value-sync" }
 dependencies = [
+    { name = "beartype" },
     { name = "py-key-value-shared" },
 ]
 
@@ -1117,7 +1116,6 @@ dev = [
     { name = "py-key-value-sync", extra = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
-    { name = "pytest-beartype" },
     { name = "pytest-dotenv" },
     { name = "pytest-mock" },
     { name = "pytest-timeout" },
@@ -1128,6 +1126,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
+    { name = "beartype", specifier = ">=0.22.2" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
     { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
@@ -1154,7 +1153,6 @@ dev = [
     { name = "py-key-value-sync", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
-    { name = "pytest-beartype", specifier = ">=0.2.0" },
     { name = "pytest-dotenv", specifier = ">=0.5.2" },
     { name = "pytest-mock" },
     { name = "pytest-timeout", specifier = ">=2.4.0" },
@@ -1372,19 +1370,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/42/86/9e3c5f48f7b7b638b216e4b9e645f54d199d7abbbab7a64a13b4e12ba10f/pytest_asyncio-1.2.0.tar.gz", hash = "sha256:c609a64a2a8768462d0c99811ddb8bd2583c33fd33cf7f21af1c142e824ffb57", size = 50119, upload-time = "2025-09-12T07:33:53.816Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/04/93/2fa34714b7a4ae72f2f8dad66ba17dd9a2c793220719e736dda28b7aec27/pytest_asyncio-1.2.0-py3-none-any.whl", hash = "sha256:8e17ae5e46d8e7efe51ab6494dd2010f4ca8dae51652aa3c8d55acf50bfb2e99", size = 15095, upload-time = "2025-09-12T07:33:52.639Z" },
-]
-
-[[package]]
-name = "pytest-beartype"
-version = "0.2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "beartype" },
-    { name = "pytest" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/63/69/954ee438f1c72f4247b09381cd07a7d776ebdb4f6c0359b3b971676a2eef/pytest_beartype-0.2.0.tar.gz", hash = "sha256:9eeec379f812e0e5c9c1bb7e95d90a33a79c387034f2d735e03bc9aa0fd7cf3f", size = 5871, upload-time = "2024-10-31T17:52:35.974Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/69/87efc2482aab172a32e4147eb5666ebc2e4c875e17d3104878553720a83a/pytest_beartype-0.2.0-py3-none-any.whl", hash = "sha256:be6be04be4a143f965f21140d6661bab43dcd7c761d50cf6daa1b16848e5d2d0", size = 4940, upload-time = "2024-10-31T17:52:33.528Z" },
 ]
 
 [[package]]

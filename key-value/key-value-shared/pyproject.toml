@@ -34,7 +34,6 @@ markers = [
     "skip_on_ci: Skip running the test when running on CI",
 ]
 timeout = 10
-beartype_packages = ["key_value.shared"]
 
 
 
@@ -51,7 +50,6 @@ dev = [
     "basedpyright>=1.31.5",
     "pytest-timeout>=2.4.0",
     "py-key-value-shared-test>=0.2.0",
-    "pytest-beartype>=0.2.0",
 ]
 
 [tool.uv.sources]

@@ -1,7 +1,8 @@
 from collections.abc import Sequence
-from typing import Any, Generic, SupportsFloat, TypeVar, get_origin, no_type_check
+from typing import Any, Generic, SupportsFloat, TypeVar, get_origin
 
 from key_value.shared.errors import DeserializationError, SerializationError
+from key_value.shared.type_checking.bear_spray import bear_spray
 from pydantic import BaseModel, ValidationError
 from pydantic.type_adapter import TypeAdapter
 from pydantic_core import PydanticSerializationError
@@ -14,7 +15,9 @@ T = TypeVar("T", bound=BaseModel | Sequence[BaseModel])
 class PydanticAdapter(Generic[T]):
     """Adapter around a KVStore-compliant Store that allows type-safe persistence of Pydantic models."""
 
-    @no_type_check
+    # Beartype doesn't like our `type[T] includes a bound on Sequence[...] as the subscript is not checkable at runtime
+    # For just the next 20 or so lines we are no longer bear bros but have no fear, we will be back soon!
+    @bear_spray
     def __init__(
         self,
         key_value: AsyncKeyValue,
