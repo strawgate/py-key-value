@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any, Literal, overload
+from typing import Any, Literal, SupportsFloat, overload
 
 from key_value.shared.errors import MissingKeyError
 
@@ -138,7 +138,7 @@ class RaiseOnMissingAdapter:
 
         return results
 
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: float | None = None) -> None:
+    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Store a key-value pair in the specified collection with optional TTL.
 
         Args:
@@ -156,7 +156,7 @@ class RaiseOnMissingAdapter:
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[float | None] | float | None = None,
+        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
     ) -> None:
         """Store multiple key-value pairs in the specified collection.
 

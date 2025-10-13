@@ -45,7 +45,7 @@ from key_value.aio.protocols.key_value import AsyncKeyValue
 from key_value.aio.stores.memory import MemoryStore
 
 
-async def example(store: AsyncKeyValue) -> None:
+async def example(key_value: AsyncKeyValue) -> None:
     await store.put(key="123", value={"name": "Alice"}, collection="users", ttl=3600)
     value = await store.get(key="123", collection="users")
     await store.delete(key="123", collection="users")
@@ -71,8 +71,8 @@ The protocols offer a simple interface for your application to interact with the
 get(key: str, collection: str | None = None) -> dict[str, Any] | None:
 get_many(keys: list[str], collection: str | None = None) -> list[dict[str, Any] | None]:
 
-put(key: str, value: dict[str, Any], collection: str | None = None, ttl: float | None = None) -> None:
-put_many(keys: list[str], values: Sequence[dict[str, Any]], collection: str | None = None, ttl: Sequence[float | None] | float | None = None) -> None:
+put(key: str, value: dict[str, Any], collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+put_many(keys: list[str], values: Sequence[dict[str, Any]], collection: str | None = None, ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None) -> None:
 
 delete(key: str, collection: str | None = None) -> bool:
 delete_many(keys: list[str], collection: str | None = None) -> int:
@@ -110,8 +110,8 @@ They simplify your applications interactions with stores and provide additional 
 
 | Adapter | Description | Example |
 |---------|-------------|---------|
-| PydanticAdapter | Type-safe storage/retrieval of Pydantic models with transparent serialization/deserialization. | `PydanticAdapter(store=memory_store, pydantic_model=User)` |
-| RaiseOnMissingAdapter | Optional raise-on-missing behavior for `get`, `get_many`, `ttl`, and `ttl_many`. | `RaiseOnMissingAdapter(store=memory_store)` |
+| PydanticAdapter | Type-safe storage/retrieval of Pydantic models with transparent serialization/deserialization. | `PydanticAdapter(key_value=memory_store, pydantic_model=User)` |
+| RaiseOnMissingAdapter | Optional raise-on-missing behavior for `get`, `get_many`, `ttl`, and `ttl_many`. | `RaiseOnMissingAdapter(key_value=memory_store)` |
 
 For example, the PydanticAdapter allows you to store and retrieve Pydantic models with transparent serialization/deserialization:
 
@@ -159,11 +159,11 @@ The following wrappers are available:
 
 | Wrapper | Description | Example |
 |---------|---------------|-----|
-| StatisticsWrapper | Track operation statistics for the store. | `StatisticsWrapper(store=memory_store)` |
-| TTLClampWrapper | Clamp the TTL to a given range. | `TTLClampWrapper(store=memory_store, min_ttl=60, max_ttl=3600)` |
-| PassthroughCacheWrapper | Wrap two stores to provide a read-through cache. | `PassthroughCacheWrapper(store=memory_store, cache_store=memory_store)` |
-| PrefixCollectionsWrapper | Prefix all collections with a given prefix. | `PrefixCollectionsWrapper(store=memory_store, prefix="users")` |
-| PrefixKeysWrapper | Prefix all keys with a given prefix. | `PrefixKeysWrapper(store=memory_store, prefix="users")` |
+| StatisticsWrapper | Track operation statistics for the store. | `StatisticsWrapper(key_value=memory_store)` |
+| TTLClampWrapper | Clamp the TTL to a given range. | `TTLClampWrapper(key_value=memory_store, min_ttl=60, max_ttl=3600)` |
+| PassthroughCacheWrapper | Wrap two stores to provide a read-through cache. | `PassthroughCacheWrapper(primary_key_value=memory_store, cache_key_value=memory_store)` |
+| PrefixCollectionsWrapper | Prefix all collections with a given prefix. | `PrefixCollectionsWrapper(key_value=memory_store, prefix="users")` |
+| PrefixKeysWrapper | Prefix all keys with a given prefix. | `PrefixKeysWrapper(key_value=memory_store, prefix="users")` |
 
 ### Atomicity / Consistency
 
@@ -192,19 +192,19 @@ class User(BaseModel):
 
 elasticsearch_store: ElasticsearchStore = ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key", index="kv-store")
 
-single_collection: SingleCollectionWrapper = SingleCollectionWrapper(store=elasticsearch_store, single_collection="users", default_collection="one-collection")
+single_collection: SingleCollectionWrapper = SingleCollectionWrapper(key_value=elasticsearch_store, single_collection="users", default_collection="one-collection")
 
 
-async def main(store: AsyncKeyValue):
-    statistics_wrapper = StatisticsWrapper(store=store)
-    users = PydanticAdapter(key_value=wrapped, pydantic_model=User)
+async def main(key_value: AsyncKeyValue):
+    statistics_wrapper = StatisticsWrapper(key_value=elasticsearch_store)
+    users = PydanticAdapter(key_value=statistics_wrapper, pydantic_model=User)
 
     await users.put(key="u1", value=User(name="Jane", email="j@example.com"), collection="ignored")
     user = await users.get(key="u1", collection="ignored")
     _ = statistics_wrapper.statistics  # access metrics
 
 
-asyncio.run(main(store=single_collection))
+asyncio.run(main(key_value=single_collection))
 ```
 
 ## Sync library status

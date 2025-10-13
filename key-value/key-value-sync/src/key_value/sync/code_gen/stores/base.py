@@ -10,12 +10,12 @@ from collections import defaultdict
 from collections.abc import Sequence
 from threading import Lock
 from types import TracebackType
-from typing import Any
+from typing import Any, SupportsFloat
 
 from key_value.shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.shared.errors import StoreSetupError
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.time_to_live import now, prepare_ttls, validate_ttl
+from key_value.shared.utils.time_to_live import now, prepare_ttl, prepare_ttls
 from typing_extensions import Self, override
 
 from key_value.sync.code_gen.protocols.key_value import (
@@ -171,12 +171,12 @@ class BaseStore(KeyValueProtocol, ABC):
             self._put_managed_entry(collection=collection, key=key, managed_entry=managed_entry)
 
     @override
-    def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: float | None = None) -> None:
+    def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Store a key-value pair in the specified collection with optional TTL."""
         collection = collection or self.default_collection
         self.setup_collection(collection=collection)
 
-        managed_entry: ManagedEntry = ManagedEntry(value=value, ttl=validate_ttl(t=ttl), created_at=now())
+        managed_entry: ManagedEntry = ManagedEntry(value=value, ttl=prepare_ttl(t=ttl), created_at=now())
 
         self._put_managed_entry(collection=collection, key=key, managed_entry=managed_entry)
 
@@ -187,7 +187,7 @@ class BaseStore(KeyValueProtocol, ABC):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[float | None] | float | None = None,
+        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
     ) -> None:
         """Store multiple key-value pairs in the specified collection."""
         if len(keys) != len(values):

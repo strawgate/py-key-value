@@ -47,6 +47,7 @@ markers = [
     "skip_on_ci: Skip running the test when running on CI",
 ]
 timeout = 10
+beartype_packages = ["key_value.aio", "key_value.shared"]
 
 env_files = [".env"]
 
@@ -68,7 +69,7 @@ dev = [
     "ast-comments>=1.2.3",
     "docker>=7.1.0",
     "py-key-value-shared-test>=0.2.0",
-    
+    "pytest-beartype>=0.2.0",
 ]
 
 [tool.ruff]

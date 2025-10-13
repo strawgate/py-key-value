@@ -222,6 +222,7 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
         "AsyncEnumerateKeysProtocol": "EnumerateKeysProtocol",
         "AsyncKeyValue": "KeyValue",
         "AsyncGenerator": "Generator",
+        "aclose": "close",
         "asyncio.sleep": "time.sleep",
         "async_running_in_event_loop": "running_in_event_loop",
         "asleep": "sleep",

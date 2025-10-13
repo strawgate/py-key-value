@@ -217,6 +217,15 @@ wheels = [
 ]
 
 [[package]]
+name = "beartype"
+version = "0.22.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/04/96/43ed27f27127155f24f5cf85df0c27fd2ac2ab67d94cecc8f76933f91679/beartype-0.22.2.tar.gz", hash = "sha256:ff3a7df26af8d15fa87f97934f0f6d41bbdadca971c410819104998dd26013d2", size = 1574491, upload-time = "2025-10-04T06:37:56.451Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/96/2a/a4773109619010192e72f48e95165b14790413a51f513c879c8d63f67e17/beartype-0.22.2-py3-none-any.whl", hash = "sha256:12077afe3528eba5c5b801f816712f7ff06f6da5509994c79561e29b48bcedb8", size = 1317280, upload-time = "2025-10-04T06:37:53.99Z" },
+]
+
+[[package]]
 name = "cachetools"
 version = "6.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -889,12 +898,13 @@ wheels = [
 
 [[package]]
 name = "py-key-value"
-version = "0.2.1"
+version = "0.2.2"
 source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
     { name = "basedpyright" },
+    { name = "beartype" },
     { name = "docker" },
 ]
 
@@ -903,6 +913,7 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "basedpyright", specifier = ">=1.31.5" },
+    { name = "beartype", specifier = ">=0.22.2" },
     { name = "docker", specifier = ">=7.1.0" },
 ]
 
@@ -955,6 +966,7 @@ dev = [
     { name = "py-key-value-shared-test" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "pytest-beartype" },
     { name = "pytest-dotenv" },
     { name = "pytest-mock" },
     { name = "pytest-timeout" },
@@ -991,6 +1003,7 @@ dev = [
     { name = "py-key-value-shared-test", editable = "key-value/key-value-shared-test" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "pytest-beartype", specifier = ">=0.2.0" },
     { name = "pytest-dotenv", specifier = ">=0.5.2" },
     { name = "pytest-mock" },
     { name = "pytest-timeout", specifier = ">=2.4.0" },
@@ -1012,6 +1025,7 @@ dev = [
     { name = "inline-snapshot" },
     { name = "py-key-value-shared-test" },
     { name = "pytest" },
+    { name = "pytest-beartype" },
     { name = "pytest-dotenv" },
     { name = "pytest-mock" },
     { name = "pytest-timeout" },
@@ -1028,6 +1042,7 @@ dev = [
     { name = "inline-snapshot", specifier = ">=0.29.0" },
     { name = "py-key-value-shared-test", editable = "key-value/key-value-shared-test" },
     { name = "pytest" },
+    { name = "pytest-beartype", specifier = ">=0.2.0" },
     { name = "pytest-dotenv", specifier = ">=0.5.2" },
     { name = "pytest-mock" },
     { name = "pytest-timeout", specifier = ">=2.4.0" },
@@ -1102,6 +1117,7 @@ dev = [
     { name = "py-key-value-sync", extra = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "pytest-beartype" },
     { name = "pytest-dotenv" },
     { name = "pytest-mock" },
     { name = "pytest-timeout" },
@@ -1138,6 +1154,7 @@ dev = [
     { name = "py-key-value-sync", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "pytest-beartype", specifier = ">=0.2.0" },
     { name = "pytest-dotenv", specifier = ">=0.5.2" },
     { name = "pytest-mock" },
     { name = "pytest-timeout", specifier = ">=2.4.0" },
@@ -1355,6 +1372,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/42/86/9e3c5f48f7b7b638b216e4b9e645f54d199d7abbbab7a64a13b4e12ba10f/pytest_asyncio-1.2.0.tar.gz", hash = "sha256:c609a64a2a8768462d0c99811ddb8bd2583c33fd33cf7f21af1c142e824ffb57", size = 50119, upload-time = "2025-09-12T07:33:53.816Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/04/93/2fa34714b7a4ae72f2f8dad66ba17dd9a2c793220719e736dda28b7aec27/pytest_asyncio-1.2.0-py3-none-any.whl", hash = "sha256:8e17ae5e46d8e7efe51ab6494dd2010f4ca8dae51652aa3c8d55acf50bfb2e99", size = 15095, upload-time = "2025-09-12T07:33:52.639Z" },
+]
+
+[[package]]
+name = "pytest-beartype"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "beartype" },
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/63/69/954ee438f1c72f4247b09381cd07a7d776ebdb4f6c0359b3b971676a2eef/pytest_beartype-0.2.0.tar.gz", hash = "sha256:9eeec379f812e0e5c9c1bb7e95d90a33a79c387034f2d735e03bc9aa0fd7cf3f", size = 5871, upload-time = "2024-10-31T17:52:35.974Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/81/69/87efc2482aab172a32e4147eb5666ebc2e4c875e17d3104878553720a83a/pytest_beartype-0.2.0-py3-none-any.whl", hash = "sha256:be6be04be4a143f965f21140d6661bab43dcd7c761d50cf6daa1b16848e5d2d0", size = 4940, upload-time = "2024-10-31T17:52:33.528Z" },
 ]
 
 [[package]]

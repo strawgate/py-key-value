@@ -1,6 +1,6 @@
 from typing import Any
 
-from key_value.shared.errors.base import BaseKeyValueError
+from key_value.shared.errors.base import BaseKeyValueError, ExtraInfoType
 
 
 class KeyValueOperationError(BaseKeyValueError):
@@ -28,10 +28,10 @@ class MissingKeyError(KeyValueOperationError):
 class InvalidTTLError(KeyValueOperationError):
     """Raised when a TTL is invalid."""
 
-    def __init__(self, ttl: Any):
+    def __init__(self, ttl: Any, extra_info: ExtraInfoType | None = None):
         super().__init__(
             message="A TTL is invalid.",
-            extra_info={"ttl": ttl},
+            extra_info={"ttl": ttl, **(extra_info or {})},
         )
 
 

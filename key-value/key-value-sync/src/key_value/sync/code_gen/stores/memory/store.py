@@ -4,7 +4,7 @@
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, SupportsFloat
 
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.time_to_live import epoch_to_datetime
@@ -30,10 +30,10 @@ class MemoryCacheEntry:
 
     expires_at: datetime | None
 
-    ttl_at_insert: float | None = field(default=None)
+    ttl_at_insert: SupportsFloat | None = field(default=None)
 
     @classmethod
-    def from_managed_entry(cls, managed_entry: ManagedEntry, ttl: float | None = None) -> Self:
+    def from_managed_entry(cls, managed_entry: ManagedEntry, ttl: SupportsFloat | None = None) -> Self:
         return cls(json_str=managed_entry.to_json(), expires_at=managed_entry.expires_at, ttl_at_insert=ttl)
 
     def to_managed_entry(self) -> ManagedEntry:
@@ -43,13 +43,13 @@ class MemoryCacheEntry:
 def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, now: float) -> float:  # pyright: ignore[reportAny]
     "Calculate time-to-use for cache entries based on their TTL."
     if value.ttl_at_insert is None:
-        return sys.maxsize
+        return float(sys.maxsize)
 
-    expiration_epoch: float = now + value.ttl_at_insert
+    expiration_epoch: float = now + float(value.ttl_at_insert)
 
     value.expires_at = epoch_to_datetime(epoch=expiration_epoch)
 
-    return expiration_epoch
+    return float(expiration_epoch)
 
 
 def _memory_cache_getsizeof(value: MemoryCacheEntry) -> int:  # pyright: ignore[reportUnusedParameter]  # noqa: ARG001

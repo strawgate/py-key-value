@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
+from inline_snapshot import snapshot
 from key_value.shared.errors import DeserializationError
 from pydantic import AnyHttpUrl, BaseModel
 
@@ -40,6 +41,9 @@ SAMPLE_USER: User = User(name="John Doe", email="john.doe@example.com", age=30)
 SAMPLE_PRODUCT: Product = Product(name="Widget", price=29.99, quantity=10, url=AnyHttpUrl(url="https://example.com"))
 SAMPLE_ORDER: Order = Order(created_at=datetime.now(), updated_at=datetime.now(), user=SAMPLE_USER, product=SAMPLE_PRODUCT, paid=False)
 
+TEST_COLLECTION: str = "test_collection"
+TEST_KEY: str = "test_key"
+
 
 class TestPydanticAdapter:
     @pytest.fixture
@@ -59,40 +63,69 @@ class TestPydanticAdapter:
         return PydanticAdapter[Product](key_value=store, pydantic_model=Product)
 
     @pytest.fixture
+    async def product_list_adapter(self, store: MemoryStore) -> PydanticAdapter[list[Product]]:
+        return PydanticAdapter[list[Product]](key_value=store, pydantic_model=list[Product])
+
+    @pytest.fixture
     async def order_adapter(self, store: MemoryStore) -> PydanticAdapter[Order]:
         return PydanticAdapter[Order](key_value=store, pydantic_model=Order)
 
     async def test_simple_adapter(self, user_adapter: PydanticAdapter[User]):
-        await user_adapter.put(collection="test", key="test", value=SAMPLE_USER)
-        cached_user: User | None = await user_adapter.get(collection="test", key="test")
+        await user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER)
+        cached_user: User | None = await user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
         assert cached_user == SAMPLE_USER
 
-        assert await user_adapter.delete(collection="test", key="test")
+        assert await user_adapter.delete(collection=TEST_COLLECTION, key=TEST_KEY)
 
-        cached_user = await user_adapter.get(collection="test", key="test")
+        cached_user = await user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
         assert cached_user is None
 
     async def test_simple_adapter_with_validation_error_ignore(
         self, user_adapter: PydanticAdapter[User], updated_user_adapter: PydanticAdapter[UpdatedUser]
     ):
-        await user_adapter.put(collection="test", key="test", value=SAMPLE_USER)
+        await user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER)
 
-        updated_user = await updated_user_adapter.get(collection="test", key="test")
+        updated_user = await updated_user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
         assert updated_user is None
 
     async def test_simple_adapter_with_validation_error_raise(
         self, user_adapter: PydanticAdapter[User], updated_user_adapter: PydanticAdapter[UpdatedUser]
     ):
-        await user_adapter.put(collection="test", key="test", value=SAMPLE_USER)
-        updated_user_adapter.raise_on_validation_error = True
+        await user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER)
+        updated_user_adapter._raise_on_validation_error = True  # pyright: ignore[reportPrivateUsage]
         with pytest.raises(DeserializationError):
-            await updated_user_adapter.get(collection="test", key="test")
+            await updated_user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
 
     async def test_complex_adapter(self, order_adapter: PydanticAdapter[Order]):
-        await order_adapter.put(collection="test", key="test", value=SAMPLE_ORDER, ttl=10)
-        cached_order: Order | None = await order_adapter.get(collection="test", key="test")
+        await order_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_ORDER, ttl=10)
+        cached_order: Order | None = await order_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
         assert cached_order == SAMPLE_ORDER
 
-        assert await order_adapter.delete(collection="test", key="test")
-        cached_order = await order_adapter.get(collection="test", key="test")
+        assert await order_adapter.delete(collection=TEST_COLLECTION, key=TEST_KEY)
+        cached_order = await order_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
         assert cached_order is None
+
+    async def test_complex_adapter_with_list(self, product_list_adapter: PydanticAdapter[list[Product]], store: MemoryStore):
+        await product_list_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=[SAMPLE_PRODUCT, SAMPLE_PRODUCT], ttl=10)
+        cached_products: list[Product] | None = await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+        assert cached_products == [SAMPLE_PRODUCT, SAMPLE_PRODUCT]
+
+        # We need to ensure our memory store doesnt hold an entry with an array
+        raw_collection = store._cache.get(TEST_COLLECTION)  # pyright: ignore[reportPrivateUsage]
+        assert raw_collection is not None
+
+        raw_entry = raw_collection.get(TEST_KEY)
+        assert raw_entry is not None
+        assert isinstance(raw_entry.value, dict)
+        assert raw_entry.value == snapshot(
+            {
+                "items": [
+                    {"name": "Widget", "price": 29.99, "quantity": 10, "url": "https://example.com/"},
+                    {"name": "Widget", "price": 29.99, "quantity": 10, "url": "https://example.com/"},
+                ]
+            }
+        )
+
+        assert await product_list_adapter.delete(collection=TEST_COLLECTION, key=TEST_KEY)
+        cached_products = await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+        assert cached_products is None

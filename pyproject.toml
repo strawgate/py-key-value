@@ -1,6 +1,6 @@
 [project]
 name = "py-key-value"
-version = "0.2.1"
+version = "0.2.2"
 description = "Key-Value Store Project"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -68,6 +68,7 @@ line-length = 140
 dev = [
     "docker>=7.1.0",
     "basedpyright>=1.31.5",
+    "beartype>=0.22.2",
 ]
 
 [tool.pyright]
