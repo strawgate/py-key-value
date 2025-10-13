@@ -2,7 +2,7 @@ import time
 from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from numbers import Real
-from typing import Any, SupportsFloat, no_type_check, overload
+from typing import Any, SupportsFloat, no_type_check_decorator, overload
 
 from key_value.shared.errors import InvalidTTLError
 from key_value.shared.errors.key_value import IncorrectTTLCountError
@@ -51,7 +51,7 @@ def prepare_ttl(t: SupportsFloat) -> float: ...
 def prepare_ttl(t: SupportsFloat | None) -> float | None: ...
 
 
-@no_type_check
+@no_type_check_decorator
 def prepare_ttl(t: SupportsFloat | None) -> float | None:
     """Prepare a TTL for use in a put operation.
 
@@ -77,7 +77,7 @@ def prepare_ttl(t: SupportsFloat | None) -> float | None:
     return ttl
 
 
-@no_type_check
+@no_type_check_decorator
 def prepare_ttls(t: Sequence[SupportsFloat | None] | SupportsFloat | None, count: int) -> list[float | None]:
     """Prepare a list of TTLs for use in a put_many operation.
 
