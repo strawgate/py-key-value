@@ -2,13 +2,11 @@
 # from the original file 'store.py'
 # DO NOT CHANGE! Change the original file instead.
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, TypedDict, overload
+from typing import Any, TypedDict, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
 from key_value.shared.utils.time_to_live import now
-from pymongo.collection import Collection
-from pymongo.database import Database
 from typing_extensions import Self, override
 
 from key_value.sync.code_gen.stores.base import (
@@ -18,11 +16,11 @@ from key_value.sync.code_gen.stores.base import (
     BaseStore,
 )
 
-if TYPE_CHECKING:
-    from pymongo.results import DeleteResult
-
 try:
     from pymongo import MongoClient
+    from pymongo.collection import Collection
+    from pymongo.database import Database
+    from pymongo.results import DeleteResult  # noqa: TC002
 except ImportError as e:
     msg = "MongoDBStore requires py-key-value-aio[mongodb]"
     raise ImportError(msg) from e
