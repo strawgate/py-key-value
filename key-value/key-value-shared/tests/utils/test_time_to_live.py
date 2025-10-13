@@ -1,6 +1,6 @@
 import sys
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, no_type_check
 
 import pytest
 from inline_snapshot import snapshot
@@ -34,6 +34,7 @@ def test_prepare_ttls_edge_cases():
     assert prepare_ttls([100, 100.0], 2) == [100.0, 100.0]
 
 
+@no_type_check
 @pytest.mark.parametrize(
     ("t"),
     [

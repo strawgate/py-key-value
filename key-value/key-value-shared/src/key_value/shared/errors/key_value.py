@@ -31,7 +31,7 @@ class InvalidTTLError(KeyValueOperationError):
     def __init__(self, ttl: Any, extra_info: ExtraInfoType | None = None):
         super().__init__(
             message="A TTL is invalid.",
-            extra_info={"ttl": ttl, **(extra_info or {})},
+            extra_info={"ttl": str(ttl), **(extra_info or {})},
         )
 
 

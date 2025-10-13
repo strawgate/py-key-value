@@ -24,6 +24,7 @@ class SingleCollectionWrapper(BaseWrapper):
             key_value: The store to wrap.
             single_collection: The single collection to use to store all collections.
             default_collection: The default collection to use if no collection is provided.
+            separator: The separator to use for the key prefix.
         """
         self.key_value: KeyValue = key_value
         self.single_collection: str = single_collection
