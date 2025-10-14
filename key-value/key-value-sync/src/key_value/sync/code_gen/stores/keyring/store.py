@@ -51,13 +51,13 @@ class KeyringStore(BaseStore):
     def _sanitize_collection_name(self, collection: str) -> str:
         return sanitize_string(value=collection, max_length=MAX_COLLECTION_LENGTH, allowed_characters=ALLOWED_COLLECTION_CHARACTERS)
 
-    def _sanitize_document_id(self, key: str) -> str:
+    def _sanitize_key(self, key: str) -> str:
         return sanitize_string(value=key, max_length=MAX_KEY_LENGTH, allowed_characters=ALLOWED_KEY_CHARACTERS)
 
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         sanitized_collection = self._sanitize_collection_name(collection=collection)
-        sanitized_key = self._sanitize_document_id(key=key)
+        sanitized_key = self._sanitize_key(key=key)
 
         combo_key: str = compound_key(collection=sanitized_collection, key=sanitized_key)
 
@@ -74,7 +74,7 @@ class KeyringStore(BaseStore):
     @override
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
         sanitized_collection = self._sanitize_collection_name(collection=collection)
-        sanitized_key = self._sanitize_document_id(key=key)
+        sanitized_key = self._sanitize_key(key=key)
 
         combo_key: str = compound_key(collection=sanitized_collection, key=sanitized_key)
 
@@ -85,7 +85,7 @@ class KeyringStore(BaseStore):
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         sanitized_collection = self._sanitize_collection_name(collection=collection)
-        sanitized_key = self._sanitize_document_id(key=key)
+        sanitized_key = self._sanitize_key(key=key)
 
         combo_key: str = compound_key(collection=sanitized_collection, key=sanitized_key)
 

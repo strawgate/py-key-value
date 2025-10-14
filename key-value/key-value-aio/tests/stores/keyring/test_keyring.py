@@ -1,6 +1,7 @@
 from typing import Any
 
 import pytest
+from key_value.shared_test.cases import LARGE_TEST_DATA_ARGNAMES, LARGE_TEST_DATA_ARGVALUES, LARGE_TEST_DATA_IDS
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -27,4 +28,7 @@ class TestKeychainStore(BaseStoreTests):
 
     @override
     @pytest.mark.skipif(condition=detect_on_windows(), reason="Keyrings do not support large values on Windows")
-    async def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str): ...
+    @pytest.mark.parametrize(argnames=LARGE_TEST_DATA_ARGNAMES, argvalues=LARGE_TEST_DATA_ARGVALUES, ids=LARGE_TEST_DATA_IDS)
+    async def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str):
+        await store.put(collection="test", key="test", value=data)
+        assert await store.get(collection="test", key="test") == data
