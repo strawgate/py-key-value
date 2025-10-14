@@ -10,4 +10,4 @@ class TestSingleCollectionWrapper(BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self, memory_store: MemoryStore) -> SingleCollectionWrapper:
-        return SingleCollectionWrapper(store=memory_store, single_collection="test")
+        return SingleCollectionWrapper(key_value=memory_store, single_collection="test")

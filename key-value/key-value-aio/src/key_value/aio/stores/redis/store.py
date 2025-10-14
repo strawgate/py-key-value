@@ -1,6 +1,7 @@
 from typing import Any, overload
 from urllib.parse import urlparse
 
+from key_value.shared.type_checking.bear_spray import bear_spray
 from key_value.shared.utils.compound import compound_key, get_keys_from_compound_keys
 from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
@@ -33,6 +34,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         self, *, host: str = "localhost", port: int = 6379, db: int = 0, password: str | None = None, default_collection: str | None = None
     ) -> None: ...
 
+    @bear_spray
     def __init__(
         self,
         *,
@@ -135,4 +137,4 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
     @override
     async def _close(self) -> None:
-        await self._client.close()
+        await self._client.aclose()

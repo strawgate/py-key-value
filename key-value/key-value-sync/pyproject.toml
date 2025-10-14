@@ -15,7 +15,8 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "py-key-value-shared>=0.2.0",
+    "py-key-value-shared>=0.2.1",
+    "beartype>=0.22.2",
 ]
 
 [tool.uv.sources]

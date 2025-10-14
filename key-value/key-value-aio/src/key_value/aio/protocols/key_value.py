@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, SupportsFloat, runtime_checkable
 
 
 @runtime_checkable
@@ -36,14 +36,14 @@ class AsyncKeyValueProtocol(Protocol):
         """
         ...
 
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: float | None = None) -> None:
+    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Store a key-value pair in the specified collection with optional TTL.
 
         Args:
             key: The key to store the value in.
             value: The value to store.
             collection: The collection to store the value in. If no collection is provided, it will use the default collection.
-            ttl: The optional time-to-live (expiry duration) for the key-value pair. Defaults to no TTL. Note: The
+            ttl: The optional time-to-live (expiry duration) in seconds for the key-value pair. Defaults to no TTL. Note: The
                 backend store will convert the provided format to its own internal format.
         """
         ...
@@ -88,7 +88,7 @@ class AsyncKeyValueProtocol(Protocol):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[float | None] | float | None = None,
+        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
     ) -> None:
         """Store multiple key-value pairs in the specified collection.
 
@@ -96,7 +96,7 @@ class AsyncKeyValueProtocol(Protocol):
             keys: The keys to store the values in.
             values: The values to store.
             collection: The collection to store keys in. If no collection is provided, it will use the default collection.
-            ttl: The optional time-to-live (expiry duration) for the key-value pairs. Defaults to no TTL. Note: The
+            ttl: The optional time-to-live (expiry duration) in seconds for the key-value pairs. Defaults to no TTL. Note: The
                 backend store will convert the provided format to its own internal format.
         """
         ...

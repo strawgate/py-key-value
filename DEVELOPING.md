@@ -14,7 +14,7 @@ This monorepo contains two Python packages:
 
 ```bash
 # From repo root
-uv sync --all-extras
+uv sync --all-extras --all-packages
 ```
 
 ## Lint and format

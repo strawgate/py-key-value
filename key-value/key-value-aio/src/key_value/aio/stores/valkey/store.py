@@ -116,12 +116,3 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
     @override
     async def _close(self) -> None:
         await self._client.close()
-
-    # @override
-    # async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
-    #     limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
-    #     pattern = compound_key(collection=collection, key="*")
-    #     _cursor: int
-    #     keys: list[str]
-    #     _cursor, keys = await self._client.scan(cursor=0, match=pattern, count=limit)
-    #     return get_keys_from_compound_keys(compound_keys=keys, collection=collection)

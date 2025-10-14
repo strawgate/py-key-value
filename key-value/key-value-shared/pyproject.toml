@@ -16,6 +16,7 @@ classifiers = [
 ]
 dependencies = [
     "typing-extensions>=4.15.0",
+    "beartype>=0.22.2",
 ]
 
 
@@ -34,6 +35,7 @@ markers = [
     "skip_on_ci: Skip running the test when running on CI",
 ]
 timeout = 10
+
 
 
 env_files = [".env"]
