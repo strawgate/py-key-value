@@ -3,7 +3,8 @@ revision = 2
 requires-python = ">=3.10"
 resolution-markers = [
     "sys_platform == 'darwin'",
-    "sys_platform != 'darwin' and sys_platform != 'win32'",
+    "sys_platform == 'linux'",
+    "sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32'",
     "sys_platform == 'win32'",
 ]
 
@@ -413,8 +414,8 @@ name = "cryptography"
 version = "46.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi", marker = "platform_python_implementation != 'PyPy' and sys_platform != 'darwin' and sys_platform != 'win32'" },
-    { name = "typing-extensions", marker = "python_full_version < '3.11' and sys_platform != 'darwin' and sys_platform != 'win32'" },
+    { name = "cffi", marker = "platform_python_implementation != 'PyPy' and sys_platform == 'linux'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11' and sys_platform == 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/4a/9b/e301418629f7bfdf72db9e80ad6ed9d1b83c487c471803eaa6464c511a01/cryptography-46.0.2.tar.gz", hash = "sha256:21b6fc8c71a3f9a604f028a329e5560009cc4a3a828bfea5fcba8eb7647d88fe", size = 749293, upload-time = "2025-10-01T00:29:11.856Z" }
 wheels = [
@@ -1085,7 +1086,10 @@ elasticsearch = [
     { name = "elasticsearch" },
 ]
 keyring = [
-    { name = "dbus-python", marker = "sys_platform == 'linux'" },
+    { name = "keyring" },
+]
+keyring-linux = [
+    { name = "dbus-python" },
     { name = "keyring" },
 ]
 memcached = [
@@ -1116,6 +1120,7 @@ dev = [
     { name = "docker" },
     { name = "inline-snapshot" },
     { name = "py-key-value-aio", extra = ["disk", "elasticsearch", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis"] },
+    { name = "py-key-value-aio", extra = ["keyring-linux"], marker = "sys_platform == 'linux'" },
     { name = "py-key-value-aio", extra = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-shared-test" },
     { name = "pytest" },
@@ -1132,10 +1137,11 @@ requires-dist = [
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
     { name = "beartype", specifier = ">=0.22.2" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
-    { name = "dbus-python", marker = "sys_platform == 'linux' and extra == 'keyring'", specifier = ">=1.4.0" },
+    { name = "dbus-python", marker = "extra == 'keyring-linux'", specifier = ">=1.4.0" },
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
     { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
     { name = "keyring", marker = "extra == 'keyring'", specifier = ">=25.6.0" },
+    { name = "keyring", marker = "extra == 'keyring-linux'", specifier = ">=25.6.0" },
     { name = "pathvalidate", marker = "extra == 'disk'", specifier = ">=3.3.1" },
     { name = "py-key-value-shared", editable = "key-value/key-value-shared" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
@@ -1143,7 +1149,7 @@ requires-dist = [
     { name = "redis", marker = "extra == 'redis'", specifier = ">=6.0.0" },
     { name = "valkey-glide", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "memcached", "elasticsearch", "keyring", "pydantic"]
+provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "memcached", "elasticsearch", "keyring", "keyring-linux", "pydantic"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1154,6 +1160,7 @@ dev = [
     { name = "docker", specifier = ">=7.1.0" },
     { name = "inline-snapshot", specifier = ">=0.29.0" },
     { name = "py-key-value-aio", extras = ["keyring"] },
+    { name = "py-key-value-aio", extras = ["keyring-linux"], marker = "sys_platform == 'linux'" },
     { name = "py-key-value-aio", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb"] },
     { name = "py-key-value-aio", extras = ["pydantic"] },
     { name = "py-key-value-aio", extras = ["valkey"], marker = "sys_platform != 'win32'" },
@@ -1245,7 +1252,10 @@ elasticsearch = [
     { name = "elasticsearch" },
 ]
 keyring = [
-    { name = "dbus-python", marker = "sys_platform == 'linux'" },
+    { name = "keyring" },
+]
+keyring-linux = [
+    { name = "dbus-python" },
     { name = "keyring" },
 ]
 memcached = [
@@ -1277,6 +1287,7 @@ dev = [
     { name = "inline-snapshot" },
     { name = "py-key-value-shared-test" },
     { name = "py-key-value-sync", extra = ["disk", "elasticsearch", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis"] },
+    { name = "py-key-value-sync", extra = ["keyring-linux"], marker = "sys_platform == 'linux'" },
     { name = "py-key-value-sync", extra = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1292,10 +1303,11 @@ requires-dist = [
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
     { name = "beartype", specifier = ">=0.22.2" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
-    { name = "dbus-python", marker = "sys_platform == 'linux' and extra == 'keyring'", specifier = ">=1.4.0" },
+    { name = "dbus-python", marker = "extra == 'keyring-linux'", specifier = ">=1.4.0" },
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
     { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
     { name = "keyring", marker = "extra == 'keyring'", specifier = ">=25.6.0" },
+    { name = "keyring", marker = "extra == 'keyring-linux'", specifier = ">=25.6.0" },
     { name = "pathvalidate", marker = "extra == 'disk'", specifier = ">=3.3.1" },
     { name = "py-key-value-shared", editable = "key-value/key-value-shared" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
@@ -1303,7 +1315,7 @@ requires-dist = [
     { name = "redis", marker = "extra == 'redis'", specifier = ">=6.0.0" },
     { name = "valkey-glide-sync", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "memcached", "elasticsearch", "pydantic", "keyring"]
+provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "memcached", "elasticsearch", "pydantic", "keyring", "keyring-linux"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1315,6 +1327,7 @@ dev = [
     { name = "inline-snapshot", specifier = ">=0.29.0" },
     { name = "py-key-value-shared-test", editable = "key-value/key-value-shared-test" },
     { name = "py-key-value-sync", extras = ["keyring"] },
+    { name = "py-key-value-sync", extras = ["keyring-linux"], marker = "sys_platform == 'linux'" },
     { name = "py-key-value-sync", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb"] },
     { name = "py-key-value-sync", extras = ["pydantic"] },
     { name = "py-key-value-sync", extras = ["valkey"], marker = "sys_platform != 'win32'" },
@@ -1699,8 +1712,8 @@ name = "secretstorage"
 version = "3.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cryptography", marker = "sys_platform != 'darwin' and sys_platform != 'win32'" },
-    { name = "jeepney", marker = "sys_platform != 'darwin' and sys_platform != 'win32'" },
+    { name = "cryptography", marker = "sys_platform == 'linux'" },
+    { name = "jeepney", marker = "sys_platform == 'linux'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/31/9f/11ef35cf1027c1339552ea7bfe6aaa74a8516d8b5caf6e7d338daf54fd80/secretstorage-3.4.0.tar.gz", hash = "sha256:c46e216d6815aff8a8a18706a2fbfd8d53fcbb0dce99301881687a1b0289ef7c", size = 19748, upload-time = "2025-09-09T16:42:13.859Z" }
 wheels = [

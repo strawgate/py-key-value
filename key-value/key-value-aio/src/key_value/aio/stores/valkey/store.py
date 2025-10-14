@@ -1,8 +1,5 @@
 from typing import overload
 
-from glide.glide_client import BaseClient
-from glide_shared.commands.core_options import ExpirySet, ExpiryType
-from glide_shared.config import GlideClientConfiguration, NodeAddress, ServerCredentials
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
@@ -11,7 +8,9 @@ from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
 
 try:
     # Use redis-py asyncio client to communicate with a Valkey server (protocol compatible)
-    from glide.glide_client import GlideClient
+    from glide.glide_client import BaseClient, GlideClient
+    from glide_shared.commands.core_options import ExpirySet, ExpiryType
+    from glide_shared.config import GlideClientConfiguration, NodeAddress, ServerCredentials
 except ImportError as e:
     msg = "ValkeyStore requires py-key-value-aio[valkey]"
     raise ImportError(msg) from e
