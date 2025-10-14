@@ -1,6 +1,5 @@
 """Python keyring-based key-value store."""
 
-
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
