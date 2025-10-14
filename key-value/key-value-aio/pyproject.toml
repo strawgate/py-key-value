@@ -58,7 +58,6 @@ dev = [
     "py-key-value-aio[memory,disk,redis,elasticsearch,memcached,mongodb]",
     "py-key-value-aio[valkey]; platform_system != 'Windows'",
     "py-key-value-aio[keyring]",
-    "py-key-value-aio[keyring-linux]; platform_system == 'Linux'",
     "py-key-value-aio[pydantic]",
     "pytest",
     "pytest-mock",

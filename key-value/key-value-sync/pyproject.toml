@@ -58,7 +58,6 @@ dev = [
     "py-key-value-sync[valkey]; platform_system != 'Windows'",
     "py-key-value-sync[pydantic]",
     "py-key-value-sync[keyring]",
-    "py-key-value-sync[keyring-linux]; platform_system == 'Linux'",
     "pytest",
     "pytest-mock",
     "pytest-asyncio",
