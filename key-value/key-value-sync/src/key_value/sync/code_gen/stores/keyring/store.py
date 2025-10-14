@@ -5,6 +5,7 @@
 
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
@@ -17,6 +18,11 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 DEFAULT_KEYCHAIN_SERVICE = "py-key-value"
+MAX_KEY_LENGTH = 256
+ALLOWED_KEY_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
+
+MAX_COLLECTION_LENGTH = 256
+ALLOWED_COLLECTION_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
 
 class KeyringStore(BaseStore):
@@ -42,9 +48,18 @@ class KeyringStore(BaseStore):
 
         super().__init__(default_collection=default_collection)
 
+    def _sanitize_collection_name(self, collection: str) -> str:
+        return sanitize_string(value=collection, max_length=MAX_COLLECTION_LENGTH, allowed_characters=ALLOWED_COLLECTION_CHARACTERS)
+
+    def _sanitize_document_id(self, key: str) -> str:
+        return sanitize_string(value=key, max_length=MAX_KEY_LENGTH, allowed_characters=ALLOWED_KEY_CHARACTERS)
+
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        combo_key: str = compound_key(collection=collection, key=key)
+        sanitized_collection = self._sanitize_collection_name(collection=collection)
+        sanitized_key = self._sanitize_document_id(key=key)
+
+        combo_key: str = compound_key(collection=sanitized_collection, key=sanitized_key)
 
         try:
             json_str: str | None = keyring.get_password(service_name=self._service_name, username=combo_key)
@@ -58,7 +73,10 @@ class KeyringStore(BaseStore):
 
     @override
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
-        combo_key: str = compound_key(collection=collection, key=key)
+        sanitized_collection = self._sanitize_collection_name(collection=collection)
+        sanitized_key = self._sanitize_document_id(key=key)
+
+        combo_key: str = compound_key(collection=sanitized_collection, key=sanitized_key)
 
         json_str: str = managed_entry.to_json()
 
@@ -66,7 +84,10 @@ class KeyringStore(BaseStore):
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        combo_key: str = compound_key(collection=collection, key=key)
+        sanitized_collection = self._sanitize_collection_name(collection=collection)
+        sanitized_key = self._sanitize_document_id(key=key)
+
+        combo_key: str = compound_key(collection=sanitized_collection, key=sanitized_key)
 
         try:
             keyring.delete_password(service_name=self._service_name, username=combo_key)
