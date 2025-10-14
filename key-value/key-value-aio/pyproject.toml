@@ -38,7 +38,7 @@ mongodb = ["pymongo>=4.15.0"]
 valkey = ["valkey-glide>=2.1.0"]
 memcached = ["aiomcache>=0.8.0"]
 elasticsearch = ["elasticsearch>=9.0.0", "aiohttp>=3.12"]
-keychain = ["keyring>=25.6.0"]
+keyring = ["keyring>=25.6.0"]
 pydantic = ["pydantic>=2.11.9"]
 
 [tool.pytest.ini_options]
@@ -55,7 +55,7 @@ env_files = [".env"]
 dev = [
     "py-key-value-aio[memory,disk,redis,elasticsearch,memcached,mongodb]",
     "py-key-value-aio[valkey]; platform_system != 'Windows'",
-    "py-key-value-aio[keychain]; platform_system == 'Darwin'",
+    "py-key-value-aio[keyring]",
     "py-key-value-aio[pydantic]",
     "pytest",
     "pytest-mock",

@@ -83,21 +83,36 @@ ttl_many(keys: list[str], collection: str | None = None) -> list[tuple[dict[str,
 
 ### Stores
 
-The library provides a variety of stores that implement the protocol:
+The library provides a variety of stores that implement the protocol.
+
+A ✅ means a store is available, a ☑️ under async means a store is available but the underlying implementation is syncronous. A ✖️ means a store is not available.
+
+
+#### Local stores
+Local stores are stored in memory or on disk, local to the application.
 
 | Local Stores     | Async | Sync | Example |
 |------------------|:-----:|:----:|:-------|
 | Memory           |  ✅  |  ✅  | `MemoryStore()` |
-| Disk             |  ✅  |  ✅  | `DiskStore(directory="./cache")` |
-| Disk (Per-Collection) |  ✅  |  ✅  | `MultiDiskStore(directory="./cache")` |
-| macOS Keychain   |  ✅  |      | `KeychainStore(service_name="py-key-value")` |
+| Disk             |  ☑️  |  ✅  | `DiskStore(directory="./cache")` |
+| Disk (Per-Collection) |  ☑️  |  ✅  | `MultiDiskStore(directory="./cache")` |
 | Simple (test)    |  ✅  |  ✅  | `SimpleStore()` |
 | Null (test)      |  ✅  |  ✅  | `NullStore()` |
+
+#### Secret stores
+Secret stores are stores that are used to store sensitive data, typically in an Operating System's secret store.
+
+| Secret Stores | Async | Sync | Example |
+|------------------|:-----:|:----:|:-------|
+| Keyring          |  ☑️  |   ✅   | `KeyringStore(service_name="py-key-value")` |
+
+#### Distributed stores
+Distributed stores are stores that are used to store data in a distributed system, for access across multiple application nodes.
 
 | Distributed Stores | Async | Sync | Example |
 |------------------|:-----:|:----:|:-------|
 | Elasticsearch    |  ✅  |  ✅  | `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key", index="kv-store")` |
-| Memcached        |  ✅  |      | `MemcachedStore(host="127.0.0.1", port=11211")` |
+| Memcached        |  ✅  |  ✖️   | `MemcachedStore(host="127.0.0.1", port=11211")` |
 | MongoDB          |  ✅  |  ✅  | `MongoDBStore(url="mongodb://localhost:27017/test")` |
 | Redis            |  ✅  |  ✅  | `RedisStore(url="redis://localhost:6379/0")` |
 | Valkey           |  ✅  |  ✅  | `ValkeyStore(host="localhost", port=6379)` |
