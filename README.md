@@ -86,7 +86,7 @@ ttl_many(keys: list[str], collection: str | None = None) -> list[tuple[dict[str,
 
 The library provides a variety of stores that implement the protocol.
 
-A ✅ means a store is available, a ☑️ under async means a store is available but the underlying implementation is syncronous. A ✖️ means a store is not available.
+A ✅ means a store is available, a ☑️ under async means a store is available but the underlying implementation is synchronous. A ✖️ means a store is not available.
 
 
 #### Local stores
