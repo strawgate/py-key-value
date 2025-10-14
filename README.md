@@ -107,6 +107,8 @@ Secret stores are stores that are used to store sensitive data, typically in an 
 |------------------|:-----:|:----:|:-------|
 | Keyring          |  ☑️  |   ✅   | `KeyringStore(service_name="py-key-value")` |
 
+Note: The Windows Keyring has strict limits on the length of values which may cause issues with large values.
+
 #### Distributed stores
 Distributed stores are stores that are used to store data in a distributed system, for access across multiple application nodes.
 

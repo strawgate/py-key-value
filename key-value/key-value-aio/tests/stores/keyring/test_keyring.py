@@ -1,9 +1,11 @@
+from typing import Any
+
 import pytest
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.keyring.store import KeyringStore
-from tests.conftest import detect_on_linux
+from tests.conftest import detect_on_linux, detect_on_windows
 from tests.stores.base import BaseStoreTests
 
 
@@ -22,3 +24,7 @@ class TestKeychainStore(BaseStoreTests):
     @override
     @pytest.mark.skip(reason="We do not test boundedness of keyring stores")
     async def test_not_unbounded(self, store: BaseStore): ...
+
+    @override
+    @pytest.mark.skipif(condition=detect_on_windows(), reason="Keyrings do not support large values on Windows")
+    async def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str): ...
