@@ -4,6 +4,7 @@
 import asyncio
 import logging
 import os
+import platform
 import subprocess
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -145,11 +146,15 @@ def detect_on_ci() -> bool:
 
 
 def detect_on_windows() -> bool:
-    return os.name == "nt"
+    return platform.system() == "Windows"
 
 
 def detect_on_macos() -> bool:
-    return os.name == "darwin"
+    return platform.system() == "Darwin"
+
+
+def detect_on_linux() -> bool:
+    return platform.system() == "Linux"
 
 
 def should_run_docker_tests() -> bool:

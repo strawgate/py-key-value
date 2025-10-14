@@ -8,7 +8,14 @@ from dirty_equals import IsFloat
 from key_value.shared.code_gen.gather import async_gather
 from key_value.shared.code_gen.sleep import asleep
 from key_value.shared.errors import InvalidTTLError, SerializationError
-from key_value.shared_test.cases import SIMPLE_TEST_DATA_ARGNAMES, SIMPLE_TEST_DATA_ARGVALUES, SIMPLE_TEST_DATA_IDS
+from key_value.shared_test.cases import (
+    LARGE_TEST_DATA_ARGNAMES,
+    LARGE_TEST_DATA_ARGVALUES,
+    LARGE_TEST_DATA_IDS,
+    SIMPLE_TEST_DATA_ARGNAMES,
+    SIMPLE_TEST_DATA_ARGVALUES,
+    SIMPLE_TEST_DATA_IDS,
+)
 from pydantic import AnyHttpUrl
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
@@ -50,6 +57,11 @@ class BaseStoreTests(ABC):
 
     @pytest.mark.parametrize(argnames=SIMPLE_TEST_DATA_ARGNAMES, argvalues=SIMPLE_TEST_DATA_ARGVALUES, ids=SIMPLE_TEST_DATA_IDS)
     async def test_get_complex_put_get(self, store: BaseStore, data: dict[str, Any], json: str):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]  # noqa: ARG002
+        await store.put(collection="test", key="test", value=data)
+        assert await store.get(collection="test", key="test") == data
+
+    @pytest.mark.parametrize(argnames=LARGE_TEST_DATA_ARGNAMES, argvalues=LARGE_TEST_DATA_ARGVALUES, ids=LARGE_TEST_DATA_IDS)
+    async def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]  # noqa: ARG002
         await store.put(collection="test", key="test", value=data)
         assert await store.get(collection="test", key="test") == data
 

@@ -59,7 +59,6 @@ TEST_CASE_DATA: list[dict[str, Any]] = [
         FLOAT_CASE,
         LARGE_FLOAT_CASE,
         STRING_CASE,
-        LARGE_STRING_CASE,
         DICT_CASE_ONE,
         DICT_CASE_TWO,
         DICT_CASE_THREE,
@@ -79,7 +78,6 @@ TEST_CASE_JSON: list[str] = [
         FLOAT_CASE,
         LARGE_FLOAT_CASE,
         STRING_CASE,
-        LARGE_STRING_CASE,
         DICT_CASE_ONE,
         DICT_CASE_TWO,
         DICT_CASE_THREE,
@@ -102,7 +100,6 @@ SIMPLE_TEST_DATA_IDS: list[str] = [
         FLOAT_CASE,
         LARGE_FLOAT_CASE,
         STRING_CASE,
-        LARGE_STRING_CASE,
         DICT_CASE_ONE,
         DICT_CASE_TWO,
         DICT_CASE_THREE,
@@ -112,4 +109,32 @@ SIMPLE_TEST_DATA_IDS: list[str] = [
     ]
 ]
 
-__all__ = ["SIMPLE_TEST_DATA_ARGNAMES", "SIMPLE_TEST_DATA_ARGVALUES", "SIMPLE_TEST_DATA_IDS"]
+LARGE_TEST_DATA_DATA: list[dict[str, Any]] = [
+    case.data
+    for case in [
+        LARGE_STRING_CASE,
+    ]
+]
+LARGE_TEST_DATA_JSON: list[str] = [
+    case.json
+    for case in [
+        LARGE_STRING_CASE,
+    ]
+]
+LARGE_TEST_DATA_ARGNAMES: tuple[str, str] = ("data", "json")
+LARGE_TEST_DATA_ARGVALUES: list[tuple[dict[str, Any], str]] = list(zip(LARGE_TEST_DATA_DATA, LARGE_TEST_DATA_JSON, strict=True))
+LARGE_TEST_DATA_IDS: list[str] = [
+    case.name
+    for case in [
+        LARGE_STRING_CASE,
+    ]
+]
+
+__all__ = [
+    "LARGE_TEST_DATA_ARGNAMES",
+    "LARGE_TEST_DATA_ARGVALUES",
+    "LARGE_TEST_DATA_IDS",
+    "SIMPLE_TEST_DATA_ARGNAMES",
+    "SIMPLE_TEST_DATA_ARGVALUES",
+    "SIMPLE_TEST_DATA_IDS",
+]
