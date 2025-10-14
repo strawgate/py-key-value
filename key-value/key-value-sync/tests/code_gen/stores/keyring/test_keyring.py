@@ -6,9 +6,11 @@ from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
 from key_value.sync.code_gen.stores.keyring.store import KeyringStore
+from tests.code_gen.conftest import detect_on_linux
 from tests.code_gen.stores.base import BaseStoreTests
 
 
+@pytest.mark.skipif(condition=detect_on_linux(), reason="KeyringStore is not available on Linux CI")
 class TestKeychainStore(BaseStoreTests):
     @override
     @pytest.fixture

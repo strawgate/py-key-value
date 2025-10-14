@@ -3,9 +3,11 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.keyring.store import KeyringStore
+from tests.conftest import detect_on_linux
 from tests.stores.base import BaseStoreTests
 
 
+@pytest.mark.skipif(condition=detect_on_linux(), reason="KeyringStore is not available on Linux CI")
 class TestKeychainStore(BaseStoreTests):
     @override
     @pytest.fixture
