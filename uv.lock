@@ -458,6 +458,12 @@ wheels = [
 ]
 
 [[package]]
+name = "dbus-python"
+version = "1.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/24/63118050c7dd7be04b1ccd60eab53fef00abe844442e1b6dec92dae505d6/dbus-python-1.4.0.tar.gz", hash = "sha256:991666e498f60dbf3e49b8b7678f5559b8a65034fdf61aae62cdecdb7d89c770", size = 232490, upload-time = "2025-03-13T19:57:54.212Z" }
+
+[[package]]
 name = "dirty-equals"
 version = "0.10.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1079,6 +1085,7 @@ elasticsearch = [
     { name = "elasticsearch" },
 ]
 keyring = [
+    { name = "dbus-python", marker = "sys_platform == 'linux'" },
     { name = "keyring" },
 ]
 memcached = [
@@ -1125,6 +1132,7 @@ requires-dist = [
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
     { name = "beartype", specifier = ">=0.22.2" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
+    { name = "dbus-python", marker = "sys_platform == 'linux' and extra == 'keyring'", specifier = ">=1.4.0" },
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
     { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
     { name = "keyring", marker = "extra == 'keyring'", specifier = ">=25.6.0" },
@@ -1237,6 +1245,7 @@ elasticsearch = [
     { name = "elasticsearch" },
 ]
 keyring = [
+    { name = "dbus-python", marker = "sys_platform == 'linux'" },
     { name = "keyring" },
 ]
 memcached = [
@@ -1283,6 +1292,7 @@ requires-dist = [
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
     { name = "beartype", specifier = ">=0.22.2" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
+    { name = "dbus-python", marker = "sys_platform == 'linux' and extra == 'keyring'", specifier = ">=1.4.0" },
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
     { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
     { name = "keyring", marker = "extra == 'keyring'", specifier = ">=25.6.0" },

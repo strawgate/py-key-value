@@ -149,6 +149,10 @@ def detect_on_macos() -> bool:
     return os.name == "darwin"
 
 
+def detect_on_linux() -> bool:
+    return os.name == "linux"
+
+
 def should_run_docker_tests() -> bool:
     if detect_on_ci():
         return all([detect_docker(), not detect_on_windows(), not detect_on_macos()])
