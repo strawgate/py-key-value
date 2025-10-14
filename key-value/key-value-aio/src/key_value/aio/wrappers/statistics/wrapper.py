@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, SupportsFloat
 
 from typing_extensions import override
 
@@ -101,8 +101,8 @@ class StatisticsWrapper(BaseWrapper):
     Note: enumeration and destroy operations are not tracked by this wrapper.
     """
 
-    def __init__(self, store: AsyncKeyValue) -> None:
-        self.store: AsyncKeyValue = store
+    def __init__(self, key_value: AsyncKeyValue) -> None:
+        self.key_value: AsyncKeyValue = key_value
         self._statistics: KVStoreStatistics = KVStoreStatistics()
 
     @property
@@ -113,7 +113,7 @@ class StatisticsWrapper(BaseWrapper):
     async def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
         collection = collection or DEFAULT_COLLECTION_NAME
 
-        if value := await self.store.get(collection=collection, key=key):
+        if value := await self.key_value.get(collection=collection, key=key):
             self.statistics.get_collection(collection=collection).get.increment_hit()
             return value
 
@@ -125,7 +125,7 @@ class StatisticsWrapper(BaseWrapper):
     async def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
         collection = collection or DEFAULT_COLLECTION_NAME
 
-        value, ttl = await self.store.ttl(collection=collection, key=key)
+        value, ttl = await self.key_value.ttl(collection=collection, key=key)
 
         if value:
             self.statistics.get_collection(collection=collection).ttl.increment_hit()
@@ -135,10 +135,10 @@ class StatisticsWrapper(BaseWrapper):
         return None, None
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: float | None = None) -> None:
+    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         collection = collection or DEFAULT_COLLECTION_NAME
 
-        await self.store.put(collection=collection, key=key, value=value, ttl=ttl)
+        await self.key_value.put(collection=collection, key=key, value=value, ttl=ttl)
 
         self.statistics.get_collection(collection=collection).put.increment()
 
@@ -146,7 +146,7 @@ class StatisticsWrapper(BaseWrapper):
     async def delete(self, key: str, *, collection: str | None = None) -> bool:
         collection = collection or DEFAULT_COLLECTION_NAME
 
-        if await self.store.delete(collection=collection, key=key):
+        if await self.key_value.delete(collection=collection, key=key):
             self.statistics.get_collection(collection=collection).delete.increment_hit()
             return True
 
@@ -158,7 +158,7 @@ class StatisticsWrapper(BaseWrapper):
     async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         collection = collection or DEFAULT_COLLECTION_NAME
 
-        results: list[dict[str, Any] | None] = await self.store.get_many(keys=keys, collection=collection)
+        results: list[dict[str, Any] | None] = await self.key_value.get_many(keys=keys, collection=collection)
 
         hits = len([result for result in results if result is not None])
         misses = len([result for result in results if result is None])
@@ -175,11 +175,11 @@ class StatisticsWrapper(BaseWrapper):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[float | None] | float | None = None,
+        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
     ) -> None:
         collection = collection or DEFAULT_COLLECTION_NAME
 
-        await self.store.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
+        await self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
 
         self.statistics.get_collection(collection=collection).put.increment(increment=len(keys))
 
@@ -187,7 +187,7 @@ class StatisticsWrapper(BaseWrapper):
     async def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
         collection = collection or DEFAULT_COLLECTION_NAME
 
-        deleted_count: int = await self.store.delete_many(keys=keys, collection=collection)
+        deleted_count: int = await self.key_value.delete_many(keys=keys, collection=collection)
 
         hits = deleted_count
         misses = len(keys) - deleted_count
@@ -201,7 +201,7 @@ class StatisticsWrapper(BaseWrapper):
     async def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         collection = collection or DEFAULT_COLLECTION_NAME
 
-        results: list[tuple[dict[str, Any] | None, float | None]] = await self.store.ttl_many(keys=keys, collection=collection)
+        results: list[tuple[dict[str, Any] | None, float | None]] = await self.key_value.ttl_many(keys=keys, collection=collection)
 
         hits = len([result for result in results if result[0] is not None])
         misses = len([result for result in results if result[0] is None])

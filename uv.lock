@@ -227,6 +227,15 @@ wheels = [
 ]
 
 [[package]]
+name = "beartype"
+version = "0.22.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/04/96/43ed27f27127155f24f5cf85df0c27fd2ac2ab67d94cecc8f76933f91679/beartype-0.22.2.tar.gz", hash = "sha256:ff3a7df26af8d15fa87f97934f0f6d41bbdadca971c410819104998dd26013d2", size = 1574491, upload-time = "2025-10-04T06:37:56.451Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/96/2a/a4773109619010192e72f48e95165b14790413a51f513c879c8d63f67e17/beartype-0.22.2-py3-none-any.whl", hash = "sha256:12077afe3528eba5c5b801f816712f7ff06f6da5509994c79561e29b48bcedb8", size = 1317280, upload-time = "2025-10-04T06:37:53.99Z" },
+]
+
+[[package]]
 name = "cachetools"
 version = "6.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1032,12 +1041,13 @@ wheels = [
 
 [[package]]
 name = "py-key-value"
-version = "0.2.1"
+version = "0.2.2"
 source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
     { name = "basedpyright" },
+    { name = "beartype" },
     { name = "docker" },
 ]
 
@@ -1046,6 +1056,7 @@ dev = [
 [package.metadata.requires-dev]
 dev = [
     { name = "basedpyright", specifier = ">=1.31.5" },
+    { name = "beartype", specifier = ">=0.22.2" },
     { name = "docker", specifier = ">=7.1.0" },
 ]
 
@@ -1054,6 +1065,7 @@ name = "py-key-value-aio"
 version = "0.2.1"
 source = { editable = "key-value/key-value-aio" }
 dependencies = [
+    { name = "beartype" },
     { name = "py-key-value-shared" },
 ]
 
@@ -1112,6 +1124,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
+    { name = "beartype", specifier = ">=0.22.2" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
     { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
@@ -1151,6 +1164,7 @@ name = "py-key-value-shared"
 version = "0.2.1"
 source = { editable = "key-value/key-value-shared" }
 dependencies = [
+    { name = "beartype" },
     { name = "typing-extensions" },
 ]
 
@@ -1168,7 +1182,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "typing-extensions", specifier = ">=4.15.0" }]
+requires-dist = [
+    { name = "beartype", specifier = ">=0.22.2" },
+    { name = "typing-extensions", specifier = ">=4.15.0" },
+]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1207,6 +1224,7 @@ name = "py-key-value-sync"
 version = "0.2.1"
 source = { editable = "key-value/key-value-sync" }
 dependencies = [
+    { name = "beartype" },
     { name = "py-key-value-shared" },
 ]
 
@@ -1261,6 +1279,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
+    { name = "beartype", specifier = ">=0.22.2" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
     { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },

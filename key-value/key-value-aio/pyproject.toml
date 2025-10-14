@@ -7,7 +7,7 @@ requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -15,7 +15,8 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "py-key-value-shared>=0.2.0",
+    "beartype>=0.22.2",
+    "py-key-value-shared>=0.2.1",
 ]
 
 
@@ -70,7 +71,6 @@ dev = [
     "ast-comments>=1.2.3",
     "docker>=7.1.0",
     "py-key-value-shared-test>=0.2.0",
-    
 ]
 
 [tool.ruff]

@@ -2,7 +2,7 @@
 # from the original file 'wrapper.py'
 # DO NOT CHANGE! Change the original file instead.
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, SupportsFloat
 
 from typing_extensions import override
 
@@ -10,8 +10,8 @@ from key_value.sync.code_gen.protocols.key_value import KeyValue
 from key_value.sync.code_gen.wrappers.base import BaseWrapper
 from key_value.sync.code_gen.wrappers.ttl_clamp import TTLClampWrapper
 
-DEFAULT_MAX_TTL: float = 30 * 60
-DEFAULT_MISSING_TTL: float = 30 * 60
+DEFAULT_MAX_TTL: float = 30.0 * 60.0
+DEFAULT_MISSING_TTL: float = 30.0 * 60.0
 
 
 class PassthroughCacheWrapper(BaseWrapper):
@@ -21,36 +21,40 @@ class PassthroughCacheWrapper(BaseWrapper):
     """
 
     def __init__(
-        self, primary_store: KeyValue, cache_store: KeyValue, maximum_ttl: float | None = None, missing_ttl: float | None = None
+        self,
+        primary_key_value: KeyValue,
+        cache_key_value: KeyValue,
+        maximum_ttl: SupportsFloat | None = None,
+        missing_ttl: SupportsFloat | None = None,
     ) -> None:
         """Initialize the passthrough cache wrapper.
 
         Args:
-            primary_store: The primary store to wrap.
-            cache_store: The cache store to wrap.
+            primary_key_value: The primary store to wrap.
+            cache_key_value: The cache store to wrap.
             maximum_ttl: The maximum TTL for puts into the cache store. Defaults to 30 minutes.
             missing_ttl: The TTL to use for entries that do not have a TTL. Defaults to 30 minutes.
         """
-        self.store: KeyValue = primary_store
-        self.cache_store: KeyValue = cache_store
+        self.primary_key_value: KeyValue = primary_key_value
+        self.unwrapped_cache_key_value: KeyValue = cache_key_value
 
-        self.cache_store = TTLClampWrapper(
-            store=cache_store, min_ttl=0, max_ttl=maximum_ttl or DEFAULT_MAX_TTL, missing_ttl=missing_ttl or DEFAULT_MISSING_TTL
+        self.cache_key_value = TTLClampWrapper(
+            key_value=cache_key_value, min_ttl=0, max_ttl=maximum_ttl or DEFAULT_MAX_TTL, missing_ttl=missing_ttl or DEFAULT_MISSING_TTL
         )
 
         super().__init__()
 
     @override
     def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
-        if managed_entry := self.cache_store.get(collection=collection, key=key):
+        if managed_entry := self.cache_key_value.get(collection=collection, key=key):
             return managed_entry
 
-        (uncached_entry, ttl) = self.store.ttl(collection=collection, key=key)
+        (uncached_entry, ttl) = self.primary_key_value.ttl(collection=collection, key=key)
 
         if not uncached_entry:
             return None
 
-        self.cache_store.put(collection=collection, key=key, value=uncached_entry, ttl=ttl)
+        self.cache_key_value.put(collection=collection, key=key, value=uncached_entry, ttl=ttl)
 
         return uncached_entry
 
@@ -59,14 +63,16 @@ class PassthroughCacheWrapper(BaseWrapper):
         key_to_value: dict[str, dict[str, Any] | None] = dict.fromkeys(keys, None)
 
         # First check the cache store for the entries
-        cached_entries: list[dict[str, Any] | None] = self.cache_store.get_many(collection=collection, keys=keys)
+        cached_entries: list[dict[str, Any] | None] = self.cache_key_value.get_many(collection=collection, keys=keys)
 
         for i, key in enumerate(keys):
             key_to_value[key] = cached_entries[i]
 
         uncached_keys = [key for (key, value) in key_to_value.items() if value is None]
 
-        uncached_entries: list[tuple[dict[str, Any] | None, float | None]] = self.store.ttl_many(collection=collection, keys=uncached_keys)
+        uncached_entries: list[tuple[dict[str, Any] | None, float | None]] = self.primary_key_value.ttl_many(
+            collection=collection, keys=uncached_keys
+        )
 
         entries_to_cache: list[dict[str, Any]] = []
         entries_to_cache_keys: list[str] = []
@@ -82,23 +88,25 @@ class PassthroughCacheWrapper(BaseWrapper):
             key_to_value[key] = entry
 
         if entries_to_cache:
-            self.cache_store.put_many(collection=collection, keys=entries_to_cache_keys, values=entries_to_cache, ttl=entries_to_cache_ttls)
+            self.cache_key_value.put_many(
+                collection=collection, keys=entries_to_cache_keys, values=entries_to_cache, ttl=entries_to_cache_ttls
+            )
 
         return [key_to_value[key] for key in keys]
 
     @override
     def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
-        (cached_entry, ttl) = self.cache_store.ttl(collection=collection, key=key)
+        (cached_entry, ttl) = self.cache_key_value.ttl(collection=collection, key=key)
 
         if cached_entry:
             return (cached_entry, ttl)
 
-        (uncached_entry, ttl) = self.store.ttl(collection=collection, key=key)
+        (uncached_entry, ttl) = self.primary_key_value.ttl(collection=collection, key=key)
 
         if not uncached_entry:
             return (None, None)
 
-        self.cache_store.put(collection=collection, key=key, value=uncached_entry, ttl=ttl)
+        self.cache_key_value.put(collection=collection, key=key, value=uncached_entry, ttl=ttl)
 
         return (uncached_entry, ttl)
 
@@ -107,14 +115,16 @@ class PassthroughCacheWrapper(BaseWrapper):
         key_to_value: dict[str, tuple[dict[str, Any] | None, float | None]] = dict.fromkeys(keys, (None, None))  # type: ignore
 
         # First check the cache store for the entries
-        cached_entries: list[tuple[dict[str, Any] | None, float | None]] = self.cache_store.ttl_many(collection=collection, keys=keys)
+        cached_entries: list[tuple[dict[str, Any] | None, float | None]] = self.cache_key_value.ttl_many(collection=collection, keys=keys)
 
         for i, key in enumerate(keys):
             key_to_value[key] = (cached_entries[i][0], cached_entries[i][1])
 
         uncached_keys = [key for (key, value) in key_to_value.items() if value == (None, None)]
 
-        uncached_entries: list[tuple[dict[str, Any] | None, float | None]] = self.store.ttl_many(collection=collection, keys=uncached_keys)
+        uncached_entries: list[tuple[dict[str, Any] | None, float | None]] = self.primary_key_value.ttl_many(
+            collection=collection, keys=uncached_keys
+        )
 
         entries_to_cache: list[dict[str, Any]] = []
         entries_to_cache_keys: list[str] = []
@@ -130,15 +140,17 @@ class PassthroughCacheWrapper(BaseWrapper):
             key_to_value[key] = (entry, ttl)
 
         if entries_to_cache:
-            self.cache_store.put_many(collection=collection, keys=entries_to_cache_keys, values=entries_to_cache, ttl=entries_to_cache_ttls)
+            self.cache_key_value.put_many(
+                collection=collection, keys=entries_to_cache_keys, values=entries_to_cache, ttl=entries_to_cache_ttls
+            )
 
         return [key_to_value[key] for key in keys]
 
     @override
-    def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: float | None = None) -> None:
-        _ = self.cache_store.delete(collection=collection, key=key)
+    def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+        _ = self.cache_key_value.delete(collection=collection, key=key)
 
-        self.store.put(collection=collection, key=key, value=value, ttl=ttl)
+        self.primary_key_value.put(collection=collection, key=key, value=value, ttl=ttl)
 
     @override
     def put_many(
@@ -147,20 +159,20 @@ class PassthroughCacheWrapper(BaseWrapper):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[float | None] | float | None = None,
+        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
     ) -> None:
-        _ = self.cache_store.delete_many(collection=collection, keys=keys)
+        _ = self.cache_key_value.delete_many(collection=collection, keys=keys)
 
-        self.store.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
+        self.primary_key_value.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
 
     @override
     def delete(self, key: str, *, collection: str | None = None) -> bool:
-        _ = self.cache_store.delete(collection=collection, key=key)
+        _ = self.cache_key_value.delete(collection=collection, key=key)
 
-        return self.store.delete(collection=collection, key=key)
+        return self.primary_key_value.delete(collection=collection, key=key)
 
     @override
     def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
-        _ = self.cache_store.delete_many(collection=collection, keys=keys)
+        _ = self.cache_key_value.delete_many(collection=collection, keys=keys)
 
-        return self.store.delete_many(collection=collection, keys=keys)
+        return self.primary_key_value.delete_many(collection=collection, keys=keys)

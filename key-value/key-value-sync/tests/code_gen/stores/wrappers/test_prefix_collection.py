@@ -13,4 +13,4 @@ class TestPrefixCollectionWrapper(BaseStoreTests):
     @override
     @pytest.fixture
     def store(self, memory_store: MemoryStore) -> PrefixCollectionsWrapper:
-        return PrefixCollectionsWrapper(store=memory_store, prefix="collection_prefix")
+        return PrefixCollectionsWrapper(key_value=memory_store, prefix="collection_prefix")

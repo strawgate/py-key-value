@@ -2,7 +2,7 @@
 # from the original file 'wrapper.py'
 # DO NOT CHANGE! Change the original file instead.
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, SupportsFloat
 
 from key_value.shared.utils.compound import DEFAULT_PREFIX_SEPARATOR, prefix_key, unprefix_key
 from typing_extensions import override
@@ -16,16 +16,17 @@ class SingleCollectionWrapper(BaseWrapper):
     """A wrapper that stores all collections within a single backing collection via key prefixing."""
 
     def __init__(
-        self, store: KeyValue, single_collection: str, default_collection: str | None = None, separator: str | None = None
+        self, key_value: KeyValue, single_collection: str, default_collection: str | None = None, separator: str | None = None
     ) -> None:
         """Initialize the prefix collections wrapper.
 
         Args:
-            store: The store to wrap.
+            key_value: The store to wrap.
             single_collection: The single collection to use to store all collections.
             default_collection: The default collection to use if no collection is provided.
+            separator: The separator to use for the key prefix.
         """
-        self.store: KeyValue = store
+        self.key_value: KeyValue = key_value
         self.single_collection: str = single_collection
         self.default_collection: str = default_collection or DEFAULT_COLLECTION_NAME
         self.separator: str = separator or DEFAULT_PREFIX_SEPARATOR
@@ -41,27 +42,27 @@ class SingleCollectionWrapper(BaseWrapper):
     @override
     def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
         new_key: str = self._prefix_key(key=key, collection=collection)
-        return self.store.get(key=new_key, collection=self.single_collection)
+        return self.key_value.get(key=new_key, collection=self.single_collection)
 
     @override
     def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         new_keys: list[str] = [self._prefix_key(key=key, collection=collection) for key in keys]
-        return self.store.get_many(keys=new_keys, collection=self.single_collection)
+        return self.key_value.get_many(keys=new_keys, collection=self.single_collection)
 
     @override
     def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
         new_key: str = self._prefix_key(key=key, collection=collection)
-        return self.store.ttl(key=new_key, collection=self.single_collection)
+        return self.key_value.ttl(key=new_key, collection=self.single_collection)
 
     @override
     def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         new_keys: list[str] = [self._prefix_key(key=key, collection=collection) for key in keys]
-        return self.store.ttl_many(keys=new_keys, collection=self.single_collection)
+        return self.key_value.ttl_many(keys=new_keys, collection=self.single_collection)
 
     @override
-    def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: float | None = None) -> None:
+    def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         new_key: str = self._prefix_key(key=key, collection=collection)
-        return self.store.put(key=new_key, value=value, collection=self.single_collection, ttl=ttl)
+        return self.key_value.put(key=new_key, value=value, collection=self.single_collection, ttl=ttl)
 
     @override
     def put_many(
@@ -70,17 +71,17 @@ class SingleCollectionWrapper(BaseWrapper):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[float | None] | float | None = None,
+        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
     ) -> None:
         new_keys: list[str] = [self._prefix_key(key=key, collection=collection) for key in keys]
-        return self.store.put_many(keys=new_keys, values=values, collection=self.single_collection, ttl=ttl)
+        return self.key_value.put_many(keys=new_keys, values=values, collection=self.single_collection, ttl=ttl)
 
     @override
     def delete(self, key: str, *, collection: str | None = None) -> bool:
         new_key: str = self._prefix_key(key=key, collection=collection)
-        return self.store.delete(key=new_key, collection=self.single_collection)
+        return self.key_value.delete(key=new_key, collection=self.single_collection)
 
     @override
     def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
         new_keys: list[str] = [self._prefix_key(key=key, collection=collection) for key in keys]
-        return self.store.delete_many(keys=new_keys, collection=self.single_collection)
+        return self.key_value.delete_many(keys=new_keys, collection=self.single_collection)

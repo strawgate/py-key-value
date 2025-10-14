@@ -10,12 +10,12 @@ from collections import defaultdict
 from collections.abc import Sequence
 from threading import Lock
 from types import TracebackType
-from typing import Any
+from typing import Any, SupportsFloat
 
 from key_value.shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.shared.errors import StoreSetupError
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.time_to_live import now, prepare_ttls, validate_ttl
+from key_value.shared.utils.time_to_live import now, prepare_ttl, prepare_ttls
 from typing_extensions import Self, override
 
 from key_value.sync.code_gen.protocols.key_value import (
@@ -78,7 +78,9 @@ class BaseStore(KeyValueProtocol, ABC):
                     try:
                         self._setup()
                     except Exception as e:
-                        raise StoreSetupError(message=f"Failed to setup store: {e}", extra_info={"store": self.__class__.__name__}) from e
+                        raise StoreSetupError(
+                            message=f"Failed to setup key value store: {e}", extra_info={"store": self.__class__.__name__}
+                        ) from e
                     self._setup_complete = True
 
     def setup_collection(self, *, collection: str) -> None:
@@ -171,12 +173,12 @@ class BaseStore(KeyValueProtocol, ABC):
             self._put_managed_entry(collection=collection, key=key, managed_entry=managed_entry)
 
     @override
-    def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: float | None = None) -> None:
+    def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Store a key-value pair in the specified collection with optional TTL."""
         collection = collection or self.default_collection
         self.setup_collection(collection=collection)
 
-        managed_entry: ManagedEntry = ManagedEntry(value=value, ttl=validate_ttl(t=ttl), created_at=now())
+        managed_entry: ManagedEntry = ManagedEntry(value=value, ttl=prepare_ttl(t=ttl), created_at=now())
 
         self._put_managed_entry(collection=collection, key=key, managed_entry=managed_entry)
 
@@ -187,7 +189,7 @@ class BaseStore(KeyValueProtocol, ABC):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[float | None] | float | None = None,
+        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
     ) -> None:
         """Store multiple key-value pairs in the specified collection."""
         if len(keys) != len(values):
@@ -245,7 +247,7 @@ class BaseStore(KeyValueProtocol, ABC):
 class BaseEnumerateKeysStore(BaseStore, EnumerateKeysProtocol, ABC):
     """An abstract base class for enumerate key-value stores.
 
-    Subclasses must implement the get_collection_keys and get_collection_names methods.
+    Subclasses must implement the _get_collection_keys method.
     """
 
     @override
@@ -282,6 +284,11 @@ class BaseContextManagerStore(BaseStore, ABC):
 
 
 class BaseEnumerateCollectionsStore(BaseStore, EnumerateCollectionsProtocol, ABC):
+    """An abstract base class for enumerate collections stores.
+
+    Subclasses must implement the _get_collection_names method.
+    """
+
     @override
     def collections(self, *, limit: int | None = None) -> list[str]:
         """List all available collection names (may include empty collections)."""
@@ -297,7 +304,7 @@ class BaseEnumerateCollectionsStore(BaseStore, EnumerateCollectionsProtocol, ABC
 class BaseDestroyStore(BaseStore, DestroyStoreProtocol, ABC):
     """An abstract base class for destroyable stores.
 
-    Subclasses must implement the delete_store method.
+    Subclasses must implement the _delete_store method.
     """
 
     @override
@@ -316,7 +323,7 @@ class BaseDestroyStore(BaseStore, DestroyStoreProtocol, ABC):
 class BaseDestroyCollectionStore(BaseStore, DestroyCollectionProtocol, ABC):
     """An abstract base class for destroyable collections.
 
-    Subclasses must implement the delete_collection method.
+    Subclasses must implement the _delete_collection method.
     """
 
     @override
@@ -335,7 +342,7 @@ class BaseDestroyCollectionStore(BaseStore, DestroyCollectionProtocol, ABC):
 class BaseCullStore(BaseStore, CullProtocol, ABC):
     """An abstract base class for cullable stores.
 
-    Subclasses must implement the cull method.
+    Subclasses must implement the _cull method.
     """
 
     @override

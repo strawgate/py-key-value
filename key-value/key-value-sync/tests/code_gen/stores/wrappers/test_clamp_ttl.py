@@ -14,10 +14,10 @@ class TestTTLClampWrapper(BaseStoreTests):
     @override
     @pytest.fixture
     def store(self, memory_store: MemoryStore) -> TTLClampWrapper:
-        return TTLClampWrapper(store=memory_store, min_ttl=0, max_ttl=100)
+        return TTLClampWrapper(key_value=memory_store, min_ttl=0, max_ttl=100)
 
     def test_put_below_min_ttl(self, memory_store: MemoryStore):
-        ttl_clamp_store: TTLClampWrapper = TTLClampWrapper(store=memory_store, min_ttl=50, max_ttl=100)
+        ttl_clamp_store: TTLClampWrapper = TTLClampWrapper(key_value=memory_store, min_ttl=50, max_ttl=100)
 
         ttl_clamp_store.put(collection="test", key="test", value={"test": "test"}, ttl=5)
         assert ttl_clamp_store.get(collection="test", key="test") is not None
@@ -28,7 +28,7 @@ class TestTTLClampWrapper(BaseStoreTests):
         assert ttl == IsFloat(approx=50)
 
     def test_put_above_max_ttl(self, memory_store: MemoryStore):
-        ttl_clamp_store: TTLClampWrapper = TTLClampWrapper(store=memory_store, min_ttl=0, max_ttl=100)
+        ttl_clamp_store: TTLClampWrapper = TTLClampWrapper(key_value=memory_store, min_ttl=0, max_ttl=100)
 
         ttl_clamp_store.put(collection="test", key="test", value={"test": "test"}, ttl=1000)
         assert ttl_clamp_store.get(collection="test", key="test") is not None
@@ -39,7 +39,7 @@ class TestTTLClampWrapper(BaseStoreTests):
         assert ttl == IsFloat(approx=100)
 
     def test_put_missing_ttl(self, memory_store: MemoryStore):
-        ttl_clamp_store: TTLClampWrapper = TTLClampWrapper(store=memory_store, min_ttl=0, max_ttl=100, missing_ttl=50)
+        ttl_clamp_store: TTLClampWrapper = TTLClampWrapper(key_value=memory_store, min_ttl=0, max_ttl=100, missing_ttl=50)
 
         ttl_clamp_store.put(collection="test", key="test", value={"test": "test"}, ttl=None)
         assert ttl_clamp_store.get(collection="test", key="test") is not None

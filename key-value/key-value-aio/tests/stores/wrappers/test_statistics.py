@@ -10,4 +10,4 @@ class TestStatisticsWrapper(BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self, memory_store: MemoryStore) -> StatisticsWrapper:
-        return StatisticsWrapper(store=memory_store)
+        return StatisticsWrapper(key_value=memory_store)

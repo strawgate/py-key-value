@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, cast
+from typing import Any, SupportsFloat, cast
 
 from typing_extensions import Self
 
@@ -56,7 +56,7 @@ class ManagedEntry:
         return dump_to_json(obj=data)
 
     @classmethod
-    def from_json(cls, json_str: str, includes_metadata: bool = True, ttl: float | None = None) -> Self:
+    def from_json(cls, json_str: str, includes_metadata: bool = True, ttl: SupportsFloat | None = None) -> Self:
         data: dict[str, Any] = load_from_json(json_str=json_str)
 
         if not includes_metadata:
@@ -76,7 +76,7 @@ class ManagedEntry:
         return cls(
             created_at=created_at,
             expires_at=expires_at,
-            ttl=ttl,
+            ttl=float(ttl) if ttl else None,
             value=value,
         )
 
