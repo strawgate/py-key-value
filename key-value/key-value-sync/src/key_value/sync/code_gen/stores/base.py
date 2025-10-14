@@ -78,7 +78,9 @@ class BaseStore(KeyValueProtocol, ABC):
                     try:
                         self._setup()
                     except Exception as e:
-                        raise StoreSetupError(message=f"Failed to setup store: {e}", extra_info={"store": self.__class__.__name__}) from e
+                        raise StoreSetupError(
+                            message=f"Failed to setup key value store: {e}", extra_info={"store": self.__class__.__name__}
+                        ) from e
                     self._setup_complete = True
 
     def setup_collection(self, *, collection: str) -> None:
@@ -245,7 +247,7 @@ class BaseStore(KeyValueProtocol, ABC):
 class BaseEnumerateKeysStore(BaseStore, EnumerateKeysProtocol, ABC):
     """An abstract base class for enumerate key-value stores.
 
-    Subclasses must implement the get_collection_keys and get_collection_names methods.
+    Subclasses must implement the _get_collection_keys method.
     """
 
     @override
@@ -282,6 +284,11 @@ class BaseContextManagerStore(BaseStore, ABC):
 
 
 class BaseEnumerateCollectionsStore(BaseStore, EnumerateCollectionsProtocol, ABC):
+    """An abstract base class for enumerate collections stores.
+
+    Subclasses must implement the _get_collection_names method.
+    """
+
     @override
     def collections(self, *, limit: int | None = None) -> list[str]:
         """List all available collection names (may include empty collections)."""
@@ -297,7 +304,7 @@ class BaseEnumerateCollectionsStore(BaseStore, EnumerateCollectionsProtocol, ABC
 class BaseDestroyStore(BaseStore, DestroyStoreProtocol, ABC):
     """An abstract base class for destroyable stores.
 
-    Subclasses must implement the delete_store method.
+    Subclasses must implement the _delete_store method.
     """
 
     @override
@@ -316,7 +323,7 @@ class BaseDestroyStore(BaseStore, DestroyStoreProtocol, ABC):
 class BaseDestroyCollectionStore(BaseStore, DestroyCollectionProtocol, ABC):
     """An abstract base class for destroyable collections.
 
-    Subclasses must implement the delete_collection method.
+    Subclasses must implement the _delete_collection method.
     """
 
     @override
@@ -335,7 +342,7 @@ class BaseDestroyCollectionStore(BaseStore, DestroyCollectionProtocol, ABC):
 class BaseCullStore(BaseStore, CullProtocol, ABC):
     """An abstract base class for cullable stores.
 
-    Subclasses must implement the cull method.
+    Subclasses must implement the _cull method.
     """
 
     @override

@@ -189,7 +189,9 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
     async def _get_collection_names(self, *, limit: int | None = None) -> list[str]:
         limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
 
-        return list(self._collections_by_name.keys())[:limit]
+        collections: list[str] = await self._db.list_collection_names(filter={})
+
+        return collections[:limit]
 
     @override
     async def _delete_collection(self, *, collection: str) -> bool:

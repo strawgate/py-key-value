@@ -47,14 +47,14 @@ from key_value.aio.stores.memory import MemoryStore
 
 
 async def example(key_value: AsyncKeyValue) -> None:
-    await store.put(key="123", value={"name": "Alice"}, collection="users", ttl=3600)
+    await key_value.put(key="123", value={"name": "Alice"}, collection="users", ttl=3600)
     value = await store.get(key="123", collection="users")
-    await store.delete(key="123", collection="users")
+    await key_value.delete(key="123", collection="users")
 
 
 async def main():
     memory_store = MemoryStore()
-    await example(memory_store)
+    await example(key_value=memory_store)
 
 asyncio.run(main())
 ```
@@ -165,6 +165,7 @@ The following wrappers are available:
 | PassthroughCacheWrapper | Wrap two stores to provide a read-through cache. | `PassthroughCacheWrapper(primary_key_value=memory_store, cache_key_value=memory_store)` |
 | PrefixCollectionsWrapper | Prefix all collections with a given prefix. | `PrefixCollectionsWrapper(key_value=memory_store, prefix="users")` |
 | PrefixKeysWrapper | Prefix all keys with a given prefix. | `PrefixKeysWrapper(key_value=memory_store, prefix="users")` |
+| SingleCollectionWrapper | Wrap a store to only use a single collection. | `SingleCollectionWrapper(key_value=memory_store, single_collection="users")` |
 
 ### Atomicity / Consistency
 
@@ -197,7 +198,7 @@ single_collection: SingleCollectionWrapper = SingleCollectionWrapper(key_value=e
 
 
 async def main(key_value: AsyncKeyValue):
-    statistics_wrapper = StatisticsWrapper(key_value=elasticsearch_store)
+    statistics_wrapper = StatisticsWrapper(key_value=key_value)
     users = PydanticAdapter(key_value=statistics_wrapper, pydantic_model=User)
 
     await users.put(key="u1", value=User(name="Jane", email="j@example.com"), collection="ignored")

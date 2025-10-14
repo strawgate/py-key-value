@@ -30,8 +30,8 @@ class PassthroughCacheWrapper(BaseWrapper):
         """Initialize the passthrough cache wrapper.
 
         Args:
-            primary_store: The primary store to wrap.
-            cache_store: The cache store to wrap.
+            primary_key_value: The primary store to wrap.
+            cache_key_value: The cache store to wrap.
             maximum_ttl: The maximum TTL for puts into the cache store. Defaults to 30 minutes.
             missing_ttl: The TTL to use for entries that do not have a TTL. Defaults to 30 minutes.
         """
