@@ -2,7 +2,7 @@ import contextlib
 from collections.abc import AsyncGenerator
 
 import pytest
-from inline_snapshot import snapshot
+from cassandra.policies import RoundRobinPolicy
 from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
 
@@ -53,7 +53,13 @@ class TestCassandraStore(BaseStoreTests):
     async def store(self, setup_cassandra: None) -> CassandraStore:
         from cassandra.cluster import Cluster
 
-        store = CassandraStore(contact_points=[CASSANDRA_HOST], port=CASSANDRA_HOST_PORT, keyspace=CASSANDRA_TEST_KEYSPACE)
+        store = CassandraStore(
+            contact_points=[CASSANDRA_HOST],
+            port=CASSANDRA_HOST_PORT,
+            keyspace=CASSANDRA_TEST_KEYSPACE,
+            protocol_version=5,
+            load_balancing_policy=RoundRobinPolicy(),
+        )
 
         # Ensure a clean keyspace by dropping it if it exists
         with contextlib.suppress(Exception):
@@ -71,11 +77,3 @@ class TestCassandraStore(BaseStoreTests):
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
-
-    async def test_cassandra_table_name_sanitization(self, cassandra_store: CassandraStore):
-        """Tests that special characters in the collection name will not raise an error."""
-        await cassandra_store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
-        assert await cassandra_store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
-
-        collections = await cassandra_store.collections()
-        assert collections == snapshot(["test_collection_-daf4a2ec"])

@@ -5,10 +5,13 @@ from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
 from typing_extensions import override
 
-from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseStore
+from cassandra.cluster import ExecutionProfile
+from cassandra.policies import RoundRobinPolicy
+from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
 
 try:
-    from cassandra.cluster import Cluster, Session
+    from cassandra.cluster import EXEC_PROFILE_DEFAULT, Cluster, Session
+    from cassandra.policies import LoadBalancingPolicy
 except ImportError as e:
     msg = "CassandraStore requires py-key-value-aio[cassandra]"
     raise ImportError(msg) from e
@@ -25,7 +28,7 @@ MAX_TABLE_LENGTH = 48
 TABLE_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
 
 
-class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
+class CassandraStore(BaseContextManagerStore, BaseStore):
     """Cassandra-based key-value store."""
 
     _cluster: Cluster
@@ -57,6 +60,8 @@ class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, 
         *,
         contact_points: list[str] | None = None,
         port: int = 9042,
+        protocol_version: int,
+        load_balancing_policy: LoadBalancingPolicy,
         keyspace: str | None = None,
         table_prefix: str | None = None,
         default_collection: str | None = None,
@@ -66,6 +71,8 @@ class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, 
         Args:
             contact_points: The contact points of the Cassandra cluster.
             port: The port of the Cassandra cluster.
+            protocol_version: The protocol version of the Cassandra cluster.
+            load_balancing_policy: The load balancing policy of the Cassandra cluster.
             keyspace: The name of the Cassandra keyspace.
             table_prefix: The prefix for Cassandra tables.
             default_collection: The default collection to use if no collection is provided.
@@ -76,6 +83,8 @@ class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, 
         *,
         cluster: Cluster | None = None,
         contact_points: list[str] | None = None,
+        protocol_version: int | None = None,
+        load_balancing_policy: LoadBalancingPolicy | None = None,
         port: int = 9042,
         keyspace: str | None = None,
         table_prefix: str | None = None,
@@ -87,7 +96,15 @@ class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, 
             self._cluster = cluster
         else:
             contact_points = contact_points or ["127.0.0.1"]
-            self._cluster = Cluster(contact_points=contact_points, port=port)
+            execution_profile = ExecutionProfile(
+                load_balancing_policy=load_balancing_policy or RoundRobinPolicy(),
+            )
+            self._cluster = Cluster(
+                contact_points=contact_points,
+                port=port,
+                protocol_version=protocol_version,
+                execution_profiles={EXEC_PROFILE_DEFAULT: execution_profile},
+            )
 
         self._keyspace = keyspace or DEFAULT_KEYSPACE
         self._table_prefix = table_prefix or DEFAULT_TABLE_PREFIX
@@ -151,7 +168,7 @@ class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, 
         if not row:
             return None
 
-        json_value: str | None = row.value
+        json_value: str | None = row.value  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
         if not isinstance(json_value, str):
             return None
@@ -197,43 +214,6 @@ class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, 
         if exists:
             delete_query = f"DELETE FROM {table_name} WHERE key = %s"  # noqa: S608 - table_name is sanitized
             self._get_session().execute(delete_query, (key,))  # pyright: ignore[reportUnknownMemberType]
-
-        return exists
-
-    @override
-    async def _get_collection_names(self, *, limit: int | None = None) -> list[str]:
-        limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
-
-        # Query system tables for table names
-        query = "SELECT table_name FROM system_schema.tables WHERE keyspace_name = %s"
-        result = self._get_session().execute(query, (self._keyspace,))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-
-        collections = []
-        prefix_len = len(self._table_prefix) + 1
-
-        for row in result:  # pyright: ignore[reportUnknownVariableType]
-            table_name = row.table_name  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            if table_name.startswith(f"{self._table_prefix}_"):
-                collection_name = table_name[prefix_len:]
-                collections.append(collection_name)
-
-            if len(collections) >= limit:
-                break
-
-        return collections
-
-    @override
-    async def _delete_collection(self, *, collection: str) -> bool:
-        table_name = self._sanitize_table_name(collection=collection)
-
-        # Check if table exists
-        check_query = "SELECT table_name FROM system_schema.tables WHERE keyspace_name = %s AND table_name = %s"
-        result = self._get_session().execute(check_query, (self._keyspace, table_name))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        exists = result.one() is not None  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-
-        if exists:
-            drop_query = f"DROP TABLE IF EXISTS {table_name}"
-            self._get_session().execute(drop_query)  # pyright: ignore[reportUnknownMemberType]
 
         return exists
 
