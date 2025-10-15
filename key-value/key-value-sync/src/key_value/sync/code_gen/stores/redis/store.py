@@ -118,7 +118,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         # redis.asyncio scan returns tuple(cursor, keys)
         _cursor: int
         keys: list[str]
-        (_cursor, keys) = self._client.scan(cursor=0, match=pattern, count=limit)  # pyright: ignore[reportUnknownMemberType, reportAny]
+        _cursor, keys = self._client.scan(cursor=0, match=pattern, count=limit)  # pyright: ignore[reportUnknownMemberType, reportAny]
 
         return get_keys_from_compound_keys(compound_keys=keys, collection=collection)
 

@@ -140,7 +140,7 @@ class BaseStoreTests(ABC):
     def test_put_ttl_get_ttl(self, store: BaseStore):
         """Tests that the put and get ttl methods work together to store and retrieve a ttl from an empty store."""
         store.put(collection="test", key="test", value={"test": "test"}, ttl=100)
-        (value, ttl) = store.ttl(collection="test", key="test")
+        value, ttl = store.ttl(collection="test", key="test")
 
         assert value == {"test": "test"}
         assert ttl is not None

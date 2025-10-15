@@ -43,3 +43,13 @@ class IncorrectTTLCountError(KeyValueOperationError):
             message="The number of TTLs is incorrect.",
             extra_info={"ttl": ttl, "count": count},
         )
+
+
+class EntryTooLargeError(KeyValueOperationError):
+    """Raised when an entry exceeds the maximum allowed size."""
+
+    def __init__(self, size: int, max_size: int, collection: str | None = None, key: str | None = None):
+        super().__init__(
+            message="Entry size exceeds the maximum allowed size.",
+            extra_info={"size": size, "max_size": max_size, "collection": collection or "default", "key": key},
+        )

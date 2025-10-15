@@ -139,7 +139,7 @@ class PydanticAdapter(Generic[T]):
         entry: dict[str, Any] | None
         ttl_info: float | None
 
-        (entry, ttl_info) = self._key_value.ttl(key=key, collection=collection)
+        entry, ttl_info = self._key_value.ttl(key=key, collection=collection)
 
         if entry is None:
             return (None, None)
@@ -155,4 +155,4 @@ class PydanticAdapter(Generic[T]):
 
         entries: list[tuple[dict[str, Any] | None, float | None]] = self._key_value.ttl_many(keys=keys, collection=collection)
 
-        return [(self._validate_model(value=entry) if entry else None, ttl_info) for (entry, ttl_info) in entries]
+        return [(self._validate_model(value=entry) if entry else None, ttl_info) for entry, ttl_info in entries]

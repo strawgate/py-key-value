@@ -128,7 +128,7 @@ class StatisticsWrapper(BaseWrapper):
     def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
         collection = collection or DEFAULT_COLLECTION_NAME
 
-        (value, ttl) = self.key_value.ttl(collection=collection, key=key)
+        value, ttl = self.key_value.ttl(collection=collection, key=key)
 
         if value:
             self.statistics.get_collection(collection=collection).ttl.increment_hit()

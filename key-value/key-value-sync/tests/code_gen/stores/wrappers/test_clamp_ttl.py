@@ -22,7 +22,7 @@ class TestTTLClampWrapper(BaseStoreTests):
         ttl_clamp_store.put(collection="test", key="test", value={"test": "test"}, ttl=5)
         assert ttl_clamp_store.get(collection="test", key="test") is not None
 
-        (value, ttl) = ttl_clamp_store.ttl(collection="test", key="test")
+        value, ttl = ttl_clamp_store.ttl(collection="test", key="test")
         assert value is not None
         assert ttl is not None
         assert ttl == IsFloat(approx=50)
@@ -33,7 +33,7 @@ class TestTTLClampWrapper(BaseStoreTests):
         ttl_clamp_store.put(collection="test", key="test", value={"test": "test"}, ttl=1000)
         assert ttl_clamp_store.get(collection="test", key="test") is not None
 
-        (value, ttl) = ttl_clamp_store.ttl(collection="test", key="test")
+        value, ttl = ttl_clamp_store.ttl(collection="test", key="test")
         assert value is not None
         assert ttl is not None
         assert ttl == IsFloat(approx=100)
@@ -44,7 +44,7 @@ class TestTTLClampWrapper(BaseStoreTests):
         ttl_clamp_store.put(collection="test", key="test", value={"test": "test"}, ttl=None)
         assert ttl_clamp_store.get(collection="test", key="test") is not None
 
-        (value, ttl) = ttl_clamp_store.ttl(collection="test", key="test")
+        value, ttl = ttl_clamp_store.ttl(collection="test", key="test")
         assert value is not None
         assert ttl is not None
 
