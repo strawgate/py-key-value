@@ -60,7 +60,7 @@ class PrefixKeysWrapper(BaseWrapper):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
+        ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
         new_keys: list[str] = [self._prefix_key(key=key) for key in keys]
         return await self.key_value.put_many(keys=new_keys, values=values, collection=collection, ttl=ttl)

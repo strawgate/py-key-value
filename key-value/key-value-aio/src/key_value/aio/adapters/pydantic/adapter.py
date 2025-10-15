@@ -110,7 +110,7 @@ class PydanticAdapter(Generic[T]):
         await self._key_value.put(key=key, value=value_dict, collection=collection, ttl=ttl)
 
     async def put_many(
-        self, keys: list[str], values: Sequence[T], *, collection: str | None = None, ttl: SupportsFloat | None = None
+        self, keys: list[str], values: Sequence[T], *, collection: str | None = None, ttl: Sequence[SupportsFloat | None] | None = None
     ) -> None:
         """Serialize and store multiple models, preserving order alignment with keys."""
         collection = collection or self._default_collection

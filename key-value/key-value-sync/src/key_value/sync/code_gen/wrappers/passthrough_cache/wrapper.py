@@ -159,7 +159,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
+        ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
         _ = self.cache_key_value.delete_many(collection=collection, keys=keys)
 
