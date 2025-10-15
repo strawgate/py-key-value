@@ -50,7 +50,6 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
             "dynamodb-test",
             "amazon/dynamodb-local:latest",
             {"8000": DYNAMODB_HOST_PORT},
-            command=["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"],
         ):
             if not await async_wait_for_true(bool_fn=ping_dynamodb, tries=30, wait_time=1):
                 msg = "DynamoDB failed to start"
