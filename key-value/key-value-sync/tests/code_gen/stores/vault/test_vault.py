@@ -8,8 +8,8 @@ from key_value.shared.stores.wait import wait_for_true
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
-from tests.code_gen.conftest import detect_on_windows, docker_container, should_skip_docker_tests
-from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
+from tests.code_gen.conftest import docker_container, should_skip_docker_tests
+from tests.code_gen.stores.base import BaseStoreTests
 
 # Vault test configuration
 VAULT_HOST = "localhost"
@@ -25,8 +25,7 @@ class VaultFailedToStartError(Exception):
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
-@pytest.mark.skipif(detect_on_windows(), reason="Vault tests may have issues on Windows")
-class TestVaultStore(ContextManagerStoreTestMixin, BaseStoreTests):
+class TestVaultStore(BaseStoreTests):
     def get_vault_client(self):
         import hvac
 
@@ -35,7 +34,7 @@ class TestVaultStore(ContextManagerStoreTestMixin, BaseStoreTests):
     def ping_vault(self) -> bool:
         try:
             client = self.get_vault_client()
-            return client.sys.is_initialized()
+            return client.sys.is_initialized()  # pyright: ignore[reportUnknownMemberType,reportUnknownReturnType,reportUnknownVariableType]
         except Exception:
             return False
 
@@ -44,7 +43,7 @@ class TestVaultStore(ContextManagerStoreTestMixin, BaseStoreTests):
         with docker_container(
             "vault-test",
             "hashicorp/vault:latest",
-            {8200: VAULT_PORT},
+            {"8200": VAULT_PORT},
             environment={"VAULT_DEV_ROOT_TOKEN_ID": VAULT_TOKEN, "VAULT_DEV_LISTEN_ADDRESS": "0.0.0.0:8200"},
         ):
             if not wait_for_true(bool_fn=self.ping_vault, tries=30, wait_time=1):
@@ -64,11 +63,11 @@ class TestVaultStore(ContextManagerStoreTestMixin, BaseStoreTests):
         client = self.get_vault_client()
         try:
             # List all secrets and delete them
-            secrets_list = client.secrets.kv.v2.list_secrets(path="", mount_point=VAULT_MOUNT_POINT)
+            secrets_list = client.secrets.kv.v2.list_secrets(path="", mount_point=VAULT_MOUNT_POINT)  # pyright: ignore[reportUnknownMemberType,reportUnknownReturnType,reportUnknownVariableType]
             if secrets_list and "data" in secrets_list and ("keys" in secrets_list["data"]):
-                for key in secrets_list["data"]["keys"]:
+                for key in secrets_list["data"]["keys"]:  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
                     # Best effort cleanup - ignore individual deletion failures
-                    client.secrets.kv.v2.delete_metadata_and_all_versions(path=key.rstrip("/"), mount_point=VAULT_MOUNT_POINT)
+                    client.secrets.kv.v2.delete_metadata_and_all_versions(path=key.rstrip("/"), mount_point=VAULT_MOUNT_POINT)  # pyright: ignore[reportUnknownMemberType,reportUnknownReturnType,reportUnknownVariableType]
         except Exception:  # noqa: S110
             # Cleanup is best-effort, ignore all errors
             pass

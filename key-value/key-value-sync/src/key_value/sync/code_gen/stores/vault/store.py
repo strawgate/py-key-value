@@ -9,17 +9,18 @@ from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
 
-from key_value.sync.code_gen.stores.base import BaseContextManagerStore, BaseStore
+from key_value.sync.code_gen.stores.base import BaseStore
 
 try:
     import hvac
+    from hvac.api.secrets_engines.kv_v2 import KvV2
     from hvac.exceptions import InvalidPath
 except ImportError as e:
     msg = "VaultStore requires py-key-value-aio[vault]"
     raise ImportError(msg) from e
 
 
-class VaultStore(BaseContextManagerStore, BaseStore):
+class VaultStore(BaseStore):
     """HashiCorp Vault-based key-value store using KV Secrets Engine v2.
 
     This store uses HashiCorp Vault's KV v2 secrets engine to persist key-value pairs.
@@ -73,12 +74,16 @@ class VaultStore(BaseContextManagerStore, BaseStore):
 
         super().__init__(default_collection=default_collection)
 
+    @property
+    def _kv_v2(self) -> KvV2:
+        return self._client.secrets.kv.v2  # pyright: ignore[reportUnknownMemberType,reportUnknownReturnType,reportUnknownVariableType]
+
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         combo_key: str = compound_key(collection=collection, key=key)
 
         try:
-            response = self._client.secrets.kv.v2.read_secret(path=combo_key, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+            response = self._kv_v2.read_secret(path=combo_key, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
         except InvalidPath:
             return None
         except Exception:
@@ -105,25 +110,17 @@ class VaultStore(BaseContextManagerStore, BaseStore):
         # Store the JSON string in a 'value' field
         secret_data = {"value": json_str}
 
-        self._client.secrets.kv.v2.create_or_update_secret(path=combo_key, secret=secret_data, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType]
+        self._kv_v2.create_or_update_secret(path=combo_key, secret=secret_data, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
 
         try:
-            # Check if the secret exists before attempting to delete
-            _ = self._client.secrets.kv.v2.read_secret(path=combo_key, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+            self._kv_v2.delete_metadata_and_all_versions(path=combo_key, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType]
         except InvalidPath:
             return False
         except Exception:
             return False
-        else:
-            # Delete the latest version of the secret
-            self._client.secrets.kv.v2.delete_metadata_and_all_versions(path=combo_key, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType]
-            return True
 
-    @override
-    def _close(self) -> None:
-        # hvac.Client doesn't require explicit cleanup
-        pass
+        return True
