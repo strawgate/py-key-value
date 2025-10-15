@@ -7,7 +7,7 @@ This monorepo contains two libraries:
 
 ## Why use this library?
 
-- **Multiple backends**: Elasticsearch, Memcached, MongoDB, Redis, Valkey, and In-memory, Disk, etc
+- **Multiple backends**: DynamoDB, Elasticsearch, Memcached, MongoDB, Redis, Valkey, and In-memory, Disk, etc
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
 - **Adapters**: Pydantic model support, raise-on-missing behavior, etc
@@ -35,6 +35,7 @@ pip install py-key-value-aio
 # With specific backend extras
 pip install py-key-value-aio[memory]
 pip install py-key-value-aio[disk]
+pip install py-key-value-aio[dynamodb]
 pip install py-key-value-aio[elasticsearch]
 # or: redis, mongodb, memcached, valkey, see below for all options
 ```
@@ -114,6 +115,7 @@ Distributed stores are stores that are used to store data in a distributed syste
 
 | Distributed Stores | Async | Sync | Example |
 |------------------|:-----:|:----:|:-------|
+| DynamoDB         |  ✅  |  ✖️   | `DynamoDBStore(table_name="kv-store", region_name="us-east-1")` |
 | Elasticsearch    |  ✅  |  ✅  | `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key", index="kv-store")` |
 | Memcached        |  ✅  |  ✖️   | `MemcachedStore(host="127.0.0.1", port=11211")` |
 | MongoDB          |  ✅  |  ✅  | `MongoDBStore(url="mongodb://localhost:27017/test")` |

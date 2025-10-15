@@ -1,0 +1,109 @@
+import contextlib
+from collections.abc import AsyncGenerator
+
+import pytest
+from key_value.shared.stores.wait import async_wait_for_true
+from typing_extensions import override
+
+from key_value.aio.stores.base import BaseStore
+from key_value.aio.stores.dynamodb import DynamoDBStore
+from tests.conftest import docker_container, should_skip_docker_tests
+from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
+
+# DynamoDB test configuration
+DYNAMODB_HOST = "localhost"
+DYNAMODB_HOST_PORT = 8000
+DYNAMODB_ENDPOINT = f"http://{DYNAMODB_HOST}:{DYNAMODB_HOST_PORT}"
+DYNAMODB_TEST_TABLE = "kv-store-test"
+
+WAIT_FOR_DYNAMODB_TIMEOUT = 30
+
+
+async def ping_dynamodb() -> bool:
+    """Check if DynamoDB Local is running."""
+    try:
+        import aioboto3
+
+        session = aioboto3.Session(
+            aws_access_key_id="test",
+            aws_secret_access_key="test",  # noqa: S106
+            region_name="us-east-1",
+        )
+        async with session.client("dynamodb", endpoint_url=DYNAMODB_ENDPOINT) as client:
+            await client.list_tables()
+    except Exception:
+        return False
+    else:
+        return True
+
+
+class DynamoDBFailedToStartError(Exception):
+    pass
+
+
+@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
+class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
+    @pytest.fixture(autouse=True, scope="session")
+    async def setup_dynamodb(self) -> AsyncGenerator[None, None]:
+        # DynamoDB Local container
+        with docker_container(
+            "dynamodb-test",
+            "amazon/dynamodb-local:latest",
+            {"8000": DYNAMODB_HOST_PORT},
+            command=["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"],
+        ):
+            if not await async_wait_for_true(bool_fn=ping_dynamodb, tries=30, wait_time=1):
+                msg = "DynamoDB failed to start"
+                raise DynamoDBFailedToStartError(msg)
+
+            yield
+
+    @override
+    @pytest.fixture
+    async def store(self, setup_dynamodb: None) -> DynamoDBStore:
+        store = DynamoDBStore(
+            table_name=DYNAMODB_TEST_TABLE,
+            endpoint_url=DYNAMODB_ENDPOINT,
+            aws_access_key_id="test",
+            aws_secret_access_key="test",  # noqa: S106
+            region_name="us-east-1",
+        )
+
+        # Clean up test table if it exists
+        import aioboto3
+
+        session = aioboto3.Session(
+            aws_access_key_id="test",
+            aws_secret_access_key="test",  # noqa: S106
+            region_name="us-east-1",
+        )
+        async with session.client("dynamodb", endpoint_url=DYNAMODB_ENDPOINT) as client:
+            with contextlib.suppress(Exception):
+                await client.delete_table(TableName=DYNAMODB_TEST_TABLE)
+                # Wait for table to be deleted
+                waiter = client.get_waiter("table_not_exists")
+                await waiter.wait(TableName=DYNAMODB_TEST_TABLE)
+
+        return store
+
+    @pytest.fixture
+    async def dynamodb_store(self, store: DynamoDBStore) -> DynamoDBStore:
+        return store
+
+    @pytest.mark.skip(reason="Distributed Caches are unbounded")
+    @override
+    async def test_not_unbounded(self, store: BaseStore): ...
+
+    async def test_dynamodb_basic_operations(self, dynamodb_store: DynamoDBStore):
+        """Tests basic DynamoDB operations."""
+        await dynamodb_store.put(collection="test_collection", key="test_key", value={"test": "value"})
+        result = await dynamodb_store.get(collection="test_collection", key="test_key")
+        assert result == {"test": "value"}
+
+        # Test deletion
+        deleted = await dynamodb_store.delete(collection="test_collection", key="test_key")
+        assert deleted is True
+
+        # Verify deletion
+        result = await dynamodb_store.get(collection="test_collection", key="test_key")
+        assert result is None
