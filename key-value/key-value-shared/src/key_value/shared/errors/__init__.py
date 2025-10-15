@@ -1,6 +1,5 @@
 from .key_value import (
     DeserializationError,
-    EntryTooLargeError,
     InvalidTTLError,
     KeyValueOperationError,
     MissingKeyError,
@@ -10,7 +9,6 @@ from .store import KeyValueStoreError, StoreConnectionError, StoreSetupError
 
 __all__ = [
     "DeserializationError",
-    "EntryTooLargeError",
     "InvalidTTLError",
     "KeyValueOperationError",
     "KeyValueStoreError",

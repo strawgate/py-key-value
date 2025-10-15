@@ -41,7 +41,7 @@ class BaseWrapper(KeyValue):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
+        ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
         return self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
 

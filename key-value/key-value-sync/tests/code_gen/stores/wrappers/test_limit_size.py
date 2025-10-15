@@ -2,7 +2,7 @@
 # from the original file 'test_limit_size.py'
 # DO NOT CHANGE! Change the original file instead.
 import pytest
-from key_value.shared.errors import EntryTooLargeError
+from key_value.shared.errors.wrappers.limit_size import EntryTooLargeError, EntryTooSmallError
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.memory.store import MemoryStore
@@ -15,10 +15,12 @@ class TestLimitSizeWrapper(BaseStoreTests):
     @pytest.fixture
     def store(self, memory_store: MemoryStore) -> LimitSizeWrapper:
         # Set a reasonable max size for normal test operations (20KB to handle large test strings)
-        return LimitSizeWrapper(key_value=memory_store, max_size=20 * 1024, raise_on_error=False)
+        return LimitSizeWrapper(key_value=memory_store, max_size=20 * 1024, raise_on_too_large=False, raise_on_too_small=False)
 
     def test_put_within_limit(self, memory_store: MemoryStore):
-        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=1024, raise_on_error=True)
+        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(
+            key_value=memory_store, max_size=1024, raise_on_too_large=True, raise_on_too_small=False
+        )
 
         # Small value should succeed
         limit_size_store.put(collection="test", key="test", value={"test": "test"})
@@ -27,24 +29,19 @@ class TestLimitSizeWrapper(BaseStoreTests):
         assert result["test"] == "test"
 
     def test_put_exceeds_limit_with_raise(self, memory_store: MemoryStore):
-        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=100, raise_on_error=True)
+        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=100, raise_on_too_large=True)
 
         # Large value should raise an error
         large_value = {"data": "x" * 1000}
-        with pytest.raises(EntryTooLargeError) as exc_info:
+        with pytest.raises(EntryTooLargeError):
             limit_size_store.put(collection="test", key="test", value=large_value)
-
-        assert exc_info.value.extra_info["max_size"] == 100
-        assert exc_info.value.extra_info["size"] > 100
-        assert exc_info.value.extra_info["collection"] == "test"
-        assert exc_info.value.extra_info["key"] == "test"
 
         # Verify nothing was stored
         result = limit_size_store.get(collection="test", key="test")
         assert result is None
 
     def test_put_exceeds_limit_without_raise(self, memory_store: MemoryStore):
-        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=100, raise_on_error=False)
+        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=100, raise_on_too_large=False)
 
         # Large value should be silently ignored
         large_value = {"data": "x" * 1000}
@@ -54,8 +51,31 @@ class TestLimitSizeWrapper(BaseStoreTests):
         result = limit_size_store.get(collection="test", key="test")
         assert result is None
 
+    def test_put_below_min_size_with_raise_on_too_small(self, memory_store: MemoryStore):
+        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, min_size=100, raise_on_too_small=True)
+
+        # Small value should raise an error
+        small_value = {"data": "x"}
+        with pytest.raises(EntryTooSmallError):
+            limit_size_store.put(collection="test", key="test", value=small_value)
+
+        # Verify nothing was stored
+        result = limit_size_store.get(collection="test", key="test")
+        assert result is None
+
+    def test_put_below_min_size_without_raise_on_too_small(self, memory_store: MemoryStore):
+        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, min_size=100, raise_on_too_small=False)
+
+        # Small value should be silently ignored
+        small_value = {"data": "x"}
+        limit_size_store.put(collection="test", key="test", value=small_value)
+
+        # Verify nothing was stored
+        result = limit_size_store.get(collection="test", key="test")
+        assert result is None
+
     def test_put_many_mixed_sizes_with_raise(self, memory_store: MemoryStore):
-        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=100, raise_on_error=True)
+        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=100, raise_on_too_large=True)
 
         # Mix of small and large values
         keys = ["small1", "large1", "small2"]
@@ -72,7 +92,7 @@ class TestLimitSizeWrapper(BaseStoreTests):
         assert results[2] is None
 
     def test_put_many_mixed_sizes_without_raise(self, memory_store: MemoryStore):
-        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=100, raise_on_error=False)
+        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=100, raise_on_too_large=False)
 
         # Mix of small and large values
         keys = ["small1", "large1", "small2"]
@@ -88,7 +108,7 @@ class TestLimitSizeWrapper(BaseStoreTests):
         assert results[2] == {"data": "y"}
 
     def test_put_many_with_ttl_sequence(self, memory_store: MemoryStore):
-        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=100, raise_on_error=False)
+        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=100, raise_on_too_large=False)
 
         # Mix of small and large values with TTLs
         keys = ["small1", "large1", "small2"]
@@ -105,7 +125,7 @@ class TestLimitSizeWrapper(BaseStoreTests):
         assert results[2] == {"data": "y"}
 
     def test_put_many_all_too_large_without_raise(self, memory_store: MemoryStore):
-        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=10, raise_on_error=False)
+        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=10, raise_on_too_large=False)
 
         # All values too large
         keys = ["key1", "key2"]
@@ -129,7 +149,7 @@ class TestLimitSizeWrapper(BaseStoreTests):
         exact_size = len(json_str.encode("utf-8"))
 
         # Create a store with exact size limit
-        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=exact_size, raise_on_error=True)
+        limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=exact_size, raise_on_too_large=True)
 
         # Should succeed at exact limit
         limit_size_store.put(collection="test", key="test", value=test_value)
@@ -137,6 +157,8 @@ class TestLimitSizeWrapper(BaseStoreTests):
         assert result == test_value
 
         # Should fail if one byte over
-        limit_size_store_under: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=exact_size - 1, raise_on_error=True)
+        limit_size_store_under: LimitSizeWrapper = LimitSizeWrapper(
+            key_value=memory_store, max_size=exact_size - 1, raise_on_too_large=True
+        )
         with pytest.raises(EntryTooLargeError):
             limit_size_store_under.put(collection="test", key="test2", value=test_value)

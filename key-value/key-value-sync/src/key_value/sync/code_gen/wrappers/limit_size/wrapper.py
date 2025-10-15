@@ -4,7 +4,7 @@
 from collections.abc import Sequence
 from typing import Any, SupportsFloat
 
-from key_value.shared.errors import EntryTooLargeError
+from key_value.shared.errors.wrappers.limit_size import EntryTooLargeError, EntryTooSmallError
 from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
 
@@ -13,28 +13,46 @@ from key_value.sync.code_gen.wrappers.base import BaseWrapper
 
 
 class LimitSizeWrapper(BaseWrapper):
-    """Wrapper that limits the size of entries stored in the cache.
+    """Wrapper that limits the size of entries stored in the cache. When using a key_value store as a cache, you may want to prevent caching
+    of very small or very large entries. This wrapper allows you to silently (or loudly) ignore entries that do not fall within the
+    specified size limits.
 
-    This wrapper checks the serialized size of values before storing them.
-    It can either raise an error or silently ignore entries that exceed the size limit.
+    This wrapper checks the serialized size of values before storing them. This incurs a performance penalty
+    as it requires JSON serialization of the value separate from serialization that occurs when the value is stored.
+
+    This wrapper does not prevent returning objects (get, ttl, get_many, ttl_many) that exceed the size limit, just storing
+    them (put, put_many).
     """
 
-    def __init__(self, key_value: KeyValue, max_size: int, *, raise_on_error: bool = True) -> None:
+    def __init__(
+        self,
+        key_value: KeyValue,
+        *,
+        min_size: int | None = None,
+        max_size: int | None = None,
+        raise_on_too_small: bool = False,
+        raise_on_too_large: bool = True,
+    ) -> None:
         """Initialize the limit size wrapper.
 
         Args:
             key_value: The store to wrap.
-            max_size: The maximum size (in bytes) allowed for each entry.
-            raise_on_error: If True, raises EntryTooLargeError when an entry exceeds max_size.
-                           If False, silently ignores entries that are too large.
+            min_size: The minimum size (in bytes) allowed for each entry. If None, no minimum size is enforced.
+            max_size: The maximum size (in bytes) allowed for each entry. If None, no maximum size is enforced.
+            raise_on_too_small: If True, raises EntryTooSmallError when an entry is less than min_size.
+                                 If False (default), silently ignores entries that are too small.
+            raise_on_too_large: If True (default), raises EntryTooLargeError when an entry exceeds max_size.
+                                 If False, silently ignores entries that are too large.
         """
         self.key_value: KeyValue = key_value
-        self.max_size: int = max_size
-        self.raise_on_error: bool = raise_on_error
+        self.min_size: int | None = min_size
+        self.max_size: int | None = max_size
+        self.raise_on_too_small: bool = raise_on_too_small
+        self.raise_on_too_large: bool = raise_on_too_large
 
         super().__init__()
 
-    def _check_size(self, value: dict[str, Any], *, collection: str | None = None, key: str | None = None) -> bool:
+    def _within_size_limit(self, value: dict[str, Any], *, collection: str | None = None, key: str | None = None) -> bool:
         """Check if a value exceeds the maximum size.
 
         Args:
@@ -46,23 +64,27 @@ class LimitSizeWrapper(BaseWrapper):
             True if the value is within the size limit, False otherwise.
 
         Raises:
-            EntryTooLargeError: If raise_on_error is True and the value exceeds max_size.
+            EntryTooSmallError: If raise_on_too_small is True and the value is less than min_size.
+            EntryTooLargeError: If raise_on_too_large is True and the value exceeds max_size.
         """
-        # Create a ManagedEntry to get the JSON representation
-        managed_entry = ManagedEntry(value=value)
-        json_str = managed_entry.to_json()
-        size = len(json_str.encode("utf-8"))
 
-        if size > self.max_size:
-            if self.raise_on_error:
-                raise EntryTooLargeError(size=size, max_size=self.max_size, collection=collection, key=key)
+        item_size: int = len(ManagedEntry(value=value).to_json())
+
+        if self.min_size is not None and item_size < self.min_size:
+            if self.raise_on_too_small:
+                raise EntryTooSmallError(size=item_size, min_size=self.min_size, collection=collection, key=key)
+            return False
+
+        if self.max_size is not None and item_size > self.max_size:
+            if self.raise_on_too_large:
+                raise EntryTooLargeError(size=item_size, max_size=self.max_size, collection=collection, key=key)
             return False
 
         return True
 
     @override
     def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
-        if self._check_size(value=value, collection=collection, key=key):
+        if self._within_size_limit(value=value, collection=collection, key=key):
             self.key_value.put(collection=collection, key=key, value=value, ttl=ttl)
 
     @override
@@ -72,26 +94,20 @@ class LimitSizeWrapper(BaseWrapper):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
+        ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
-        # Filter out values that exceed the size limit
         filtered_keys: list[str] = []
         filtered_values: list[dict[str, Any]] = []
-        filtered_ttls: list[SupportsFloat | None] | SupportsFloat | None = None
+        filtered_ttls: list[SupportsFloat | None] | None = None
 
         if isinstance(ttl, Sequence):
             filtered_ttls = []
 
         for i, (k, v) in enumerate(zip(keys, values, strict=True)):
-            if self._check_size(value=v, collection=collection, key=k):
+            if self._within_size_limit(value=v, collection=collection, key=k):
                 filtered_keys.append(k)
                 filtered_values.append(v)
                 if isinstance(ttl, Sequence):
                     filtered_ttls.append(ttl[i])  # type: ignore[union-attr]
 
-        if filtered_keys:
-            # Use the original ttl if it's not a sequence
-            if not isinstance(ttl, Sequence):
-                filtered_ttls = ttl
-
-            self.key_value.put_many(keys=filtered_keys, values=filtered_values, collection=collection, ttl=filtered_ttls)
+        self.key_value.put_many(keys=filtered_keys, values=filtered_values, collection=collection, ttl=filtered_ttls)

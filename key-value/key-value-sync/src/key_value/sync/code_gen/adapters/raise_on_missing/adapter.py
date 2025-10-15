@@ -92,7 +92,7 @@ class RaiseOnMissingAdapter:
         Returns:
             The value and TTL information for the key. If the key is not found, (None, None) will be returned.
         """
-        value, ttl = self.key_value.ttl(key=key, collection=collection)
+        (value, ttl) = self.key_value.ttl(key=key, collection=collection)
 
         if value is not None:
             return (value, ttl)
@@ -147,7 +147,7 @@ class RaiseOnMissingAdapter:
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
+        ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
         """Store multiple key-value pairs in the specified collection.
 

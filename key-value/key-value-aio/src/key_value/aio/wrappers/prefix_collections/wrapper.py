@@ -63,7 +63,7 @@ class PrefixCollectionsWrapper(BaseWrapper):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
+        ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
         new_collection: str = self._prefix_collection(collection=collection)
         return await self.key_value.put_many(keys=keys, values=values, collection=new_collection, ttl=ttl)

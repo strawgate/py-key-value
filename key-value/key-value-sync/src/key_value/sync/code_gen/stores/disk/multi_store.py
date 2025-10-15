@@ -113,7 +113,7 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
 
         expire_epoch: float
 
-        managed_entry_str, expire_epoch = self._cache[collection].get(key=combo_key, expire_time=True)  # pyright: ignore[reportAny]
+        (managed_entry_str, expire_epoch) = self._cache[collection].get(key=combo_key, expire_time=True)  # pyright: ignore[reportAny]
 
         if not isinstance(managed_entry_str, str):
             return None

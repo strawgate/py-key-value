@@ -73,7 +73,7 @@ get(key: str, collection: str | None = None) -> dict[str, Any] | None:
 get_many(keys: list[str], collection: str | None = None) -> list[dict[str, Any] | None]:
 
 put(key: str, value: dict[str, Any], collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
-put_many(keys: list[str], values: Sequence[dict[str, Any]], collection: str | None = None, ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None) -> None:
+put_many(keys: list[str], values: Sequence[dict[str, Any]], collection: str | None = None, ttl: Sequence[SupportsFloat | None] | None = None) -> None:
 
 delete(key: str, collection: str | None = None) -> bool:
 delete_many(keys: list[str], collection: str | None = None) -> int:
@@ -178,13 +178,39 @@ The following wrappers are available:
 
 | Wrapper | Description | Example |
 |---------|---------------|-----|
-| StatisticsWrapper | Track operation statistics for the store. | `StatisticsWrapper(key_value=memory_store)` |
-| TTLClampWrapper | Clamp the TTL to a given range. | `TTLClampWrapper(key_value=memory_store, min_ttl=60, max_ttl=3600)` |
-| LimitSizeWrapper | Limit the size of entries stored in the cache. | `LimitSizeWrapper(key_value=memory_store, max_size=1024, raise_on_error=True)` |
+| CompressionWrapper | Compress values before storing and decompress on retrieval. | `CompressionWrapper(key_value=memory_store, min_size_to_compress=0)` |
+| FallbackWrapper | Fallback to a secondary store when the primary store fails. | `FallbackWrapper(primary_key_value=memory_store, fallback_key_value=memory_store)` |
+| LimitSizeWrapper | Limit the size of entries stored in the cache. | `LimitSizeWrapper(key_value=memory_store, max_size=1024, raise_on_too_large=True)` |
+| LoggingWrapper | Log the operations performed on the store. | `LoggingWrapper(key_value=memory_store, log_level=logging.INFO, structured_logs=True)` |
 | PassthroughCacheWrapper | Wrap two stores to provide a read-through cache. | `PassthroughCacheWrapper(primary_key_value=memory_store, cache_key_value=memory_store)` |
 | PrefixCollectionsWrapper | Prefix all collections with a given prefix. | `PrefixCollectionsWrapper(key_value=memory_store, prefix="users")` |
 | PrefixKeysWrapper | Prefix all keys with a given prefix. | `PrefixKeysWrapper(key_value=memory_store, prefix="users")` |
+| ReadOnlyWrapper | Prevent all write operations on the underlying store. | `ReadOnlyWrapper(key_value=memory_store, raise_on_write=True)` |
+| RetryWrapper | Retry failed operations with exponential backoff. | `RetryWrapper(key_value=memory_store, max_retries=3, initial_delay=0.1, max_delay=10.0, exponential_base=2.0)` |
 | SingleCollectionWrapper | Wrap a store to only use a single collection. | `SingleCollectionWrapper(key_value=memory_store, single_collection="users")` |
+| TTLClampWrapper | Clamp the TTL to a given range. | `TTLClampWrapper(key_value=memory_store, min_ttl=60, max_ttl=3600)` |
+| StatisticsWrapper | Track operation statistics for the store. | `StatisticsWrapper(key_value=memory_store)` |
+
+Wrappers can be stacked on top of each other to create more complex functionality.
+
+```python
+# Create a retriable redis store with timeout protection that is monitored, with compressed values, and a fallback to memory store! This probably isn't a good idea but you can do it!
+store = 
+LoggingWrapper(
+    CompressionWrapper(
+        FallbackWrapper(
+            primary_key_value=RetryWrapper(
+                TimeoutWrapper(
+                    key_value=redis_store,
+                )
+            ),
+            fallback_key_value=memory_store,
+        )
+    )
+)
+```
+
+Wrappers are applied in order, so the outermost wrapper is applied first and the innermost wrapper is applied last. Keep this in mind when chaining wrappers!
 
 ### Atomicity / Consistency
 

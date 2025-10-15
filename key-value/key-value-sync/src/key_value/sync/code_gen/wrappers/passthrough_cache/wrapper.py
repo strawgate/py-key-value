@@ -49,7 +49,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         if managed_entry := self.cache_key_value.get(collection=collection, key=key):
             return managed_entry
 
-        uncached_entry, ttl = self.primary_key_value.ttl(collection=collection, key=key)
+        (uncached_entry, ttl) = self.primary_key_value.ttl(collection=collection, key=key)
 
         if not uncached_entry:
             return None
@@ -68,7 +68,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         for i, key in enumerate(keys):
             key_to_value[key] = cached_entries[i]
 
-        uncached_keys = [key for key, value in key_to_value.items() if value is None]
+        uncached_keys = [key for (key, value) in key_to_value.items() if value is None]
 
         uncached_entries: list[tuple[dict[str, Any] | None, float | None]] = self.primary_key_value.ttl_many(
             collection=collection, keys=uncached_keys
@@ -79,7 +79,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         entries_to_cache_ttls: list[float | None] = []
 
         for i, key in enumerate(uncached_keys):
-            entry, ttl = uncached_entries[i]
+            (entry, ttl) = uncached_entries[i]
             if entry is not None:
                 entries_to_cache_keys.append(key)
                 entries_to_cache.append(entry)
@@ -96,12 +96,12 @@ class PassthroughCacheWrapper(BaseWrapper):
 
     @override
     def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
-        cached_entry, ttl = self.cache_key_value.ttl(collection=collection, key=key)
+        (cached_entry, ttl) = self.cache_key_value.ttl(collection=collection, key=key)
 
         if cached_entry:
             return (cached_entry, ttl)
 
-        uncached_entry, ttl = self.primary_key_value.ttl(collection=collection, key=key)
+        (uncached_entry, ttl) = self.primary_key_value.ttl(collection=collection, key=key)
 
         if not uncached_entry:
             return (None, None)
@@ -120,7 +120,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         for i, key in enumerate(keys):
             key_to_value[key] = (cached_entries[i][0], cached_entries[i][1])
 
-        uncached_keys = [key for key, value in key_to_value.items() if value == (None, None)]
+        uncached_keys = [key for (key, value) in key_to_value.items() if value == (None, None)]
 
         uncached_entries: list[tuple[dict[str, Any] | None, float | None]] = self.primary_key_value.ttl_many(
             collection=collection, keys=uncached_keys
@@ -131,7 +131,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         entries_to_cache_ttls: list[float | None] = []
 
         for i, key in enumerate(uncached_keys):
-            entry, ttl = uncached_entries[i]
+            (entry, ttl) = uncached_entries[i]
             if entry is not None:
                 entries_to_cache_keys.append(key)
                 entries_to_cache.append(entry)
@@ -159,7 +159,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
+        ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
         _ = self.cache_key_value.delete_many(collection=collection, keys=keys)
 

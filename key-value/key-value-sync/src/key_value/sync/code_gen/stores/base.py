@@ -182,16 +182,13 @@ class BaseStore(KeyValueProtocol, ABC):
 
         self._put_managed_entry(collection=collection, key=key, managed_entry=managed_entry)
 
-    @override
-    def put_many(
-        self,
-        keys: list[str],
-        values: Sequence[dict[str, Any]],
-        *,
-        collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
-    ) -> None:
-        """Store multiple key-value pairs in the specified collection."""
+    def _prepare_put_many(
+        self, *, keys: list[str], values: Sequence[dict[str, Any]], ttl: Sequence[SupportsFloat | None] | SupportsFloat | None
+    ) -> tuple[list[str], Sequence[dict[str, Any]], list[float | None]]:
+        """Prepare multiple managed entries for a put_many operation.
+
+        Inheriting classes can use this method if they need to modify a put_many operation."""
+
         if len(keys) != len(values):
             msg = "put_many called but a different number of keys and values were provided"
             raise ValueError(msg) from None
@@ -200,15 +197,29 @@ class BaseStore(KeyValueProtocol, ABC):
             msg = "put_many called but a different number of keys and ttl values were provided"
             raise ValueError(msg) from None
 
+        ttl_for_entries: list[float | None] = prepare_ttls(t=ttl, count=len(keys))
+
+        return (keys, values, ttl_for_entries)
+
+    @override
+    def put_many(
+        self,
+        keys: list[str],
+        values: Sequence[dict[str, Any]],
+        *,
+        collection: str | None = None,
+        ttl: Sequence[SupportsFloat | None] | None = None,
+    ) -> None:
+        """Store multiple key-value pairs in the specified collection."""
+
         collection = collection or self.default_collection
         self.setup_collection(collection=collection)
 
-        ttl_for_entries: list[float | None] = prepare_ttls(t=ttl, count=len(keys))
+        (keys, values, ttl_for_entries) = self._prepare_put_many(keys=keys, values=values, ttl=ttl)
 
-        managed_entries: list[ManagedEntry] = []
-
-        for value, value_ttl in zip(values, ttl_for_entries, strict=True):
-            managed_entries.append(ManagedEntry(value=value, ttl=value_ttl, created_at=now()))
+        managed_entries: list[ManagedEntry] = [
+            ManagedEntry(value=value, ttl=ttl_for_entries[i], created_at=now()) for (i, value) in enumerate(values)
+        ]
 
         self._put_managed_entries(collection=collection, keys=keys, managed_entries=managed_entries)
 
