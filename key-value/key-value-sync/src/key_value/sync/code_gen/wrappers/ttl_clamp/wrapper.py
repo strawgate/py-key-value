@@ -57,11 +57,8 @@ class TTLClampWrapper(BaseWrapper):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
+        ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
-        if isinstance(ttl, (float, int)):
-            ttl = self._ttl_clamp(ttl=ttl)
-
         if isinstance(ttl, Sequence):
             ttl = [self._ttl_clamp(ttl=t) for t in ttl]
 

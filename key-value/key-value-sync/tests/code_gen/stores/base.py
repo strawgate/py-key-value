@@ -106,6 +106,10 @@ class BaseStoreTests(ABC):
         assert store.delete_many(collection="test", keys=["test", "test_2"]) == 2
         assert store.get_many(collection="test", keys=["test", "test_2"]) == [None, None]
 
+    def test_put_many_tuple_get_many(self, store: BaseStore):
+        store.put_many(collection="test", keys=["test", "test_2"], values=({"test": "test"}, {"test": "test_2"}))
+        assert store.get_many(collection="test", keys=["test", "test_2"]) == [{"test": "test"}, {"test": "test_2"}]
+
     def test_get_put_get_delete_get(self, store: BaseStore):
         """Tests that the get, put, delete, and get methods work together to store and retrieve a value from an empty store."""
 

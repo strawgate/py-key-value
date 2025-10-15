@@ -47,8 +47,15 @@ SYNC_PROJECT_TESTS_DIR = SYNC_PROJECT_DIR / "tests"
 SYNC_PROJECT_TESTS_CODE_GEN_DIR = SYNC_PROJECT_TESTS_DIR / "code_gen"
 
 PATHS_TO_LINT = [SYNC_PROJECT_MODULE_DIR, SYNC_PROJECT_TESTS_DIR]
-EXCLUDE_FILES = ["key-value/key-value-aio/src/key_value/aio/__init__.py"]
-EXCLUDE_DIRECTORIES = ["key-value/key-value-aio/src/key_value/aio/stores/memcached", "key-value/key-value-aio/tests/stores/memcached"]
+EXCLUDE_FILES = [
+    "key-value/key-value-aio/src/key_value/aio/__init__.py",
+    "key-value/key-value-aio/tests/stores/wrappers/test_timeout.py",
+]
+EXCLUDE_DIRECTORIES = [
+    "key-value/key-value-aio/src/key_value/aio/stores/memcached",
+    "key-value/key-value-aio/tests/stores/memcached",
+    "key-value/key-value-aio/src/key_value/aio/wrappers/timeout",
+]
 
 SCRIPT_NAME = Path(sys.argv[0]).name
 
@@ -227,6 +234,7 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
         "async_running_in_event_loop": "running_in_event_loop",
         "asleep": "sleep",
         "async_wait_for_true": "wait_for_true",
+        "async_retry_operation": "retry_operation",
         "async_gather": "gather",
     }
     _skip_imports: ClassVar[dict[str, set[str]]] = {
