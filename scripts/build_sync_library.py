@@ -234,6 +234,7 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
         "async_running_in_event_loop": "running_in_event_loop",
         "asleep": "sleep",
         "async_wait_for_true": "wait_for_true",
+        "async_retry_operation": "retry_operation",
         "async_gather": "gather",
     }
     _skip_imports: ClassVar[dict[str, set[str]]] = {

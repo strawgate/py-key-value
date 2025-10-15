@@ -1,7 +1,7 @@
-from collections.abc import Callable, Coroutine, Sequence
+from collections.abc import Sequence
 from typing import Any, SupportsFloat, TypeVar
 
-from key_value.shared.code_gen.sleep import asleep
+from key_value.shared.code_gen.run import async_retry_operation
 from typing_extensions import override
 
 from key_value.aio.protocols.key_value import AsyncKeyValue
@@ -51,47 +51,72 @@ class RetryWrapper(BaseWrapper):
         delay = self.initial_delay * (self.exponential_base**attempt)
         return min(delay, self.max_delay)
 
-    async def _retry_operation(self, operation: Callable[[], Coroutine[Any, Any, T]]) -> T:
-        """Execute an operation with retry logic."""
-        last_exception: Exception | None = None
-
-        for attempt in range(self.max_retries + 1):
-            try:
-                return await operation()
-            except self.retry_on as e:  # noqa: PERF203
-                last_exception = e
-                if attempt < self.max_retries:
-                    delay = self._calculate_delay(attempt)
-                    await asleep(delay)
-                else:
-                    # Last attempt failed, re-raise
-                    raise
-
-        # This should never be reached, but satisfy type checker
-        if last_exception:
-            raise last_exception
-        msg = "Retry operation failed without exception"
-        raise RuntimeError(msg)
-
     @override
     async def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
-        return await self._retry_operation(lambda: self.key_value.get(key=key, collection=collection))
+        return await async_retry_operation(
+            max_retries=self.max_retries,
+            retry_on=self.retry_on,
+            initial_delay=self.initial_delay,
+            max_delay=self.max_delay,
+            exponential_base=self.exponential_base,
+            operation=self.key_value.get,
+            key=key,
+            collection=collection,
+        )
 
     @override
     async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
-        return await self._retry_operation(lambda: self.key_value.get_many(keys=keys, collection=collection))
+        return await async_retry_operation(
+            max_retries=self.max_retries,
+            retry_on=self.retry_on,
+            initial_delay=self.initial_delay,
+            max_delay=self.max_delay,
+            exponential_base=self.exponential_base,
+            operation=self.key_value.get_many,
+            keys=keys,
+            collection=collection,
+        )
 
     @override
     async def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
-        return await self._retry_operation(lambda: self.key_value.ttl(key=key, collection=collection))
+        return await async_retry_operation(
+            max_retries=self.max_retries,
+            retry_on=self.retry_on,
+            initial_delay=self.initial_delay,
+            max_delay=self.max_delay,
+            exponential_base=self.exponential_base,
+            operation=self.key_value.ttl,
+            key=key,
+            collection=collection,
+        )
 
     @override
     async def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
-        return await self._retry_operation(lambda: self.key_value.ttl_many(keys=keys, collection=collection))
+        return await async_retry_operation(
+            max_retries=self.max_retries,
+            retry_on=self.retry_on,
+            initial_delay=self.initial_delay,
+            max_delay=self.max_delay,
+            exponential_base=self.exponential_base,
+            operation=self.key_value.ttl_many,
+            keys=keys,
+            collection=collection,
+        )
 
     @override
     async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
-        return await self._retry_operation(lambda: self.key_value.put(key=key, value=value, collection=collection, ttl=ttl))
+        return await async_retry_operation(
+            max_retries=self.max_retries,
+            retry_on=self.retry_on,
+            initial_delay=self.initial_delay,
+            max_delay=self.max_delay,
+            exponential_base=self.exponential_base,
+            operation=self.key_value.put,
+            key=key,
+            value=value,
+            collection=collection,
+            ttl=ttl,
+        )
 
     @override
     async def put_many(
@@ -102,12 +127,41 @@ class RetryWrapper(BaseWrapper):
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
-        return await self._retry_operation(lambda: self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=ttl))
+        return await async_retry_operation(
+            max_retries=self.max_retries,
+            retry_on=self.retry_on,
+            initial_delay=self.initial_delay,
+            max_delay=self.max_delay,
+            exponential_base=self.exponential_base,
+            operation=self.key_value.put_many,
+            keys=keys,
+            values=values,
+            collection=collection,
+            ttl=ttl,
+        )
 
     @override
     async def delete(self, key: str, *, collection: str | None = None) -> bool:
-        return await self._retry_operation(lambda: self.key_value.delete(key=key, collection=collection))
+        return await async_retry_operation(
+            max_retries=self.max_retries,
+            retry_on=self.retry_on,
+            initial_delay=self.initial_delay,
+            max_delay=self.max_delay,
+            exponential_base=self.exponential_base,
+            operation=self.key_value.delete,
+            key=key,
+            collection=collection,
+        )
 
     @override
     async def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
-        return await self._retry_operation(lambda: self.key_value.delete_many(keys=keys, collection=collection))
+        return await async_retry_operation(
+            max_retries=self.max_retries,
+            retry_on=self.retry_on,
+            initial_delay=self.initial_delay,
+            max_delay=self.max_delay,
+            exponential_base=self.exponential_base,
+            operation=self.key_value.delete_many,
+            keys=keys,
+            collection=collection,
+        )
