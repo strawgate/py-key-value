@@ -1,5 +1,5 @@
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, overload
+from typing import Any, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import Self, override
@@ -11,13 +11,12 @@ from key_value.aio.stores.base import (
 
 try:
     import aioboto3
+    from aioboto3.session import Session  # noqa: TC002
     from types_aiobotocore_dynamodb.client import DynamoDBClient
 except ImportError as e:
     msg = "DynamoDBStore requires py-key-value-aio[dynamodb]"
     raise ImportError(msg) from e
 
-if TYPE_CHECKING:
-    from aioboto3.session import Session
 
 DEFAULT_PAGE_SIZE = 1000
 PAGE_LIMIT = 1000
@@ -38,7 +37,14 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     _client: DynamoDBClient | None
 
     @overload
-    def __init__(self, *, client: DynamoDBClient, table_name: str, default_collection: str | None = None) -> None: ...
+    def __init__(self, *, client: DynamoDBClient, table_name: str, default_collection: str | None = None) -> None:
+        """Initialize the DynamoDB store.
+
+        Args:
+            client: The DynamoDB client to use. You must have entered the context manager before passing this in.
+            table_name: The name of the DynamoDB table to use.
+            default_collection: The default collection to use if no collection is provided.
+        """
 
     @overload
     def __init__(
@@ -50,7 +56,17 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         aws_access_key_id: str | None = None,
         aws_secret_access_key: str | None = None,
         default_collection: str | None = None,
-    ) -> None: ...
+    ) -> None:
+        """Initialize the DynamoDB store.
+
+        Args:
+            table_name: The name of the DynamoDB table to use.
+            region_name: AWS region name. Defaults to None (uses AWS default).
+            endpoint_url: Custom endpoint URL (useful for local DynamoDB). Defaults to None.
+            aws_access_key_id: AWS access key ID. Defaults to None (uses AWS default credentials).
+            aws_secret_access_key: AWS secret access key. Defaults to None (uses AWS default credentials).
+            default_collection: The default collection to use if no collection is provided.
+        """
 
     def __init__(
         self,

@@ -115,10 +115,12 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
     @override
     def __enter__(self) -> Self:
         _ = self._client.__enter__()
+        super().__enter__()
         return self
 
     @override
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
+        super().__exit__(exc_type, exc_val, exc_tb)
         self._client.__exit__(exc_type, exc_val, exc_tb)
 
     def _sanitize_collection_name(self, collection: str) -> str:
