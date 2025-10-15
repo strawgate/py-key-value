@@ -29,8 +29,8 @@ async def ping_dynamodb() -> bool:
             aws_secret_access_key="test",  # noqa: S106
             region_name="us-east-1",
         )
-        async with session.client("dynamodb", endpoint_url=DYNAMODB_ENDPOINT) as client:
-            await client.list_tables()
+        async with session.client(service_name="dynamodb", endpoint_url=DYNAMODB_ENDPOINT) as client:  # type: ignore
+            await client.list_tables()  # type: ignore
     except Exception:
         return False
     else:
@@ -76,12 +76,12 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
             aws_secret_access_key="test",  # noqa: S106
             region_name="us-east-1",
         )
-        async with session.client("dynamodb", endpoint_url=DYNAMODB_ENDPOINT) as client:
+        async with session.client(service_name="dynamodb", endpoint_url=DYNAMODB_ENDPOINT) as client:  # type: ignore
             with contextlib.suppress(Exception):
-                await client.delete_table(TableName=DYNAMODB_TEST_TABLE)
+                await client.delete_table(TableName=DYNAMODB_TEST_TABLE)  # type: ignore
                 # Wait for table to be deleted
-                waiter = client.get_waiter("table_not_exists")
-                await waiter.wait(TableName=DYNAMODB_TEST_TABLE)
+                waiter = client.get_waiter("table_not_exists")  # type: ignore
+                await waiter.wait(TableName=DYNAMODB_TEST_TABLE)  # type: ignore
 
         return store
 

@@ -1,46 +1,61 @@
-from typing import Any
+from types import TracebackType
+from typing import TYPE_CHECKING, Any, overload
 
-from key_value.shared.type_checking.bear_spray import bear_spray
 from key_value.shared.utils.managed_entry import ManagedEntry
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from key_value.aio.stores.base import (
     BaseContextManagerStore,
-    BaseDestroyCollectionStore,
-    BaseEnumerateKeysStore,
     BaseStore,
 )
 
 try:
     import aioboto3
+    from types_aiobotocore_dynamodb.client import DynamoDBClient
 except ImportError as e:
     msg = "DynamoDBStore requires py-key-value-aio[dynamodb]"
     raise ImportError(msg) from e
 
+if TYPE_CHECKING:
+    from aioboto3.session import Session
 
 DEFAULT_PAGE_SIZE = 1000
 PAGE_LIMIT = 1000
 
 
-class DynamoDBStore(BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
+class DynamoDBStore(BaseContextManagerStore, BaseStore):
     """DynamoDB-based key-value store.
 
     This store uses a single DynamoDB table with a composite primary key:
     - collection (partition key)
     - key (sort key)
-
-    Each item stores the managed entry as a JSON string in the 'value' attribute.
     """
 
     _session: aioboto3.Session  # pyright: ignore[reportAny]
     _table_name: str
     _endpoint_url: str | None
-    _client: Any  # DynamoDB client from aioboto3
+    _raw_client: Any  # DynamoDB client from aioboto3
+    _client: DynamoDBClient | None
 
-    @bear_spray
+    @overload
+    def __init__(self, *, client: DynamoDBClient, table_name: str, default_collection: str | None = None) -> None: ...
+
+    @overload
     def __init__(
         self,
         *,
+        table_name: str,
+        region_name: str | None = None,
+        endpoint_url: str | None = None,
+        aws_access_key_id: str | None = None,
+        aws_secret_access_key: str | None = None,
+        default_collection: str | None = None,
+    ) -> None: ...
+
+    def __init__(
+        self,
+        *,
+        client: DynamoDBClient | None = None,
         table_name: str,
         region_name: str | None = None,
         endpoint_url: str | None = None,
@@ -59,28 +74,55 @@ class DynamoDBStore(BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCont
             default_collection: The default collection to use if no collection is provided.
         """
         self._table_name = table_name
-        self._session = aioboto3.Session(  # pyright: ignore[reportAny]
-            region_name=region_name,
-            aws_access_key_id=aws_access_key_id,
-            aws_secret_access_key=aws_secret_access_key,
-        )
-        self._endpoint_url = endpoint_url
-        self._client = None
+        if client:
+            self._client = client
+        else:
+            session: Session = aioboto3.Session(  # pyright: ignore[reportAny]
+                region_name=region_name,
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+            )
+
+            self._raw_client = session.client(service_name="dynamodb", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType]
+
+            self._client = None
 
         super().__init__(default_collection=default_collection)
 
     @override
+    async def __aenter__(self) -> Self:
+        if self._raw_client:
+            self._client = await self._raw_client.__aenter__()
+        await super().__aenter__()
+        return self
+
+    @override
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        await super().__aexit__(exc_type, exc_value, traceback)
+        if self._client:
+            await self._client.__aexit__(exc_type, exc_value, traceback)
+
+    @property
+    def _connected_client(self) -> DynamoDBClient:
+        if not self._client:
+            msg = "Client not connected"
+            raise ValueError(msg)
+        return self._client
+
+    @override
     async def _setup(self) -> None:
         """Setup the DynamoDB client and ensure table exists."""
-        # Create a persistent client
-        self._client = await self._session.client("dynamodb", endpoint_url=self._endpoint_url).__aenter__()  # pyright: ignore[reportUnknownMemberType, reportAny, reportGeneralTypeIssues, reportUnknownVariableType]
 
-        # Check if table exists, if not create it
+        if not self._client:
+            self._client = await self._raw_client.__aenter__()
+
         try:
-            await self._client.describe_table(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
-        except self._client.exceptions.ResourceNotFoundException:  # pyright: ignore[reportUnknownMemberType]
+            await self._connected_client.describe_table(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
+        except self._connected_client.exceptions.ResourceNotFoundException:  # pyright: ignore[reportUnknownMemberType]
             # Create the table with composite primary key
-            await self._client.create_table(  # pyright: ignore[reportUnknownMemberType]
+            await self._connected_client.create_table(  # pyright: ignore[reportUnknownMemberType]
                 TableName=self._table_name,
                 KeySchema=[
                     {"AttributeName": "collection", "KeyType": "HASH"},  # Partition key
@@ -94,13 +136,13 @@ class DynamoDBStore(BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCont
             )
 
             # Wait for table to be active
-            waiter = self._client.get_waiter("table_exists")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            waiter = self._connected_client.get_waiter("table_exists")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             await waiter.wait(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         """Retrieve a managed entry from DynamoDB."""
-        response = await self._client.get_item(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        response = await self._connected_client.get_item(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             TableName=self._table_name,
             Key={
                 "collection": {"S": collection},
@@ -141,7 +183,7 @@ class DynamoDBStore(BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCont
             ttl_timestamp = int(managed_entry.created_at.timestamp() + managed_entry.ttl)
             item["ttl"] = {"N": str(ttl_timestamp)}
 
-        await self._client.put_item(  # pyright: ignore[reportUnknownMemberType]
+        await self._connected_client.put_item(  # pyright: ignore[reportUnknownMemberType]
             TableName=self._table_name,
             Item=item,
         )
@@ -149,7 +191,7 @@ class DynamoDBStore(BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCont
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         """Delete a managed entry from DynamoDB."""
-        response = await self._client.delete_item(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        response = await self._connected_client.delete_item(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             TableName=self._table_name,
             Key={
                 "collection": {"S": collection},
@@ -162,55 +204,7 @@ class DynamoDBStore(BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCont
         return "Attributes" in response  # pyright: ignore[reportUnknownArgumentType]
 
     @override
-    async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
-        """List all keys in a collection."""
-        limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
-
-        response: Any = await self._client.query(  # pyright: ignore[reportUnknownMemberType]
-            TableName=self._table_name,
-            KeyConditionExpression="collection = :collection",
-            ExpressionAttributeValues={
-                ":collection": {"S": collection},
-            },
-            ProjectionExpression="key",
-            Limit=limit,
-        )
-
-        items = response.get("Items", [])
-        return [item["key"]["S"] for item in items if "key" in item]
-
-    @override
-    async def _delete_collection(self, *, collection: str) -> bool:
-        """Delete all items in a collection."""
-        # DynamoDB doesn't have a native "delete collection" operation
-        # We need to query all keys and delete them individually
-        # Query all items in the collection
-        response: Any = await self._client.query(  # pyright: ignore[reportUnknownMemberType]
-            TableName=self._table_name,
-            KeyConditionExpression="collection = :collection",
-            ExpressionAttributeValues={
-                ":collection": {"S": collection},
-            },
-            ProjectionExpression="collection, key",
-        )
-
-        items = response.get("Items", [])
-
-        # Delete each item
-        for item in items:
-            await self._client.delete_item(  # pyright: ignore[reportUnknownMemberType]
-                TableName=self._table_name,
-                Key={
-                    "collection": {"S": item["collection"]["S"]},
-                    "key": {"S": item["key"]["S"]},
-                },
-            )
-
-        return len(items) > 0  # pyright: ignore[reportUnknownArgumentType]
-
-    @override
     async def _close(self) -> None:
         """Close the DynamoDB client."""
         if self._client:
             await self._client.__aexit__(None, None, None)  # pyright: ignore[reportUnknownMemberType]
-            self._client = None
