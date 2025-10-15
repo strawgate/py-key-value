@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "sys_platform == 'darwin'",
@@ -660,6 +660,18 @@ wheels = [
 ]
 
 [[package]]
+name = "hvac"
+version = "2.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/48/a4/c0b698a7250b7a5c2956427406560701862215c646e079a7907846608f44/hvac-2.3.0.tar.gz", hash = "sha256:1b85e3320e8642dd82f234db63253cda169a817589e823713dc5fca83119b1e2", size = 332660, upload-time = "2024-06-18T14:46:09.748Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0b/34/56facf52e2ea14ce640f434ccf00311af6f3a1df0019d4682ba28ea09948/hvac-2.3.0-py3-none-any.whl", hash = "sha256:a3afc5710760b6ee9b3571769df87a0333da45da05a5f9f963e1d3925a84be7d", size = 155860, upload-time = "2024-06-18T14:46:05.399Z" },
+]
+
+[[package]]
 name = "idna"
 version = "3.10"
 source = { registry = "https://pypi.org/simple" }
@@ -1110,6 +1122,9 @@ redis = [
 valkey = [
     { name = "valkey-glide" },
 ]
+vault = [
+    { name = "hvac" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1119,7 +1134,7 @@ dev = [
     { name = "diskcache-stubs" },
     { name = "docker" },
     { name = "inline-snapshot" },
-    { name = "py-key-value-aio", extra = ["disk", "elasticsearch", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis"] },
+    { name = "py-key-value-aio", extra = ["disk", "elasticsearch", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "vault"] },
     { name = "py-key-value-aio", extra = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-shared-test" },
     { name = "pytest" },
@@ -1139,6 +1154,7 @@ requires-dist = [
     { name = "dbus-python", marker = "extra == 'keyring-linux'", specifier = ">=1.4.0" },
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
     { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
+    { name = "hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "keyring", marker = "extra == 'keyring'", specifier = ">=25.6.0" },
     { name = "keyring", marker = "extra == 'keyring-linux'", specifier = ">=25.6.0" },
     { name = "pathvalidate", marker = "extra == 'disk'", specifier = ">=3.3.1" },
@@ -1148,7 +1164,7 @@ requires-dist = [
     { name = "redis", marker = "extra == 'redis'", specifier = ">=6.0.0" },
     { name = "valkey-glide", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "memcached", "elasticsearch", "keyring", "keyring-linux", "pydantic"]
+provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "keyring", "keyring-linux", "pydantic"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1159,7 +1175,7 @@ dev = [
     { name = "docker", specifier = ">=7.1.0" },
     { name = "inline-snapshot", specifier = ">=0.29.0" },
     { name = "py-key-value-aio", extras = ["keyring"] },
-    { name = "py-key-value-aio", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb"] },
+    { name = "py-key-value-aio", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb", "vault"] },
     { name = "py-key-value-aio", extras = ["pydantic"] },
     { name = "py-key-value-aio", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-shared-test", editable = "key-value/key-value-shared-test" },

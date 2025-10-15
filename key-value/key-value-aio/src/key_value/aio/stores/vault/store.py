@@ -1,0 +1,132 @@
+"""HashiCorp Vault-based key-value store."""
+
+from typing import overload
+
+from key_value.shared.utils.compound import compound_key
+from key_value.shared.utils.managed_entry import ManagedEntry
+from typing_extensions import override
+
+from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
+
+try:
+    import hvac
+    from hvac.exceptions import InvalidPath
+except ImportError as e:
+    msg = "VaultStore requires py-key-value-aio[vault]"
+    raise ImportError(msg) from e
+
+
+class VaultStore(BaseContextManagerStore, BaseStore):
+    """HashiCorp Vault-based key-value store using KV Secrets Engine v2.
+
+    This store uses HashiCorp Vault's KV v2 secrets engine to persist key-value pairs.
+    Each entry is stored as a secret in Vault with the combination of collection and key
+    as the secret path.
+
+    Note: The hvac library is synchronous, so operations are not truly async.
+    """
+
+    _client: hvac.Client
+    _mount_point: str
+
+    @overload
+    def __init__(
+        self,
+        *,
+        client: hvac.Client,
+        mount_point: str = "secret",
+        default_collection: str | None = None,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        *,
+        url: str = "http://localhost:8200",
+        token: str | None = None,
+        mount_point: str = "secret",
+        default_collection: str | None = None,
+    ) -> None: ...
+
+    def __init__(
+        self,
+        *,
+        client: hvac.Client | None = None,
+        url: str = "http://localhost:8200",
+        token: str | None = None,
+        mount_point: str = "secret",
+        default_collection: str | None = None,
+    ) -> None:
+        """Initialize the Vault store.
+
+        Args:
+            client: An existing hvac.Client instance. If provided, url and token are ignored.
+            url: The URL of the Vault server. Defaults to "http://localhost:8200".
+            token: The Vault token for authentication. If not provided, the client will
+                attempt to use other authentication methods (e.g., environment variables).
+            mount_point: The mount point for the KV v2 secrets engine. Defaults to "secret".
+            default_collection: The default collection to use if no collection is provided.
+        """
+        if client is not None:
+            self._client = client
+        else:
+            self._client = hvac.Client(url=url, token=token)
+
+        self._mount_point = mount_point
+
+        super().__init__(default_collection=default_collection)
+
+    @override
+    async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
+        combo_key: str = compound_key(collection=collection, key=key)
+
+        try:
+            response = self._client.secrets.kv.v2.read_secret(path=combo_key, mount_point=self._mount_point)
+        except InvalidPath:
+            return None
+        except Exception:
+            return None
+
+        if response is None or "data" not in response or "data" not in response["data"]:
+            return None
+
+        # Vault KV v2 returns data in response['data']['data']
+        secret_data = response["data"]["data"]
+
+        if "value" not in secret_data:
+            return None
+
+        json_str: str = secret_data["value"]
+        return ManagedEntry.from_json(json_str=json_str)
+
+    @override
+    async def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
+        combo_key: str = compound_key(collection=collection, key=key)
+
+        json_str: str = managed_entry.to_json()
+
+        # Store the JSON string in a 'value' field
+        secret_data = {"value": json_str}
+
+        self._client.secrets.kv.v2.create_or_update_secret(path=combo_key, secret=secret_data, mount_point=self._mount_point)
+
+    @override
+    async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
+        combo_key: str = compound_key(collection=collection, key=key)
+
+        try:
+            # Check if the secret exists before attempting to delete
+            _ = self._client.secrets.kv.v2.read_secret(path=combo_key, mount_point=self._mount_point)
+        except InvalidPath:
+            return False
+        except Exception:
+            return False
+        else:
+            # Delete the latest version of the secret
+            self._client.secrets.kv.v2.delete_metadata_and_all_versions(path=combo_key, mount_point=self._mount_point)
+            return True
+
+    @override
+    async def _close(self) -> None:
+        # hvac.Client doesn't require explicit cleanup
+        pass
