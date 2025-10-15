@@ -29,7 +29,7 @@ class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, 
     """Cassandra-based key-value store."""
 
     _cluster: Cluster
-    _session: Session
+    _session: Session | None
     _keyspace: str
     _table_prefix: str
 
@@ -91,20 +91,27 @@ class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, 
 
         self._keyspace = keyspace or DEFAULT_KEYSPACE
         self._table_prefix = table_prefix or DEFAULT_TABLE_PREFIX
-        self._session = self._cluster.connect()  # pyright: ignore[reportUnknownMemberType]
+        self._session = None
 
         super().__init__(default_collection=default_collection)
+
+    def _get_session(self) -> Session:
+        """Get or create the session."""
+        if self._session is None:
+            self._session = self._cluster.connect()  # pyright: ignore[reportUnknownMemberType]
+        return self._session
 
     @override
     async def _setup(self) -> None:
         # Create keyspace if it doesn't exist
-        self._session.execute(  # pyright: ignore[reportUnknownMemberType]
+        session = self._get_session()
+        session.execute(  # pyright: ignore[reportUnknownMemberType]
             f"""
             CREATE KEYSPACE IF NOT EXISTS {self._keyspace}
             WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}}
             """
         )
-        self._session.set_keyspace(self._keyspace)  # pyright: ignore[reportUnknownMemberType]
+        session.set_keyspace(self._keyspace)  # pyright: ignore[reportUnknownMemberType]
 
     def _sanitize_table_name(self, collection: str) -> str:
         sanitized = sanitize_string(
@@ -117,7 +124,7 @@ class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, 
         table_name = self._sanitize_table_name(collection=collection)
 
         # Create table if it doesn't exist
-        self._session.execute(  # pyright: ignore[reportUnknownMemberType]
+        self._get_session().execute(  # pyright: ignore[reportUnknownMemberType]
             f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
                 key text PRIMARY KEY,
@@ -131,14 +138,14 @@ class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, 
         # Create index on expires_at for TTL queries
         with suppress(Exception):
             # Index might already exist, ignore errors
-            self._session.execute(f"CREATE INDEX IF NOT EXISTS ON {table_name} (expires_at)")  # pyright: ignore[reportUnknownMemberType]
+            self._get_session().execute(f"CREATE INDEX IF NOT EXISTS ON {table_name} (expires_at)")  # pyright: ignore[reportUnknownMemberType]
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         table_name = self._sanitize_table_name(collection=collection)
 
         query = f"SELECT value FROM {table_name} WHERE key = %s"  # noqa: S608 - table_name is sanitized
-        result = self._session.execute(query, (key,))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        result = self._get_session().execute(query, (key,))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         row = result.one()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
         if not row:
@@ -168,7 +175,7 @@ class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, 
             VALUES (%s, %s, %s, %s)
         """  # noqa: S608
 
-        self._session.execute(  # pyright: ignore[reportUnknownMemberType]
+        self._get_session().execute(  # pyright: ignore[reportUnknownMemberType]
             query,
             (
                 key,
@@ -184,12 +191,12 @@ class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, 
 
         # Check if key exists first
         check_query = f"SELECT key FROM {table_name} WHERE key = %s"  # noqa: S608 - table_name is sanitized
-        result = self._session.execute(check_query, (key,))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        result = self._get_session().execute(check_query, (key,))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         exists = result.one() is not None  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
         if exists:
             delete_query = f"DELETE FROM {table_name} WHERE key = %s"  # noqa: S608 - table_name is sanitized
-            self._session.execute(delete_query, (key,))  # pyright: ignore[reportUnknownMemberType]
+            self._get_session().execute(delete_query, (key,))  # pyright: ignore[reportUnknownMemberType]
 
         return exists
 
@@ -199,7 +206,7 @@ class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, 
 
         # Query system tables for table names
         query = "SELECT table_name FROM system_schema.tables WHERE keyspace_name = %s"
-        result = self._session.execute(query, (self._keyspace,))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        result = self._get_session().execute(query, (self._keyspace,))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
         collections = []
         prefix_len = len(self._table_prefix) + 1
@@ -221,12 +228,12 @@ class CassandraStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, 
 
         # Check if table exists
         check_query = "SELECT table_name FROM system_schema.tables WHERE keyspace_name = %s AND table_name = %s"
-        result = self._session.execute(check_query, (self._keyspace, table_name))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        result = self._get_session().execute(check_query, (self._keyspace, table_name))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         exists = result.one() is not None  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
         if exists:
             drop_query = f"DROP TABLE IF EXISTS {table_name}"
-            self._session.execute(drop_query)  # pyright: ignore[reportUnknownMemberType]
+            self._get_session().execute(drop_query)  # pyright: ignore[reportUnknownMemberType]
 
         return exists
 
