@@ -136,7 +136,7 @@ class DynamoDBStore(BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCont
         }
 
         # Add TTL if present
-        if managed_entry.ttl is not None:
+        if managed_entry.ttl is not None and managed_entry.created_at:
             # DynamoDB TTL expects a Unix timestamp
             ttl_timestamp = int(managed_entry.created_at.timestamp() + managed_entry.ttl)
             item["ttl"] = {"N": str(ttl_timestamp)}
