@@ -65,7 +65,7 @@ def retry_operation(
     initial_delay: float,
     max_delay: float,
     exponential_base: float,
-    operation: Callable[[], T],
+    operation: Callable[..., T],
     *args: Any,
     **kwargs: Any,
 ) -> T:
