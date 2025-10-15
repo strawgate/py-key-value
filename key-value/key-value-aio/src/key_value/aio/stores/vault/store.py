@@ -81,23 +81,23 @@ class VaultStore(BaseContextManagerStore, BaseStore):
         combo_key: str = compound_key(collection=collection, key=key)
 
         try:
-            response = self._client.secrets.kv.v2.read_secret(path=combo_key, mount_point=self._mount_point)
+            response = self._client.secrets.kv.v2.read_secret(path=combo_key, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
         except InvalidPath:
             return None
         except Exception:
             return None
 
-        if response is None or "data" not in response or "data" not in response["data"]:
+        if response is None or "data" not in response or "data" not in response["data"]:  # pyright: ignore[reportUnknownVariableType]
             return None
 
         # Vault KV v2 returns data in response['data']['data']
-        secret_data = response["data"]["data"]
+        secret_data = response["data"]["data"]  # pyright: ignore[reportUnknownVariableType]
 
-        if "value" not in secret_data:
+        if "value" not in secret_data:  # pyright: ignore[reportUnknownVariableType]
             return None
 
-        json_str: str = secret_data["value"]
-        return ManagedEntry.from_json(json_str=json_str)
+        json_str: str = secret_data["value"]  # pyright: ignore[reportUnknownVariableType]
+        return ManagedEntry.from_json(json_str=json_str)  # pyright: ignore[reportUnknownArgumentType]
 
     @override
     async def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
@@ -108,7 +108,7 @@ class VaultStore(BaseContextManagerStore, BaseStore):
         # Store the JSON string in a 'value' field
         secret_data = {"value": json_str}
 
-        self._client.secrets.kv.v2.create_or_update_secret(path=combo_key, secret=secret_data, mount_point=self._mount_point)
+        self._client.secrets.kv.v2.create_or_update_secret(path=combo_key, secret=secret_data, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
@@ -116,14 +116,14 @@ class VaultStore(BaseContextManagerStore, BaseStore):
 
         try:
             # Check if the secret exists before attempting to delete
-            _ = self._client.secrets.kv.v2.read_secret(path=combo_key, mount_point=self._mount_point)
+            _ = self._client.secrets.kv.v2.read_secret(path=combo_key, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
         except InvalidPath:
             return False
         except Exception:
             return False
         else:
             # Delete the latest version of the secret
-            self._client.secrets.kv.v2.delete_metadata_and_all_versions(path=combo_key, mount_point=self._mount_point)
+            self._client.secrets.kv.v2.delete_metadata_and_all_versions(path=combo_key, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType]
             return True
 
     @override
