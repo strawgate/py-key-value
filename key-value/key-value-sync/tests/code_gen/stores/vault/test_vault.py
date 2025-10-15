@@ -4,6 +4,7 @@
 from collections.abc import Generator
 
 import pytest
+from key_value.shared.code_gen.sleep import sleep
 from key_value.shared.stores.wait import wait_for_true
 from typing_extensions import override
 
@@ -34,6 +35,7 @@ class TestVaultStore(BaseStoreTests):
     def ping_vault(self) -> bool:
         try:
             client = self.get_vault_client()
+            sleep(1)
             return client.sys.is_initialized()  # pyright: ignore[reportUnknownMemberType,reportUnknownReturnType,reportUnknownVariableType]
         except Exception:
             return False

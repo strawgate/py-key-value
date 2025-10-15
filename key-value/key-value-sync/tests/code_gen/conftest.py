@@ -41,6 +41,11 @@ def docker_client() -> DockerClient:
     return get_docker_client()
 
 
+def docker_logs(name: str) -> list[str]:
+    client = get_docker_client()
+    return client.containers.get(name).logs().decode("utf-8").splitlines()
+
+
 def docker_pull(image: str, raise_on_error: bool = False) -> bool:
     logger.info(f"Pulling image {image}")
     client = get_docker_client()
@@ -116,6 +121,11 @@ def docker_container(
     finally:
         docker_stop(name, raise_on_error=False)
         docker_rm(name, raise_on_error=False)
+
+    logger.info(f"Container {name} logs:")
+    for log in docker_logs(name):
+        logger.info(log)
+
     logger.info(f"Container {name} stopped and removed")
     return
 
