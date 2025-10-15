@@ -49,7 +49,6 @@ class TestVaultStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 "VAULT_DEV_ROOT_TOKEN_ID": VAULT_TOKEN,
                 "VAULT_DEV_LISTEN_ADDRESS": "0.0.0.0:8200",
             },
-            cap_add=["IPC_LOCK"],
         ):
             if not await async_wait_for_true(bool_fn=self.ping_vault, tries=30, wait_time=1):
                 msg = "Vault failed to start"
