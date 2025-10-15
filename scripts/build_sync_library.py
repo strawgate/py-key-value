@@ -52,6 +52,8 @@ EXCLUDE_FILES = [
     "key-value/key-value-aio/tests/stores/wrappers/test_timeout.py",
 ]
 EXCLUDE_DIRECTORIES = [
+    "key-value/key-value-aio/src/key_value/aio/stores/dynamodb",
+    "key-value/key-value-aio/tests/stores/dynamodb",
     "key-value/key-value-aio/src/key_value/aio/stores/memcached",
     "key-value/key-value-aio/tests/stores/memcached",
     "key-value/key-value-aio/src/key_value/aio/wrappers/timeout",
