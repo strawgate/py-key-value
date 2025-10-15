@@ -86,7 +86,7 @@ class KeyValueProtocol(Protocol):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | SupportsFloat | None = None,
+        ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
         """Store multiple key-value pairs in the specified collection.
 
