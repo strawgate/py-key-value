@@ -108,10 +108,12 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
     @override
     async def __aenter__(self) -> Self:
         _ = await self._client.__aenter__()
+        await super().__aenter__()
         return self
 
     @override
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
+        await super().__aexit__(exc_type, exc_val, exc_tb)
         await self._client.__aexit__(exc_type, exc_val, exc_tb)
 
     def _sanitize_collection_name(self, collection: str) -> str:
