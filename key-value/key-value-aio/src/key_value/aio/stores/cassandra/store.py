@@ -1,0 +1,222 @@
+from contextlib import suppress
+from typing import overload
+
+from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
+from typing_extensions import override
+
+from cassandra.cluster import ExecutionProfile
+from cassandra.policies import RoundRobinPolicy
+from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
+
+try:
+    from cassandra.cluster import EXEC_PROFILE_DEFAULT, Cluster, Session
+    from cassandra.policies import LoadBalancingPolicy
+except ImportError as e:
+    msg = "CassandraStore requires py-key-value-aio[cassandra]"
+    raise ImportError(msg) from e
+
+
+DEFAULT_KEYSPACE = "kv_store"
+DEFAULT_TABLE_PREFIX = "kv"
+
+DEFAULT_PAGE_SIZE = 10000
+PAGE_LIMIT = 10000
+
+# Cassandra table name length limit (48 chars)
+MAX_TABLE_LENGTH = 48
+TABLE_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
+
+
+class CassandraStore(BaseContextManagerStore, BaseStore):
+    """Cassandra-based key-value store."""
+
+    _cluster: Cluster
+    _session: Session | None
+    _keyspace: str
+    _table_prefix: str
+
+    @overload
+    def __init__(
+        self,
+        *,
+        cluster: Cluster,
+        keyspace: str | None = None,
+        table_prefix: str | None = None,
+        default_collection: str | None = None,
+    ) -> None:
+        """Initialize the Cassandra store.
+
+        Args:
+            cluster: The Cassandra cluster to use.
+            keyspace: The name of the Cassandra keyspace.
+            table_prefix: The prefix for Cassandra tables.
+            default_collection: The default collection to use if no collection is provided.
+        """
+
+    @overload
+    def __init__(
+        self,
+        *,
+        contact_points: list[str] | None = None,
+        port: int = 9042,
+        protocol_version: int,
+        load_balancing_policy: LoadBalancingPolicy,
+        keyspace: str | None = None,
+        table_prefix: str | None = None,
+        default_collection: str | None = None,
+    ) -> None:
+        """Initialize the Cassandra store.
+
+        Args:
+            contact_points: The contact points of the Cassandra cluster.
+            port: The port of the Cassandra cluster.
+            protocol_version: The protocol version of the Cassandra cluster.
+            load_balancing_policy: The load balancing policy of the Cassandra cluster.
+            keyspace: The name of the Cassandra keyspace.
+            table_prefix: The prefix for Cassandra tables.
+            default_collection: The default collection to use if no collection is provided.
+        """
+
+    def __init__(
+        self,
+        *,
+        cluster: Cluster | None = None,
+        contact_points: list[str] | None = None,
+        protocol_version: int | None = None,
+        load_balancing_policy: LoadBalancingPolicy | None = None,
+        port: int = 9042,
+        keyspace: str | None = None,
+        table_prefix: str | None = None,
+        default_collection: str | None = None,
+    ) -> None:
+        """Initialize the Cassandra store."""
+
+        if cluster:
+            self._cluster = cluster
+        else:
+            contact_points = contact_points or ["127.0.0.1"]
+            execution_profile = ExecutionProfile(
+                load_balancing_policy=load_balancing_policy or RoundRobinPolicy(),
+            )
+            self._cluster = Cluster(
+                contact_points=contact_points,
+                port=port,
+                protocol_version=protocol_version,
+                execution_profiles={EXEC_PROFILE_DEFAULT: execution_profile},
+            )
+
+        self._keyspace = keyspace or DEFAULT_KEYSPACE
+        self._table_prefix = table_prefix or DEFAULT_TABLE_PREFIX
+        self._session = None
+
+        super().__init__(default_collection=default_collection)
+
+    def _get_session(self) -> Session:
+        """Get or create the session."""
+        if self._session is None:
+            self._session = self._cluster.connect()  # pyright: ignore[reportUnknownMemberType]
+        return self._session
+
+    @override
+    async def _setup(self) -> None:
+        # Create keyspace if it doesn't exist
+        session = self._get_session()
+        session.execute(  # pyright: ignore[reportUnknownMemberType]
+            f"""
+            CREATE KEYSPACE IF NOT EXISTS {self._keyspace}
+            WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}}
+            """
+        )
+        session.set_keyspace(self._keyspace)  # pyright: ignore[reportUnknownMemberType]
+
+    def _sanitize_table_name(self, collection: str) -> str:
+        sanitized = sanitize_string(
+            value=collection, max_length=MAX_TABLE_LENGTH - len(self._table_prefix) - 1, allowed_characters=TABLE_ALLOWED_CHARACTERS
+        )
+        return f"{self._table_prefix}_{sanitized}"
+
+    @override
+    async def _setup_collection(self, *, collection: str) -> None:
+        table_name = self._sanitize_table_name(collection=collection)
+
+        # Create table if it doesn't exist
+        self._get_session().execute(  # pyright: ignore[reportUnknownMemberType]
+            f"""
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                key text PRIMARY KEY,
+                value text,
+                created_at timestamp,
+                expires_at timestamp
+            )
+            """
+        )
+
+        # Create index on expires_at for TTL queries
+        with suppress(Exception):
+            # Index might already exist, ignore errors
+            self._get_session().execute(f"CREATE INDEX IF NOT EXISTS ON {table_name} (expires_at)")  # pyright: ignore[reportUnknownMemberType]
+
+    @override
+    async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
+        table_name = self._sanitize_table_name(collection=collection)
+
+        query = f"SELECT value FROM {table_name} WHERE key = %s"  # noqa: S608 - table_name is sanitized
+        result = self._get_session().execute(query, (key,))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        row = result.one()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+        if not row:
+            return None
+
+        json_value: str | None = row.value  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+        if not isinstance(json_value, str):
+            return None
+
+        return ManagedEntry.from_json(json_str=json_value)
+
+    @override
+    async def _put_managed_entry(
+        self,
+        *,
+        key: str,
+        collection: str,
+        managed_entry: ManagedEntry,
+    ) -> None:
+        json_value: str = managed_entry.to_json()
+        table_name = self._sanitize_table_name(collection=collection)
+
+        # table_name is sanitized
+        query = f"""
+            INSERT INTO {table_name} (key, value, created_at, expires_at)
+            VALUES (%s, %s, %s, %s)
+        """  # noqa: S608
+
+        self._get_session().execute(  # pyright: ignore[reportUnknownMemberType]
+            query,
+            (
+                key,
+                json_value,
+                managed_entry.created_at if managed_entry.created_at else None,
+                managed_entry.expires_at if managed_entry.expires_at else None,
+            ),
+        )
+
+    @override
+    async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
+        table_name = self._sanitize_table_name(collection=collection)
+
+        # Check if key exists first
+        check_query = f"SELECT key FROM {table_name} WHERE key = %s"  # noqa: S608 - table_name is sanitized
+        result = self._get_session().execute(check_query, (key,))  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        exists = result.one() is not None  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+        if exists:
+            delete_query = f"DELETE FROM {table_name} WHERE key = %s"  # noqa: S608 - table_name is sanitized
+            self._get_session().execute(delete_query, (key,))  # pyright: ignore[reportUnknownMemberType]
+
+        return exists
+
+    @override
+    async def _close(self) -> None:
+        self._cluster.shutdown()
