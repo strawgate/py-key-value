@@ -98,7 +98,7 @@ Local stores are stored in memory or on disk, local to the application.
 | Memory           |  ✅  |  ✅  | `MemoryStore()` |
 | Disk             |  ☑️  |  ✅  | `DiskStore(directory="./cache")` |
 | Disk (Per-Collection) |  ☑️  |  ✅  | `MultiDiskStore(directory="./cache")` |
-| RocksDB          |  ☑️  |  ✖️  | `RocksDBStore(path="./rocksdb")` |
+| RocksDB          |  ☑️  |  ✅  | `RocksDBStore(path="./rocksdb")` |
 | Simple (test)    |  ✅  |  ✅  | `SimpleStore()` |
 | Null (test)      |  ✅  |  ✅  | `NullStore()` |
 
