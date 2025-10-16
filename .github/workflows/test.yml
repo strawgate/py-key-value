@@ -70,7 +70,7 @@ jobs:
         working-directory: ${{ matrix.project }}
 
       - name: "Test"
-        run: uv run pytest tests .
+        run: uv run pytest tests . -s -vv
         working-directory: ${{ matrix.project }}
 
       - name: "Build"
@@ -113,7 +113,7 @@ jobs:
         working-directory: ${{ matrix.project }}
 
       - name: "Test"
-        run: uv run pytest tests .
+        run: uv run pytest tests . -s -vv
         working-directory: ${{ matrix.project }}
 
       - name: "Build"

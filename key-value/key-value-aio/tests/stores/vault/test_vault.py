@@ -1,7 +1,6 @@
 from collections.abc import AsyncGenerator
 
 import pytest
-from key_value.shared.code_gen.sleep import asleep
 from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
 
@@ -16,8 +15,6 @@ VAULT_HOST = "localhost"
 VAULT_PORT = 8200
 VAULT_TOKEN = "dev-root-token"  # noqa: S105
 VAULT_MOUNT_POINT = "secret"
-
-WAIT_FOR_VAULT_TIMEOUT = 30
 
 
 class VaultFailedToStartError(Exception):
@@ -34,7 +31,6 @@ class TestVaultStore(BaseStoreTests):
     async def ping_vault(self) -> bool:
         try:
             client = await self.get_vault_client()
-            await asleep(1)
             return client.sys.is_initialized()  # pyright: ignore[reportUnknownMemberType,reportUnknownReturnType,reportUnknownVariableType]
         except Exception:
             return False
