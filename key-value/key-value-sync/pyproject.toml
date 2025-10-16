@@ -36,6 +36,7 @@ disk = ["diskcache>=5.6.0", "pathvalidate>=3.3.1",]
 redis = ["redis>=6.0.0"]
 mongodb = ["pymongo>=4.15.0"]
 valkey = ["valkey-glide-sync>=2.1.0"]
+vault = ["hvac>=2.3.0", "types-hvac>=2.3.0"]
 memcached = ["aiomcache>=0.8.0"]
 elasticsearch = ["elasticsearch>=9.0.0", "aiohttp>=3.12"]
 pydantic = ["pydantic>=2.11.9"]
@@ -44,7 +45,7 @@ keyring-linux = ["keyring>=25.6.0", "dbus-python>=1.4.0"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-addopts = ["--inline-snapshot=disable","-vv","-s"]
+addopts = ["--inline-snapshot=disable"]
 markers = [
     "skip_on_ci: Skip running the test when running on CI",
 ]
@@ -54,7 +55,7 @@ env_files = [".env"]
 
 [dependency-groups]
 dev = [
-    "py-key-value-sync[memory,disk,redis,elasticsearch,memcached,mongodb]",
+    "py-key-value-sync[memory,disk,redis,elasticsearch,memcached,mongodb,vault]",
     "py-key-value-sync[valkey]; platform_system != 'Windows'",
     "py-key-value-sync[pydantic]",
     "py-key-value-sync[keyring]",
