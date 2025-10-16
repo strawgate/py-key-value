@@ -1,6 +1,6 @@
 [project]
 name = "py-key-value-aio"
-version = "0.2.4"
+version = "0.2.5"
 description = "Async Key-Value"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,7 +16,7 @@ classifiers = [
 ]
 dependencies = [
     "beartype>=0.22.2",
-    "py-key-value-shared>=0.2.1",
+    "py-key-value-shared==0.2.5",
 ]
 
 

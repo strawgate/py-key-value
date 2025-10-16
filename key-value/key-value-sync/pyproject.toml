@@ -1,6 +1,6 @@
 [project]
 name = "py-key-value-sync"
-version = "0.2.4"
+version = "0.2.5"
 description = "Sync Key-Value"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,7 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "py-key-value-shared>=0.2.1",
+    "py-key-value-shared==0.2.5",
     "beartype>=0.22.2",
 ]
 
