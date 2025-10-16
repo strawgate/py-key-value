@@ -44,7 +44,7 @@ dynamodb = ["aioboto3>=13.3.0", "types-aiobotocore-dynamodb>=2.16.0"]
 keyring = ["keyring>=25.6.0"]
 keyring-linux = ["keyring>=25.6.0", "dbus-python>=1.4.0"]
 pydantic = ["pydantic>=2.11.9"]
-rocksdb = ["python-rocksdb>=0.7.0"]
+rocksdb = ["rocksdict>=0.3.0"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

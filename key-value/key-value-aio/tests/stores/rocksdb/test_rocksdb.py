@@ -22,8 +22,12 @@ class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         yield rocksdb_store
 
-        # Cleanup
-        await rocksdb_store._close()
+        # Cleanup - close first if not already closed
+        try:
+            await rocksdb_store._close()
+        except Exception:
+            pass
+        
         temp_dir.cleanup()
 
     async def test_rocksdb_path_connection(self):
@@ -42,15 +46,15 @@ class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     async def test_rocksdb_db_connection(self):
         """Test RocksDB store creation with existing DB instance."""
-        import rocksdb
+        from rocksdict import Options, Rdict
 
         temp_dir = TemporaryDirectory()
         db_path = Path(temp_dir.name) / "db_test_db"
         db_path.mkdir(parents=True, exist_ok=True)
 
-        opts = rocksdb.Options()
-        opts.create_if_missing = True
-        db = rocksdb.DB(str(db_path), opts)
+        opts = Options()
+        opts.create_if_missing(True)
+        db = Rdict(str(db_path), options=opts)
 
         store = RocksDBStore(db=db)
 

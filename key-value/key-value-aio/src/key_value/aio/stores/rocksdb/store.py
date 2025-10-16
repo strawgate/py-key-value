@@ -8,7 +8,7 @@ from typing_extensions import override
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseEnumerateKeysStore, BaseStore
 
 try:
-    import rocksdb
+    from rocksdict import Options, Rdict
 except ImportError as e:
     msg = "RocksDBStore requires py-key-value-aio[rocksdb]"
     raise ImportError(msg) from e
@@ -17,42 +17,40 @@ except ImportError as e:
 class RocksDBStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):
     """A RocksDB-based key-value store."""
 
-    _db: rocksdb.DB
+    _db: Rdict
+    _is_closed: bool
 
     @overload
-    def __init__(self, *, db: rocksdb.DB, default_collection: str | None = None) -> None:
+    def __init__(self, *, db: Rdict, default_collection: str | None = None) -> None:
         """Initialize the RocksDB store.
 
         Args:
-            db: An existing RocksDB database instance to use.
+            db: An existing Rdict database instance to use.
             default_collection: The default collection to use if no collection is provided.
         """
 
     @overload
-    def __init__(self, *, path: Path | str, default_collection: str | None = None, **options: dict) -> None:
+    def __init__(self, *, path: Path | str, default_collection: str | None = None) -> None:
         """Initialize the RocksDB store.
 
         Args:
             path: The path to the RocksDB database directory.
             default_collection: The default collection to use if no collection is provided.
-            options: Additional options to pass to RocksDB.
         """
 
     def __init__(
         self,
         *,
-        db: rocksdb.DB | None = None,
+        db: Rdict | None = None,
         path: Path | str | None = None,
         default_collection: str | None = None,
-        **options: dict,
     ) -> None:
         """Initialize the RocksDB store.
 
         Args:
-            db: An existing RocksDB database instance to use.
+            db: An existing Rdict database instance to use.
             path: The path to the RocksDB database directory.
             default_collection: The default collection to use if no collection is provided.
-            options: Additional options to pass to RocksDB.
         """
         if db is not None and path is not None:
             msg = "Provide only one of db or path"
@@ -68,26 +66,19 @@ class RocksDBStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerS
             path = Path(path)
             path.mkdir(parents=True, exist_ok=True)
 
-            opts = rocksdb.Options()
-            opts.create_if_missing = True
-            opts.max_open_files = 300000
-            opts.write_buffer_size = 67108864
-            opts.max_write_buffer_number = 3
-            opts.target_file_size_base = 67108864
+            opts = Options()
+            opts.create_if_missing(True)
 
-            # Apply any additional options passed
-            for key, value in options.items():
-                setattr(opts, key, value)
+            self._db = Rdict(str(path), options=opts)
 
-            self._db = rocksdb.DB(str(path), opts)
-
+        self._is_closed = False
         super().__init__(default_collection=default_collection)
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        value: bytes | None = self._db.get(combo_key.encode("utf-8"))
+        value: bytes | None = self._db.get(combo_key)
 
         if value is None:
             return None
@@ -108,37 +99,34 @@ class RocksDBStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerS
         combo_key: str = compound_key(collection=collection, key=key)
         json_value: str = managed_entry.to_json()
 
-        self._db.put(combo_key.encode("utf-8"), json_value.encode("utf-8"))
+        self._db[combo_key] = json_value.encode("utf-8")
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
-        combo_key_bytes = combo_key.encode("utf-8")
 
         # Check if key exists before deleting
-        exists = self._db.get(combo_key_bytes) is not None
+        exists = combo_key in self._db
 
         if exists:
-            self._db.delete(combo_key_bytes)
+            self._db.delete(combo_key)
 
         return exists
 
     @override
     async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
         pattern = compound_key(collection=collection, key="")
-        pattern_bytes = pattern.encode("utf-8")
 
         keys: list[str] = []
-        it = self._db.iterkeys()
-        it.seek(pattern_bytes)
-
         count = 0
-        for key_bytes in it:
-            key = key_bytes.decode("utf-8")
-            if not key.startswith(pattern):
-                break
 
-            keys.append(key)
+        for key in self._db:
+            key_str = key.decode("utf-8") if isinstance(key, bytes) else str(key)
+
+            if not key_str.startswith(pattern):
+                continue
+
+            keys.append(key_str)
             count += 1
 
             if limit is not None and count >= limit:
@@ -149,20 +137,18 @@ class RocksDBStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerS
     @override
     async def _delete_store(self) -> bool:
         # Delete all keys in the database
-        batch = rocksdb.WriteBatch()
-        it = self._db.iterkeys()
-        it.seek_to_first()
+        all_keys = list(self._db.keys())
+        for key in all_keys:
+            self._db.delete(key)
 
-        for key in it:
-            batch.delete(key)
-
-        self._db.write(batch)
         return True
 
     @override
     async def _close(self) -> None:
-        del self._db
+        if hasattr(self, "_db") and not self._is_closed:
+            self._db.close()
+            self._is_closed = True
 
     def __del__(self) -> None:
-        if hasattr(self, "_db"):
-            del self._db
+        # Don't try to close if already closed
+        pass
