@@ -57,6 +57,7 @@ EXCLUDE_DIRECTORIES = [
     "key-value/key-value-aio/src/key_value/aio/stores/memcached",
     "key-value/key-value-aio/tests/stores/memcached",
     "key-value/key-value-aio/src/key_value/aio/wrappers/timeout",
+    "key-value/key-value-aio/tests/wrappers/timeout",
 ]
 
 SCRIPT_NAME = Path(sys.argv[0]).name

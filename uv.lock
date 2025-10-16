@@ -1535,6 +1535,10 @@ redis = [
 valkey = [
     { name = "valkey-glide-sync" },
 ]
+vault = [
+    { name = "hvac" },
+    { name = "types-hvac" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1545,7 +1549,7 @@ dev = [
     { name = "docker" },
     { name = "inline-snapshot" },
     { name = "py-key-value-shared-test" },
-    { name = "py-key-value-sync", extra = ["disk", "elasticsearch", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis"] },
+    { name = "py-key-value-sync", extra = ["disk", "elasticsearch", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "vault"] },
     { name = "py-key-value-sync", extra = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -1564,6 +1568,7 @@ requires-dist = [
     { name = "dbus-python", marker = "extra == 'keyring-linux'", specifier = ">=1.4.0" },
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
     { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
+    { name = "hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "keyring", marker = "extra == 'keyring'", specifier = ">=25.6.0" },
     { name = "keyring", marker = "extra == 'keyring-linux'", specifier = ">=25.6.0" },
     { name = "pathvalidate", marker = "extra == 'disk'", specifier = ">=3.3.1" },
@@ -1571,9 +1576,10 @@ requires-dist = [
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
     { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.15.0" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=6.0.0" },
+    { name = "types-hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "valkey-glide-sync", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "memcached", "elasticsearch", "pydantic", "keyring", "keyring-linux"]
+provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "pydantic", "keyring", "keyring-linux"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1585,7 +1591,7 @@ dev = [
     { name = "inline-snapshot", specifier = ">=0.29.0" },
     { name = "py-key-value-shared-test", editable = "key-value/key-value-shared-test" },
     { name = "py-key-value-sync", extras = ["keyring"] },
-    { name = "py-key-value-sync", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb"] },
+    { name = "py-key-value-sync", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb", "vault"] },
     { name = "py-key-value-sync", extras = ["pydantic"] },
     { name = "py-key-value-sync", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "pytest" },
