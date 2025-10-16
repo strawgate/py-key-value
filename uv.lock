@@ -1297,7 +1297,7 @@ wheels = [
 
 [[package]]
 name = "py-key-value"
-version = "0.2.3"
+version = "0.2.4"
 source = { virtual = "." }
 
 [package.dev-dependencies]
@@ -1318,7 +1318,7 @@ dev = [
 
 [[package]]
 name = "py-key-value-aio"
-version = "0.2.3"
+version = "0.2.4"
 source = { editable = "key-value/key-value-aio" }
 dependencies = [
     { name = "beartype" },
@@ -1438,7 +1438,7 @@ dev = [
 
 [[package]]
 name = "py-key-value-shared"
-version = "0.2.3"
+version = "0.2.4"
 source = { editable = "key-value/key-value-shared" }
 dependencies = [
     { name = "beartype" },
@@ -1479,7 +1479,7 @@ dev = [
 
 [[package]]
 name = "py-key-value-shared-test"
-version = "0.2.3"
+version = "0.2.4"
 source = { editable = "key-value/key-value-shared-test" }
 
 [package.dev-dependencies]
@@ -1498,7 +1498,7 @@ dev = [
 
 [[package]]
 name = "py-key-value-sync"
-version = "0.2.3"
+version = "0.2.4"
 source = { editable = "key-value/key-value-sync" }
 dependencies = [
     { name = "beartype" },
