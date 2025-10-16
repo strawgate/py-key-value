@@ -22,12 +22,8 @@ class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         yield rocksdb_store
 
-        # Cleanup - close first if not already closed
-        try:
-            await rocksdb_store._close()
-        except Exception:
-            pass
-        
+        # Cleanup
+        await rocksdb_store._close()
         temp_dir.cleanup()
 
     async def test_rocksdb_path_connection(self):
