@@ -10,7 +10,9 @@ no_bear_type = beartype(conf=no_bear_type_check_conf)
 P = ParamSpec("P")
 R = TypeVar("R")
 
+
 def no_bear_type_check(func: Callable[P, R]) -> Callable[P, R]:
     return no_bear_type(func)
+
 
 bear_spray = no_bear_type_check
