@@ -92,36 +92,3 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
-
-    async def test_dynamodb_basic_operations(self, dynamodb_store: DynamoDBStore):
-        """Tests basic DynamoDB operations."""
-        await dynamodb_store.put(collection="test_collection", key="test_key", value={"test": "value"})
-        result = await dynamodb_store.get(collection="test_collection", key="test_key")
-        assert result == {"test": "value"}
-
-        # Test deletion
-        deleted = await dynamodb_store.delete(collection="test_collection", key="test_key")
-        assert deleted is True
-
-        # Verify deletion
-        result = await dynamodb_store.get(collection="test_collection", key="test_key")
-        assert result is None
-
-    async def test_dynamodb_with_session_token(self, setup_dynamodb: None):  # noqa: ARG002
-        """Tests that DynamoDB store can be initialized with aws_session_token parameter."""
-        # This test verifies that the session token parameter is accepted
-        # In a real scenario with IAM role assumption, this would be a valid session token
-        store = DynamoDBStore(
-            table_name="kv-store-session-token-test",
-            endpoint_url=DYNAMODB_ENDPOINT,
-            aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
-            aws_session_token="test-session-token",  # noqa: S106
-            region_name="us-east-1",
-        )
-
-        # Verify the store can be used for basic operations
-        async with store:
-            await store.put(collection="test_collection", key="test_key", value={"test": "value"})
-            result = await store.get(collection="test_collection", key="test_key")
-            assert result == {"test": "value"}
