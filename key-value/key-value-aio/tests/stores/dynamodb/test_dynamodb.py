@@ -92,17 +92,3 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
-
-    async def test_dynamodb_basic_operations(self, dynamodb_store: DynamoDBStore):
-        """Tests basic DynamoDB operations."""
-        await dynamodb_store.put(collection="test_collection", key="test_key", value={"test": "value"})
-        result = await dynamodb_store.get(collection="test_collection", key="test_key")
-        assert result == {"test": "value"}
-
-        # Test deletion
-        deleted = await dynamodb_store.delete(collection="test_collection", key="test_key")
-        assert deleted is True
-
-        # Verify deletion
-        result = await dynamodb_store.get(collection="test_collection", key="test_key")
-        assert result is None
