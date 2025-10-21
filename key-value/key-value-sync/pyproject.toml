@@ -33,7 +33,7 @@ module-name = "key_value.sync"
 [project.optional-dependencies]
 memory = ["cachetools>=6.0.0"]
 disk = ["diskcache>=5.6.0", "pathvalidate>=3.3.1",]
-redis = ["redis>=6.0.0"]
+redis = ["redis>=4.3.0"]
 mongodb = ["pymongo>=4.15.0"]
 valkey = ["valkey-glide-sync>=2.1.0"]
 vault = ["hvac>=2.3.0", "types-hvac>=2.3.0"]
