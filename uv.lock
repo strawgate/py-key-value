@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "sys_platform != 'win32'",
@@ -1407,7 +1407,7 @@ requires-dist = [
     { name = "py-key-value-shared", editable = "key-value/key-value-shared" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
     { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.15.0" },
-    { name = "redis", marker = "extra == 'redis'", specifier = ">=6.0.0" },
+    { name = "redis", marker = "extra == 'redis'", specifier = ">=4.3.0" },
     { name = "rocksdict", marker = "extra == 'rocksdb'", specifier = ">=0.3.0" },
     { name = "types-aiobotocore-dynamodb", marker = "extra == 'dynamodb'", specifier = ">=2.16.0" },
     { name = "types-hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
@@ -1582,7 +1582,7 @@ requires-dist = [
     { name = "py-key-value-shared", editable = "key-value/key-value-shared" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
     { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.15.0" },
-    { name = "redis", marker = "extra == 'redis'", specifier = ">=6.0.0" },
+    { name = "redis", marker = "extra == 'redis'", specifier = ">=4.3.0" },
     { name = "rocksdict", marker = "extra == 'rocksdb'", specifier = ">=0.3.0" },
     { name = "types-hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "valkey-glide-sync", marker = "extra == 'valkey'", specifier = ">=2.1.0" },

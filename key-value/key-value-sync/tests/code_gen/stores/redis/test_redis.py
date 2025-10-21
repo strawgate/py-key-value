@@ -20,6 +20,8 @@ REDIS_DB = 15  # Use a separate database for tests
 
 WAIT_FOR_REDIS_TIMEOUT = 30
 
+REDIS_VERSIONS_TO_TEST = ["4.0.0", "7.0.0"]
+
 
 def ping_redis() -> bool:
     client: Redis = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
@@ -35,12 +37,13 @@ class RedisFailedToStartError(Exception):
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
 class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session")
-    def setup_redis(self) -> Generator[None, None, None]:
+    @pytest.fixture(autouse=True, scope="session", params=REDIS_VERSIONS_TO_TEST)
+    def setup_redis(self, request: pytest.FixtureRequest) -> Generator[None, None, None]:
+        version = request.param
         # Double-check that the Valkey test container is stopped
         docker_stop("valkey-test", raise_on_error=False)
 
-        with docker_container("redis-test", "redis", {"6379": 6379}):
+        with docker_container("redis-test", f"redis:{version}", {"6379": 6379}):
             if not wait_for_true(bool_fn=ping_redis, tries=30, wait_time=1):
                 msg = "Redis failed to start"
                 raise RedisFailedToStartError(msg)
