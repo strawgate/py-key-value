@@ -55,6 +55,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         endpoint_url: str | None = None,
         aws_access_key_id: str | None = None,
         aws_secret_access_key: str | None = None,
+        aws_session_token: str | None = None,
         default_collection: str | None = None,
     ) -> None:
         """Initialize the DynamoDB store.
@@ -65,6 +66,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             endpoint_url: Custom endpoint URL (useful for local DynamoDB). Defaults to None.
             aws_access_key_id: AWS access key ID. Defaults to None (uses AWS default credentials).
             aws_secret_access_key: AWS secret access key. Defaults to None (uses AWS default credentials).
+            aws_session_token: AWS session token. Defaults to None (uses AWS default credentials).
             default_collection: The default collection to use if no collection is provided.
         """
 
@@ -77,6 +79,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         endpoint_url: str | None = None,
         aws_access_key_id: str | None = None,
         aws_secret_access_key: str | None = None,
+        aws_session_token: str | None = None,
         default_collection: str | None = None,
     ) -> None:
         """Initialize the DynamoDB store.
@@ -87,6 +90,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             endpoint_url: Custom endpoint URL (useful for local DynamoDB). Defaults to None.
             aws_access_key_id: AWS access key ID. Defaults to None (uses AWS default credentials).
             aws_secret_access_key: AWS secret access key. Defaults to None (uses AWS default credentials).
+            aws_session_token: AWS session token. Defaults to None (uses AWS default credentials).
             default_collection: The default collection to use if no collection is provided.
         """
         self._table_name = table_name
@@ -97,6 +101,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
                 region_name=region_name,
                 aws_access_key_id=aws_access_key_id,
                 aws_secret_access_key=aws_secret_access_key,
+                aws_session_token=aws_session_token,
             )
 
             self._raw_client = session.client(service_name="dynamodb", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType]
