@@ -23,7 +23,7 @@ class TestWindowsRegistryStore(BaseStoreTests):
         # Use a test-specific root to avoid conflicts
         from key_value.sync.code_gen.stores.windows_registry.store import WindowsRegistryStore
 
-        store = WindowsRegistryStore(root="py-key-value-test")
+        store = WindowsRegistryStore(registry_path="software\\py-key-value-test", hive="HKEY_CURRENT_USER")
         store.delete_many(collection="test", keys=["test"])
         store.delete_many(collection="test_collection", keys=["test_key"])
 
