@@ -1,6 +1,7 @@
+from typing import Any
+
 import pytest
 from cryptography.fernet import Fernet
-from typing import Any
 from typing_extensions import override
 
 from key_value.aio.stores.memory.store import MemoryStore
