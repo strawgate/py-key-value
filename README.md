@@ -7,7 +7,7 @@ This monorepo contains two libraries:
 
 ## Why use this library?
 
-- **Multiple backends**: DynamoDB, Elasticsearch, Memcached, MongoDB, Redis, RocksDB, Valkey, and In-memory, Disk, etc
+- **Multiple backends**: DynamoDB, Elasticsearch, Memcached, MongoDB, Redis, RocksDB, SQLite, Valkey, and In-memory, Disk, etc
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
 - **Adapters**: Pydantic model support, raise-on-missing behavior, etc
@@ -35,6 +35,7 @@ pip install py-key-value-aio
 # With specific backend extras
 pip install py-key-value-aio[memory]
 pip install py-key-value-aio[disk]
+pip install py-key-value-aio[sqlite]
 pip install py-key-value-aio[dynamodb]
 pip install py-key-value-aio[elasticsearch]
 # or: redis, mongodb, memcached, valkey, vault, rocksdb, see below for all options
@@ -98,6 +99,7 @@ Local stores are stored in memory or on disk, local to the application.
 | Memory           |  ✅  |  ✅  | `MemoryStore()` |
 | Disk             |  ☑️  |  ✅  | `DiskStore(directory="./cache")` |
 | Disk (Per-Collection) |  ☑️  |  ✅  | `MultiDiskStore(directory="./cache")` |
+| SQLite           |  ✅  |  ✖️   | `SQLiteStore(path="./cache.db")` |
 | RocksDB          |  ☑️  |  ✅  | `RocksDBStore(path="./rocksdb")` |
 | Simple (test)    |  ✅  |  ✅  | `SimpleStore()` |
 | Null (test)      |  ✅  |  ✅  | `NullStore()` |

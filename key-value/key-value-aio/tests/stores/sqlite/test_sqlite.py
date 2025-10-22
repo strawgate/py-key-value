@@ -20,7 +20,7 @@ class TestSQLiteStore(ContextManagerStoreTestMixin, BaseStoreTests):
             db_path = Path(temp_dir) / "test.db"
             sqlite_store = SQLiteStore(path=db_path)
             yield sqlite_store
-            await sqlite_store._close()
+            await sqlite_store.close()
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
     @override

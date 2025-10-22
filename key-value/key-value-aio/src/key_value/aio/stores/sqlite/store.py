@@ -90,14 +90,14 @@ class SQLiteStore(BaseContextManagerStore, BaseStore):
             )
             """
         )
-        
+
         # Create index on expires_at for efficient TTL queries
         await self._db.execute(
             """
             CREATE INDEX IF NOT EXISTS idx_expires_at ON kv_store(expires_at)
             """
         )
-        
+
         await self._db.commit()
 
     @override
@@ -122,17 +122,14 @@ class SQLiteStore(BaseContextManagerStore, BaseStore):
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         self._fail_on_closed_store()
-        
+
         if self._db is None:
             raise KeyValueStoreError(message="Database not initialized")
 
         combo_key: str = compound_key(collection=collection, key=key)
 
         # Query the value and expiration time
-        async with self._db.execute(
-            "SELECT value, expires_at FROM kv_store WHERE key = ?",
-            (combo_key,)
-        ) as cursor:
+        async with self._db.execute("SELECT value, expires_at FROM kv_store WHERE key = ?", (combo_key,)) as cursor:
             row = await cursor.fetchone()
 
         if row is None:
@@ -142,14 +139,14 @@ class SQLiteStore(BaseContextManagerStore, BaseStore):
 
         # Check if the entry has expired
         import time
+
         current_time = time.time()
-        
-        if expires_at is not None:
-            if current_time > expires_at:
-                # Delete expired entry
-                await self._db.execute("DELETE FROM kv_store WHERE key = ?", (combo_key,))
-                await self._db.commit()
-                return None
+
+        if expires_at is not None and current_time > expires_at:
+            # Delete expired entry
+            await self._db.execute("DELETE FROM kv_store WHERE key = ?", (combo_key,))
+            await self._db.commit()
+            return None
 
         # Calculate remaining TTL
         ttl: float | None = None
@@ -169,7 +166,7 @@ class SQLiteStore(BaseContextManagerStore, BaseStore):
         managed_entry: ManagedEntry,
     ) -> None:
         self._fail_on_closed_store()
-        
+
         if self._db is None:
             raise KeyValueStoreError(message="Database not initialized")
 
@@ -180,29 +177,26 @@ class SQLiteStore(BaseContextManagerStore, BaseStore):
         expires_at: float | None = None
         if managed_entry.ttl is not None:
             import time
+
             expires_at = time.time() + float(managed_entry.ttl)
 
         # Insert or replace the entry
         await self._db.execute(
-            "INSERT OR REPLACE INTO kv_store (key, value, expires_at) VALUES (?, ?, ?)",
-            (combo_key, json_value, expires_at)
+            "INSERT OR REPLACE INTO kv_store (key, value, expires_at) VALUES (?, ?, ?)", (combo_key, json_value, expires_at)
         )
         await self._db.commit()
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         self._fail_on_closed_store()
-        
+
         if self._db is None:
             raise KeyValueStoreError(message="Database not initialized")
 
         combo_key: str = compound_key(collection=collection, key=key)
 
         # Check if key exists before deleting
-        async with self._db.execute(
-            "SELECT 1 FROM kv_store WHERE key = ?",
-            (combo_key,)
-        ) as cursor:
+        async with self._db.execute("SELECT 1 FROM kv_store WHERE key = ?", (combo_key,)) as cursor:
             exists = await cursor.fetchone() is not None
 
         if exists:
