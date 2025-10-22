@@ -5,22 +5,22 @@ from key_value.shared_test.cases import LARGE_TEST_DATA_ARGNAMES, LARGE_TEST_DAT
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
-from tests.conftest import detect_on_linux, detect_on_macos
+from tests.conftest import detect_on_windows
 from tests.stores.base import BaseStoreTests
 
 if TYPE_CHECKING:
-    from key_value.aio.stores.registry.store import RegistryStore
+    from key_value.aio.stores.windows_registry.store import WindowsRegistryStore
 
 
-@pytest.mark.skipif(condition=detect_on_linux() or detect_on_macos(), reason="RegistryStore is only available on Windows")
-class TestRegistryStore(BaseStoreTests):
+@pytest.mark.skipif(condition=not detect_on_windows(), reason="WindowsRegistryStore is only available on Windows")
+class TestWindowsRegistryStore(BaseStoreTests):
     @override
     @pytest.fixture
-    async def store(self) -> "RegistryStore":
+    async def store(self) -> "WindowsRegistryStore":
         # Use a test-specific root to avoid conflicts
-        from key_value.aio.stores.registry.store import RegistryStore
+        from key_value.aio.stores.windows_registry.store import WindowsRegistryStore
 
-        store = RegistryStore(root="py-key-value-test")
+        store = WindowsRegistryStore(root="py-key-value-test")
         await store.delete_many(collection="test", keys=["test"])
         await store.delete_many(collection="test_collection", keys=["test_key"])
 

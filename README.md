@@ -98,17 +98,17 @@ Local stores are stored in memory or on disk, local to the application.
 | Memory           |  ✅  |  ✅  | `MemoryStore()` |
 | Disk             |  ☑️  |  ✅  | `DiskStore(directory="./cache")` |
 | Disk (Per-Collection) |  ☑️  |  ✅  | `MultiDiskStore(directory="./cache")` |
+| Null (test)      |  ✅  |  ✅  | `NullStore()` |
 | RocksDB          |  ☑️  |  ✅  | `RocksDBStore(path="./rocksdb")` |
 | Simple (test)    |  ✅  |  ✅  | `SimpleStore()` |
-| Null (test)      |  ✅  |  ✅  | `NullStore()` |
+| Windows Registry |  ☑️  |   ✅   | `WindowsRegistryStore(base_key="HKEY_CURRENT_USER\\Software", key_name="py-key-value")` |
 
-#### Secret stores
+#### Local - Secret stores
 Secret stores are stores that are used to store sensitive data, typically in an Operating System's secret store.
 
 | Secret Stores | Async | Sync | Example |
 |------------------|:-----:|:----:|:-------|
 | Keyring          |  ☑️  |   ✅   | `KeyringStore(service_name="py-key-value")` |
-| Registry (Windows) |  ☑️  |   ✅   | `RegistryStore(root="py-key-value")` |
 | Vault            |  ☑️  |   ✅   | `VaultStore(url="http://localhost:8200", token="your-token")` |
 
 Note: The Windows Keyring has strict limits on the length of values which may cause issues with large values.

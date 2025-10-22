@@ -1,5 +1,7 @@
 """Windows Registry-based key-value store."""
 
+from typing import Literal
+
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
 from typing_extensions import override
@@ -9,18 +11,20 @@ from key_value.aio.stores.base import BaseStore
 try:
     import winreg
 except ImportError as e:
-    msg = "RegistryStore requires Windows platform (winreg module)"
+    msg = "WindowsRegistryStore requires Windows platform (winreg module)"
     raise ImportError(msg) from e
 
 DEFAULT_REGISTRY_ROOT = "py-key-value"
-MAX_KEY_LENGTH = 256
+MAX_KEY_LENGTH = 96
 ALLOWED_KEY_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
-MAX_COLLECTION_LENGTH = 256
+MAX_COLLECTION_LENGTH = 96
 ALLOWED_COLLECTION_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
+DEFAULT_REGISTRY_PATH = "Software\\py-key-value"
+DEFAULT_HIVE = "HKEY_CURRENT_USER"
 
 
-class RegistryStore(BaseStore):
+class WindowsRegistryStore(BaseStore):
     """Windows Registry-based key-value store.
 
     This store uses the Windows Registry to persist key-value pairs. Each entry is stored
@@ -36,17 +40,21 @@ class RegistryStore(BaseStore):
     def __init__(
         self,
         *,
-        root: str = DEFAULT_REGISTRY_ROOT,
+        hive: Literal["HKEY_CURRENT_USER", "HKEY_LOCAL_MACHINE"] | None = None,
+        registry_path: str | None = None,
         default_collection: str | None = None,
     ) -> None:
         """Initialize the Windows Registry store.
 
         Args:
-            root: The root registry path under HKEY_CURRENT_USER\\Software. Defaults to "py-key-value".
+            hive: The hive to use. Defaults to "HKEY_CURRENT_USER".
+            registry_path: The registry path to use. Must be a valid registry path under the hive. Defaults to "Software\\py-key-value".
             default_collection: The default collection to use if no collection is provided.
         """
-        self._root = root
-        self._base_key_path = f"Software\\{self._root}"
+        hive = hive or DEFAULT_HIVE
+        registry_path = registry_path or DEFAULT_REGISTRY_PATH
+
+        self._registry_path = hive + "\\" + registry_path
 
         super().__init__(default_collection=default_collection)
 
@@ -67,7 +75,7 @@ class RegistryStore(BaseStore):
     def _get_registry_path(self, *, collection: str) -> str:
         """Get the full registry path for a collection."""
         sanitized_collection = self._sanitize_collection_name(collection=collection)
-        return f"{self._base_key_path}\\{sanitized_collection}"
+        return f"{self._registry_path}\\{sanitized_collection}"
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -75,7 +83,7 @@ class RegistryStore(BaseStore):
         registry_path = self._get_registry_path(collection=collection)
 
         try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, registry_path, 0, winreg.KEY_READ) as reg_key:
+            with winreg.OpenKey(key=winreg.HKEY_CURRENT_USER, sub_key=registry_path, reserved=0, access=winreg.KEY_READ) as reg_key:
                 json_str, _ = winreg.QueryValueEx(reg_key, sanitized_key)
         except (FileNotFoundError, OSError):
             return None
