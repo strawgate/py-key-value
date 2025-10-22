@@ -43,6 +43,7 @@ elasticsearch = ["elasticsearch>=9.0.0", "aiohttp>=3.12"]
 dynamodb = ["aioboto3>=13.3.0", "types-aiobotocore-dynamodb>=2.16.0"]
 keyring = ["keyring>=25.6.0"]
 keyring-linux = ["keyring>=25.6.0", "dbus-python>=1.4.0"]
+registry = []  # Uses built-in winreg module on Windows
 pydantic = ["pydantic>=2.11.9"]
 rocksdb = ["rocksdict>=0.3.0"]
 

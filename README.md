@@ -37,7 +37,7 @@ pip install py-key-value-aio[memory]
 pip install py-key-value-aio[disk]
 pip install py-key-value-aio[dynamodb]
 pip install py-key-value-aio[elasticsearch]
-# or: redis, mongodb, memcached, valkey, vault, rocksdb, see below for all options
+# or: redis, mongodb, memcached, valkey, vault, registry, rocksdb, see below for all options
 ```
 
 ```python
@@ -108,6 +108,7 @@ Secret stores are stores that are used to store sensitive data, typically in an 
 | Secret Stores | Async | Sync | Example |
 |------------------|:-----:|:----:|:-------|
 | Keyring          |  ☑️  |   ✅   | `KeyringStore(service_name="py-key-value")` |
+| Registry (Windows) |  ☑️  |   ✅   | `RegistryStore(root="py-key-value")` |
 | Vault            |  ☑️  |   ✅   | `VaultStore(url="http://localhost:8200", token="your-token")` |
 
 Note: The Windows Keyring has strict limits on the length of values which may cause issues with large values.
