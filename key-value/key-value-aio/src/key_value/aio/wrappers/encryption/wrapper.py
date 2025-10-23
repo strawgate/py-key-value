@@ -49,7 +49,7 @@ class EncryptionWrapper(BaseWrapper):
         Args:
             key_value: The store to wrap.
             encryption_key: The encryption key to use. Can be a bytes object or a base64-encoded string.
-                          Use Fernet.generate_key() to generate a new key.
+                          Use `generate_key()` to generate a new key.
             raise_on_decryption_error: Whether to raise an exception if decryption fails. Defaults to True.
         """
         self.key_value: AsyncKeyValue = key_value
@@ -62,6 +62,14 @@ class EncryptionWrapper(BaseWrapper):
         self._fernet: Fernet = Fernet(key=encryption_key)
 
         super().__init__()
+
+    @classmethod
+    def generate_key(cls) -> bytes:
+        """A helper method to generate a new encryption key for use with the encryption wrapper.
+
+        You must save this key somewhere secure and use it to initialize the encryption wrapper. If you
+        lose the key, you will not be able to decrypt the data."""
+        return Fernet.generate_key()
 
     def _encrypt_value(self, value: dict[str, Any]) -> dict[str, Any]:
         """Encrypt a value into the encrypted format."""
