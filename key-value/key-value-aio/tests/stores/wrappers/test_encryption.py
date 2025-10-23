@@ -115,7 +115,6 @@ class TestEncryptionWrapper(BaseStoreTests):
         with pytest.raises(DecryptionError):
             await encryption_store.get(collection="test", key="test")
 
-
     async def test_decryption_ignores_corrupted_data(self, memory_store: MemoryStore):
         """Test that corrupted encrypted data is ignored."""
         encryption_key = Fernet.generate_key()
