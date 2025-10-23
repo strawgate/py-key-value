@@ -1,6 +1,6 @@
 [project]
 name = "py-key-value"
-version = "0.2.6"
+version = "0.2.7"
 description = "Key-Value Store Project"
 readme = "README.md"
 requires-python = ">=3.10"
