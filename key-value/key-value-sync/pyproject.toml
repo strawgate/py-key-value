@@ -43,6 +43,7 @@ pydantic = ["pydantic>=2.11.9"]
 keyring = ["keyring>=25.6.0"]
 keyring-linux = ["keyring>=25.6.0", "dbus-python>=1.4.0"]
 rocksdb = ["rocksdict>=0.3.0"]
+wrappers-encryption = ["cryptography>=45.0.0"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -60,6 +61,7 @@ dev = [
     "py-key-value-sync[valkey]; platform_system != 'Windows'",
     "py-key-value-sync[pydantic]",
     "py-key-value-sync[keyring]",
+    "py-key-value-sync[wrappers-encryption]",
     "pytest",
     "pytest-mock",
     "pytest-asyncio",
