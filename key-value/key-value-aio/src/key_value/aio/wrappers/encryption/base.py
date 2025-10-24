@@ -1,9 +1,8 @@
 import base64
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, SupportsFloat
 
-from cryptography.fernet import Fernet
 from key_value.shared.errors.key_value import SerializationError
 from key_value.shared.errors.wrappers.encryption import DecryptionError
 from typing_extensions import override
@@ -16,12 +15,15 @@ _ENCRYPTED_DATA_KEY = "__encrypted_data__"
 _ENCRYPTION_VERSION_KEY = "__encryption_version__"
 _ENCRYPTION_VERSION = 1
 
+EncryptionFn = Callable[[bytes], bytes]
+DecryptionFn = Callable[[bytes], bytes]
+
 
 class EncryptionError(Exception):
     """Exception raised when encryption or decryption fails."""
 
 
-class EncryptionWrapper(BaseWrapper):
+class BaseEncryptionWrapper(BaseWrapper):
     """Wrapper that encrypts values before storing and decrypts on retrieval.
 
     This wrapper encrypts the JSON-serialized value using Fernet (symmetric encryption)
@@ -41,33 +43,31 @@ class EncryptionWrapper(BaseWrapper):
     def __init__(
         self,
         key_value: AsyncKeyValue,
-        encryption_key: bytes | str,
+        encryption_fn: EncryptionFn,
+        decryption_fn: DecryptionFn,
         raise_on_decryption_error: bool = True,
     ) -> None:
         """Initialize the encryption wrapper.
 
         Args:
             key_value: The store to wrap.
-            encryption_key: The encryption key to use. Can be a bytes object or a base64-encoded string.
-                          Use Fernet.generate_key() to generate a new key.
+            encryption_fn: The encryption function to use.
+            decryption_fn: The decryption function to use.
             raise_on_decryption_error: Whether to raise an exception if decryption fails. Defaults to True.
         """
         self.key_value: AsyncKeyValue = key_value
         self.raise_on_decryption_error: bool = raise_on_decryption_error
 
-        # Convert string key to bytes if needed
-        if isinstance(encryption_key, str):
-            encryption_key = encryption_key.encode("utf-8")
-
-        self._fernet: Fernet = Fernet(key=encryption_key)
+        self._encryption_fn: EncryptionFn = encryption_fn
+        self._decryption_fn: DecryptionFn = decryption_fn
 
         super().__init__()
 
     def _encrypt_value(self, value: dict[str, Any]) -> dict[str, Any]:
         """Encrypt a value into the encrypted format."""
-        # Don't encrypt if it's already encrypted
-        if _ENCRYPTED_DATA_KEY in value:
-            return value
+        # # Don't encrypt if it's already encrypted
+        # if _ENCRYPTED_DATA_KEY in value:
+        #     return value
 
         # Serialize to JSON
         try:
@@ -79,7 +79,7 @@ class EncryptionWrapper(BaseWrapper):
         json_bytes: bytes = json_str.encode(encoding="utf-8")
 
         # Encrypt with Fernet
-        encrypted_bytes: bytes = self._fernet.encrypt(data=json_bytes)
+        encrypted_bytes: bytes = self._encryption_fn(json_bytes)
 
         # Encode to base64 for storage in dict (though Fernet output is already base64)
         base64_str: str = base64.b64encode(encrypted_bytes).decode(encoding="ascii")
@@ -110,7 +110,7 @@ class EncryptionWrapper(BaseWrapper):
             encrypted_bytes: bytes = base64.b64decode(base64_str)
 
             # Decrypt with Fernet
-            json_bytes: bytes = self._fernet.decrypt(token=encrypted_bytes)
+            json_bytes: bytes = self._decryption_fn(encrypted_bytes)
 
             # Parse JSON
             json_str: str = json_bytes.decode(encoding="utf-8")

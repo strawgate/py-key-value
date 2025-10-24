@@ -49,7 +49,7 @@ wrappers-encryption = ["cryptography>=45.0.0"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-addopts = ["--inline-snapshot=disable"]
+addopts = ["--inline-snapshot=fix,create"]
 markers = [
     "skip_on_ci: Skip running the test when running on CI",
 ]

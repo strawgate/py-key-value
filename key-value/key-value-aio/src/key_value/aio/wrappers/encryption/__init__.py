@@ -1,3 +1,4 @@
-from key_value.aio.wrappers.encryption.wrapper import EncryptionWrapper
+from key_value.aio.wrappers.encryption.base import BaseEncryptionWrapper
+from key_value.aio.wrappers.encryption.fernet import FernetEncryptionWrapper
 
-__all__ = ["EncryptionWrapper"]
+__all__ = ["BaseEncryptionWrapper", "FernetEncryptionWrapper"]
