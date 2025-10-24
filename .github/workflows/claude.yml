@@ -51,7 +51,7 @@ jobs:
 
           # Getting Started
           1. Call the generate_agents_md tool to get a high-level summary of the project you're working in
-          2. Get the issue ${{ github.event.issue.number }} in the GitHub repository: ${{ github.repository }}.
+          2. Get the ${{ github.event_name == 'issues' && 'issue' || 'pull request' }} ${{ github.event.issue.number || github.event.pull_request.number }} in the GitHub repository: ${{ github.repository }}.
           3. Use the search_issues and search_pull_requests tools to scour the repository for actually related issues and pull requests
           4. Call the search_code, get_files, etc. tools to search the repository to identify the related classes, methods, docs, tests, etc that are relevant to the issue.
 
