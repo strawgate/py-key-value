@@ -1,5 +1,5 @@
 from types import TracebackType
-from typing import Any, overload
+from typing import Any, cast, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import Self, override
@@ -113,7 +113,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def __aenter__(self) -> Self:
         if self._raw_client:
-            self._client = await self._raw_client.__aenter__()
+            self._client = cast("DynamoDBClient", await self._raw_client.__aenter__())
         await super().__aenter__()
         return self
 
@@ -137,7 +137,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         """Setup the DynamoDB client and ensure table exists."""
 
         if not self._client:
-            self._client = await self._raw_client.__aenter__()
+            self._client = cast("DynamoDBClient", await self._raw_client.__aenter__())
 
         try:
             await self._connected_client.describe_table(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
