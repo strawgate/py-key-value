@@ -28,8 +28,8 @@ class FernetEncryptionWrapper(BaseEncryptionWrapper):
 
         Args:
             key_value: The key-value store to wrap.
-            source_material: The source material to combine with the salt to generate the encryption key.
-            salt: The salt to combine with the source material to generate the encryption key. Defaults to "py-key-value-salt".
+            source_material: A string to use as the source material for the encryption key.
+            salt: A string to use as the salt for the encryption key.
             raise_on_decryption_error: Whether to raise an exception if decryption fails. Defaults to True.
         """
 
@@ -77,13 +77,14 @@ class FernetEncryptionWrapper(BaseEncryptionWrapper):
 
 
 def _generate_encryption_key(source_material: str, salt: str) -> bytes:
+    """Generate a Fernet encryption key from a source material and salt using PBKDF2 with 1.2 million iterations."""
     import base64
 
     from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-    derived_key = HKDF(algorithm=hashes.SHA256(), length=32, salt=salt.encode(), info=b"Fernet").derive(
+    pbkdf2 = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt.encode(), iterations=1200000).derive(
         key_material=source_material.encode()
     )
 
-    return base64.urlsafe_b64encode(derived_key)
+    return base64.urlsafe_b64encode(pbkdf2)
