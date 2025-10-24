@@ -1,120 +1,136 @@
 import base64
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, SupportsFloat
 
-from cryptography.fernet import Fernet
 from key_value.shared.errors.key_value import SerializationError
-from key_value.shared.errors.wrappers.encryption import DecryptionError
+from key_value.shared.errors.wrappers.encryption import CorruptedDataError, DecryptionError, EncryptionError
 from typing_extensions import override
 
 from key_value.aio.protocols.key_value import AsyncKeyValue
 from key_value.aio.wrappers.base import BaseWrapper
 
-# Special keys used to store encrypted data
 _ENCRYPTED_DATA_KEY = "__encrypted_data__"
 _ENCRYPTION_VERSION_KEY = "__encryption_version__"
-_ENCRYPTION_VERSION = 1
 
 
-class EncryptionError(Exception):
-    """Exception raised when encryption or decryption fails."""
+EncryptionFn = Callable[[bytes], bytes]
+DecryptionFn = Callable[[bytes, int], bytes]
 
 
-class EncryptionWrapper(BaseWrapper):
+class BaseEncryptionWrapper(BaseWrapper):
     """Wrapper that encrypts values before storing and decrypts on retrieval.
 
-    This wrapper encrypts the JSON-serialized value using Fernet (symmetric encryption)
+    This wrapper encrypts the JSON-serialized value using a custom encryption function
     and stores it as a base64-encoded string within a special key in the dictionary.
     This allows encryption while maintaining the dict[str, Any] interface.
-
-    The encrypted format looks like:
-    {
-        "__encrypted_data__": "base64-encoded-encrypted-data",
-        "__encryption_version__": 1
-    }
-
-    Note: The encryption key must be kept secret and secure. If the key is lost,
-    encrypted data cannot be recovered.
     """
 
     def __init__(
         self,
         key_value: AsyncKeyValue,
-        encryption_key: bytes | str,
+        encryption_fn: EncryptionFn,
+        decryption_fn: DecryptionFn,
+        encryption_version: int,
         raise_on_decryption_error: bool = True,
     ) -> None:
         """Initialize the encryption wrapper.
 
         Args:
             key_value: The store to wrap.
-            encryption_key: The encryption key to use. Can be a bytes object or a base64-encoded string.
-                          Use Fernet.generate_key() to generate a new key.
+            encryption_fn: The encryption function to use. A callable that takes bytes and returns encrypted bytes.
+            decryption_fn: The decryption function to use. A callable that takes bytes and an
+                           encryption version int and returns decrypted bytes.
+            encryption_version: The encryption version to use.
             raise_on_decryption_error: Whether to raise an exception if decryption fails. Defaults to True.
         """
         self.key_value: AsyncKeyValue = key_value
         self.raise_on_decryption_error: bool = raise_on_decryption_error
 
-        # Convert string key to bytes if needed
-        if isinstance(encryption_key, str):
-            encryption_key = encryption_key.encode("utf-8")
+        self.encryption_version: int = encryption_version
 
-        self._fernet: Fernet = Fernet(key=encryption_key)
+        self._encryption_fn: EncryptionFn = encryption_fn
+        self._decryption_fn: DecryptionFn = decryption_fn
 
         super().__init__()
 
     def _encrypt_value(self, value: dict[str, Any]) -> dict[str, Any]:
-        """Encrypt a value into the encrypted format."""
-        # Don't encrypt if it's already encrypted
-        if _ENCRYPTED_DATA_KEY in value:
-            return value
+        """Encrypt a value into the encrypted format.
+
+        The encrypted format looks like:
+        {
+            "__encrypted_data__": "base64-encoded-encrypted-data",
+            "__encryption_version__": 1
+        }
+        """
 
         # Serialize to JSON
         try:
             json_str: str = json.dumps(value, separators=(",", ":"))
+
+            json_bytes: bytes = json_str.encode(encoding="utf-8")
         except (json.JSONDecodeError, TypeError) as e:
             msg: str = f"Failed to serialize object to JSON: {e}"
             raise SerializationError(msg) from e
 
-        json_bytes: bytes = json_str.encode(encoding="utf-8")
+        try:
+            encrypted_bytes: bytes = self._encryption_fn(json_bytes)
 
-        # Encrypt with Fernet
-        encrypted_bytes: bytes = self._fernet.encrypt(data=json_bytes)
-
-        # Encode to base64 for storage in dict (though Fernet output is already base64)
-        base64_str: str = base64.b64encode(encrypted_bytes).decode(encoding="ascii")
+            base64_str: str = base64.b64encode(encrypted_bytes).decode(encoding="ascii")
+        except Exception as e:
+            msg = "Failed to encrypt value"
+            raise EncryptionError(msg) from e
 
         return {
             _ENCRYPTED_DATA_KEY: base64_str,
-            _ENCRYPTION_VERSION_KEY: _ENCRYPTION_VERSION,
+            _ENCRYPTION_VERSION_KEY: self.encryption_version,
         }
+
+    def _validate_encrypted_payload(self, value: dict[str, Any]) -> tuple[int, str]:
+        if _ENCRYPTION_VERSION_KEY not in value:
+            msg = "missing encryption version key"
+            raise CorruptedDataError(msg)
+
+        encryption_version = value[_ENCRYPTION_VERSION_KEY]
+        if not isinstance(encryption_version, int):
+            msg = f"expected encryption version to be an int, got {type(encryption_version)}"
+            raise CorruptedDataError(msg)
+
+        if _ENCRYPTED_DATA_KEY not in value:
+            msg = "missing encrypted data key"
+            raise CorruptedDataError(msg)
+
+        encrypted_data = value[_ENCRYPTED_DATA_KEY]
+
+        if not isinstance(encrypted_data, str):
+            msg = f"expected encrypted data to be a str, got {type(encrypted_data)}"
+            raise CorruptedDataError(msg)
+
+        return encryption_version, encrypted_data
 
     def _decrypt_value(self, value: dict[str, Any] | None) -> dict[str, Any] | None:
         """Decrypt a value from the encrypted format."""
         if value is None:
             return None
 
-        # Check if it's encrypted
-        if _ENCRYPTED_DATA_KEY not in value:
+        # If the value is not actually encrypted, return it as-is
+        if _ENCRYPTED_DATA_KEY not in value and isinstance(value, dict):  # pyright: ignore[reportUnnecessaryIsInstance]
             return value
 
-        # Extract encrypted data
-        base64_str = value[_ENCRYPTED_DATA_KEY]
-        if not isinstance(base64_str, str):
-            # Corrupted data, return as-is
-            msg = f"Corrupted data: expected str, got {type(base64_str)}"
-            raise TypeError(msg)
-
         try:
-            # Decode from base64
-            encrypted_bytes: bytes = base64.b64decode(base64_str)
+            encryption_version, encrypted_data = self._validate_encrypted_payload(value)
 
-            # Decrypt with Fernet
-            json_bytes: bytes = self._fernet.decrypt(token=encrypted_bytes)
+            encrypted_bytes: bytes = base64.b64decode(encrypted_data, validate=True)
 
-            # Parse JSON
+            json_bytes: bytes = self._decryption_fn(encrypted_bytes, encryption_version)
+
             json_str: str = json_bytes.decode(encoding="utf-8")
+
             return json.loads(json_str)  # type: ignore[no-any-return]
+        except CorruptedDataError:
+            if self.raise_on_decryption_error:
+                raise
+            return None
         except Exception as e:
             msg = "Failed to decrypt value"
             if self.raise_on_decryption_error:

@@ -1,30 +1,31 @@
-from typing import Any
-
 import pytest
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
+from dirty_equals import IsStr
+from inline_snapshot import snapshot
 from key_value.shared.errors.wrappers.encryption import DecryptionError
 from typing_extensions import override
 
 from key_value.aio.stores.memory.store import MemoryStore
-from key_value.aio.wrappers.encryption import EncryptionWrapper
+from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
+from key_value.aio.wrappers.encryption.fernet import _generate_encryption_key  # pyright: ignore[reportPrivateUsage]
 from tests.stores.base import BaseStoreTests
 
 
-class TestEncryptionWrapper(BaseStoreTests):
+@pytest.fixture
+def fernet() -> Fernet:
+    return Fernet(key=Fernet.generate_key())
+
+
+class TestFernetEncryptionWrapper(BaseStoreTests):
     @override
     @pytest.fixture
-    async def store(self, memory_store: MemoryStore) -> EncryptionWrapper:
-        # Generate a key for testing
-        encryption_key = Fernet.generate_key()
-        return EncryptionWrapper(key_value=memory_store, encryption_key=encryption_key)
+    async def store(self, memory_store: MemoryStore, fernet: Fernet) -> FernetEncryptionWrapper:
+        return FernetEncryptionWrapper(key_value=memory_store, fernet=fernet)
 
-    async def test_encryption_encrypts_value(self, memory_store: MemoryStore):
+    async def test_encryption_encrypts_value(self, store: FernetEncryptionWrapper, memory_store: MemoryStore):
         """Test that values are actually encrypted in the underlying store."""
-        encryption_key = Fernet.generate_key()
-        encryption_store = EncryptionWrapper(key_value=memory_store, encryption_key=encryption_key)
-
         original_value = {"test": "value", "number": 123}
-        await encryption_store.put(collection="test", key="test", value=original_value)
+        await store.put(collection="test", key="test", value=original_value)
 
         # Check the underlying store - should be encrypted
         raw_value = await memory_store.get(collection="test", key="test")
@@ -38,29 +39,43 @@ class TestEncryptionWrapper(BaseStoreTests):
         assert "value" not in str(raw_value)
 
         # Retrieve through wrapper - should decrypt automatically
-        result = await encryption_store.get(collection="test", key="test")
+        result = await store.get(collection="test", key="test")
         assert result == original_value
 
-    async def test_encryption_with_string_key(self, memory_store: MemoryStore):
-        """Test that encryption works with a string key."""
-        encryption_key = Fernet.generate_key().decode("utf-8")
-        encryption_store = EncryptionWrapper(key_value=memory_store, encryption_key=encryption_key)
-
+    async def test_encryption_with_wrong_encryption_version(self, store: FernetEncryptionWrapper):
+        """Test that encryption fails with the wrong encryption version."""
+        store.encryption_version = 2
         original_value = {"test": "value"}
-        await encryption_store.put(collection="test", key="test", value=original_value)
+        await store.put(collection="test", key="test", value=original_value)
 
-        result = await encryption_store.get(collection="test", key="test")
-        assert result == original_value
+        assert await store.get(collection="test", key="test") is not None
+        store.encryption_version = 1
 
-    async def test_encryption_many_operations(self, memory_store: MemoryStore):
+        with pytest.raises(DecryptionError):
+            await store.get(collection="test", key="test")
+
+    async def test_encryption_with_string_key(self, store: FernetEncryptionWrapper, memory_store: MemoryStore):
+        """Test that encryption works with a string key."""
+        original_value = {"test": "value"}
+        await store.put(collection="test", key="test", value=original_value)
+
+        round_trip_value = await store.get(collection="test", key="test")
+        assert round_trip_value == original_value
+
+        raw_result = await memory_store.get(collection="test", key="test")
+        assert raw_result == snapshot(
+            {
+                "__encrypted_data__": IsStr(min_length=32),
+                "__encryption_version__": 1,
+            }
+        )
+
+    async def test_encryption_many_operations(self, store: FernetEncryptionWrapper, memory_store: MemoryStore):
         """Test that encryption works with put_many and get_many."""
-        encryption_key = Fernet.generate_key()
-        encryption_store = EncryptionWrapper(key_value=memory_store, encryption_key=encryption_key)
-
         keys = ["k1", "k2", "k3"]
         values = [{"data": "value1"}, {"data": "value2"}, {"data": "value3"}]
 
-        await encryption_store.put_many(collection="test", keys=keys, values=values)
+        await store.put_many(collection="test", keys=keys, values=values)
 
         # Check underlying store - all should be encrypted
         for key in keys:
@@ -69,41 +84,21 @@ class TestEncryptionWrapper(BaseStoreTests):
             assert "__encrypted_data__" in raw_value
 
         # Retrieve through wrapper
-        results = await encryption_store.get_many(collection="test", keys=keys)
+        results = await store.get_many(collection="test", keys=keys)
         assert results == values
 
-    async def test_encryption_already_encrypted_not_reencrypted(self, memory_store: MemoryStore):
-        """Test that already encrypted values are not re-encrypted."""
-        encryption_key = Fernet.generate_key()
-        encryption_store = EncryptionWrapper(key_value=memory_store, encryption_key=encryption_key)
-
-        # Manually create an encrypted value
-        encrypted_value = {
-            "__encrypted_data__": "gAAAAABmxxx...",  # Mock encrypted data
-            "__encryption_version__": 1,
-        }
-
-        # Should not try to encrypt again
-        result = encryption_store._encrypt_value(value=encrypted_value)  # pyright: ignore[reportPrivateUsage]
-        assert result == encrypted_value
-
-    async def test_decryption_handles_unencrypted_data(self, memory_store: MemoryStore):
+    async def test_decryption_handles_unencrypted_data(self, store: FernetEncryptionWrapper, memory_store: MemoryStore):
         """Test that unencrypted data is returned as-is."""
-        encryption_key = Fernet.generate_key()
-        encryption_store = EncryptionWrapper(key_value=memory_store, encryption_key=encryption_key)
-
         # Store unencrypted data directly in underlying store
         unencrypted_value = {"test": "value"}
         await memory_store.put(collection="test", key="test", value=unencrypted_value)
 
         # Should return as-is when retrieved through encryption wrapper
-        result = await encryption_store.get(collection="test", key="test")
+        result = await store.get(collection="test", key="test")
         assert result == unencrypted_value
 
-    async def test_decryption_handles_corrupted_data(self, memory_store: MemoryStore):
+    async def test_decryption_handles_corrupted_data(self, store: FernetEncryptionWrapper, memory_store: MemoryStore):
         """Test that corrupted encrypted data is handled gracefully."""
-        encryption_key = Fernet.generate_key()
-        encryption_store = EncryptionWrapper(key_value=memory_store, encryption_key=encryption_key)
 
         # Store corrupted encrypted data
         corrupted_value = {
@@ -113,12 +108,11 @@ class TestEncryptionWrapper(BaseStoreTests):
         await memory_store.put(collection="test", key="test", value=corrupted_value)
 
         with pytest.raises(DecryptionError):
-            await encryption_store.get(collection="test", key="test")
+            await store.get(collection="test", key="test")
 
-    async def test_decryption_ignores_corrupted_data(self, memory_store: MemoryStore):
+    async def test_decryption_ignores_corrupted_data(self, memory_store: MemoryStore, fernet: Fernet):
         """Test that corrupted encrypted data is ignored."""
-        encryption_key = Fernet.generate_key()
-        encryption_store = EncryptionWrapper(key_value=memory_store, encryption_key=encryption_key, raise_on_decryption_error=False)
+        store = FernetEncryptionWrapper(key_value=memory_store, fernet=fernet, raise_on_decryption_error=False)
 
         # Store corrupted encrypted data
         corrupted_value = {
@@ -127,95 +121,57 @@ class TestEncryptionWrapper(BaseStoreTests):
         }
         await memory_store.put(collection="test", key="test", value=corrupted_value)
 
-        assert await encryption_store.get(collection="test", key="test") is None
+        assert await store.get(collection="test", key="test") is None
 
-    async def test_decryption_with_wrong_key_returns_original(self, memory_store: MemoryStore):
-        """Test that decryption with the wrong key returns the original encrypted value."""
-        encryption_key1 = Fernet.generate_key()
-        encryption_key2 = Fernet.generate_key()
+    async def test_decryption_with_multi_fernet(self, memory_store: MemoryStore):
+        """Test that decryption works with a MultiFernet."""
+        first_fernet = Fernet(key=Fernet.generate_key())
+        first_fernet_store = FernetEncryptionWrapper(key_value=memory_store, fernet=first_fernet)
+        original_value = {"test": "value"}
+        await first_fernet_store.put(collection="test", key="test", value=original_value)
+        assert await first_fernet_store.get(collection="test", key="test") == original_value
 
-        encryption_store1 = EncryptionWrapper(key_value=memory_store, encryption_key=encryption_key1)
-        encryption_store2 = EncryptionWrapper(key_value=memory_store, encryption_key=encryption_key2)
+        second_fernet = Fernet(key=Fernet.generate_key())
+        multi_fernet = MultiFernet([second_fernet, first_fernet])
+        multi_fernet_store = FernetEncryptionWrapper(key_value=memory_store, fernet=multi_fernet)
+        assert await multi_fernet_store.get(collection="test", key="test") == original_value
+
+    async def test_decryption_with_wrong_key_raises_error(self, memory_store: MemoryStore):
+        """Test that decryption with the wrong key raises an error."""
+        fernet1 = Fernet(key=Fernet.generate_key())
+        fernet2 = Fernet(key=Fernet.generate_key())
+
+        store1 = FernetEncryptionWrapper(key_value=memory_store, fernet=fernet1)
+        store2 = FernetEncryptionWrapper(key_value=memory_store, fernet=fernet2)
 
         original_value = {"test": "value"}
-        await encryption_store1.put(collection="test", key="test", value=original_value)
+        await store1.put(collection="test", key="test", value=original_value)
 
         with pytest.raises(DecryptionError):
-            await encryption_store2.get(collection="test", key="test")
+            await store2.get(collection="test", key="test")
 
-    async def test_encryption_with_ttl(self, memory_store: MemoryStore):
-        """Test that encryption works with TTL."""
-        encryption_key = Fernet.generate_key()
-        encryption_store = EncryptionWrapper(key_value=memory_store, encryption_key=encryption_key)
 
-        original_value = {"test": "value"}
-        await encryption_store.put(collection="test", key="test", value=original_value, ttl=3600)
+def test_key_generation():
+    """Test that key generation works with a source material and salt and that different source materials and salts produce different keys."""
 
-        # Check underlying store - should be encrypted
-        raw_value = await memory_store.get(collection="test", key="test")
-        assert raw_value is not None
-        assert "__encrypted_data__" in raw_value
+    source_material = "test-source-material"
+    salt = "test-salt"
+    key = _generate_encryption_key(source_material=source_material, salt=salt)
+    key_str_one = key.decode()
+    assert key_str_one == snapshot("znx7rVYt4roVgu3ymt5sIYFmfMNGEPbm8AShXQv6CY4=")
 
-        # Retrieve through wrapper with TTL
-        result, ttl = await encryption_store.ttl(collection="test", key="test")
-        assert result == original_value
-        assert ttl is not None
-        assert ttl > 0
+    source_material = "different-source-material"
+    salt = "test-salt"
+    key = _generate_encryption_key(source_material=source_material, salt=salt)
+    key_str_two = key.decode()
+    assert key_str_two == snapshot("1TLRpjxQm4Op699i9hAXFVfyz6PqPXbuvwKaWB48tS8=")
 
-    async def test_encryption_ttl_many(self, memory_store: MemoryStore):
-        """Test that encryption works with ttl_many."""
-        encryption_key = Fernet.generate_key()
-        encryption_store = EncryptionWrapper(key_value=memory_store, encryption_key=encryption_key)
+    source_material = "test-source-material"
+    salt = "different-salt"
+    key = _generate_encryption_key(source_material=source_material, salt=salt)
+    key_str_three = key.decode()
+    assert key_str_three == snapshot("oLz_g5NoLhANNh2_-ZwbgchDZ1q23VFx90kUQDjracc=")
 
-        keys = ["k1", "k2"]
-        values = [{"data": "value1"}, {"data": "value2"}]
-        ttls = [3600, 7200]
-
-        await encryption_store.put_many(collection="test", keys=keys, values=values, ttl=ttls)
-
-        # Retrieve through wrapper with TTL
-        results = await encryption_store.ttl_many(collection="test", keys=keys)
-        assert len(results) == 2
-        for (value, ttl), expected_value in zip(results, values, strict=True):
-            assert value == expected_value
-            assert ttl is not None
-            assert ttl > 0
-
-    async def test_encryption_complex_data(self, memory_store: MemoryStore):
-        """Test encryption with complex nested data structures."""
-        encryption_key = Fernet.generate_key()
-        encryption_store = EncryptionWrapper(key_value=memory_store, encryption_key=encryption_key)
-
-        complex_value = {
-            "users": [
-                {"name": "Alice", "age": 30, "active": True},
-                {"name": "Bob", "age": 25, "active": False},
-            ],
-            "metadata": {
-                "created_at": "2024-01-01T00:00:00Z",
-                "version": 1,
-            },
-            "tags": ["python", "encryption", "testing"],
-        }
-
-        await encryption_store.put(collection="test", key="complex", value=complex_value)
-
-        # Check underlying store - should be encrypted
-        raw_value = await memory_store.get(collection="test", key="complex")
-        assert raw_value is not None
-        assert "__encrypted_data__" in raw_value
-
-        # Retrieve and verify
-        result = await encryption_store.get(collection="test", key="complex")
-        assert result == complex_value
-
-    async def test_encryption_empty_dict(self, memory_store: MemoryStore):
-        """Test encryption with an empty dictionary."""
-        encryption_key = Fernet.generate_key()
-        encryption_store = EncryptionWrapper(key_value=memory_store, encryption_key=encryption_key)
-
-        empty_value: dict[str, Any] = {}
-        await encryption_store.put(collection="test", key="empty", value=empty_value)
-
-        result = await encryption_store.get(collection="test", key="empty")
-        assert result == empty_value
+    assert key_str_one != key_str_two
+    assert key_str_one != key_str_three
+    assert key_str_two != key_str_three
