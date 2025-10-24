@@ -4,7 +4,7 @@ from collections.abc import Callable, Sequence
 from typing import Any, SupportsFloat
 
 from key_value.shared.errors.key_value import SerializationError
-from key_value.shared.errors.wrappers.encryption import CorruptedEncryptionDataError, DecryptionError
+from key_value.shared.errors.wrappers.encryption import CorruptedDataError, DecryptionError, EncryptionError
 from typing_extensions import override
 
 from key_value.aio.protocols.key_value import AsyncKeyValue
@@ -16,10 +16,6 @@ _ENCRYPTION_VERSION_KEY = "__encryption_version__"
 
 EncryptionFn = Callable[[bytes], bytes]
 DecryptionFn = Callable[[bytes, int], bytes]
-
-
-class EncryptionError(Exception):
-    """Exception raised when encryption or decryption fails."""
 
 
 class BaseEncryptionWrapper(BaseWrapper):
@@ -90,36 +86,51 @@ class BaseEncryptionWrapper(BaseWrapper):
             _ENCRYPTION_VERSION_KEY: self.encryption_version,
         }
 
+    def _validate_encrypted_payload(self, value: dict[str, Any]) -> tuple[int, str]:
+        if _ENCRYPTION_VERSION_KEY not in value:
+            msg = "missing encryption version key"
+            raise CorruptedDataError(msg)
+
+        encryption_version = value[_ENCRYPTION_VERSION_KEY]
+        if not isinstance(encryption_version, int):
+            msg = f"expected encryption version to be an int, got {type(encryption_version)}"
+            raise CorruptedDataError(msg)
+
+        if _ENCRYPTED_DATA_KEY not in value:
+            msg = "missing encrypted data key"
+            raise CorruptedDataError(msg)
+
+        encrypted_data = value[_ENCRYPTED_DATA_KEY]
+
+        if not isinstance(encrypted_data, str):
+            msg = f"expected encrypted data to be a str, got {type(encrypted_data)}"
+            raise CorruptedDataError(msg)
+
+        return encryption_version, encrypted_data
+
     def _decrypt_value(self, value: dict[str, Any] | None) -> dict[str, Any] | None:
         """Decrypt a value from the encrypted format."""
         if value is None:
             return None
 
+        # If the value is not actually encrypted, return it as-is
         if _ENCRYPTED_DATA_KEY not in value and isinstance(value, dict):  # pyright: ignore[reportUnnecessaryIsInstance]
             return value
 
-        base64_str = value[_ENCRYPTED_DATA_KEY]
-        if not isinstance(base64_str, str):
-            msg = f"Corrupted data: expected str, got {type(base64_str)}"
-            raise CorruptedEncryptionDataError(msg)
-
-        if _ENCRYPTION_VERSION_KEY not in value:
-            msg = "Corrupted data: missing encryption version"
-            raise CorruptedEncryptionDataError(msg)
-
-        encryption_version = value[_ENCRYPTION_VERSION_KEY]
-        if not isinstance(encryption_version, int):
-            msg = f"Corrupted data: expected int, got {type(encryption_version)}"
-            raise CorruptedEncryptionDataError(msg)
-
         try:
-            encrypted_bytes: bytes = base64.b64decode(base64_str, validate=True)
+            encryption_version, encrypted_data = self._validate_encrypted_payload(value)
+
+            encrypted_bytes: bytes = base64.b64decode(encrypted_data, validate=True)
 
             json_bytes: bytes = self._decryption_fn(encrypted_bytes, encryption_version)
 
             json_str: str = json_bytes.decode(encoding="utf-8")
 
             return json.loads(json_str)  # type: ignore[no-any-return]
+        except CorruptedDataError:
+            if self.raise_on_decryption_error:
+                raise
+            return None
         except Exception as e:
             msg = "Failed to decrypt value"
             if self.raise_on_decryption_error:

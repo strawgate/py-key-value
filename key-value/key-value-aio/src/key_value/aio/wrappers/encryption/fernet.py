@@ -76,7 +76,7 @@ class FernetEncryptionWrapper(BaseEncryptionWrapper):
 
         def decrypt_with_fernet(data: bytes, encryption_version: int) -> bytes:
             if encryption_version > self.encryption_version:
-                msg = f"Decryption failed: encryption version {encryption_version} is not supported"
+                msg = f"Decryption failed: encryption versions newer than {self.encryption_version} are not supported"
                 raise EncryptionVersionError(msg)
             return fernet.decrypt(data)
 
