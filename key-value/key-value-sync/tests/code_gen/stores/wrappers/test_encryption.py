@@ -10,6 +10,7 @@ from typing_extensions import override
 
 from key_value.sync.code_gen.stores.memory.store import MemoryStore
 from key_value.sync.code_gen.wrappers.encryption import FernetEncryptionWrapper
+from key_value.sync.code_gen.wrappers.encryption.fernet import _generate_encryption_key  # pyright: ignore[reportPrivateUsage]
 from tests.code_gen.stores.base import BaseStoreTests
 
 
@@ -127,3 +128,29 @@ class TestFernetEncryptionWrapper(BaseStoreTests):
 
         with pytest.raises(DecryptionError):
             store2.get(collection="test", key="test")
+
+
+def test_key_generation():
+    """Test that key generation works with a source material and salt and that different source materials and salts produce different keys."""
+
+    source_material = "test-source-material"
+    salt = "test-salt"
+    key = _generate_encryption_key(source_material=source_material, salt=salt)
+    key_str_one = key.decode()
+    assert key_str_one == snapshot("znx7rVYt4roVgu3ymt5sIYFmfMNGEPbm8AShXQv6CY4=")
+
+    source_material = "different-source-material"
+    salt = "test-salt"
+    key = _generate_encryption_key(source_material=source_material, salt=salt)
+    key_str_two = key.decode()
+    assert key_str_two == snapshot("1TLRpjxQm4Op699i9hAXFVfyz6PqPXbuvwKaWB48tS8=")
+
+    source_material = "test-source-material"
+    salt = "different-salt"
+    key = _generate_encryption_key(source_material=source_material, salt=salt)
+    key_str_three = key.decode()
+    assert key_str_three == snapshot("oLz_g5NoLhANNh2_-ZwbgchDZ1q23VFx90kUQDjracc=")
+
+    assert key_str_one != key_str_two
+    assert key_str_one != key_str_three
+    assert key_str_two != key_str_three
