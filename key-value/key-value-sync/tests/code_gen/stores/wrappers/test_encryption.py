@@ -2,7 +2,7 @@
 # from the original file 'test_encryption.py'
 # DO NOT CHANGE! Change the original file instead.
 import pytest
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
 from dirty_equals import IsStr
 from inline_snapshot import snapshot
 from key_value.shared.errors.wrappers.encryption import DecryptionError
@@ -114,6 +114,19 @@ class TestFernetEncryptionWrapper(BaseStoreTests):
         memory_store.put(collection="test", key="test", value=corrupted_value)
 
         assert store.get(collection="test", key="test") is None
+
+    def test_decryption_with_multi_fernet(self, memory_store: MemoryStore):
+        """Test that decryption works with a MultiFernet."""
+        first_fernet = Fernet(key=Fernet.generate_key())
+        first_fernet_store = FernetEncryptionWrapper(key_value=memory_store, fernet=first_fernet)
+        original_value = {"test": "value"}
+        first_fernet_store.put(collection="test", key="test", value=original_value)
+        assert first_fernet_store.get(collection="test", key="test") == original_value
+
+        second_fernet = Fernet(key=Fernet.generate_key())
+        multi_fernet = MultiFernet([second_fernet, first_fernet])
+        multi_fernet_store = FernetEncryptionWrapper(key_value=memory_store, fernet=multi_fernet)
+        assert multi_fernet_store.get(collection="test", key="test") == original_value
 
     def test_decryption_with_wrong_key_raises_error(self, memory_store: MemoryStore):
         """Test that decryption with the wrong key raises an error."""

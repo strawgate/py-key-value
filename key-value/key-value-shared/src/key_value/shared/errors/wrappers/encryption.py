@@ -11,3 +11,7 @@ class DecryptionError(EncryptionError):
 
 class EncryptionVersionError(EncryptionError):
     """Exception raised when the encryption version is not supported."""
+
+
+class CorruptedEncryptionDataError(EncryptionError):
+    """Exception raised when the encrypted data is corrupted."""

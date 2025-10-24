@@ -1,4 +1,4 @@
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, MultiFernet
 from key_value.shared.errors.wrappers.encryption import EncryptionVersionError
 from typing_extensions import overload
 
@@ -7,21 +7,26 @@ from key_value.aio.wrappers.encryption.base import BaseEncryptionWrapper
 
 ENCRYPTION_VERSION = 1
 
+KDF_ITERATIONS = 1_200_000
+
 
 class FernetEncryptionWrapper(BaseEncryptionWrapper):
+    """Wrapper that encrypts values before storing and decrypts on retrieval using Fernet (symmetric encryption)."""
+
     @overload
     def __init__(
         self,
         key_value: AsyncKeyValue,
         *,
-        fernet: Fernet,
+        fernet: Fernet | MultiFernet,
         raise_on_decryption_error: bool = True,
     ) -> None:
         """Initialize the Fernet encryption wrapper.
 
         Args:
             key_value: The key-value store to wrap.
-            fernet: The Fernet instance to use for encryption and decryption.
+            fernet: The Fernet or MultiFernet instance to use for encryption and decryption MultiFernet is used to support
+                    key rotation by allowing you to provide multiple Fernet instances that are attempted in order.
             raise_on_decryption_error: Whether to raise an exception if decryption fails. Defaults to True.
         """
 
@@ -47,21 +52,21 @@ class FernetEncryptionWrapper(BaseEncryptionWrapper):
         self,
         key_value: AsyncKeyValue,
         *,
-        fernet: Fernet | None = None,
+        fernet: Fernet | MultiFernet | None = None,
         source_material: str | None = None,
         salt: str | None = None,
         raise_on_decryption_error: bool = True,
     ) -> None:
         if fernet is not None:  # noqa: SIM102
             if source_material or salt:
-                msg = "Cannot provide both fernet and source_material and salt"
+                msg = "Cannot provide fernet together with source_material or salt"
                 raise ValueError(msg)
 
         if fernet is None:
-            if not source_material:
+            if not source_material or not source_material.strip():
                 msg = "Must provide either fernet or source_material"
                 raise ValueError(msg)
-            if not salt:
+            if not salt or not salt.strip():
                 msg = "Must provide a salt"
                 raise ValueError(msg)
             fernet = Fernet(key=_generate_encryption_key(source_material=source_material, salt=salt))
@@ -85,7 +90,7 @@ class FernetEncryptionWrapper(BaseEncryptionWrapper):
 
 
 def _generate_encryption_key(source_material: str, salt: str) -> bytes:
-    """Generate a Fernet encryption key from a source material and salt using PBKDF2 with 1.2 million iterations."""
+    """Generate a Fernet encryption key from a source material and salt using PBKDF2."""
     import base64
 
     from cryptography.hazmat.primitives import hashes
@@ -95,7 +100,7 @@ def _generate_encryption_key(source_material: str, salt: str) -> bytes:
         algorithm=hashes.SHA256(),
         length=32,
         salt=salt.encode(),
-        iterations=1_200_000,
+        iterations=KDF_ITERATIONS,
     ).derive(key_material=source_material.encode())
 
     return base64.urlsafe_b64encode(pbkdf2)

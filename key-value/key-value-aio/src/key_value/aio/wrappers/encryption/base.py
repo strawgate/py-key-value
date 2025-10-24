@@ -4,16 +4,15 @@ from collections.abc import Callable, Sequence
 from typing import Any, SupportsFloat
 
 from key_value.shared.errors.key_value import SerializationError
-from key_value.shared.errors.wrappers.encryption import DecryptionError
+from key_value.shared.errors.wrappers.encryption import CorruptedEncryptionDataError, DecryptionError
 from typing_extensions import override
 
 from key_value.aio.protocols.key_value import AsyncKeyValue
 from key_value.aio.wrappers.base import BaseWrapper
 
-# Special keys used to store encrypted data
 _ENCRYPTED_DATA_KEY = "__encrypted_data__"
 _ENCRYPTION_VERSION_KEY = "__encryption_version__"
-_ENCRYPTION_VERSION = 1
+
 
 EncryptionFn = Callable[[bytes], bytes]
 DecryptionFn = Callable[[bytes, int], bytes]
@@ -26,18 +25,9 @@ class EncryptionError(Exception):
 class BaseEncryptionWrapper(BaseWrapper):
     """Wrapper that encrypts values before storing and decrypts on retrieval.
 
-    This wrapper encrypts the JSON-serialized value using Fernet (symmetric encryption)
+    This wrapper encrypts the JSON-serialized value using a custom encryption function
     and stores it as a base64-encoded string within a special key in the dictionary.
     This allows encryption while maintaining the dict[str, Any] interface.
-
-    The encrypted format looks like:
-    {
-        "__encrypted_data__": "base64-encoded-encrypted-data",
-        "__encryption_version__": 1
-    }
-
-    Note: The encryption key must be kept secret and secure. If the key is lost,
-    encrypted data cannot be recovered.
     """
 
     def __init__(
@@ -69,22 +59,31 @@ class BaseEncryptionWrapper(BaseWrapper):
         super().__init__()
 
     def _encrypt_value(self, value: dict[str, Any]) -> dict[str, Any]:
-        """Encrypt a value into the encrypted format."""
+        """Encrypt a value into the encrypted format.
+
+        The encrypted format looks like:
+        {
+            "__encrypted_data__": "base64-encoded-encrypted-data",
+            "__encryption_version__": 1
+        }
+        """
 
         # Serialize to JSON
         try:
             json_str: str = json.dumps(value, separators=(",", ":"))
+
+            json_bytes: bytes = json_str.encode(encoding="utf-8")
         except (json.JSONDecodeError, TypeError) as e:
             msg: str = f"Failed to serialize object to JSON: {e}"
             raise SerializationError(msg) from e
 
-        json_bytes: bytes = json_str.encode(encoding="utf-8")
+        try:
+            encrypted_bytes: bytes = self._encryption_fn(json_bytes)
 
-        # Encrypt with Fernet
-        encrypted_bytes: bytes = self._encryption_fn(json_bytes)
-
-        # Encode to base64 for storage in dict (though Fernet output is already base64)
-        base64_str: str = base64.b64encode(encrypted_bytes).decode(encoding="ascii")
+            base64_str: str = base64.b64encode(encrypted_bytes).decode(encoding="ascii")
+        except Exception as e:
+            msg = "Failed to encrypt value"
+            raise EncryptionError(msg) from e
 
         return {
             _ENCRYPTED_DATA_KEY: base64_str,
@@ -96,34 +95,30 @@ class BaseEncryptionWrapper(BaseWrapper):
         if value is None:
             return None
 
-        if _ENCRYPTED_DATA_KEY not in value:
+        if _ENCRYPTED_DATA_KEY not in value and isinstance(value, dict):  # pyright: ignore[reportUnnecessaryIsInstance]
             return value
 
         base64_str = value[_ENCRYPTED_DATA_KEY]
         if not isinstance(base64_str, str):
-            # Corrupted data, return as-is
             msg = f"Corrupted data: expected str, got {type(base64_str)}"
-            raise TypeError(msg)
+            raise CorruptedEncryptionDataError(msg)
 
         if _ENCRYPTION_VERSION_KEY not in value:
             msg = "Corrupted data: missing encryption version"
-            raise TypeError(msg)
+            raise CorruptedEncryptionDataError(msg)
 
         encryption_version = value[_ENCRYPTION_VERSION_KEY]
         if not isinstance(encryption_version, int):
-            # Corrupted data, return as-is
             msg = f"Corrupted data: expected int, got {type(encryption_version)}"
-            raise TypeError(msg)
+            raise CorruptedEncryptionDataError(msg)
 
         try:
-            # Decode from base64
-            encrypted_bytes: bytes = base64.b64decode(base64_str)
+            encrypted_bytes: bytes = base64.b64decode(base64_str, validate=True)
 
-            # Decrypt with Fernet
             json_bytes: bytes = self._decryption_fn(encrypted_bytes, encryption_version)
 
-            # Parse JSON
             json_str: str = json_bytes.decode(encoding="utf-8")
+
             return json.loads(json_str)  # type: ignore[no-any-return]
         except Exception as e:
             msg = "Failed to decrypt value"
