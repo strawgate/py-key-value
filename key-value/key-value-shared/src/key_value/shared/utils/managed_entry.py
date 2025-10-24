@@ -85,7 +85,7 @@ class ManagedEntry:
 
 def dump_to_json(obj: dict[str, Any]) -> str:
     try:
-        return json.dumps(obj, separators=(",", ":"))
+        return json.dumps(obj)
     except (json.JSONDecodeError, TypeError) as e:
         msg: str = f"Failed to serialize object to JSON: {e}"
         raise SerializationError(msg) from e
