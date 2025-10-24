@@ -101,7 +101,7 @@ Local stores are stored in memory or on disk, local to the application.
 | Null (test)      |  ✅  |  ✅  | `NullStore()` |
 | RocksDB          |  ☑️  |  ✅  | `RocksDBStore(path="./rocksdb")` |
 | Simple (test)    |  ✅  |  ✅  | `SimpleStore()` |
-| Windows Registry |  ☑️  |   ✅   | `WindowsRegistryStore(base_key="HKEY_CURRENT_USER\\Software", key_name="py-key-value")` |
+| Windows Registry |  ☑️  |   ✅   | `WindowsRegistryStore(hive="HKEY_CURRENT_USER", registry_path="Software\\py-key-value")` |
 
 #### Local - Secret stores
 Secret stores are stores that are used to store sensitive data, typically in an Operating System's secret store.
