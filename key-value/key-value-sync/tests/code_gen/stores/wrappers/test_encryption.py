@@ -3,6 +3,7 @@
 # DO NOT CHANGE! Change the original file instead.
 import pytest
 from cryptography.fernet import Fernet
+from dirty_equals import IsStr
 from inline_snapshot import snapshot
 from key_value.shared.errors.wrappers.encryption import DecryptionError
 from typing_extensions import override
@@ -43,6 +44,18 @@ class TestFernetEncryptionWrapper(BaseStoreTests):
         result = store.get(collection="test", key="test")
         assert result == original_value
 
+    def test_encryption_with_wrong_encryption_version(self, store: FernetEncryptionWrapper):
+        """Test that encryption fails with the wrong encryption version."""
+        store.encryption_version = 2
+        original_value = {"test": "value"}
+        store.put(collection="test", key="test", value=original_value)
+
+        assert store.get(collection="test", key="test") is not None
+        store.encryption_version = 1
+
+        with pytest.raises(DecryptionError):
+            store.get(collection="test", key="test")
+
     def test_encryption_with_string_key(self, store: FernetEncryptionWrapper, memory_store: MemoryStore):
         """Test that encryption works with a string key."""
         original_value = {"test": "value"}
@@ -52,12 +65,7 @@ class TestFernetEncryptionWrapper(BaseStoreTests):
         assert round_trip_value == original_value
 
         raw_result = memory_store.get(collection="test", key="test")
-        assert raw_result == snapshot(
-            {
-                "__encrypted_data__": "Z0FBQUFBQm8tc0ZsYWhZUmJqUnN0VGlyeGVoUWZuczlPUllyWWxyVEotTVNMVFMtd1hoalNTQk56eFdzNGVocEg0T0xDeEVkTHpJckc2Z0lGZGpCTWZpS3o3cmVWRmRUTl91RENvSW8zNnI3QTlJVmtrQ1FtNnc9",
-                "__encryption_version__": 1,
-            }
-        )
+        assert raw_result == snapshot({"__encrypted_data__": IsStr(min_length=32), "__encryption_version__": 1})
 
     def test_encryption_many_operations(self, store: FernetEncryptionWrapper, memory_store: MemoryStore):
         """Test that encryption works with put_many and get_many."""
@@ -106,7 +114,7 @@ class TestFernetEncryptionWrapper(BaseStoreTests):
 
         assert store.get(collection="test", key="test") is None
 
-    def test_decryption_with_wrong_key_returns_original(self, memory_store: MemoryStore):
+    def test_decryption_with_wrong_key_raises_error(self, memory_store: MemoryStore):
         """Test that decryption with the wrong key raises an error."""
         fernet1 = Fernet(key=Fernet.generate_key())
         fernet2 = Fernet(key=Fernet.generate_key())

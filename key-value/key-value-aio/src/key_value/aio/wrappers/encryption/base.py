@@ -15,8 +15,8 @@ _ENCRYPTED_DATA_KEY = "__encrypted_data__"
 _ENCRYPTION_VERSION_KEY = "__encryption_version__"
 _ENCRYPTION_VERSION = 1
 
-EncryptionFn = Callable[[bytes], bytes]
-DecryptionFn = Callable[[bytes], bytes]
+EncryptionFn = Callable[[bytes, int], bytes]
+DecryptionFn = Callable[[bytes, int], bytes]
 
 
 class EncryptionError(Exception):
@@ -45,18 +45,23 @@ class BaseEncryptionWrapper(BaseWrapper):
         key_value: AsyncKeyValue,
         encryption_fn: EncryptionFn,
         decryption_fn: DecryptionFn,
+        encryption_version: int,
         raise_on_decryption_error: bool = True,
     ) -> None:
         """Initialize the encryption wrapper.
 
         Args:
             key_value: The store to wrap.
-            encryption_fn: The encryption function to use.
-            decryption_fn: The decryption function to use.
+            encryption_fn: The encryption function to use. A callable that takes bytes and an
+                           encryption version int and returns encrypted bytes.
+            decryption_fn: The decryption function to use. A callable that takes bytes and an
+                           encryption version int and returns decrypted bytes.
+            encryption_version: The encryption version to use.
             raise_on_decryption_error: Whether to raise an exception if decryption fails. Defaults to True.
         """
         self.key_value: AsyncKeyValue = key_value
         self.raise_on_decryption_error: bool = raise_on_decryption_error
+        self.encryption_version: int = encryption_version
 
         self._encryption_fn: EncryptionFn = encryption_fn
         self._decryption_fn: DecryptionFn = decryption_fn
@@ -65,9 +70,6 @@ class BaseEncryptionWrapper(BaseWrapper):
 
     def _encrypt_value(self, value: dict[str, Any]) -> dict[str, Any]:
         """Encrypt a value into the encrypted format."""
-        # # Don't encrypt if it's already encrypted
-        # if _ENCRYPTED_DATA_KEY in value:
-        #     return value
 
         # Serialize to JSON
         try:
@@ -79,14 +81,14 @@ class BaseEncryptionWrapper(BaseWrapper):
         json_bytes: bytes = json_str.encode(encoding="utf-8")
 
         # Encrypt with Fernet
-        encrypted_bytes: bytes = self._encryption_fn(json_bytes)
+        encrypted_bytes: bytes = self._encryption_fn(json_bytes, self.encryption_version)
 
         # Encode to base64 for storage in dict (though Fernet output is already base64)
         base64_str: str = base64.b64encode(encrypted_bytes).decode(encoding="ascii")
 
         return {
             _ENCRYPTED_DATA_KEY: base64_str,
-            _ENCRYPTION_VERSION_KEY: _ENCRYPTION_VERSION,
+            _ENCRYPTION_VERSION_KEY: self.encryption_version,
         }
 
     def _decrypt_value(self, value: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -105,12 +107,18 @@ class BaseEncryptionWrapper(BaseWrapper):
             msg = f"Corrupted data: expected str, got {type(base64_str)}"
             raise TypeError(msg)
 
+        encryption_version = value[_ENCRYPTION_VERSION_KEY]
+        if not isinstance(encryption_version, int):
+            # Corrupted data, return as-is
+            msg = f"Corrupted data: expected int, got {type(encryption_version)}"
+            raise TypeError(msg)
+
         try:
             # Decode from base64
             encrypted_bytes: bytes = base64.b64decode(base64_str)
 
             # Decrypt with Fernet
-            json_bytes: bytes = self._decryption_fn(encrypted_bytes)
+            json_bytes: bytes = self._decryption_fn(encrypted_bytes, encryption_version)
 
             # Parse JSON
             json_str: str = json_bytes.decode(encoding="utf-8")

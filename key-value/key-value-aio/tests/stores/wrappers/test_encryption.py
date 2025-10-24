@@ -1,5 +1,6 @@
 import pytest
 from cryptography.fernet import Fernet
+from dirty_equals import IsStr
 from inline_snapshot import snapshot
 from key_value.shared.errors.wrappers.encryption import DecryptionError
 from typing_extensions import override
@@ -40,6 +41,18 @@ class TestFernetEncryptionWrapper(BaseStoreTests):
         result = await store.get(collection="test", key="test")
         assert result == original_value
 
+    async def test_encryption_with_wrong_encryption_version(self, store: FernetEncryptionWrapper):
+        """Test that encryption fails with the wrong encryption version."""
+        store.encryption_version = 2
+        original_value = {"test": "value"}
+        await store.put(collection="test", key="test", value=original_value)
+
+        assert await store.get(collection="test", key="test") is not None
+        store.encryption_version = 1
+
+        with pytest.raises(DecryptionError):
+            await store.get(collection="test", key="test")
+
     async def test_encryption_with_string_key(self, store: FernetEncryptionWrapper, memory_store: MemoryStore):
         """Test that encryption works with a string key."""
         original_value = {"test": "value"}
@@ -51,7 +64,7 @@ class TestFernetEncryptionWrapper(BaseStoreTests):
         raw_result = await memory_store.get(collection="test", key="test")
         assert raw_result == snapshot(
             {
-                "__encrypted_data__": "Z0FBQUFBQm8tc0ZsYWhZUmJqUnN0VGlyeGVoUWZuczlPUllyWWxyVEotTVNMVFMtd1hoalNTQk56eFdzNGVocEg0T0xDeEVkTHpJckc2Z0lGZGpCTWZpS3o3cmVWRmRUTl91RENvSW8zNnI3QTlJVmtrQ1FtNnc9",
+                "__encrypted_data__": IsStr(min_length=32),
                 "__encryption_version__": 1,
             }
         )
@@ -109,7 +122,7 @@ class TestFernetEncryptionWrapper(BaseStoreTests):
 
         assert await store.get(collection="test", key="test") is None
 
-    async def test_decryption_with_wrong_key_returns_original(self, memory_store: MemoryStore):
+    async def test_decryption_with_wrong_key_raises_error(self, memory_store: MemoryStore):
         """Test that decryption with the wrong key raises an error."""
         fernet1 = Fernet(key=Fernet.generate_key())
         fernet2 = Fernet(key=Fernet.generate_key())
