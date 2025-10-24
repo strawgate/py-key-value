@@ -4,6 +4,7 @@
 """Windows Registry-based key-value store."""
 
 from typing import Literal
+from winreg import HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE
 
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
@@ -17,7 +18,6 @@ except ImportError as e:
     msg = "WindowsRegistryStore requires Windows platform (winreg module)"
     raise ImportError(msg) from e
 
-DEFAULT_REGISTRY_ROOT = "py-key-value"
 MAX_KEY_LENGTH = 96
 ALLOWED_KEY_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
@@ -37,9 +37,6 @@ class WindowsRegistryStore(BaseStore):
     within the JSON payload and checked at retrieval time.
     """
 
-    _root: str
-    _base_key_path: str
-
     def __init__(
         self,
         *,
@@ -54,10 +51,8 @@ class WindowsRegistryStore(BaseStore):
             registry_path: The registry path to use. Must be a valid registry path under the hive. Defaults to "Software\\py-key-value".
             default_collection: The default collection to use if no collection is provided.
         """
-        hive = hive or DEFAULT_HIVE
-        registry_path = registry_path or DEFAULT_REGISTRY_PATH
-
-        self._registry_path = hive + "\\" + registry_path
+        self._hive = HKEY_LOCAL_MACHINE if hive == "HKEY_LOCAL_MACHINE" else HKEY_CURRENT_USER
+        self._registry_path = registry_path or DEFAULT_REGISTRY_PATH
 
         super().__init__(default_collection=default_collection)
 
@@ -78,7 +73,7 @@ class WindowsRegistryStore(BaseStore):
         registry_path = self._get_registry_path(collection=collection)
 
         try:
-            with winreg.OpenKey(key=winreg.HKEY_CURRENT_USER, sub_key=registry_path, reserved=0, access=winreg.KEY_READ) as reg_key:
+            with winreg.OpenKey(key=self._hive, sub_key=registry_path, reserved=0, access=winreg.KEY_READ) as reg_key:
                 (json_str, _) = winreg.QueryValueEx(reg_key, sanitized_key)
         except (FileNotFoundError, OSError):
             return None
@@ -96,7 +91,7 @@ class WindowsRegistryStore(BaseStore):
         json_str: str = managed_entry.to_json()
 
         try:
-            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, registry_path) as reg_key:
+            with winreg.CreateKey(self._hive, registry_path) as reg_key:
                 winreg.SetValueEx(reg_key, sanitized_key, 0, winreg.REG_SZ, json_str)
         except OSError as e:
             msg = f"Failed to write to registry: {e}"
@@ -108,7 +103,7 @@ class WindowsRegistryStore(BaseStore):
         registry_path = self._get_registry_path(collection=collection)
 
         try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, registry_path, 0, winreg.KEY_WRITE) as reg_key:
+            with winreg.OpenKey(self._hive, registry_path, 0, winreg.KEY_WRITE) as reg_key:
                 winreg.DeleteValue(reg_key, sanitized_key)
         except (FileNotFoundError, OSError):
             return False
