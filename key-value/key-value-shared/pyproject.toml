@@ -30,7 +30,12 @@ module-name = "key_value.shared"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-addopts = ["--inline-snapshot=disable","-vv","-s"]
+addopts = [
+    "--inline-snapshot=disable",
+    "-vv",
+    "-n=auto",
+    "--dist=loadfile",
+]
 markers = [
     "skip_on_ci: Skip running the test when running on CI",
 ]
@@ -44,6 +49,7 @@ env_files = [".env"]
 dev = [
     "pytest",
     "pytest-mock",
+    "pytest-xdist>=3.6.0",
     "ruff",
     "pytest-dotenv>=0.5.2",
     "dirty-equals>=0.10.0",
