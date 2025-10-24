@@ -1,4 +1,5 @@
 import hashlib
+from collections.abc import Sequence
 from typing import overload
 
 from key_value.shared.utils.compound import compound_key
@@ -67,6 +68,27 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         return ManagedEntry.from_json(json_str=json_str)
 
     @override
+    async def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
+        if not keys:
+            return []
+
+        combo_keys: list[str] = [self.sanitize_key(compound_key(collection=collection, key=key)) for key in keys]
+
+        # Use multi_get for efficient batch retrieval
+        # multi_get returns a tuple in the same order as keys
+        raw_values: tuple[bytes | None, ...] = await self._client.multi_get(*[k.encode("utf-8") for k in combo_keys])
+
+        entries: list[ManagedEntry | None] = []
+        for raw_value in raw_values:
+            if isinstance(raw_value, (bytes, bytearray)):
+                json_str: str = raw_value.decode(encoding="utf-8")
+                entries.append(ManagedEntry.from_json(json_str=json_str))
+            else:
+                entries.append(None)
+
+        return entries
+
+    @override
     async def _put_managed_entry(
         self,
         *,
@@ -91,6 +113,30 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
             value=json_value.encode(encoding="utf-8"),
             exptime=exptime,
         )
+
+    @override
+    async def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
+        if not keys:
+            return
+
+        # aiomcache doesn't have a native multi_set, so we'll batch individual sets
+        # We could use asyncio.gather but aiomcache Client might not be thread-safe
+        for key, managed_entry in zip(keys, managed_entries, strict=True):
+            combo_key: str = self.sanitize_key(compound_key(collection=collection, key=key))
+
+            exptime: int
+            if managed_entry.ttl is None:  # noqa: SIM108
+                exptime = 0
+            else:
+                exptime = max(int(managed_entry.ttl), 1)
+
+            json_value: str = managed_entry.to_json()
+
+            _ = await self._client.set(
+                key=combo_key.encode(encoding="utf-8"),
+                value=json_value.encode(encoding="utf-8"),
+                exptime=exptime,
+            )
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:

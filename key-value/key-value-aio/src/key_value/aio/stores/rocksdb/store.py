@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, overload
 
@@ -112,6 +113,28 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         return managed_entry
 
     @override
+    async def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
+        self._fail_on_closed_store()
+
+        if not keys:
+            return []
+
+        combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
+
+        # RocksDB's multi_get is more efficient than individual gets
+        values: list[bytes | None] = self._db.multi_get(combo_keys)
+
+        entries: list[ManagedEntry | None] = []
+        for value in values:
+            if value is None:
+                entries.append(None)
+            else:
+                managed_entry_str: str = value.decode("utf-8")
+                entries.append(ManagedEntry.from_json(json_str=managed_entry_str))
+
+        return entries
+
+    @override
     async def _put_managed_entry(
         self,
         *,
@@ -127,6 +150,24 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         self._db[combo_key] = json_value.encode("utf-8")
 
     @override
+    async def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
+        self._fail_on_closed_store()
+
+        if not keys:
+            return
+
+        # Use WriteBatch for efficient batch writes
+        from rocksdict import WriteBatch
+
+        batch = WriteBatch()
+        for key, managed_entry in zip(keys, managed_entries, strict=True):
+            combo_key: str = compound_key(collection=collection, key=key)
+            json_value: str = managed_entry.to_json()
+            batch.put(combo_key, json_value.encode("utf-8"))
+
+        self._db.write(batch)
+
+    @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         self._fail_on_closed_store()
 
@@ -139,6 +180,32 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
             self._db.delete(combo_key)
 
         return exists
+
+    @override
+    async def _delete_managed_entries(self, *, keys: list[str], collection: str) -> int:
+        self._fail_on_closed_store()
+
+        if not keys:
+            return 0
+
+        # Use WriteBatch for efficient batch deletes
+        from rocksdict import WriteBatch
+
+        batch = WriteBatch()
+        deleted_count = 0
+
+        for key in keys:
+            combo_key: str = compound_key(collection=collection, key=key)
+
+            # Check if key exists before deleting
+            if combo_key in self._db:
+                batch.delete(combo_key)
+                deleted_count += 1
+
+        if deleted_count > 0:
+            self._db.write(batch)
+
+        return deleted_count
 
     def __del__(self) -> None:
         self._close_and_flush()

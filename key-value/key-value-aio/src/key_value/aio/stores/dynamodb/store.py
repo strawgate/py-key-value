@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from types import TracebackType
 from typing import Any, overload
 
@@ -20,6 +21,10 @@ except ImportError as e:
 
 DEFAULT_PAGE_SIZE = 1000
 PAGE_LIMIT = 1000
+
+# DynamoDB batch operation limits
+BATCH_GET_ITEM_LIMIT = 100
+BATCH_WRITE_ITEM_LIMIT = 25
 
 
 class DynamoDBStore(BaseContextManagerStore, BaseStore):
@@ -182,6 +187,37 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         return ManagedEntry.from_json(json_str=json_value)  # pyright: ignore[reportUnknownArgumentType]
 
     @override
+    async def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
+        """Retrieve multiple managed entries from DynamoDB using batch_get_item."""
+        if not keys:
+            return []
+
+        entries: dict[str, ManagedEntry | None] = dict.fromkeys(keys)
+
+        # Process in batches of BATCH_GET_ITEM_LIMIT
+        for i in range(0, len(keys), BATCH_GET_ITEM_LIMIT):
+            batch_keys = keys[i : i + BATCH_GET_ITEM_LIMIT]
+
+            request_items = {
+                self._table_name: {
+                    "Keys": [{"collection": {"S": collection}, "key": {"S": key}} for key in batch_keys],
+                }
+            }
+
+            response = await self._connected_client.batch_get_item(RequestItems=request_items)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+            items = response.get("Responses", {}).get(self._table_name, [])  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+            for item in items:  # pyright: ignore[reportUnknownVariableType]
+                item_key = item.get("key", {}).get("S")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                json_value = item.get("value", {}).get("S")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+                if item_key and json_value:
+                    entries[item_key] = ManagedEntry.from_json(json_str=json_value)  # pyright: ignore[reportUnknownArgumentType]
+
+        return [entries[key] for key in keys]
+
+    @override
     async def _put_managed_entry(
         self,
         *,
@@ -210,6 +246,38 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         )
 
     @override
+    async def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
+        """Store multiple managed entries in DynamoDB using batch_write_item."""
+        if not keys:
+            return
+
+        # Process in batches of BATCH_WRITE_ITEM_LIMIT
+        for i in range(0, len(keys), BATCH_WRITE_ITEM_LIMIT):
+            batch_keys = keys[i : i + BATCH_WRITE_ITEM_LIMIT]
+            batch_entries = managed_entries[i : i + BATCH_WRITE_ITEM_LIMIT]
+
+            put_requests = []
+            for key, managed_entry in zip(batch_keys, batch_entries, strict=True):
+                json_value = managed_entry.to_json()
+
+                item: dict[str, Any] = {
+                    "collection": {"S": collection},
+                    "key": {"S": key},
+                    "value": {"S": json_value},
+                }
+
+                # Add TTL if present
+                if managed_entry.ttl is not None and managed_entry.created_at:
+                    ttl_timestamp = int(managed_entry.created_at.timestamp() + managed_entry.ttl)
+                    item["ttl"] = {"N": str(ttl_timestamp)}
+
+                put_requests.append({"PutRequest": {"Item": item}})
+
+            request_items = {self._table_name: put_requests}
+
+            await self._connected_client.batch_write_item(RequestItems=request_items)  # pyright: ignore[reportUnknownMemberType]
+
+    @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         """Delete a managed entry from DynamoDB."""
         response = await self._connected_client.delete_item(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
@@ -223,6 +291,39 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
 
         # Return True if an item was actually deleted
         return "Attributes" in response  # pyright: ignore[reportUnknownArgumentType]
+
+    @override
+    async def _delete_managed_entries(self, *, keys: list[str], collection: str) -> int:
+        """Delete multiple managed entries from DynamoDB using batch_write_item."""
+        if not keys:
+            return 0
+
+        deleted_count = 0
+
+        # Process in batches of BATCH_WRITE_ITEM_LIMIT
+        for i in range(0, len(keys), BATCH_WRITE_ITEM_LIMIT):
+            batch_keys = keys[i : i + BATCH_WRITE_ITEM_LIMIT]
+
+            delete_requests = [
+                {
+                    "DeleteRequest": {
+                        "Key": {
+                            "collection": {"S": collection},
+                            "key": {"S": key},
+                        }
+                    }
+                }
+                for key in batch_keys
+            ]
+
+            request_items = {self._table_name: delete_requests}
+
+            # Note: batch_write_item doesn't return information about which items were deleted
+            # We assume all items in the batch were deleted (even if they didn't exist)
+            await self._connected_client.batch_write_item(RequestItems=request_items)  # pyright: ignore[reportUnknownMemberType]
+            deleted_count += len(batch_keys)
+
+        return deleted_count
 
     @override
     async def _close(self) -> None:
