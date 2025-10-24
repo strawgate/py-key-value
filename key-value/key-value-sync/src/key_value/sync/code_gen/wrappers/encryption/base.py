@@ -18,7 +18,7 @@ _ENCRYPTED_DATA_KEY = "__encrypted_data__"
 _ENCRYPTION_VERSION_KEY = "__encryption_version__"
 _ENCRYPTION_VERSION = 1
 
-EncryptionFn = Callable[[bytes, int], bytes]
+EncryptionFn = Callable[[bytes], bytes]
 DecryptionFn = Callable[[bytes, int], bytes]
 
 
@@ -55,8 +55,7 @@ class BaseEncryptionWrapper(BaseWrapper):
 
         Args:
             key_value: The store to wrap.
-            encryption_fn: The encryption function to use. A callable that takes bytes and an
-                           encryption version int and returns encrypted bytes.
+            encryption_fn: The encryption function to use. A callable that takes bytes and returns encrypted bytes.
             decryption_fn: The decryption function to use. A callable that takes bytes and an
                            encryption version int and returns decrypted bytes.
             encryption_version: The encryption version to use.
@@ -64,6 +63,7 @@ class BaseEncryptionWrapper(BaseWrapper):
         """
         self.key_value: KeyValue = key_value
         self.raise_on_decryption_error: bool = raise_on_decryption_error
+
         self.encryption_version: int = encryption_version
 
         self._encryption_fn: EncryptionFn = encryption_fn
@@ -84,7 +84,7 @@ class BaseEncryptionWrapper(BaseWrapper):
         json_bytes: bytes = json_str.encode(encoding="utf-8")
 
         # Encrypt with Fernet
-        encrypted_bytes: bytes = self._encryption_fn(json_bytes, self.encryption_version)
+        encrypted_bytes: bytes = self._encryption_fn(json_bytes)
 
         # Encode to base64 for storage in dict (though Fernet output is already base64)
         base64_str: str = base64.b64encode(encrypted_bytes).decode(encoding="ascii")
@@ -96,15 +96,17 @@ class BaseEncryptionWrapper(BaseWrapper):
         if value is None:
             return None
 
-        # Check if it's encrypted
         if _ENCRYPTED_DATA_KEY not in value:
             return value
 
-        # Extract encrypted data
         base64_str = value[_ENCRYPTED_DATA_KEY]
         if not isinstance(base64_str, str):
             # Corrupted data, return as-is
             msg = f"Corrupted data: expected str, got {type(base64_str)}"
+            raise TypeError(msg)
+
+        if _ENCRYPTION_VERSION_KEY not in value:
+            msg = "Corrupted data: missing encryption version"
             raise TypeError(msg)
 
         encryption_version = value[_ENCRYPTION_VERSION_KEY]

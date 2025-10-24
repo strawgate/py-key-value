@@ -52,23 +52,21 @@ class FernetEncryptionWrapper(BaseEncryptionWrapper):
         salt: str | None = None,
         raise_on_decryption_error: bool = True,
     ) -> None:
-        if fernet is not None and source_material is not None:
-            msg = "Cannot provide both fernet and source_material"
-            raise ValueError(msg)
+        if fernet is not None:  # noqa: SIM102
+            if source_material or salt:
+                msg = "Cannot provide both fernet and source_material and salt"
+                raise ValueError(msg)
 
         if fernet is None:
-            if source_material is None:
+            if not source_material:
                 msg = "Must provide either fernet or source_material"
                 raise ValueError(msg)
-            if salt is None:
+            if not salt:
                 msg = "Must provide a salt"
                 raise ValueError(msg)
             fernet = Fernet(key=_generate_encryption_key(source_material=source_material, salt=salt))
 
-        def encrypt_with_fernet(data: bytes, encryption_version: int) -> bytes:
-            if encryption_version > self.encryption_version:
-                msg = f"Encryption failed: encryption version {encryption_version} is not supported"
-                raise EncryptionVersionError(msg)
+        def encrypt_with_fernet(data: bytes) -> bytes:
             return fernet.encrypt(data)
 
         def decrypt_with_fernet(data: bytes, encryption_version: int) -> bytes:
