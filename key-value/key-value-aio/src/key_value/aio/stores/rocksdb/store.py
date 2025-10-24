@@ -113,28 +113,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         return managed_entry
 
     @override
-    async def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
-        self._fail_on_closed_store()
-
-        if not keys:
-            return []
-
-        combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
-
-        # RocksDB's multi_get is more efficient than individual gets
-        values: list[bytes | None] = self._db.multi_get(combo_keys)
-
-        entries: list[ManagedEntry | None] = []
-        for value in values:
-            if value is None:
-                entries.append(None)
-            else:
-                managed_entry_str: str = value.decode("utf-8")
-                entries.append(ManagedEntry.from_json(json_str=managed_entry_str))
-
-        return entries
-
-    @override
     async def _put_managed_entry(
         self,
         *,
