@@ -159,8 +159,16 @@ class BaseStoreTests(ABC):
     def test_put_expired_get_none(self, store: BaseStore):
         """Tests that a put call with a negative ttl will return None when getting the key."""
         store.put(collection="test_collection", key="test_key", value={"test": "test"}, ttl=1)
-        sleep(seconds=3)
-        assert store.get(collection="test_collection", key="test_key") is None
+        assert store.get(collection="test_collection", key="test_key") is not None
+        sleep(seconds=1)
+
+        for _ in range(8):
+            sleep(seconds=0.25)
+            if store.get(collection="test_collection", key="test_key") is None:
+                # pass the test
+                return
+
+        pytest.fail("put_expired_get_none test failed, entry did not expire")
 
     def test_long_collection_name(self, store: BaseStore):
         """Tests that a long collection name will not raise an error."""

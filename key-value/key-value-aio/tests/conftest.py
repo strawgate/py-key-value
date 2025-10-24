@@ -38,7 +38,7 @@ def docker_client() -> DockerClient:
     return get_docker_client()
 
 
-def docker_logs(name: str, print_logs: bool = False, raise_on_error: bool = False) -> list[str]:
+def docker_logs(name: str, print_logs: bool = False, raise_on_error: bool = False, log_level: int = logging.INFO) -> list[str]:
     client = get_docker_client()
     try:
         logs: list[str] = client.containers.get(name).logs().decode("utf-8").splitlines()
@@ -52,7 +52,7 @@ def docker_logs(name: str, print_logs: bool = False, raise_on_error: bool = Fals
     if print_logs:
         logger.info(f"Container {name} logs:")
         for log in logs:
-            logger.info(log)
+            logger.log(log_level, log)
 
     return logs
 
@@ -124,13 +124,14 @@ def docker_container(
         docker_run(name=name, image=image, ports=ports, environment=environment or {}, raise_on_error=True)
         logger.info(f"Container {name} created")
         yield
+        docker_logs(name, print_logs=True, raise_on_error=False)
     except Exception:
-        logger.info(f"Container {name} failed to create")
+        logger.info(f"Creating container {name} failed")
+        docker_logs(name, print_logs=True, raise_on_error=False, log_level=logging.ERROR)
         if raise_on_error:
             raise
         return
     finally:
-        docker_logs(name, print_logs=True, raise_on_error=False)
         docker_stop(name, raise_on_error=False)
         docker_rm(name, raise_on_error=False)
 
