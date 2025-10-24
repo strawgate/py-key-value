@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.10"
 resolution-markers = [
     "sys_platform != 'win32'",
@@ -1313,7 +1313,7 @@ wheels = [
 
 [[package]]
 name = "py-key-value"
-version = "0.2.7"
+version = "0.2.8"
 source = { virtual = "." }
 
 [package.dev-dependencies]
@@ -1334,7 +1334,7 @@ dev = [
 
 [[package]]
 name = "py-key-value-aio"
-version = "0.2.7"
+version = "0.2.8"
 source = { editable = "key-value/key-value-aio" }
 dependencies = [
     { name = "beartype" },
@@ -1433,7 +1433,6 @@ requires-dist = [
     { name = "types-hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "valkey-glide", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-
 provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "dynamodb", "keyring", "keyring-linux", "registry", "pydantic", "rocksdb", "wrappers-encryption"]
 
 [package.metadata.requires-dev]
@@ -1460,7 +1459,7 @@ dev = [
 
 [[package]]
 name = "py-key-value-shared"
-version = "0.2.7"
+version = "0.2.8"
 source = { editable = "key-value/key-value-shared" }
 dependencies = [
     { name = "beartype" },
@@ -1501,7 +1500,7 @@ dev = [
 
 [[package]]
 name = "py-key-value-shared-test"
-version = "0.2.7"
+version = "0.2.8"
 source = { editable = "key-value/key-value-shared-test" }
 
 [package.dev-dependencies]
@@ -1520,7 +1519,7 @@ dev = [
 
 [[package]]
 name = "py-key-value-sync"
-version = "0.2.7"
+version = "0.2.8"
 source = { editable = "key-value/key-value-sync" }
 dependencies = [
     { name = "beartype" },
