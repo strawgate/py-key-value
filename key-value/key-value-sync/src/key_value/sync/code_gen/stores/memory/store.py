@@ -116,6 +116,8 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
 
         self._cache = {}
 
+        self._stable_api = True
+
         super().__init__(default_collection=default_collection)
 
     @override

@@ -63,6 +63,12 @@ class BaseStore(KeyValueProtocol, ABC):
 
         self.default_collection = default_collection or DEFAULT_COLLECTION_NAME
 
+        if not hasattr(self, "_stable_api"):
+            self._stable_api = False
+
+        if not self._stable_api:
+            self._warn_about_stability()
+
         super().__init__()
 
     def _setup(self) -> None:

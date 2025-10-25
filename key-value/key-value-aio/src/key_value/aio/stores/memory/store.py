@@ -81,8 +81,6 @@ class MemoryCollection:
             getsizeof=_memory_cache_getsizeof,
         )
 
-        self._stable_api = True
-
     def get(self, key: str) -> ManagedEntry | None:
         managed_entry_str: MemoryCacheEntry | None = self._cache.get(key)
 
@@ -122,6 +120,8 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         self.max_entries_per_collection = max_entries_per_collection
 
         self._cache = {}
+
+        self._stable_api = True
 
         super().__init__(default_collection=default_collection)
 

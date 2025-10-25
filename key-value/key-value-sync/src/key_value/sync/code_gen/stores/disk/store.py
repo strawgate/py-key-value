@@ -78,6 +78,8 @@ class DiskStore(BaseContextManagerStore, BaseStore):
             else:
                 self._cache = Cache(directory=directory, eviction_policy="none")
 
+        self._stable_api = True
+
         super().__init__(default_collection=default_collection)
 
     @override
