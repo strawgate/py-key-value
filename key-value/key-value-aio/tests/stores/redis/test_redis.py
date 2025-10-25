@@ -7,7 +7,7 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.redis import RedisStore
-from tests.conftest import docker_container, docker_stop, should_skip_docker_tests
+from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # Redis test configuration
@@ -40,10 +40,8 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=REDIS_VERSIONS_TO_TEST)
     async def setup_redis(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
         version = request.param
-        # Double-check that the Valkey test container is stopped
-        docker_stop("valkey-test", raise_on_error=False)
 
-        with docker_container("redis-test", f"redis:{version}", {"6379": 6379}):
+        with docker_container("redis-test", f"redis:{version}", {"6379": REDIS_PORT}):
             if not await async_wait_for_true(bool_fn=ping_redis, tries=30, wait_time=1):
                 msg = "Redis failed to start"
                 raise RedisFailedToStartError(msg)
