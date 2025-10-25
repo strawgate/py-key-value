@@ -14,8 +14,6 @@ except ImportError as e:
     msg = "DiskStore requires py-key-value-aio[disk]"
     raise ImportError(msg) from e
 
-DEFAULT_DISK_STORE_MAX_SIZE = 1 * 1024 * 1024 * 1024  # 1GB
-
 
 class DiskStore(BaseContextManagerStore, BaseStore):
     """A disk-based store that uses the diskcache library to store data."""
@@ -54,7 +52,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
         Args:
             disk_cache: An existing diskcache Cache instance to use.
             directory: The directory to use for the disk cache.
-            max_size: The maximum size of the disk cache. Defaults to 1GB.
+            max_size: The maximum size of the disk cache.
             default_collection: The default collection to use if no collection is provided.
         """
         if disk_cache is not None and directory is not None:
@@ -72,7 +70,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
             directory.mkdir(parents=True, exist_ok=True)
 
-            self._cache = Cache(directory=directory, size_limit=max_size or DEFAULT_DISK_STORE_MAX_SIZE)
+            self._cache = Cache(directory=directory, size_limit=max_size)
 
         super().__init__(default_collection=default_collection)
 

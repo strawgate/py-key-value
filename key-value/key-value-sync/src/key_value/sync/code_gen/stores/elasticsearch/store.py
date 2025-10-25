@@ -111,6 +111,8 @@ class ElasticsearchStore(
         self._index_prefix = index_prefix
         self._is_serverless = False
 
+        self._warn_about_stability()
+
         super().__init__(default_collection=default_collection)
 
     @override

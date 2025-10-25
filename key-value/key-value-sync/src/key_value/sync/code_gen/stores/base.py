@@ -254,6 +254,16 @@ class BaseStore(KeyValueProtocol, ABC):
 
         return self._delete_managed_entries(keys=keys, collection=collection)
 
+    def _warn_about_stability(self) -> None:
+        """Warn about the stability of the store."""
+        from warnings import warn
+
+        warn(
+            message="A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.",
+            category=UserWarning,
+            stacklevel=2,
+        )
+
 
 class BaseEnumerateKeysStore(BaseStore, EnumerateKeysProtocol, ABC):
     """An abstract base class for enumerate key-value stores.

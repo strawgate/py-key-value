@@ -16,8 +16,6 @@ except ImportError as e:
     msg = "DiskStore requires py-key-value-aio[disk]"
     raise ImportError(msg) from e
 
-DEFAULT_DISK_STORE_SIZE_LIMIT = 1 * 1024 * 1024 * 1024  # 1GB
-
 CacheFactory = Callable[[str], Cache]
 
 
@@ -54,7 +52,7 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
 
         Args:
             base_directory: The directory to use for the disk caches.
-            max_size: The maximum size of the disk caches. Defaults to 1GB.
+            max_size: The maximum size of the disk caches.
             default_collection: The default collection to use if no collection is provided.
         """
 
@@ -71,7 +69,7 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
         Args:
             disk_cache_factory: A factory function that creates a diskcache Cache instance for a given collection.
             base_directory: The directory to use for the disk caches.
-            max_size: The maximum size of the disk caches. Defaults to 1GB.
+            max_size: The maximum size of the disk caches.
             default_collection: The default collection to use if no collection is provided.
         """
         if disk_cache_factory is None and base_directory is None:
@@ -92,7 +90,7 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
 
             cache_directory.mkdir(parents=True, exist_ok=True)
 
-            return Cache(directory=cache_directory, size_limit=self._max_size or DEFAULT_DISK_STORE_SIZE_LIMIT)
+            return Cache(directory=cache_directory, size_limit=self._max_size)
 
         self._disk_cache_factory = disk_cache_factory or default_disk_cache_factory
 

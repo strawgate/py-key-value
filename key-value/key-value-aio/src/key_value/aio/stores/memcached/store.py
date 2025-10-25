@@ -45,6 +45,8 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         """
         self._client = client or Client(host=host, port=port)
 
+        self._warn_about_stability()
+
         super().__init__(default_collection=default_collection)
 
     def sanitize_key(self, key: str) -> str:

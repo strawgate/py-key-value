@@ -51,6 +51,8 @@ class WindowsRegistryStore(BaseStore):
         self._hive = HKEY_LOCAL_MACHINE if hive == "HKEY_LOCAL_MACHINE" else HKEY_CURRENT_USER
         self._registry_path = registry_path or DEFAULT_REGISTRY_PATH
 
+        self._warn_about_stability()
+
         super().__init__(default_collection=default_collection)
 
     def _sanitize_collection_name(self, collection: str) -> str:

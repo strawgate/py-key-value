@@ -46,6 +46,8 @@ class KeyringStore(BaseStore):
         """
         self._service_name = service_name
 
+        self._warn_about_stability()
+
         super().__init__(default_collection=default_collection)
 
     def _sanitize_collection_name(self, collection: str) -> str:
