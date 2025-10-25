@@ -1,6 +1,7 @@
 from types import TracebackType
 from typing import Any, cast, overload
 
+from key_value.shared.type_checking.bear_spray import bear_spray
 from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import Self, override
 
@@ -126,6 +127,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             await self._client.__aexit__(exc_type, exc_value, traceback)
 
     @property
+    @bear_spray  # aioboto generates types at runtime, so we use bear_spray to prevent runtime warnings
     def _connected_client(self) -> DynamoDBClient:
         if not self._client:
             msg = "Client not connected"
@@ -137,7 +139,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         """Setup the DynamoDB client and ensure table exists."""
 
         if not self._client:
-            self._client = cast("DynamoDBClient", await self._raw_client.__aenter__())
+            self._client = await self._raw_client.__aenter__()
 
         try:
             await self._connected_client.describe_table(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
