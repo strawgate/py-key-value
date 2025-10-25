@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any, overload
 
 from key_value.shared.utils.compound import compound_key
-from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json
+from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitize import (
     ALPHANUMERIC_CHARACTERS,
     LOWERCASE_ALPHABET,
@@ -55,10 +55,7 @@ DEFAULT_MAPPING = {
             "type": "keyword",
         },
         "value": {
-            "type": "keyword",
-            "index": False,
-            "doc_values": False,
-            "ignore_above": 256,
+            "type": "flattened",
         },
     },
 }
@@ -171,14 +168,15 @@ class ElasticsearchStore(
         if not (source := get_source_from_body(body=body)):
             return None
 
-        if not (value_str := source.get("value")) or not isinstance(value_str, str):
+        # Get value as flattened object instead of JSON string
+        if not (value := source.get("value")) or not isinstance(value, dict):
             return None
 
         created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
         expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
 
         return ManagedEntry(
-            value=load_from_json(value_str),
+            value=value,
             created_at=created_at,
             expires_at=expires_at,
         )
@@ -200,7 +198,7 @@ class ElasticsearchStore(
         document: dict[str, Any] = {
             "collection": collection,
             "key": key,
-            "value": managed_entry.to_json(include_metadata=False),
+            "value": managed_entry.value,  # Store as flattened object
         }
 
         if managed_entry.created_at:

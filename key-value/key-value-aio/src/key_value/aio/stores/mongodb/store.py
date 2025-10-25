@@ -134,6 +134,8 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         new_collection: AsyncCollection[dict[str, Any]] = await self._db.create_collection(name=collection)
 
         _ = await new_collection.create_index(keys="key")
+        # Create TTL index for automatic expiration
+        _ = await new_collection.create_index(keys="expires_at", expireAfterSeconds=0)
 
         self._collections_by_name[collection] = new_collection
 
@@ -146,12 +148,21 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         if not doc:
             return None
 
-        json_value: str | None = doc.get("value")
+        # Get value as BSON document instead of JSON string
+        value: dict[str, Any] | None = doc.get("value")
 
-        if not isinstance(json_value, str):
+        if not isinstance(value, dict):
             return None
 
-        return ManagedEntry.from_json(json_str=json_value)
+        # Parse datetime objects directly
+        created_at: datetime | None = doc.get("created_at")
+        expires_at: datetime | None = doc.get("expires_at")
+
+        return ManagedEntry(
+            value=value,
+            created_at=created_at,
+            expires_at=expires_at,
+        )
 
     @override
     async def _put_managed_entry(
@@ -161,22 +172,24 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
-        json_value: str = managed_entry.to_json()
-
         collection = self._sanitize_collection_name(collection=collection)
+
+        document: dict[str, Any] = {
+            "collection": collection,
+            "key": key,
+            "value": managed_entry.value,  # Store as BSON document
+            "updated_at": now(),
+        }
+
+        # Store as datetime objects
+        if managed_entry.created_at:
+            document["created_at"] = managed_entry.created_at
+        if managed_entry.expires_at:
+            document["expires_at"] = managed_entry.expires_at
 
         _ = await self._collections_by_name[collection].update_one(
             filter={"key": key},
-            update={
-                "$set": {
-                    "collection": collection,
-                    "key": key,
-                    "value": json_value,
-                    "created_at": managed_entry.created_at.isoformat() if managed_entry.created_at else None,
-                    "expires_at": managed_entry.expires_at.isoformat() if managed_entry.expires_at else None,
-                    "updated_at": now().isoformat(),
-                }
-            },
+            update={"$set": document},
             upsert=True,
         )
 
