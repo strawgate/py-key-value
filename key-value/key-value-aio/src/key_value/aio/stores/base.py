@@ -7,7 +7,7 @@ from asyncio.locks import Lock
 from collections import defaultdict
 from collections.abc import Sequence
 from types import TracebackType
-from typing import Any, SupportsFloat, TypeVar
+from typing import Any, SupportsFloat
 
 from key_value.shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.shared.errors import StoreSetupError
@@ -23,8 +23,6 @@ from key_value.aio.protocols.key_value import (
     AsyncEnumerateKeysProtocol,
     AsyncKeyValueProtocol,
 )
-
-T = TypeVar("T")
 
 
 class BaseStore(AsyncKeyValueProtocol, ABC):
@@ -93,23 +91,6 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
                     except Exception as e:
                         raise StoreSetupError(message=f"Failed to setup collection: {e}", extra_info={"collection": collection}) from e
                     self._setup_collection_complete[collection] = True
-
-    @staticmethod
-    def _batch_items(items: list[T], batch_size: int) -> list[list[T]]:
-        """Split a list of items into batches of a specified size.
-
-        Args:
-            items: The list of items to batch
-            batch_size: The maximum size of each batch
-
-        Returns:
-            A list of batches, where each batch is a list of items
-        """
-        if batch_size <= 0:
-            msg = "batch_size must be greater than 0"
-            raise ValueError(msg)
-
-        return [items[i : i + batch_size] for i in range(0, len(items), batch_size)]
 
     @abstractmethod
     async def _get_managed_entry(self, *, collection: str, key: str) -> ManagedEntry | None:
