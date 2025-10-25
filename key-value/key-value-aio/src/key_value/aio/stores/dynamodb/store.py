@@ -1,5 +1,5 @@
 from types import TracebackType
-from typing import Any, cast, overload
+from typing import TYPE_CHECKING, Any, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import Self, override
@@ -12,10 +12,12 @@ from key_value.aio.stores.base import (
 try:
     import aioboto3
     from aioboto3.session import Session  # noqa: TC002
-    from types_aiobotocore_dynamodb.client import DynamoDBClient
 except ImportError as e:
     msg = "DynamoDBStore requires py-key-value-aio[dynamodb]"
     raise ImportError(msg) from e
+
+if TYPE_CHECKING:
+    from types_aiobotocore_dynamodb.client import DynamoDBClient
 
 
 DEFAULT_PAGE_SIZE = 1000
@@ -34,10 +36,10 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     _table_name: str
     _endpoint_url: str | None
     _raw_client: Any  # DynamoDB client from aioboto3
-    _client: DynamoDBClient | None
+    _client: Any  # DynamoDB client - typed as DynamoDBClient for static analysis, but runtime type is aiobotocore.client.DynamoDB
 
     @overload
-    def __init__(self, *, client: DynamoDBClient, table_name: str, default_collection: str | None = None) -> None:
+    def __init__(self, *, client: "DynamoDBClient", table_name: str, default_collection: str | None = None) -> None:
         """Initialize the DynamoDB store.
 
         Args:
@@ -73,7 +75,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     def __init__(
         self,
         *,
-        client: DynamoDBClient | None = None,
+        client: "DynamoDBClient | None" = None,
         table_name: str,
         region_name: str | None = None,
         endpoint_url: str | None = None,
@@ -113,7 +115,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def __aenter__(self) -> Self:
         if self._raw_client:
-            self._client = cast("DynamoDBClient", await self._raw_client.__aenter__())
+            self._client = await self._raw_client.__aenter__()
         await super().__aenter__()
         return self
 
@@ -126,7 +128,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             await self._client.__aexit__(exc_type, exc_value, traceback)
 
     @property
-    def _connected_client(self) -> DynamoDBClient:
+    def _connected_client(self) -> "DynamoDBClient":
         if not self._client:
             msg = "Client not connected"
             raise ValueError(msg)
@@ -137,7 +139,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         """Setup the DynamoDB client and ensure table exists."""
 
         if not self._client:
-            self._client = cast("DynamoDBClient", await self._raw_client.__aenter__())
+            self._client = await self._raw_client.__aenter__()
 
         try:
             await self._connected_client.describe_table(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
