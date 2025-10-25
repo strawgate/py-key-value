@@ -18,9 +18,13 @@ This monorepo contains two libraries:
 ## Why not use this library?
 
 - **Async-only**: While a code-gen'd synchronous library is under development, the async library is the primary focus at the moment.
-- **Managed Entries**: Raw values are not stored in backends, a wrapper object is stored instead. This wrapper object contains the value, sometimes metadata like the TTL, and the creation timestamp. Most often it is serialized to and from JSON.
-- **No Live Objects**: Even when using the in-memory store, "live" objects are never returned from the store. You get a dictionary or a Pydantic model, hopefully a copy of what you stored, but never the same instance in memory.
-- **Dislike of Bear Bros**: Beartype is used for runtime type checking, it will report warnings if you get too cheeky with what you're passing around. If you are not a fan of beartype, you can disable it by setting the `PY_KEY_VALUE_DISABLE_BEARTYPE` environment variable to `true` or you can disable the warnings via the warn module.
+- **Managed Entries**: Raw values are not stored in backends, a wrapper object is stored instead. This wrapper object contains
+  the value, sometimes metadata like the TTL, and the creation timestamp. Most often it is serialized to and from JSON.
+- **No Live Objects**: Even when using the in-memory store, "live" objects are never returned from the store. You get a
+  dictionary or a Pydantic model, hopefully a copy of what you stored, but never the same instance in memory.
+- **Dislike of Bear Bros**: Beartype is used for runtime type checking, it will report warnings if you get too cheeky with what
+  you're passing around. If you are not a fan of beartype, you can disable it by setting the `PY_KEY_VALUE_DISABLE_BEARTYPE`
+  environment variable to `true` or you can disable the warnings via the warn module.
 
 ## Installation
 
@@ -64,7 +68,8 @@ asyncio.run(main())
 
 ### Protocols
 
-- **Async**: `key_value.aio.protocols.AsyncKeyValue` — async `get/put/delete/ttl` and bulk variants; optional protocol segments for culling, destroying stores/collections, and enumerating keys/collections implemented by capable stores.
+- **Async**: `key_value.aio.protocols.AsyncKeyValue` — async `get/put/delete/ttl` and bulk variants; optional protocol segments
+  for culling, destroying stores/collections, and enumerating keys/collections implemented by capable stores.
 - **Sync**: `key_value.sync.protocols.KeyValue` — sync mirror of the async protocol, generated from the async library.
 
 The protocols offer a simple interface for your application to interact with the store:
@@ -130,7 +135,8 @@ Distributed stores are stores that are used to store data in a distributed syste
 
 Adapters "wrap" any protocol-compliant store but do not themselves implement the protocol.
 
-They simplify your applications interactions with stores and provide additional functionality. While your application will accept an instance that implements the protocol, your application code might be simplified by using an adapter.
+They simplify your applications interactions with stores and provide additional functionality. While your application will
+accept an instance that implements the protocol, your application code might be simplified by using an adapter.
 
 | Adapter | Description | Example |
 |---------|-------------|---------|
@@ -177,7 +183,8 @@ asyncio.run(example())
 
 ### Wrappers
 
-The library provides a wrapper pattern for adding functionality to a store. Wrappers themselves implement the protocol meaning that you can wrap any store with any wrapper, and chain wrappers together as needed.
+The library provides a wrapper pattern for adding functionality to a store. Wrappers themselves implement the protocol meaning
+that you can wrap any store with any wrapper, and chain wrappers together as needed.
 
 The following wrappers are available:
 
@@ -227,7 +234,9 @@ We aim for consistent semantics across basic key-value operations. Guarantees ma
 
 Adapters, stores, and wrappers can be combined in a variety of ways as needed.
 
-The following example simulates a consumer of your service providing an Elasticsearch store and forcing all data into a single collection. They pass this wrapped store to your service and you further wrap it in a statistics wrapper (for metrics/monitoring) and a pydantic adapter, to simplify the application's usage.
+The following example simulates a consumer of your service providing an Elasticsearch store and forcing all data into a
+single collection. They pass this wrapped store to your service and you further wrap it in a statistics wrapper (for
+metrics/monitoring) and a pydantic adapter, to simplify the application's usage.
 
 ```python
 import asyncio

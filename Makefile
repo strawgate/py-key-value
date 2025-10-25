@@ -19,6 +19,7 @@ lint:
 	@echo "Linting..."
 	@uv run ruff format
 	@uv run ruff check --fix
+	@npm run lint:md
 
 typecheck:
 	@echo "Type checking..."
