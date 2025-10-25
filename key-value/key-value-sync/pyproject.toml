@@ -16,7 +16,7 @@ classifiers = [
 ]
 dependencies = [
     "py-key-value-shared==0.2.8",
-    "beartype>=0.22.2",
+    "beartype>=0.20.0",
 ]
 
 [tool.uv.sources]
@@ -66,20 +66,7 @@ dev = [
     "py-key-value-sync[pydantic]",
     "py-key-value-sync[keyring]",
     "py-key-value-sync[wrappers-encryption]",
-    "pytest",
-    "pytest-mock",
-    "pytest-asyncio",
-    "pytest-xdist>=3.6.0",
-    "ruff",
-    "diskcache-stubs>=5.6.3.6.20240818",
-    "pytest-dotenv>=0.5.2",
-    "dirty-equals>=0.10.0",
-    "inline-snapshot>=0.29.0",
-    "basedpyright>=1.31.5",
-    "pytest-timeout>=2.4.0",
-    "ast-comments>=1.2.3",
-    "docker>=7.1.0",
-    "py-key-value-shared-test>=0.2.0",
+    "py-key-value-shared-test",
 ]
 
 [tool.ruff]
