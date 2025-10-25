@@ -46,7 +46,8 @@ uv run pytest key-value/key-value-sync/tests -q
 
 ## Generate/update sync package
 
-The sync package is generated from the async package. After changes to the async code, regenerate the sync package:
+The sync package is generated from the async package. After changes to the
+async code, regenerate the sync package:
 
 ```bash
 uv run python scripts/build_sync_library.py
@@ -55,7 +56,8 @@ uv run python scripts/build_sync_library.py
 Notes:
 
 - The codegen script lints the generated code automatically.
-- Some extras differ between async and sync (e.g., valkey). Refer to each package’s README for current extras.
+- Some extras differ between async and sync (e.g., valkey). Refer to each
+  package's README for current extras.
 
 ## Project layout
 
@@ -66,5 +68,3 @@ Notes:
 ## Releasing
 
 TBD
-
-

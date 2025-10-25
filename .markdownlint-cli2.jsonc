@@ -1,20 +1,12 @@
 // Configuration for markdownlint-cli2
 {
   "config": {
-    // Default to recommended rules with some customizations
     "default": true,
-    // Allow long lines (common in documentation with tables, code blocks, etc.)
     "MD013": {
-      "line_length": 200,
+      "line_length": 80,
       "code_blocks": false,
       "tables": false
-    },
-    // Allow multiple blanks (useful for separating sections)
-    "MD012": false,
-    // Allow bare URLs (common in documentation)
-    "MD034": false,
-    // Allow headings without blank lines around them
-    "MD022": false
+    }
   },
   "globs": [
     "**/*.md"
