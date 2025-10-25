@@ -195,9 +195,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         entries: dict[str, ManagedEntry | None] = dict.fromkeys(keys)
 
         # Process in batches of BATCH_GET_ITEM_LIMIT
-        for i in range(0, len(keys), BATCH_GET_ITEM_LIMIT):
-            batch_keys = keys[i : i + BATCH_GET_ITEM_LIMIT]
-
+        for batch_keys in self._batch_items(keys, BATCH_GET_ITEM_LIMIT):
             request_items = {
                 self._table_name: {
                     "Keys": [{"collection": {"S": collection}, "key": {"S": key}} for key in batch_keys],
@@ -252,10 +250,10 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             return
 
         # Process in batches of BATCH_WRITE_ITEM_LIMIT
-        for i in range(0, len(keys), BATCH_WRITE_ITEM_LIMIT):
-            batch_keys = keys[i : i + BATCH_WRITE_ITEM_LIMIT]
-            batch_entries = managed_entries[i : i + BATCH_WRITE_ITEM_LIMIT]
+        keys_batches = self._batch_items(keys, BATCH_WRITE_ITEM_LIMIT)
+        entries_batches = self._batch_items(list(managed_entries), BATCH_WRITE_ITEM_LIMIT)
 
+        for batch_keys, batch_entries in zip(keys_batches, entries_batches, strict=True):
             put_requests = []
             for key, managed_entry in zip(batch_keys, batch_entries, strict=True):
                 json_value = managed_entry.to_json()
@@ -301,9 +299,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         deleted_count = 0
 
         # Process in batches of BATCH_WRITE_ITEM_LIMIT
-        for i in range(0, len(keys), BATCH_WRITE_ITEM_LIMIT):
-            batch_keys = keys[i : i + BATCH_WRITE_ITEM_LIMIT]
-
+        for batch_keys in self._batch_items(keys, BATCH_WRITE_ITEM_LIMIT):
             delete_requests = [
                 {
                     "DeleteRequest": {
