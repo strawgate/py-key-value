@@ -152,16 +152,12 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          
+
           additional_permissions: |
             actions: read
-
-          allowed_tools: |
-            mcp__repository-summary__*
-            mcp__code-search__*
-            mcp__github-research__*
 
           prompt: ${{ steps.triage-prompt.outputs.PROMPT }}
           track_progress: true
           claude_args: |
+            --allowed-tools mcp__repository-summary,mcp__code-search,mcp__github-research,WebSearch,WebFetch 
             --mcp-config /tmp/mcp-config/mcp-servers.json
