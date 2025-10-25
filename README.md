@@ -104,17 +104,21 @@ ttl_many(keys: list[str], collection: str | None = None) -> list[tuple[dict[str,
 
 The library provides a variety of stores that implement the protocol.
 
-A ✅ means a store is available, a ☑️ under async means a store is available 
-but the underlying implementation is synchronous. A ✖️ means a store is 
+A ✅ means a store is available, a ☑️ under async means a store is available
+but the underlying implementation is synchronous. A ✖️ means a store is
 not available.
 
-Stability is a measure of the likelihood that the way data is stored will change 
-in a backwards incompatible way. 
-- A stable store is one we do not intend to change in a backwards incompatible way. 
+Stability is a measure of the likelihood that the way data is stored will change
+in a backwards incompatible way.
+
+- A stable store is one we do not intend to change in a backwards incompatible way.
 - A preview store is one that is unlikely to change in a backwards incompatible way.
 - An unstable store is one that is likely to change in a backwards incompatible way.
 
-If you are using py-key-value-aio for caching, stability may not be a concern for you. If you are using py-key-value-aio for long-term storage, stability is a concern and you should consider using a stable store.
+If you are using py-key-value-aio for caching, stability may not be a concern for
+you. If you are using py-key-value-aio for long-term storage, stability is a
+concern and you should consider using a stable store.
+
 A ✅ means a store is available, a ☑️ under async means a store is available
 but the underlying implementation is synchronous. A ✖️ means a store is not
 available.
