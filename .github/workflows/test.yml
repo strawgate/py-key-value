@@ -21,7 +21,7 @@ jobs:
 
       - uses: DavidAnson/markdownlint-cli2-action@v20
         with:
-          config: '.markdownlint-cli2.jsonc'
+          config: '.markdownlint.jsonc'
           globs: '**/*.md'
 
   static_analysis:
