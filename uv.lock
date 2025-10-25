@@ -1329,38 +1329,12 @@ source = { virtual = "." }
 [package.dev-dependencies]
 dev = [
     { name = "ast-comments" },
-    { name = "basedpyright" },
-    { name = "dirty-equals" },
-    { name = "diskcache-stubs" },
-    { name = "docker" },
-    { name = "inline-snapshot" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-dotenv" },
-    { name = "pytest-mock" },
-    { name = "pytest-timeout" },
-    { name = "pytest-xdist" },
-    { name = "ruff" },
 ]
 
 [package.metadata]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "ast-comments", specifier = ">=1.2.3" },
-    { name = "basedpyright", specifier = ">=1.32.1" },
-    { name = "dirty-equals", specifier = ">=0.10.0" },
-    { name = "diskcache-stubs", specifier = ">=5.6.3.6.20240818" },
-    { name = "docker", specifier = ">=7.1.0" },
-    { name = "inline-snapshot", specifier = ">=0.30.1" },
-    { name = "pytest", specifier = ">=8.4.2" },
-    { name = "pytest-asyncio", specifier = ">=1.2.0" },
-    { name = "pytest-dotenv", specifier = ">=0.5.2" },
-    { name = "pytest-mock", specifier = ">=3.15.1" },
-    { name = "pytest-timeout", specifier = ">=2.4.0" },
-    { name = "pytest-xdist", specifier = ">=3.8.0" },
-    { name = "ruff", specifier = ">=0.14.2" },
-]
+dev = [{ name = "ast-comments", specifier = ">=1.2.3" }]
 
 [[package]]
 name = "py-key-value-aio"
@@ -1422,9 +1396,21 @@ wrappers-encryption = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "basedpyright" },
+    { name = "dirty-equals" },
+    { name = "diskcache-stubs" },
+    { name = "docker" },
+    { name = "inline-snapshot" },
     { name = "py-key-value-aio", extra = ["disk", "dynamodb", "elasticsearch", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "rocksdb", "vault", "wrappers-encryption"] },
     { name = "py-key-value-aio", extra = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-shared-test" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-dotenv" },
+    { name = "pytest-mock" },
+    { name = "pytest-timeout" },
+    { name = "pytest-xdist" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
@@ -1455,12 +1441,24 @@ provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "vault", "mem
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "basedpyright", specifier = ">=1.32.1" },
+    { name = "dirty-equals", specifier = ">=0.10.0" },
+    { name = "diskcache-stubs", specifier = ">=5.6.3.6.20240818" },
+    { name = "docker", specifier = ">=7.1.0" },
+    { name = "inline-snapshot", specifier = ">=0.30.1" },
     { name = "py-key-value-aio", extras = ["keyring"] },
     { name = "py-key-value-aio", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb", "vault", "dynamodb", "rocksdb"] },
     { name = "py-key-value-aio", extras = ["pydantic"] },
     { name = "py-key-value-aio", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extras = ["wrappers-encryption"] },
     { name = "py-key-value-shared-test", editable = "key-value/key-value-shared-test" },
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pytest-asyncio", specifier = ">=1.2.0" },
+    { name = "pytest-dotenv", specifier = ">=0.5.2" },
+    { name = "pytest-mock", specifier = ">=3.15.1" },
+    { name = "pytest-timeout", specifier = ">=2.4.0" },
+    { name = "pytest-xdist", specifier = ">=3.8.0" },
+    { name = "ruff", specifier = ">=0.14.2" },
 ]
 
 [[package]]
@@ -1581,9 +1579,21 @@ wrappers-encryption = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "basedpyright" },
+    { name = "dirty-equals" },
+    { name = "diskcache-stubs" },
+    { name = "docker" },
+    { name = "inline-snapshot" },
     { name = "py-key-value-shared-test" },
     { name = "py-key-value-sync", extra = ["disk", "elasticsearch", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "rocksdb", "vault", "wrappers-encryption"] },
     { name = "py-key-value-sync", extra = ["valkey"], marker = "sys_platform != 'win32'" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-dotenv" },
+    { name = "pytest-mock" },
+    { name = "pytest-timeout" },
+    { name = "pytest-xdist" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
@@ -1612,12 +1622,24 @@ provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "vault", "mem
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "basedpyright", specifier = ">=1.32.1" },
+    { name = "dirty-equals", specifier = ">=0.10.0" },
+    { name = "diskcache-stubs", specifier = ">=5.6.3.6.20240818" },
+    { name = "docker", specifier = ">=7.1.0" },
+    { name = "inline-snapshot", specifier = ">=0.30.1" },
     { name = "py-key-value-shared-test", editable = "key-value/key-value-shared-test" },
     { name = "py-key-value-sync", extras = ["keyring"] },
     { name = "py-key-value-sync", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb", "vault", "rocksdb"] },
     { name = "py-key-value-sync", extras = ["pydantic"] },
     { name = "py-key-value-sync", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-sync", extras = ["wrappers-encryption"] },
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pytest-asyncio", specifier = ">=1.2.0" },
+    { name = "pytest-dotenv", specifier = ">=0.5.2" },
+    { name = "pytest-mock", specifier = ">=3.15.1" },
+    { name = "pytest-timeout", specifier = ">=2.4.0" },
+    { name = "pytest-xdist", specifier = ">=3.8.0" },
+    { name = "ruff", specifier = ">=0.14.2" },
 ]
 
 [[package]]

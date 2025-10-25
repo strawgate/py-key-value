@@ -67,6 +67,18 @@ dev = [
     "py-key-value-sync[keyring]",
     "py-key-value-sync[wrappers-encryption]",
     "py-key-value-shared-test",
+    "basedpyright>=1.32.1",
+    "dirty-equals>=0.10.0",
+    "diskcache-stubs>=5.6.3.6.20240818",
+    "docker>=7.1.0",
+    "inline-snapshot>=0.30.1",
+    "pytest-asyncio>=1.2.0",
+    "pytest-dotenv>=0.5.2",
+    "pytest-mock>=3.15.1",
+    "pytest-timeout>=2.4.0",
+    "pytest-xdist>=3.8.0",
+    "pytest>=8.4.2",
+    "ruff>=0.14.2",
 ]
 
 [tool.ruff]
