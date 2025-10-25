@@ -26,7 +26,7 @@ REDIS_VERSIONS_TO_TEST = [
 async def ping_redis() -> bool:
     client: Redis = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
     try:
-        return await client.ping()  # pyright: ignore[reportUnknownMemberType, reportAny, reportReturnType]
+        return await client.ping()  # pyright: ignore[reportUnknownMemberType, reportAny, reportReturnType, reportUnknownVariableType, reportGeneralTypeIssues]
     except Exception:
         return False
 
