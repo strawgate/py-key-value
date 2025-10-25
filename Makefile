@@ -19,6 +19,7 @@ lint:
 	@echo "Linting..."
 	@uv run ruff format
 	@uv run ruff check --fix
+	@markdownlint  --fix -c .markdownlint.jsonc .
 
 typecheck:
 	@echo "Type checking..."
@@ -27,5 +28,6 @@ typecheck:
 sync:
 	@echo "Syncing..."
 	@uv sync --all-packages
+	@npm install -g markdownlint-cli
 
 precommit: lint typecheck codegen

@@ -10,6 +10,20 @@ on:
   workflow_dispatch:
 
 jobs:
+  markdown_lint:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - uses: DavidAnson/markdownlint-cli2-action@v20
+        with:
+          config: '.markdownlint.jsonc'
+          globs: '**/*.md'
+
   static_analysis:
     runs-on: ubuntu-latest
 
@@ -45,6 +59,7 @@ jobs:
 
   test_quick:
     needs:
+      - markdown_lint
       - static_analysis
     timeout-minutes: 10
     strategy:

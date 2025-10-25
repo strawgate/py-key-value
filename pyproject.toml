@@ -79,6 +79,7 @@ reportExplicitAny = false
 reportMissingTypeStubs = false
 exclude = [
     "**/playground/**",
+    "**/node_modules/**",
     "**/examples/**",
     "**/references/**",
     "**/docs/**",

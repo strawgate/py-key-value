@@ -15,14 +15,23 @@ This monorepo contains two Python packages:
 ```bash
 # From repo root
 uv sync --all-extras --all-packages
+
+# Install Node.js dependencies for markdown linting
+npm install
 ```
 
 ## Lint and format
 
 ```bash
-# From repo root
+# From repo root - Lint Python code
 uv run ruff format .
 uv run ruff check --fix .
+
+# Lint markdown files
+npm run lint:md
+
+# Or use the Makefile to run all linters
+make lint
 ```
 
 ## Test
@@ -37,15 +46,18 @@ uv run pytest key-value/key-value-sync/tests -q
 
 ## Generate/update sync package
 
-The sync package is generated from the async package. After changes to the async code, regenerate the sync package:
+The sync package is generated from the async package. After changes to the
+async code, regenerate the sync package:
 
 ```bash
 uv run python scripts/build_sync_library.py
 ```
 
 Notes:
+
 - The codegen script lints the generated code automatically.
-- Some extras differ between async and sync (e.g., valkey). Refer to each package’s README for current extras.
+- Some extras differ between async and sync (e.g., valkey). Refer to each
+  package's README for current extras.
 
 ## Project layout
 
@@ -56,5 +68,3 @@ Notes:
 ## Releasing
 
 TBD
-
-
