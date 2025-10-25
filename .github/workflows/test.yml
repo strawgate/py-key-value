@@ -19,16 +19,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: DavidAnson/markdownlint-cli2-action@v20
         with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint markdown files
-        run: npm run lint:md
+          config: '.markdownlint-cli2.jsonc'
+          globs: '**/*.md'
 
   static_analysis:
     runs-on: ubuntu-latest

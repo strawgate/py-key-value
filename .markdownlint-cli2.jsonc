@@ -4,8 +4,8 @@
     "default": true,
     "MD013": {
       "line_length": 80,
-      "code_blocks": false,
-      "tables": false
+      "code_blocks": false, // Don't restrict line length in code blocks
+      "tables": false // Don't restrict line length in tables
     }
   },
   "globs": [

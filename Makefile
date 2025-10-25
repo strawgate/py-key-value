@@ -28,5 +28,6 @@ typecheck:
 sync:
 	@echo "Syncing..."
 	@uv sync --all-packages
+	@npm install
 
 precommit: lint typecheck codegen
