@@ -201,7 +201,7 @@ class BaseStoreTests(ABC):
         assert store.get(collection="test_collection", key="test_key_0") is None
         assert store.get(collection="test_collection", key="test_key_999") is not None
 
-    @pytest.mark.skipif(condition=not running_in_event_loop(), reason="Cannot run concurrent operations in event loop")
+    @pytest.mark.skipif(condition=not running_in_event_loop(), reason="Cannot run concurrent operations outside of event loop")
     def test_concurrent_operations(self, store: BaseStore):
         """Tests that the store can handle concurrent operations."""
 
