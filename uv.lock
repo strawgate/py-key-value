@@ -1341,7 +1341,6 @@ name = "py-key-value-aio"
 version = "0.2.8"
 source = { editable = "key-value/key-value-aio" }
 dependencies = [
-    { name = "beartype" },
     { name = "py-key-value-shared" },
 ]
 
@@ -1418,7 +1417,6 @@ requires-dist = [
     { name = "aioboto3", marker = "extra == 'dynamodb'", specifier = ">=13.3.0" },
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
-    { name = "beartype", specifier = ">=0.20.0" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
     { name = "cryptography", marker = "extra == 'wrappers-encryption'", specifier = ">=45.0.0" },
     { name = "dbus-python", marker = "extra == 'keyring-linux'", specifier = ">=1.4.0" },
@@ -1486,7 +1484,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "beartype", specifier = ">=0.22.2" },
+    { name = "beartype", specifier = ">=0.20.0" },
     { name = "typing-extensions", specifier = ">=4.15.0" },
 ]
 
@@ -1528,7 +1526,6 @@ name = "py-key-value-sync"
 version = "0.2.8"
 source = { editable = "key-value/key-value-sync" }
 dependencies = [
-    { name = "beartype" },
     { name = "py-key-value-shared" },
 ]
 
@@ -1600,7 +1597,6 @@ dev = [
 requires-dist = [
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
-    { name = "beartype", specifier = ">=0.20.0" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
     { name = "cryptography", marker = "extra == 'wrappers-encryption'", specifier = ">=45.0.0" },
     { name = "dbus-python", marker = "extra == 'keyring-linux'", specifier = ">=1.4.0" },

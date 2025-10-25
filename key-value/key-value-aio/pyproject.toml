@@ -15,7 +15,6 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "beartype>=0.20.0",
     "py-key-value-shared==0.2.8",
 ]
 

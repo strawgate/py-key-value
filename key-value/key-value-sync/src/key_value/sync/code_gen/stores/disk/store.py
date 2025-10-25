@@ -25,7 +25,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
     @overload
     def __init__(self, *, disk_cache: Cache, default_collection: str | None = None) -> None:
-        """Initialize the disk cache.
+        """Initialize the disk store.
 
         Args:
             disk_cache: An existing diskcache Cache instance to use.
@@ -34,11 +34,11 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
     @overload
     def __init__(self, *, directory: Path | str, max_size: int | None = None, default_collection: str | None = None) -> None:
-        """Initialize the disk cache.
+        """Initialize the disk store.
 
         Args:
-            directory: The directory to use for the disk cache.
-            max_size: The maximum size of the disk cache. Defaults to 1GB.
+            directory: The directory to use for the disk store.
+            max_size: The maximum size of the disk store. Defaults to an unlimited size disk store
             default_collection: The default collection to use if no collection is provided.
         """
 
@@ -50,12 +50,12 @@ class DiskStore(BaseContextManagerStore, BaseStore):
         max_size: int | None = None,
         default_collection: str | None = None,
     ) -> None:
-        """Initialize the disk cache.
+        """Initialize the disk store.
 
         Args:
             disk_cache: An existing diskcache Cache instance to use.
-            directory: The directory to use for the disk cache.
-            max_size: The maximum size of the disk cache.
+            directory: The directory to use for the disk store.
+            max_size: The maximum size of the disk store.
             default_collection: The default collection to use if no collection is provided.
         """
         if disk_cache is not None and directory is not None:
@@ -73,7 +73,10 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
             directory.mkdir(parents=True, exist_ok=True)
 
-            self._cache = Cache(directory=directory, size_limit=max_size)
+            if max_size:
+                self._cache = Cache(directory=directory, size_limit=max_size)
+            else:
+                self._cache = Cache(directory=directory, eviction_policy="none")
 
         super().__init__(default_collection=default_collection)
 

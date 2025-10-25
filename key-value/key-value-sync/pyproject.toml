@@ -16,7 +16,6 @@ classifiers = [
 ]
 dependencies = [
     "py-key-value-shared==0.2.8",
-    "beartype>=0.20.0",
 ]
 
 [tool.uv.sources]

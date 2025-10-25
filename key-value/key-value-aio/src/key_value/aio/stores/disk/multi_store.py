@@ -90,7 +90,10 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
 
             cache_directory.mkdir(parents=True, exist_ok=True)
 
-            return Cache(directory=cache_directory, size_limit=self._max_size)
+            if self._max_size:
+                return Cache(directory=cache_directory, size_limit=self._max_size)
+
+            return Cache(directory=cache_directory, eviction_policy="none")
 
         self._disk_cache_factory = disk_cache_factory or default_disk_cache_factory
 
