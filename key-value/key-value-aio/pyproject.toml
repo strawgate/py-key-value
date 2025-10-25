@@ -43,7 +43,10 @@ dynamodb = ["aioboto3>=13.3.0", "types-aiobotocore-dynamodb>=2.16.0"]
 keyring = ["keyring>=25.6.0"]
 keyring-linux = ["keyring>=25.6.0", "dbus-python>=1.4.0"]
 pydantic = ["pydantic>=2.11.9"]
-rocksdb = ["rocksdict>=0.3.24"] # 0.3.24 is the first version to support Python 3.13
+rocksdb = [
+    "rocksdict>=0.3.24 ; python_version >= '3.12'", # RocksDB 0.3.24 is the first version to support Python 3.13
+    "rocksdict>=0.3.2 ; python_version >= '3.10'"
+]
 wrappers-encryption = ["cryptography>=45.0.0"]
 
 [tool.pytest.ini_options]

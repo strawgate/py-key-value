@@ -2,8 +2,10 @@ version = 1
 revision = 2
 requires-python = ">=3.10"
 resolution-markers = [
-    "sys_platform != 'win32'",
-    "sys_platform == 'win32'",
+    "python_full_version >= '3.12' and sys_platform != 'win32'",
+    "python_full_version >= '3.12' and sys_platform == 'win32'",
+    "python_full_version < '3.12' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
 ]
 
 [manifest]
@@ -705,7 +707,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -877,7 +879,7 @@ name = "importlib-metadata"
 version = "8.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp" },
+    { name = "zipp", marker = "python_full_version < '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/66/650a33bd90f786193e4de4b3ad86ea60b53c89b669a5c7be931fac31cdb0/importlib_metadata-8.7.0.tar.gz", hash = "sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000", size = 56641, upload-time = "2025-04-27T15:29:01.736Z" }
 wheels = [
@@ -1430,7 +1432,8 @@ requires-dist = [
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
     { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.15.0" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=4.3.0" },
-    { name = "rocksdict", marker = "extra == 'rocksdb'", specifier = ">=0.3.24" },
+    { name = "rocksdict", marker = "python_full_version >= '3.10' and extra == 'rocksdb'", specifier = ">=0.3.2" },
+    { name = "rocksdict", marker = "python_full_version >= '3.12' and extra == 'rocksdb'", specifier = ">=0.3.24" },
     { name = "types-aiobotocore-dynamodb", marker = "extra == 'dynamodb'", specifier = ">=2.16.0" },
     { name = "types-hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "valkey-glide", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
@@ -1472,7 +1475,6 @@ dependencies = [
 dev = [
     { name = "basedpyright" },
     { name = "dirty-equals" },
-    { name = "diskcache-stubs" },
     { name = "docker" },
     { name = "inline-snapshot" },
     { name = "py-key-value-shared-test" },
@@ -1495,7 +1497,6 @@ requires-dist = [
 dev = [
     { name = "basedpyright", specifier = ">=1.32.1" },
     { name = "dirty-equals", specifier = ">=0.10.0" },
-    { name = "diskcache-stubs", specifier = ">=5.6.3.6.20240818" },
     { name = "docker", specifier = ">=7.1.0" },
     { name = "inline-snapshot", specifier = ">=0.30.1" },
     { name = "py-key-value-shared-test", editable = "key-value/key-value-shared-test" },
@@ -1516,6 +1517,15 @@ source = { editable = "key-value/key-value-shared-test" }
 [package.dev-dependencies]
 dev = [
     { name = "basedpyright" },
+    { name = "dirty-equals" },
+    { name = "docker" },
+    { name = "inline-snapshot" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-dotenv" },
+    { name = "pytest-mock" },
+    { name = "pytest-timeout" },
+    { name = "pytest-xdist" },
     { name = "ruff" },
 ]
 
@@ -1523,8 +1533,17 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "basedpyright", specifier = ">=1.31.5" },
-    { name = "ruff" },
+    { name = "basedpyright", specifier = ">=1.32.1" },
+    { name = "dirty-equals", specifier = ">=0.10.0" },
+    { name = "docker", specifier = ">=7.1.0" },
+    { name = "inline-snapshot", specifier = ">=0.30.1" },
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pytest-asyncio", specifier = ">=1.2.0" },
+    { name = "pytest-dotenv", specifier = ">=0.5.2" },
+    { name = "pytest-mock", specifier = ">=3.15.1" },
+    { name = "pytest-timeout", specifier = ">=2.4.0" },
+    { name = "pytest-xdist", specifier = ">=3.8.0" },
+    { name = "ruff", specifier = ">=0.14.2" },
 ]
 
 [[package]]
@@ -1616,7 +1635,8 @@ requires-dist = [
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
     { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.15.0" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=4.3.0" },
-    { name = "rocksdict", marker = "extra == 'rocksdb'", specifier = ">=0.3.24" },
+    { name = "rocksdict", marker = "python_full_version >= '3.10' and extra == 'rocksdb'", specifier = ">=0.3.2" },
+    { name = "rocksdict", marker = "python_full_version >= '3.12' and extra == 'rocksdb'", specifier = ">=0.3.24" },
     { name = "types-hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "valkey-glide-sync", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
