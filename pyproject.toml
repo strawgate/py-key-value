@@ -67,9 +67,7 @@ line-length = 140
 
 [dependency-groups]
 dev = [
-    "docker>=7.1.0",
-    "basedpyright>=1.31.5",
-    "beartype>=0.22.2",
+    "ast-comments>=1.2.3"
 ]
 
 [tool.pyright]

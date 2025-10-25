@@ -23,6 +23,8 @@ except ImportError as e:
 
 @dataclass
 class MemoryCacheEntry:
+    """A cache entry for the memory store."""
+
     json_str: str
 
     expires_at: datetime | None
@@ -68,6 +70,11 @@ class MemoryCollection:
     _cache: TLRUCache[str, MemoryCacheEntry]
 
     def __init__(self, max_entries: int = DEFAULT_MAX_ENTRIES_PER_COLLECTION):
+        """Initialize a fixed-size in-memory collection.
+
+        Args:
+            max_entries: The maximum number of entries per collection. Defaults to 10,000 entries.
+        """
         self._cache = TLRUCache[str, MemoryCacheEntry](
             maxsize=max_entries,
             ttu=_memory_cache_ttu,
@@ -96,14 +103,14 @@ class MemoryCollection:
 
 
 class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseEnumerateKeysStore):
-    """In-memory key-value store using TLRU (Time-aware Least Recently Used) cache."""
+    """A fixed-size in-memory key-value store using TLRU (Time-aware Least Recently Used) cache."""
 
     max_entries_per_collection: int
 
     _cache: dict[str, MemoryCollection]
 
     def __init__(self, *, max_entries_per_collection: int = DEFAULT_MAX_ENTRIES_PER_COLLECTION, default_collection: str | None = None):
-        """Initialize the in-memory cache.
+        """Initialize a fixed-size in-memory store.
 
         Args:
             max_entries_per_collection: The maximum number of entries per collection. Defaults to 10000.
@@ -113,6 +120,8 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         self.max_entries_per_collection = max_entries_per_collection
 
         self._cache = {}
+
+        self._stable_api = True
 
         super().__init__(default_collection=default_collection)
 
