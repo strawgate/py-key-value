@@ -70,7 +70,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
             directory.mkdir(parents=True, exist_ok=True)
 
-            if max_size:
+            if max_size is not None and max_size > 0:
                 self._cache = Cache(directory=directory, size_limit=max_size)
             else:
                 self._cache = Cache(directory=directory, eviction_policy="none")
