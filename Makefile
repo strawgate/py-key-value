@@ -19,6 +19,7 @@ lint:
 	@echo "Linting..."
 	@uv run ruff format
 	@uv run ruff check --fix
+	@npm run lint:md
 
 typecheck:
 	@echo "Type checking..."
@@ -27,5 +28,6 @@ typecheck:
 sync:
 	@echo "Syncing..."
 	@uv sync --all-packages
+	@npm install
 
 precommit: lint typecheck codegen
