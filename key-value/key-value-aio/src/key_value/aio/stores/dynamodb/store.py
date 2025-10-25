@@ -1,7 +1,6 @@
 from types import TracebackType
-from typing import Any, cast, overload
+from typing import TYPE_CHECKING, Any, cast, overload
 
-from key_value.shared.type_checking.bear_spray import bear_spray
 from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import Self, override
 
@@ -13,11 +12,15 @@ from key_value.aio.stores.base import (
 try:
     import aioboto3
     from aioboto3.session import Session  # noqa: TC002
-    from types_aiobotocore_dynamodb.client import DynamoDBClient
 except ImportError as e:
     msg = "DynamoDBStore requires py-key-value-aio[dynamodb]"
     raise ImportError(msg) from e
 
+# aioboto3 generates types at runtime, so we use AioBaseClient at runtime but DynamoDBClient during static type checking
+if TYPE_CHECKING:
+    from types_aiobotocore_dynamodb.client import DynamoDBClient
+else:
+    from aiobotocore.client import AioBaseClient as DynamoDBClient
 
 DEFAULT_PAGE_SIZE = 1000
 PAGE_LIMIT = 1000
@@ -127,7 +130,6 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             await self._client.__aexit__(exc_type, exc_value, traceback)
 
     @property
-    @bear_spray  # aioboto generates types at runtime, so we use bear_spray to prevent runtime warnings
     def _connected_client(self) -> DynamoDBClient:
         if not self._client:
             msg = "Client not connected"
