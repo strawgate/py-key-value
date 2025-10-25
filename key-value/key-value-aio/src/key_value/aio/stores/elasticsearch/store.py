@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, overload
 
 from key_value.shared.utils.compound import compound_key
@@ -183,6 +184,56 @@ class ElasticsearchStore(
             expires_at=expires_at,
         )
 
+    @override
+    async def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
+        if not keys:
+            return []
+
+        combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
+
+        # Use mget for efficient batch retrieval
+        docs = [{"_id": self._sanitize_document_id(key=combo_key)} for combo_key in combo_keys]
+
+        elasticsearch_response = await self._client.options(ignore_status=404).mget(
+            index=self._sanitize_index_name(collection=collection), docs=docs
+        )
+
+        body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
+        docs_result = body.get("docs", [])
+
+        entries_by_id: dict[str, ManagedEntry | None] = {}
+        for doc in docs_result:
+            doc_id = doc.get("_id")
+            if not doc.get("found"):
+                if doc_id:
+                    entries_by_id[doc_id] = None
+                continue
+
+            source = doc.get("_source")
+            if not source:
+                if doc_id:
+                    entries_by_id[doc_id] = None
+                continue
+
+            value_str = source.get("value")
+            if not value_str or not isinstance(value_str, str):
+                if doc_id:
+                    entries_by_id[doc_id] = None
+                continue
+
+            created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
+            expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
+
+            if doc_id:
+                entries_by_id[doc_id] = ManagedEntry(
+                    value=load_from_json(value_str),
+                    created_at=created_at,
+                    expires_at=expires_at,
+                )
+
+        # Return entries in the same order as input keys
+        return [entries_by_id.get(self._sanitize_document_id(key=combo_key)) for combo_key in combo_keys]
+
     @property
     def _should_refresh_on_put(self) -> bool:
         return not self._is_serverless
@@ -216,6 +267,38 @@ class ElasticsearchStore(
         )
 
     @override
+    async def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
+        if not keys:
+            return
+
+        # Use bulk API for efficient batch indexing
+        operations = []
+        for key, managed_entry in zip(keys, managed_entries, strict=True):
+            combo_key: str = compound_key(collection=collection, key=key)
+
+            document: dict[str, Any] = {
+                "collection": collection,
+                "key": key,
+                "value": managed_entry.to_json(include_metadata=False),
+            }
+
+            if managed_entry.created_at:
+                document["created_at"] = managed_entry.created_at.isoformat()
+            if managed_entry.expires_at:
+                document["expires_at"] = managed_entry.expires_at.isoformat()
+
+            index_action = {
+                "index": {
+                    "_index": self._sanitize_index_name(collection=collection),
+                    "_id": self._sanitize_document_id(key=combo_key),
+                }
+            }
+            operations.append(index_action)
+            operations.append(document)
+
+        _ = await self._client.bulk(operations=operations, refresh=self._should_refresh_on_put)
+
+    @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
 
@@ -229,6 +312,37 @@ class ElasticsearchStore(
             return False
 
         return result == "deleted"
+
+    @override
+    async def _delete_managed_entries(self, *, keys: list[str], collection: str) -> int:
+        if not keys:
+            return 0
+
+        # Use bulk API for efficient batch deletion
+        operations = []
+        for key in keys:
+            combo_key: str = compound_key(collection=collection, key=key)
+            delete_action = {
+                "delete": {
+                    "_index": self._sanitize_index_name(collection=collection),
+                    "_id": self._sanitize_document_id(key=combo_key),
+                }
+            }
+            operations.append(delete_action)
+
+        elasticsearch_response = await self._client.bulk(operations=operations)
+
+        body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
+
+        # Count successful deletions
+        deleted_count = 0
+        items = body.get("items", [])
+        for item in items:
+            delete_result = item.get("delete", {})
+            if delete_result.get("result") == "deleted":
+                deleted_count += 1
+
+        return deleted_count
 
     @override
     async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:

@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any, overload
 from urllib.parse import urlparse
 
@@ -93,6 +94,24 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         return managed_entry
 
     @override
+    async def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
+        if not keys:
+            return []
+
+        combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
+
+        redis_responses: list[Any] = await self._client.mget(keys=combo_keys)  # pyright: ignore[reportAny]
+
+        entries: list[ManagedEntry | None] = []
+        for redis_response in redis_responses:
+            if isinstance(redis_response, str):
+                entries.append(ManagedEntry.from_json(json_str=redis_response))
+            else:
+                entries.append(None)
+
+        return entries
+
+    @override
     async def _put_managed_entry(
         self,
         *,
@@ -113,10 +132,44 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             _ = await self._client.set(name=combo_key, value=json_value)  # pyright: ignore[reportAny]
 
     @override
+    async def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
+        if not keys:
+            return
+
+        # Use pipeline for bulk operations
+        # Note: We can't use mset for entries with TTL since each may have different TTL
+        # We'll use a pipeline to batch the operations
+        pipeline = self._client.pipeline()
+
+        for key, managed_entry in zip(keys, managed_entries, strict=True):
+            combo_key: str = compound_key(collection=collection, key=key)
+            json_value: str = managed_entry.to_json()
+
+            if managed_entry.ttl is not None:
+                # Redis does not support <= 0 TTLs
+                ttl = max(int(managed_entry.ttl), 1)
+                pipeline.setex(name=combo_key, time=ttl, value=json_value)
+            else:
+                pipeline.set(name=combo_key, value=json_value)
+
+        await pipeline.execute()  # pyright: ignore[reportAny]
+
+    @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
 
         return await self._client.delete(combo_key) != 0  # pyright: ignore[reportAny]
+
+    @override
+    async def _delete_managed_entries(self, *, keys: list[str], collection: str) -> int:
+        if not keys:
+            return 0
+
+        combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
+
+        deleted_count: int = await self._client.delete(*combo_keys)  # pyright: ignore[reportAny]
+
+        return deleted_count
 
     @override
     async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:

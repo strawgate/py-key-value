@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import overload
 
 from key_value.shared.utils.compound import compound_key
@@ -92,6 +93,25 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         return ManagedEntry.from_json(json_str=decoded_response)
 
     @override
+    async def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
+        if not keys:
+            return []
+
+        combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
+
+        responses: list[bytes | None] = await self._client.mget(keys=combo_keys)  # pyright: ignore[reportUnknownMemberType]
+
+        entries: list[ManagedEntry | None] = []
+        for response in responses:
+            if isinstance(response, bytes):
+                decoded_response: str = response.decode("utf-8")
+                entries.append(ManagedEntry.from_json(json_str=decoded_response))
+            else:
+                entries.append(None)
+
+        return entries
+
+    @override
     async def _put_managed_entry(
         self,
         *,
@@ -108,9 +128,33 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         _ = await self._client.set(key=combo_key, value=json_value, expiry=expiry)
 
     @override
+    async def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
+        if not keys:
+            return
+
+        # Valkey's mset doesn't support per-key TTL, so we need to use a different approach
+        # We'll use a pipeline-like approach with individual set commands
+        # Note: BaseClient supports pipelining through transaction
+        for key, managed_entry in zip(keys, managed_entries, strict=True):
+            combo_key: str = compound_key(collection=collection, key=key)
+            json_value: str = managed_entry.to_json()
+            expiry: ExpirySet | None = ExpirySet(expiry_type=ExpiryType.SEC, value=int(managed_entry.ttl)) if managed_entry.ttl else None
+            _ = await self._client.set(key=combo_key, value=json_value, expiry=expiry)
+
+    @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
         return await self._client.delete(keys=[combo_key]) != 0
+
+    @override
+    async def _delete_managed_entries(self, *, keys: list[str], collection: str) -> int:
+        if not keys:
+            return 0
+
+        combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
+        deleted_count: int = await self._client.delete(keys=combo_keys)
+
+        return deleted_count
 
     @override
     async def _close(self) -> None:
