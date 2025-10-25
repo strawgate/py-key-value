@@ -37,7 +37,7 @@ pip install py-key-value-aio[memory]
 pip install py-key-value-aio[disk]
 pip install py-key-value-aio[dynamodb]
 pip install py-key-value-aio[elasticsearch]
-# or: redis, mongodb, memcached, valkey, vault, rocksdb, see below for all options
+# or: redis, mongodb, memcached, valkey, vault, registry, rocksdb, see below for all options
 ```
 
 ```python
@@ -98,11 +98,12 @@ Local stores are stored in memory or on disk, local to the application.
 | Memory           |  ✅  |  ✅  | `MemoryStore()` |
 | Disk             |  ☑️  |  ✅  | `DiskStore(directory="./cache")` |
 | Disk (Per-Collection) |  ☑️  |  ✅  | `MultiDiskStore(directory="./cache")` |
+| Null (test)      |  ✅  |  ✅  | `NullStore()` |
 | RocksDB          |  ☑️  |  ✅  | `RocksDBStore(path="./rocksdb")` |
 | Simple (test)    |  ✅  |  ✅  | `SimpleStore()` |
-| Null (test)      |  ✅  |  ✅  | `NullStore()` |
+| Windows Registry |  ☑️  |   ✅   | `WindowsRegistryStore(hive="HKEY_CURRENT_USER", registry_path="Software\\py-key-value")` |
 
-#### Secret stores
+#### Local - Secret stores
 Secret stores are stores that are used to store sensitive data, typically in an Operating System's secret store.
 
 | Secret Stores | Async | Sync | Example |

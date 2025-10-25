@@ -8,12 +8,12 @@ from key_value.shared.stores.wait import wait_for_true
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
-from tests.code_gen.conftest import detect_on_windows, docker_container, docker_stop, should_skip_docker_tests
+from tests.code_gen.conftest import detect_on_windows, docker_container, should_skip_docker_tests
 from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # Valkey test configuration
 VALKEY_HOST = "localhost"
-VALKEY_PORT = 6379  # avoid clashing with Redis tests
+VALKEY_PORT = 6380  # normally 6379, avoid clashing with Redis tests
 VALKEY_DB = 15
 
 WAIT_FOR_VALKEY_TIMEOUT = 30
@@ -46,10 +46,7 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @pytest.fixture(scope="session")
     def setup_valkey(self) -> Generator[None, None, None]:
-        # Double-check that the Redis test container is stopped
-        docker_stop("redis-test", raise_on_error=False)
-
-        with docker_container("valkey-test", "valkey/valkey:latest", {"6379": 6379}):
+        with docker_container("valkey-test", "valkey/valkey:latest", {"6379": VALKEY_PORT}):
             if not wait_for_true(bool_fn=self.ping_valkey, tries=30, wait_time=1):
                 msg = "Valkey failed to start"
                 raise ValkeyFailedToStartError(msg)
