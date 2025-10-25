@@ -110,8 +110,6 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         self._db = self._client[db_name]
         self._collections_by_name = {}
 
-        self._warn_about_stability()
-
         super().__init__(default_collection=default_collection)
 
     @override

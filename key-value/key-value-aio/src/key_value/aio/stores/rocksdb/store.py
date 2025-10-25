@@ -74,8 +74,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
         self._is_closed = False
 
-        self._warn_about_stability()
-
         super().__init__(default_collection=default_collection)
 
     @override

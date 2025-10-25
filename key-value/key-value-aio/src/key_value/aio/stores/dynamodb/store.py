@@ -108,8 +108,6 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
 
             self._client = None
 
-        self._warn_about_stability()
-
         super().__init__(default_collection=default_collection)
 
     @override

@@ -81,6 +81,8 @@ class MemoryCollection:
             getsizeof=_memory_cache_getsizeof,
         )
 
+        self._stable_api = True
+
     def get(self, key: str) -> ManagedEntry | None:
         managed_entry_str: MemoryCacheEntry | None = self._cache.get(key)
 
