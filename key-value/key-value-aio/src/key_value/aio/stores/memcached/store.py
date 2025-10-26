@@ -120,16 +120,18 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         if not keys:
             return
 
+        # All entries in a batch have the same TTL (from BaseStore.put_many)
+        # Extract TTL once from the first entry
+        first_entry = managed_entries[0]
+        exptime: int
+        if first_entry.ttl is None:  # noqa: SIM108
+            exptime = 0
+        else:
+            exptime = max(int(first_entry.ttl), 1)
+
         # aiomcache doesn't have a native multi_set, so we use concurrent individual sets
         async def put_single(key: str, managed_entry: ManagedEntry) -> None:
             combo_key: str = self.sanitize_key(compound_key(collection=collection, key=key))
-
-            exptime: int
-            if managed_entry.ttl is None:  # noqa: SIM108
-                exptime = 0
-            else:
-                exptime = max(int(managed_entry.ttl), 1)
-
             json_value: str = managed_entry.to_json()
 
             _ = await self._client.set(

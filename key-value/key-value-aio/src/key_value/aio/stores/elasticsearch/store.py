@@ -271,6 +271,12 @@ class ElasticsearchStore(
         if not keys:
             return
 
+        # All entries in a batch have the same timestamps (from BaseStore.put_many)
+        # Extract timestamps once from the first entry
+        first_entry = managed_entries[0]
+        created_at_iso: str | None = first_entry.created_at.isoformat() if first_entry.created_at else None
+        expires_at_iso: str | None = first_entry.expires_at.isoformat() if first_entry.expires_at else None
+
         # Use bulk API for efficient batch indexing
         operations: list[dict[str, Any]] = []
         for key, managed_entry in zip(keys, managed_entries, strict=True):
@@ -282,10 +288,10 @@ class ElasticsearchStore(
                 "value": managed_entry.to_json(include_metadata=False),
             }
 
-            if managed_entry.created_at:
-                document["created_at"] = managed_entry.created_at.isoformat()
-            if managed_entry.expires_at:
-                document["expires_at"] = managed_entry.expires_at.isoformat()
+            if created_at_iso:
+                document["created_at"] = created_at_iso
+            if expires_at_iso:
+                document["expires_at"] = expires_at_iso
 
             index_action: dict[str, Any] = {
                 "index": {

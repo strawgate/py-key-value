@@ -138,19 +138,23 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         if not keys:
             return
 
+        # All entries in a batch have the same TTL (from BaseStore.put_many)
+        # Extract TTL once from the first entry
+        first_entry = managed_entries[0]
+        ttl_seconds: int | None = None
+        if first_entry.ttl is not None:
+            # Redis does not support <= 0 TTLs
+            ttl_seconds = max(int(first_entry.ttl), 1)
+
         # Use pipeline for bulk operations
-        # Note: We can't use mset for entries with TTL since each may have different TTL
-        # We'll use a pipeline to batch the operations
         pipeline = self._client.pipeline()
 
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             combo_key: str = compound_key(collection=collection, key=key)
             json_value: str = managed_entry.to_json()
 
-            if managed_entry.ttl is not None:
-                # Redis does not support <= 0 TTLs
-                ttl = max(int(managed_entry.ttl), 1)
-                pipeline.setex(name=combo_key, time=ttl, value=json_value)
+            if ttl_seconds is not None:
+                pipeline.setex(name=combo_key, time=ttl_seconds, value=json_value)
             else:
                 pipeline.set(name=combo_key, value=json_value)
 

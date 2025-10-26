@@ -130,18 +130,6 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         _ = await self._client.set(key=combo_key, value=json_value, expiry=expiry)
 
     @override
-    async def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
-        if not keys:
-            return
-
-        # Valkey's mset doesn't support per-key TTL, so we use individual set commands
-        for key, managed_entry in zip(keys, managed_entries, strict=True):
-            combo_key: str = compound_key(collection=collection, key=key)
-            json_value: str = managed_entry.to_json()
-            expiry: ExpirySet | None = ExpirySet(expiry_type=ExpiryType.SEC, value=int(managed_entry.ttl)) if managed_entry.ttl else None
-            _ = await self._client.set(key=combo_key, value=json_value, expiry=expiry)
-
-    @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
         return await self._client.delete(keys=[combo_key]) != 0

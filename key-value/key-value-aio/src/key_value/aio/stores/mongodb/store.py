@@ -209,6 +209,13 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
         collection = self._sanitize_collection_name(collection=collection)
 
+        # All entries in a batch have the same timestamps (from BaseStore.put_many)
+        # Extract timestamps once from the first entry
+        first_entry = managed_entries[0]
+        created_at_iso: str | None = first_entry.created_at.isoformat() if first_entry.created_at else None
+        expires_at_iso: str | None = first_entry.expires_at.isoformat() if first_entry.expires_at else None
+        updated_at_iso: str = now().isoformat()
+
         # Use bulk_write for efficient batch operations
         from pymongo import UpdateOne
 
@@ -224,9 +231,9 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
                             "collection": collection,
                             "key": key,
                             "value": json_value,
-                            "created_at": managed_entry.created_at.isoformat() if managed_entry.created_at else None,
-                            "expires_at": managed_entry.expires_at.isoformat() if managed_entry.expires_at else None,
-                            "updated_at": now().isoformat(),
+                            "created_at": created_at_iso,
+                            "expires_at": expires_at_iso,
+                            "updated_at": updated_at_iso,
                         }
                     },
                     upsert=True,
