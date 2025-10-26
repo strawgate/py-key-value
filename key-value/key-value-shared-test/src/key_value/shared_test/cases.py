@@ -144,7 +144,7 @@ EMPTY_DICT_CASE: Case = Case(
 UNICODE_CASE: Case = Case(
     name="unicode",
     data={"unicode_key": "Hello 世界 🌍 émojis"},
-    json='{"unicode_key": "Hello 世界 🌍 émojis"}',
+    json='{"unicode_key": "Hello \\u4e16\\u754c \\ud83c\\udf0d \\u00e9mojis"}',
 )
 
 SPECIAL_CHARS_CASE: Case = Case(
