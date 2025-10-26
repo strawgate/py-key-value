@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Sequence
 
 import pytest
 from typing_extensions import override
@@ -19,7 +20,7 @@ class SlowStore(MemoryStore):
         await asyncio.sleep(self.delay)
         return await super().get(key=key, collection=collection)
 
-    async def get_many(self, keys: list[str], *, collection: str | None = None):
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None):
         await asyncio.sleep(self.delay)
         return await super().get_many(keys=keys, collection=collection)
 
@@ -27,7 +28,7 @@ class SlowStore(MemoryStore):
         await asyncio.sleep(self.delay)
         return await super().ttl(key=key, collection=collection)
 
-    async def ttl_many(self, keys: list[str], *, collection: str | None = None):
+    async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None):
         await asyncio.sleep(self.delay)
         return await super().ttl_many(keys=keys, collection=collection)
 

@@ -12,7 +12,7 @@ from typing import Any, SupportsFloat
 from key_value.shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.shared.errors import StoreSetupError
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.time_to_live import now, prepare_ttl, prepare_ttls
+from key_value.shared.utils.time_to_live import now, prepare_ttl
 from typing_extensions import Self, override
 
 from key_value.aio.protocols.key_value import (
@@ -102,7 +102,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
     async def _get_managed_entry(self, *, collection: str, key: str) -> ManagedEntry | None:
         """Retrieve a cache entry by key from the specified collection."""
 
-    async def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
+    async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
         """Retrieve multiple managed entries by key from the specified collection."""
 
         return [await self._get_managed_entry(collection=collection, key=key) for key in keys]
@@ -137,7 +137,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         return dict(managed_entry.value)
 
     @override
-    async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         collection = collection or self.default_collection
         await self.setup_collection(collection=collection)
 
@@ -159,7 +159,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
     @override
     async def ttl_many(
         self,
-        keys: list[str],
+        keys: Sequence[str],
         *,
         collection: str | None = None,
     ) -> list[tuple[dict[str, Any] | None, float | None]]:
@@ -179,7 +179,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         """Store a managed entry by key in the specified collection."""
         ...
 
-    async def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    async def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
         """Store multiple managed entries by key in the specified collection."""
 
         for key, managed_entry in zip(keys, managed_entries, strict=True):
@@ -204,8 +204,8 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         )
 
     def _prepare_put_many(
-        self, *, keys: list[str], values: Sequence[Mapping[str, Any]], ttl: Sequence[SupportsFloat | None] | SupportsFloat | None
-    ) -> tuple[list[str], Sequence[Mapping[str, Any]], list[float | None]]:
+        self, *, keys: Sequence[str], values: Sequence[Mapping[str, Any]], ttl: SupportsFloat | None
+    ) -> tuple[Sequence[str], Sequence[Mapping[str, Any]], float | None]:
         """Prepare multiple managed entries for a put_many operation.
 
         Inheriting classes can use this method if they need to modify a put_many operation."""
@@ -214,22 +214,18 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
             msg = "put_many called but a different number of keys and values were provided"
             raise ValueError(msg) from None
 
-        if ttl and isinstance(ttl, Sequence) and len(ttl) != len(keys):
-            msg = "put_many called but a different number of keys and ttl values were provided"
-            raise ValueError(msg) from None
-
-        ttl_for_entries: list[float | None] = prepare_ttls(t=ttl, count=len(keys))
+        ttl_for_entries: float | None = prepare_ttl(t=ttl)
 
         return (keys, values, ttl_for_entries)
 
     @override
     async def put_many(
         self,
-        keys: list[str],
+        keys: Sequence[str],
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         """Store multiple key-value pairs in the specified collection."""
 
@@ -238,9 +234,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         keys, values, ttl_for_entries = self._prepare_put_many(keys=keys, values=values, ttl=ttl)
 
-        managed_entries: list[ManagedEntry] = [
-            ManagedEntry(value=value, ttl=ttl_for_entries[i], created_at=now()) for i, value in enumerate(values)
-        ]
+        managed_entries: list[ManagedEntry] = [ManagedEntry(value=value, ttl=ttl_for_entries, created_at=now()) for value in values]
 
         await self._put_managed_entries(collection=collection, keys=keys, managed_entries=managed_entries)
 
@@ -249,7 +243,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         """Delete a managed entry by key from the specified collection."""
         ...
 
-    async def _delete_managed_entries(self, *, keys: list[str], collection: str) -> int:
+    async def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
         """Delete multiple managed entries by key from the specified collection."""
 
         deleted_count: int = 0
@@ -268,7 +262,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         return await self._delete_managed_entry(key=key, collection=collection)
 
     @override
-    async def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         """Delete multiple managed entries by key from the specified collection."""
         collection = collection or self.default_collection
         await self.setup_collection(collection=collection)

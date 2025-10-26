@@ -25,6 +25,7 @@ lint.fixable = ["ALL"]
 lint.ignore = [
     "COM812",
     "PLR0913", # Too many arguments, MCP Servers have a lot of arguments, OKAY?!
+    "ARG001", # Unused argument, Pyright captures this for us
 ]
 lint.extend-select = [
     "A",

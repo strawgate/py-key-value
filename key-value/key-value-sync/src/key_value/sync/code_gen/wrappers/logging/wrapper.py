@@ -60,7 +60,7 @@ class LoggingWrapper(BaseWrapper):
         self,
         state: Literal["start", "finish"],
         action: str,
-        keys: list[str] | str,
+        keys: Sequence[str] | str,
         collection: str | None,
         values: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None = None,
         extra: dict[str, Any] | None = None,
@@ -88,7 +88,7 @@ class LoggingWrapper(BaseWrapper):
         self,
         state: Literal["start", "finish"],
         action: str,
-        keys: list[str] | str,
+        keys: Sequence[str] | str,
         collection: str | None,
         values: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None = None,
         extra: dict[str, Any] | None = None,
@@ -108,7 +108,7 @@ class LoggingWrapper(BaseWrapper):
         return result
 
     @override
-    def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         self._log(state="start", action="GET_MANY", keys=keys, collection=collection, extra={"keys": keys[:5]})
 
         results = self.key_value.get_many(keys=keys, collection=collection)
@@ -131,7 +131,7 @@ class LoggingWrapper(BaseWrapper):
         return (value, ttl)
 
     @override
-    def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         self._log(state="start", action="TTL_MANY", keys=keys, collection=collection, extra={"keys": keys[:5]})
 
         results = self.key_value.ttl_many(keys=keys, collection=collection)
@@ -153,12 +153,7 @@ class LoggingWrapper(BaseWrapper):
 
     @override
     def put_many(
-        self,
-        keys: list[str],
-        values: Sequence[Mapping[str, Any]],
-        *,
-        collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        self, keys: Sequence[str], values: Sequence[Mapping[str, Any]], *, collection: str | None = None, ttl: SupportsFloat | None = None
     ) -> None:
         self._log(state="start", action="PUT_MANY", keys=keys, collection=collection, values=values, extra={"ttl": ttl})
 
@@ -176,7 +171,7 @@ class LoggingWrapper(BaseWrapper):
         return result
 
     @override
-    def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         self._log(state="start", action="DELETE_MANY", keys=keys, collection=collection, extra={"keys": keys[:5]})
 
         deleted_count: int = self.key_value.delete_many(keys=keys, collection=collection)

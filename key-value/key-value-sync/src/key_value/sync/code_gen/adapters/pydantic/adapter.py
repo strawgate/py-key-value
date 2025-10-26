@@ -82,7 +82,7 @@ class PydanticAdapter(Generic[T]):
 
         return None
 
-    def get_many(self, keys: list[str], *, collection: str | None = None) -> list[T | None]:
+    def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[T | None]:
         """Batch get and validate models by keys, preserving order.
 
         Returns:
@@ -110,7 +110,7 @@ class PydanticAdapter(Generic[T]):
         self._key_value.put(key=key, value=value_dict, collection=collection, ttl=ttl)
 
     def put_many(
-        self, keys: list[str], values: Sequence[T], *, collection: str | None = None, ttl: Sequence[SupportsFloat | None] | None = None
+        self, keys: Sequence[str], values: Sequence[T], *, collection: str | None = None, ttl: SupportsFloat | None = None
     ) -> None:
         """Serialize and store multiple models, preserving order alignment with keys."""
         collection = collection or self._default_collection
@@ -125,7 +125,7 @@ class PydanticAdapter(Generic[T]):
 
         return self._key_value.delete(key=key, collection=collection)
 
-    def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         """Delete multiple models by key. Returns the count of deleted entries."""
         collection = collection or self._default_collection
 
@@ -151,7 +151,7 @@ class PydanticAdapter(Generic[T]):
 
         return (None, None)
 
-    def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[T | None, float | None]]:
+    def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[T | None, float | None]]:
         """Batch get models with TTLs. Each element is (model|None, ttl_seconds|None)."""
         collection = collection or self._default_collection
 

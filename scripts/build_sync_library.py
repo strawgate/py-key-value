@@ -122,7 +122,7 @@ def convert(source_path: Path, output_path: Path) -> None:
         print(output, file=f)
 
 
-def async_to_sync(tree: ast.AST, filepath: Path | None = None) -> ast.AST:  # noqa: ARG001
+def async_to_sync(tree: ast.AST, filepath: Path | None = None) -> ast.AST:
     tree = BlanksInserter().visit(tree)
     tree = RenameAsyncToSync().visit(tree)
     tree = AsyncToSync().visit(tree)
