@@ -11,6 +11,7 @@ from typing import Any, SupportsFloat
 
 from key_value.shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.shared.errors import StoreSetupError
+from key_value.shared.type_checking.bear_spray import bear_enforce
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.time_to_live import now, prepare_ttl
 from typing_extensions import Self, override
@@ -107,6 +108,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         return [await self._get_managed_entry(collection=collection, key=key) for key in keys]
 
+    @bear_enforce
     @override
     async def get(
         self,
@@ -136,6 +138,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         return dict(managed_entry.value)
 
+    @bear_enforce
     @override
     async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         collection = collection or self.default_collection
@@ -144,6 +147,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         entries = await self._get_managed_entries(keys=keys, collection=collection)
         return [dict(entry.value) if entry and not entry.is_expired else None for entry in entries]
 
+    @bear_enforce
     @override
     async def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
         collection = collection or self.default_collection
@@ -156,6 +160,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         return (dict(managed_entry.value), managed_entry.ttl)
 
+    @bear_enforce
     @override
     async def ttl_many(
         self,
@@ -189,6 +194,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
                 managed_entry=managed_entry,
             )
 
+    @bear_enforce
     @override
     async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Store a key-value pair in the specified collection with optional TTL."""
@@ -218,6 +224,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         return (keys, values, ttl_for_entries)
 
+    @bear_enforce
     @override
     async def put_many(
         self,
@@ -254,6 +261,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         return deleted_count
 
+    @bear_enforce
     @override
     async def delete(self, key: str, *, collection: str | None = None) -> bool:
         collection = collection or self.default_collection
@@ -261,6 +269,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         return await self._delete_managed_entry(key=key, collection=collection)
 
+    @bear_enforce
     @override
     async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         """Delete multiple managed entries by key from the specified collection."""
