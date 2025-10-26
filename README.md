@@ -17,6 +17,79 @@ This monorepo contains two libraries:
 - **Collection-based**: Organize keys into logical collections/namespaces
 - **Pluggable architecture**: Easy to add custom store implementations
 
+## Value to Framework Authors
+
+While key-value storage is valuable for individual projects, its true power
+emerges when framework authors use it as a **pluggable abstraction layer**.
+
+By coding your framework against the `AsyncKeyValue` protocol (or `KeyValue`
+for sync), you enable your users to choose their own storage backend without
+changing a single line of your framework code. Users can seamlessly switch
+between local caching (memory, disk) for development and distributed storage
+(Redis, DynamoDB, MongoDB) for production.
+
+### Real-World Example: FastMCP
+
+[FastMCP](https://github.com/jlowin/fastmcp) demonstrates this pattern
+perfectly. FastMCP framework authors use the `AsyncKeyValue` protocol for:
+
+- **Response caching middleware**: Store and retrieve cached responses
+- **OAuth proxy tokens**: Persist authentication tokens across sessions
+
+FastMCP users can plug in any store implementation:
+
+- Development: `MemoryStore()` for fast iteration
+- Production: `RedisStore()` for distributed caching
+- Testing: `NullStore()` for testing without side effects
+
+### How to Use This in Your Framework
+
+1. **Accept the protocol** in your framework's initialization:
+
+   ```python
+   from key_value.aio.protocols.key_value import AsyncKeyValue
+
+   class YourFramework:
+       def __init__(self, cache: AsyncKeyValue):
+           self.cache = cache
+   ```
+
+2. **Use simple key-value operations** in your framework:
+
+   ```python
+   # Store data
+   await self.cache.put(
+       key="session:123",
+       value={"user_id": "456", "expires": "2024-01-01"},
+       collection="sessions",
+       ttl=3600
+   )
+
+   # Retrieve data
+   session = await self.cache.get(key="session:123", collection="sessions")
+   ```
+
+3. **Let users choose their backend**:
+
+   ```python
+   # User's code - they control the storage backend
+   from your_framework import YourFramework
+   from key_value.aio.stores.redis import RedisStore
+   from key_value.aio.stores.memory import MemoryStore
+
+   # Development
+   framework = YourFramework(cache=MemoryStore())
+
+   # Production
+   framework = YourFramework(
+       cache=RedisStore(url="redis://localhost:6379/0")
+   )
+   ```
+
+By depending on `py-key-value-aio` instead of a specific storage backend,
+you give your users the flexibility to choose the right storage for their
+needs while keeping your framework code clean and backend-agnostic.
+
 ## Why not use this library?
 
 - **Async-only**: While a code-gen'd synchronous library is under development,
