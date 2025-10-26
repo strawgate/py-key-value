@@ -1,4 +1,5 @@
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, SupportsFloat
@@ -109,12 +110,19 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
 
     _cache: dict[str, MemoryCollection]
 
-    def __init__(self, *, max_entries_per_collection: int = DEFAULT_MAX_ENTRIES_PER_COLLECTION, default_collection: str | None = None):
+    def __init__(
+        self,
+        *,
+        max_entries_per_collection: int = DEFAULT_MAX_ENTRIES_PER_COLLECTION,
+        default_collection: str | None = None,
+        seed: Mapping[str, Mapping[str, Mapping[str, Any]]] | None = None,
+    ):
         """Initialize a fixed-size in-memory store.
 
         Args:
             max_entries_per_collection: The maximum number of entries per collection. Defaults to 10000.
             default_collection: The default collection to use if no collection is provided.
+            seed: Optional seed data to pre-populate the store. Format: {collection: {key: value}}.
         """
 
         self.max_entries_per_collection = max_entries_per_collection
@@ -124,6 +132,26 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         self._stable_api = True
 
         super().__init__(default_collection=default_collection)
+
+        # Seed the store if seed data is provided
+        if seed:
+            self._seed_store_sync(seed)
+
+    def _seed_store_sync(self, seed: Mapping[str, Mapping[str, Mapping[str, Any]]]) -> None:
+        """Seed the store with initial data synchronously.
+
+        Args:
+            seed: Seed data in format {collection: {key: value}}.
+        """
+        for collection, items in seed.items():
+            # Ensure collection exists
+            if collection not in self._cache:
+                self._cache[collection] = MemoryCollection(max_entries=self.max_entries_per_collection)
+
+            # Add items directly to the collection
+            for key, value in items.items():
+                managed_entry = ManagedEntry(value=value)
+                self._cache[collection].put(key=key, value=managed_entry)
 
     @override
     async def _setup_collection(self, *, collection: str) -> None:

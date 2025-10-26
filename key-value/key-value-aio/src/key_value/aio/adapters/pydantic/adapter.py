@@ -65,11 +65,16 @@ class PydanticAdapter(Generic[T]):
             msg = f"Invalid Pydantic model: {e}"
             raise SerializationError(msg) from e
 
-    async def get(self, key: str, *, collection: str | None = None) -> T | None:
+    async def get(self, key: str, *, collection: str | None = None, default: T | None = None) -> T | None:
         """Get and validate a model by key.
 
+        Args:
+            key: The key to retrieve.
+            collection: The collection to use. If not provided, uses the default collection.
+            default: The default value to return if the key doesn't exist.
+
         Returns:
-            The parsed model instance, or None if not present.
+            The parsed model instance, the default value if provided and key doesn't exist, or None.
 
         Raises:
             DeserializationError if the stored data cannot be validated as the model and the PydanticAdapter is configured to
@@ -80,13 +85,18 @@ class PydanticAdapter(Generic[T]):
         if value := await self._key_value.get(key=key, collection=collection):
             return self._validate_model(value=value)
 
-        return None
+        return default
 
-    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[T | None]:
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None, default: T | None = None) -> list[T | None]:
         """Batch get and validate models by keys, preserving order.
 
+        Args:
+            keys: The list of keys to retrieve.
+            collection: The collection to use. If not provided, uses the default collection.
+            default: The default value to return for keys that don't exist.
+
         Returns:
-            A list of parsed model instances, or None if missing.
+            A list of parsed model instances, with default values for missing keys, or None if no default provided.
 
         Raises:
             DeserializationError if the stored data cannot be validated as the model and the PydanticAdapter is configured to
@@ -96,7 +106,7 @@ class PydanticAdapter(Generic[T]):
 
         values: list[dict[str, Any] | None] = await self._key_value.get_many(keys=keys, collection=collection)
 
-        return [self._validate_model(value=value) if value else None for value in values]
+        return [self._validate_model(value=value) if value else default for value in values]
 
     async def put(self, key: str, value: T, *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Serialize and store a model.
