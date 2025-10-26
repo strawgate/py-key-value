@@ -1,23 +1,14 @@
-name: Claude Code
+name: Claude Code Triage
 
 on:
-  issue_comment:
-    types: [created]
-  pull_request_review_comment:
-    types: [created]
   issues:
-    types: [opened, assigned, labeled]
-  pull_request_review:
-    types: [submitted]
+    types: [opened, labeled]
 
 jobs:
   claude:
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
       (github.event.action == 'labeled' && github.event.label.name == 'triage-claude') ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      (github.event_name == 'issues' && github.event.action == 'opened')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -48,6 +39,7 @@ jobs:
           2. You will identify the issue type (bug/feature/question) up front and tailor the Recommendation (e.g., for questions: answer directly + links; for bugs: point to failing tests/lines).
           3. You will avoid speculation and only assert facts that are deeply rooted (traceable) to the codebase, language/framework conventions, related issues, related pull requests, etc.
           4. The main branch of the repository has been cloned locally, but changes will not be accepted and you are not allowed to make pull requests or other changes. You can search the local repository for relevant code. You will use the available MCP Server tools identify related issues and pull requests (search_issues and search_pull_requests) and you can use search_code to look at the code in relevant dependent packages. For example, you can use search_code to look at a particular store's SDK `https://github.com/elastic/elasticsearch-py` to see how it implements a certain class or function relevant to the issue at hand.
+          5. You can run make commands (e.g., `make lint`, `make typecheck`, `make sync`) to build, test, or lint the code. You can also run git commands (e.g., `git status`, `git log`, `git diff`) to inspect the repository. You cannot run arbitrary bash commands - only make and git commands are allowed.
 
           # Getting Started
           1. Call the generate_agents_md tool to get a high-level summary of the project you're working in
@@ -159,5 +151,5 @@ jobs:
           prompt: ${{ steps.triage-prompt.outputs.PROMPT }}
           track_progress: true
           claude_args: |
-            --allowed-tools mcp__repository-summary,mcp__code-search,mcp__github-research,WebSearch,WebFetch 
+            --allowed-tools mcp__repository-summary,mcp__code-search,mcp__github-research,WebSearch,WebFetch,Bash(make:*)
             --mcp-config /tmp/mcp-config/mcp-servers.json

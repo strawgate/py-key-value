@@ -15,6 +15,10 @@ members = [
     "key-value/key-value-shared-test",
 ]
 
+[tool.uv.sources]
+py-key-value-shared-test = { workspace = true }
+py-key-value = { workspace = true }
+
 [tool.ruff]
 target-version = "py310"
 lint.fixable = ["ALL"]
@@ -66,11 +70,22 @@ line-length = 140
     "E501", # Ignore line length
 ]
 
-[dependency-groups]
+[project.optional-dependencies]
 dev = [
+    "ast-comments>=1.2.3",
+    "py-key-value-shared-test",
+    "basedpyright>=1.32.1",
+    "dirty-equals>=0.10.0",
+    "diskcache-stubs>=5.6.3.6.20240818",
     "docker>=7.1.0",
-    "basedpyright>=1.31.5",
-    "beartype>=0.22.2",
+    "inline-snapshot>=0.30.1",
+    "pytest-asyncio>=1.2.0",
+    "pytest-dotenv>=0.5.2",
+    "pytest-mock>=3.15.1",
+    "pytest-timeout>=2.4.0",
+    "pytest-xdist>=3.8.0",
+    "pytest>=8.4.2",
+    "ruff>=0.14.2"
 ]
 
 [tool.pyright]

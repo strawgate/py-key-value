@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, SupportsFloat
 
 from typing_extensions import override
@@ -71,7 +71,7 @@ class FallbackWrapper(BaseWrapper):
             return await self.fallback_key_value.ttl_many(keys=keys, collection=collection)
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         if self.write_to_fallback:
             try:
                 return await self.primary_key_value.put(key=key, value=value, collection=collection, ttl=ttl)
@@ -84,7 +84,7 @@ class FallbackWrapper(BaseWrapper):
     async def put_many(
         self,
         keys: list[str],
-        values: Sequence[dict[str, Any]],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,

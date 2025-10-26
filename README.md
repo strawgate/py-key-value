@@ -17,6 +17,79 @@ This monorepo contains two libraries:
 - **Collection-based**: Organize keys into logical collections/namespaces
 - **Pluggable architecture**: Easy to add custom store implementations
 
+## Value to Framework Authors
+
+While key-value storage is valuable for individual projects, its true power
+emerges when framework authors use it as a **pluggable abstraction layer**.
+
+By coding your framework against the `AsyncKeyValue` protocol (or `KeyValue`
+for sync), you enable your users to choose their own storage backend without
+changing a single line of your framework code. Users can seamlessly switch
+between local caching (memory, disk) for development and distributed storage
+(Redis, DynamoDB, MongoDB) for production.
+
+### Real-World Example: FastMCP
+
+[FastMCP](https://github.com/jlowin/fastmcp) demonstrates this pattern
+perfectly. FastMCP framework authors use the `AsyncKeyValue` protocol for:
+
+- **Response caching middleware**: Store and retrieve cached responses
+- **OAuth proxy tokens**: Persist authentication tokens across sessions
+
+FastMCP users can plug in any store implementation:
+
+- Development: `MemoryStore()` for fast iteration
+- Production: `RedisStore()` for distributed caching
+- Testing: `NullStore()` for testing without side effects
+
+### How to Use This in Your Framework
+
+1. **Accept the protocol** in your framework's initialization:
+
+   ```python
+   from key_value.aio.protocols.key_value import AsyncKeyValue
+
+   class YourFramework:
+       def __init__(self, cache: AsyncKeyValue):
+           self.cache = cache
+   ```
+
+2. **Use simple key-value operations** in your framework:
+
+   ```python
+   # Store data
+   await self.cache.put(
+       key="session:123",
+       value={"user_id": "456", "expires": "2024-01-01"},
+       collection="sessions",
+       ttl=3600
+   )
+
+   # Retrieve data
+   session = await self.cache.get(key="session:123", collection="sessions")
+   ```
+
+3. **Let users choose their backend**:
+
+   ```python
+   # User's code - they control the storage backend
+   from your_framework import YourFramework
+   from key_value.aio.stores.redis import RedisStore
+   from key_value.aio.stores.memory import MemoryStore
+
+   # Development
+   framework = YourFramework(cache=MemoryStore())
+
+   # Production
+   framework = YourFramework(
+       cache=RedisStore(url="redis://localhost:6379/0")
+   )
+   ```
+
+By depending on `py-key-value-aio` instead of a specific storage backend,
+you give your users the flexibility to choose the right storage for their
+needs while keeping your framework code clean and backend-agnostic.
+
 ## Why not use this library?
 
 - **Async-only**: While a code-gen'd synchronous library is under development,
@@ -105,32 +178,43 @@ ttl_many(keys: list[str], collection: str | None = None) -> list[tuple[dict[str,
 The library provides a variety of stores that implement the protocol.
 
 A ✅ means a store is available, a ☑️ under async means a store is available
-but the underlying implementation is synchronous. A ✖️ means a store is not
-available.
+but the underlying implementation is synchronous. A ✖️ means a store is
+not available.
+
+Stability is a measure of the likelihood that the way data is stored will change
+in a backwards incompatible way.
+
+- A stable store is one we do not intend to change in a backwards incompatible way.
+- A preview store is one that is unlikely to change in a backwards incompatible way.
+- An unstable store is one that is likely to change in a backwards incompatible way.
+
+If you are using py-key-value-aio for caching, stability may not be a concern for
+you. If you are using py-key-value-aio for long-term storage, stability is a
+concern and you should consider using a stable store.
 
 #### Local stores
 
 Local stores are stored in memory or on disk, local to the application.
 
-| Local Stores     | Async | Sync | Example |
-|------------------|:-----:|:----:|:-------|
-| Memory           |  ✅  |  ✅  | `MemoryStore()` |
-| Disk             |  ☑️  |  ✅  | `DiskStore(directory="./cache")` |
-| Disk (Per-Collection) |  ☑️  |  ✅  | `MultiDiskStore(directory="./cache")` |
-| Null (test)      |  ✅  |  ✅  | `NullStore()` |
-| RocksDB          |  ☑️  |  ✅  | `RocksDBStore(path="./rocksdb")` |
-| Simple (test)    |  ✅  |  ✅  | `SimpleStore()` |
-| Windows Registry |  ☑️  |   ✅   | `WindowsRegistryStore(hive="HKEY_CURRENT_USER", registry_path="Software\\py-key-value")` |
+| Local Stores     | Stability | Async | Sync | Example |
+|------------------|:---------:|:-----:|:----:|:-------|
+| Memory           | N/A | ✅  |  ✅  | `MemoryStore()` |
+| Disk             | Stable | ☑️  |  ✅  | `DiskStore(directory="./cache")` |
+| Disk (Per-Collection) | Stable | ☑️  |  ✅  | `MultiDiskStore(directory="./cache")` |
+| Null (test)      | N/A | ✅  |  ✅  | `NullStore()` |
+| RocksDB          | Unstable | ☑️  |  ✅  | `RocksDBStore(path="./rocksdb")` |
+| Simple (test)    | N/A | ✅  |  ✅  | `SimpleStore()` |
+| Windows Registry | Unstable | ☑️  |   ✅   | `WindowsRegistryStore(hive="HKEY_CURRENT_USER", registry_path="Software\\py-key-value")` |
 
 #### Local - Secret stores
 
 Secret stores are stores that are used to store sensitive data, typically in
 an Operating System's secret store.
 
-| Secret Stores | Async | Sync | Example |
-|------------------|:-----:|:----:|:-------|
-| Keyring          |  ☑️  |   ✅   | `KeyringStore(service_name="py-key-value")` |
-| Vault            |  ☑️  |   ✅   | `VaultStore(url="http://localhost:8200", token="your-token")` |
+| Secret Stores | Stability | Async | Sync | Example |
+|---------------|:---------:|:-----:|:----:|:-------|
+| Keyring       | Stable    | ✅  |   ✅   | `KeyringStore(service_name="py-key-value")` |
+| Vault         | Unstable  | ✅  |   ✅   | `VaultStore(url="http://localhost:8200", token="your-token")` |
 
 Note: The Windows Keyring has strict limits on the length of values which may
 cause issues with large values.
@@ -140,14 +224,14 @@ cause issues with large values.
 Distributed stores are stores that are used to store data in a distributed
 system, for access across multiple application nodes.
 
-| Distributed Stores | Async | Sync | Example |
-|------------------|:-----:|:----:|:-------|
-| DynamoDB         |  ✅  |  ✖️   | `DynamoDBStore(table_name="kv-store", region_name="us-east-1")` |
-| Elasticsearch    |  ✅  |  ✅  | `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key", index="kv-store")` |
-| Memcached        |  ✅  |  ✖️   | `MemcachedStore(host="127.0.0.1", port=11211")` |
-| MongoDB          |  ✅  |  ✅  | `MongoDBStore(url="mongodb://localhost:27017/test")` |
-| Redis            |  ✅  |  ✅  | `RedisStore(url="redis://localhost:6379/0")` |
-| Valkey           |  ✅  |  ✅  | `ValkeyStore(host="localhost", port=6379)` |
+| Distributed Stores | Stability | Async | Sync | Example |
+|------------------|:---------:|:-----:|:----:|:-------|
+| DynamoDB         | Unstable | ✅  |  ✖️   | `DynamoDBStore(table_name="kv-store", region_name="us-east-1")` |
+| Elasticsearch    | Unstable | ✅  |  ✅  | `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key", index="kv-store")` |
+| Memcached        | Unstable | ✅  |  ✖️   | `MemcachedStore(host="127.0.0.1", port=11211")` |
+| MongoDB          | Unstable | ✅  |  ✅  | `MongoDBStore(url="mongodb://localhost:27017/test")` |
+| Redis            | Stable | ✅  |  ✅  | `RedisStore(url="redis://localhost:6379/0")` |
+| Valkey           | Stable | ✅  |  ✅  | `ValkeyStore(host="localhost", port=6379)` |
 
 ### Adapters
 
@@ -159,7 +243,7 @@ functionality. While your application will accept an instance that implements
 the protocol, your application code might be simplified by using an adapter.
 
 | Adapter | Description | Example |
-|---------|-------------|---------|
+|---------|:------------|:------------------|
 | PydanticAdapter | Type-safe storage/retrieval of Pydantic models with transparent serialization/deserialization. | `PydanticAdapter(key_value=memory_store, pydantic_model=User)` |
 | RaiseOnMissingAdapter | Optional raise-on-missing behavior for `get`, `get_many`, `ttl`, and `ttl_many`. | `RaiseOnMissingAdapter(key_value=memory_store)` |
 
