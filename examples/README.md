@@ -47,6 +47,7 @@ pytest test_chat_app.py -v
 **Use Case**: Simple chat message storage with automatic expiration
 
 **Demonstrates**:
+
 - Type-safe message storage with PydanticAdapter
 - Automatic message expiration using TTLClampWrapper
 - Operation statistics tracking with StatisticsWrapper
@@ -66,6 +67,7 @@ pytest test_chat_app.py -v
 caching
 
 **Demonstrates**:
+
 - Multi-tier caching (memory + disk) with PassthroughCacheWrapper
 - Data compression with CompressionWrapper
 - Automatic retry with RetryWrapper
@@ -85,6 +87,7 @@ optimization
 **Use Case**: Cache scraped web pages with encryption and size limits
 
 **Demonstrates**:
+
 - Encrypted storage with FernetEncryptionWrapper
 - Size limits with LimitSizeWrapper (reject pages >5MB)
 - TTL enforcement with TTLClampWrapper
@@ -185,6 +188,7 @@ async def cache(self, tmp_path) -> MyCache:
 - pydantic
 
 Additional dependencies per example:
+
 - **trading_data**: None (uses built-in stores)
 - **web_scraper_cache**: cryptography (for encryption)
 
@@ -194,7 +198,7 @@ Additional dependencies per example:
 
 Each example follows this structure:
 
-```
+```text
 example_name/
 ├── README.md           # Detailed documentation
 ├── pyproject.toml      # Project metadata and dependencies

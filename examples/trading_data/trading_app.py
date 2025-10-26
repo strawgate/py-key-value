@@ -14,8 +14,6 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pydantic import BaseModel
-
 from key_value.aio.adapters.pydantic import PydanticAdapter
 from key_value.aio.stores.disk.store import DiskStore
 from key_value.aio.stores.memory.store import MemoryStore
@@ -23,6 +21,7 @@ from key_value.aio.wrappers.compression.wrapper import CompressionWrapper
 from key_value.aio.wrappers.passthrough_cache.wrapper import PassthroughCacheWrapper
 from key_value.aio.wrappers.retry.wrapper import RetryWrapper
 from key_value.aio.wrappers.statistics.wrapper import StatisticsWrapper
+from pydantic import BaseModel
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -167,7 +166,6 @@ class TradingDataCache:
     async def cleanup(self):
         """Clean up resources (close stores, etc.)."""
         # In a real application, you'd close any open connections here
-        pass
 
 
 async def main():

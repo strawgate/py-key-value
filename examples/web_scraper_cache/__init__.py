@@ -2,4 +2,4 @@
 
 from scraper import ScrapedPage, WebScraperCache
 
-__all__ = ["WebScraperCache", "ScrapedPage"]
+__all__ = ["ScrapedPage", "WebScraperCache"]

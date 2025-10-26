@@ -2,7 +2,6 @@
 
 import pytest
 from cryptography.fernet import Fernet
-
 from scraper import ScrapedPage, WebScraperCache
 
 

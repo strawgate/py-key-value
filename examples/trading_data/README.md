@@ -31,6 +31,7 @@ The wrapper stack (applied inside-out):
    persistence
 
 Data flow:
+
 - **Write**: Data → Memory cache → Compressed → Disk storage
 - **Read**: Check memory cache → If miss, load from disk → Decompress → Cache in
   memory
@@ -114,6 +115,7 @@ cache_store = PassthroughCacheWrapper(
 ```
 
 Benefits:
+
 - **Fast reads**: Recent data served from memory
 - **Persistence**: All data backed by disk storage
 - **Automatic promotion**: Disk data cached in memory on read
@@ -127,6 +129,7 @@ compressed_store = CompressionWrapper(key_value=disk_cache)
 ```
 
 Especially effective for:
+
 - Historical price data with many data points
 - JSON-serialized objects with repeated keys
 - Text-heavy data structures
@@ -144,6 +147,7 @@ retry_store = RetryWrapper(
 ```
 
 Automatically retries on:
+
 - Network timeouts
 - Temporary unavailability
 - Rate limiting

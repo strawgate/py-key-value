@@ -1,7 +1,6 @@
 """Tests for the trading data cache example."""
 
 import pytest
-
 from trading_app import PriceData, TradingDataCache
 
 

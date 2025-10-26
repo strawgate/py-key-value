@@ -30,6 +30,7 @@ The wrapper stack (applied inside-out):
 4. **FallbackWrapper** - Falls back to memory storage if disk operations fail
 
 Data flow:
+
 - **Write**: Data → Size check → Encrypt → Store (disk or memory fallback)
 - **Read**: Retrieve → Decrypt → Return data
 
@@ -149,6 +150,7 @@ fallback_store = FallbackWrapper(
 ```
 
 Use cases:
+
 - Disk failures → Memory fallback
 - Remote failures → Local fallback
 - Complex store → Simple store fallback
@@ -166,6 +168,7 @@ clamped_store = TTLClampWrapper(
 ```
 
 Benefits:
+
 - Prevents too-short TTL (cache thrashing)
 - Prevents too-long TTL (stale data)
 - Enforces consistent caching policy
@@ -182,6 +185,7 @@ def url_to_key(url: str) -> str:
 ```
 
 Advantages:
+
 - Filesystem-safe keys
 - Consistent key generation
 - Privacy (URLs not stored in plaintext as keys)

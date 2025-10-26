@@ -16,8 +16,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from cryptography.fernet import Fernet
-from pydantic import BaseModel
-
 from key_value.aio.adapters.pydantic import PydanticAdapter
 from key_value.aio.stores.disk.store import DiskStore
 from key_value.aio.stores.memory.store import MemoryStore
@@ -25,9 +23,11 @@ from key_value.aio.wrappers.encryption.wrapper import FernetEncryptionWrapper
 from key_value.aio.wrappers.fallback.wrapper import FallbackWrapper
 from key_value.aio.wrappers.limit_size.wrapper import LimitSizeWrapper
 from key_value.aio.wrappers.ttl_clamp.wrapper import TTLClampWrapper
+from pydantic import BaseModel
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 
 class ScrapedPage(BaseModel):
@@ -54,8 +54,8 @@ class WebScraperCache:
         # Generate or use provided encryption key
         if encryption_key is None:
             encryption_key = Fernet.generate_key()
-            logging.warning(f"Generated new encryption key: {encryption_key.decode()}")
-            logging.warning("Store this key securely! Data encrypted with different keys cannot be decrypted.")
+            logger.warning(f"Generated new encryption key: {encryption_key.decode()}")
+            logger.warning("Store this key securely! Data encrypted with different keys cannot be decrypted.")
 
         self.encryption_key = encryption_key
 
@@ -123,10 +123,11 @@ class WebScraperCache:
 
         try:
             await self.adapter.put(collection="pages", key=key, value=page, ttl=ttl)
-            return True
-        except Exception as e:
-            logging.error(f"Failed to cache page {url}: {e}")
+        except Exception:
+            logger.exception(f"Failed to cache page {url}")
             return False
+        else:
+            return True
 
     async def get_cached_page(self, url: str) -> ScrapedPage | None:
         """
@@ -170,7 +171,6 @@ class WebScraperCache:
     async def cleanup(self):
         """Clean up resources."""
         # In a real application, you'd close any open connections here
-        pass
 
 
 async def simulate_scrape(url: str) -> tuple[str, dict[str, str]]:

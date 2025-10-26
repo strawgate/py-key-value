@@ -12,13 +12,12 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from pydantic import BaseModel
-
 from key_value.aio.adapters.pydantic import PydanticAdapter
 from key_value.aio.stores.memory.store import MemoryStore
 from key_value.aio.wrappers.logging.wrapper import LoggingWrapper
 from key_value.aio.wrappers.statistics.wrapper import StatisticsWrapper
 from key_value.aio.wrappers.ttl_clamp.wrapper import TTLClampWrapper
+from pydantic import BaseModel
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
