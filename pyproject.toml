@@ -69,7 +69,7 @@ line-length = 140
     "E501", # Ignore line length
 ]
 
-[dependency-groups]
+[project.optional-dependencies]
 dev = [
     "ast-comments>=1.2.3",
     "py-key-value-shared-test",
