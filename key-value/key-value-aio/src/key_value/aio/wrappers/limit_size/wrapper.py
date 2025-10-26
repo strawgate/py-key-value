@@ -87,13 +87,13 @@ class LimitSizeWrapper(BaseWrapper):
     @override
     async def put_many(
         self,
-        keys: list[str],
+        keys: Sequence[str],
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
-        filtered_keys: list[str] = []
+        filtered_keys: Sequence[str] = []
         filtered_values: list[Mapping[str, Any]] = []
         filtered_ttls: list[SupportsFloat | None] | None = None
 

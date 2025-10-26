@@ -50,7 +50,7 @@ class TTLClampWrapper(BaseWrapper):
     @override
     async def put_many(
         self,
-        keys: list[str],
+        keys: Sequence[str],
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
