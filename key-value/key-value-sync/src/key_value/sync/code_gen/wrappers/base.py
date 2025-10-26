@@ -19,7 +19,7 @@ class BaseWrapper(KeyValue):
         return self.key_value.get(collection=collection, key=key)
 
     @override
-    def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         return self.key_value.get_many(collection=collection, keys=keys)
 
     @override
@@ -27,7 +27,7 @@ class BaseWrapper(KeyValue):
         return self.key_value.ttl(collection=collection, key=key)
 
     @override
-    def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         return self.key_value.ttl_many(collection=collection, keys=keys)
 
     @override
@@ -36,12 +36,7 @@ class BaseWrapper(KeyValue):
 
     @override
     def put_many(
-        self,
-        keys: list[str],
-        values: Sequence[Mapping[str, Any]],
-        *,
-        collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        self, keys: Sequence[str], values: Sequence[Mapping[str, Any]], *, collection: str | None = None, ttl: SupportsFloat | None = None
     ) -> None:
         return self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
 
@@ -50,5 +45,5 @@ class BaseWrapper(KeyValue):
         return self.key_value.delete(collection=collection, key=key)
 
     @override
-    def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         return self.key_value.delete_many(keys=keys, collection=collection)
