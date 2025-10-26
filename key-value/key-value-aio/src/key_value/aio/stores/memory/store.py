@@ -43,7 +43,7 @@ class MemoryCacheEntry:
         return ManagedEntry.from_json(json_str=self.json_str)
 
 
-def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, now: float) -> float:  # pyright: ignore[reportAny]
+def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, now: float) -> float:
     """Calculate time-to-use for cache entries based on their TTL."""
     if value.ttl_at_insert is None:
         return float(sys.maxsize)
@@ -55,7 +55,7 @@ def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, now: float) -> float: 
     return float(expiration_epoch)
 
 
-def _memory_cache_getsizeof(value: MemoryCacheEntry) -> int:  # pyright: ignore[reportUnusedParameter]
+def _memory_cache_getsizeof(value: MemoryCacheEntry) -> int:  # noqa: ARG001
     """Return size of cache entry (always 1 for entry counting)."""
     return 1
 

@@ -88,7 +88,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
         expire_epoch: float | None
 
-        (managed_entry_str, expire_epoch) = self._cache.get(key=combo_key, expire_time=True)  # pyright: ignore[reportAny]
+        (managed_entry_str, expire_epoch) = self._cache.get(key=combo_key, expire_time=True)
 
         if not isinstance(managed_entry_str, str):
             return None
