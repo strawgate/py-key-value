@@ -203,23 +203,17 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         if not doc:
             return None
 
-        if self._native_storage:
-            # Native storage mode: Get value as BSON document
-            value: dict[str, Any] | None = doc.get("value")
+        # Accept both storage formats on read (native BSON or JSON string)
+        # The native_storage flag only controls what format we write
+        value = doc.get("value")
 
-            if not isinstance(value, dict):
-                msg = (
-                    f"Data for key '{key}' has invalid value type: expected dict but got {type(value).__name__}. "
-                    f"This may indicate the collection contains JSON-mode data but native_storage=True."
-                )
-                raise TypeError(msg)
-
-            # Parse datetime objects directly
+        # Try to read as native BSON format first
+        if isinstance(value, dict):
+            # Native BSON format: value is a dict, timestamps are datetime objects
             created_at: datetime | None = doc.get("created_at")
             expires_at: datetime | None = doc.get("expires_at")
 
-            # Validate datetime types to detect storage mode mismatches
-            # Note: MongoDB returns datetime objects natively in BSON, but we check for safety
+            # Validate datetime types (MongoDB returns datetime objects natively in BSON)
             if created_at is not None and type(created_at) is not datetime:
                 msg = (
                     f"Data for key '{key}' has invalid created_at type: expected datetime but got {type(created_at).__name__}. "
@@ -238,17 +232,14 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
                 created_at=created_at,
                 expires_at=expires_at,
             )
-        # JSON string mode: Get value as JSON string and parse it
-        json_value: str | None = doc.get("value")
 
-        if not isinstance(json_value, str):
-            msg = (
-                f"Data for key '{key}' has invalid value type: expected str but got {type(json_value).__name__}. "
-                f"This may indicate the collection contains native-mode data but native_storage=False."
-            )
-            raise TypeError(msg)
+        # Try to read as JSON string format
+        if isinstance(value, str):
+            # JSON string format: parse the JSON string
+            return ManagedEntry.from_json(json_str=value)
 
-        return ManagedEntry.from_json(json_str=json_value)
+        # Unexpected type or None
+        return None
 
     @override
     async def _put_managed_entry(

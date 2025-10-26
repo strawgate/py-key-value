@@ -233,27 +233,17 @@ class ElasticsearchStore(
         if not (source := get_source_from_body(body=body)):
             return None
 
-        if self._native_storage:
-            # Native storage mode: Get value as flattened object
-            if "value" not in source:
-                return None
-            value = source["value"]
+        # Accept both storage formats on read (native object or JSON string)
+        # The native_storage flag only controls what format we write
+        if "value" not in source:
+            return None
 
-            # Detect if data is in JSON string format
-            if isinstance(value, str):
-                msg = (
-                    f"Data for key '{key}' appears to be in JSON string format, but store is configured "
-                    "for native_storage mode. This indicates a storage mode mismatch. "
-                    "You may need to migrate existing data or use the correct storage mode."
-                )
-                raise TypeError(msg)
+        value = source["value"]
 
-            if not isinstance(value, dict):
-                return None
-
-            # Cast to the correct type for ManagedEntry (value is guaranteed to be dict here)
+        # Try to read as native object format first
+        if isinstance(value, dict):
+            # Native object format: value is a dict/object
             value_dict = cast("dict[str, Any]", value)
-
             created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
             expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
 
@@ -262,22 +252,14 @@ class ElasticsearchStore(
                 created_at=created_at,
                 expires_at=expires_at,
             )
-        # JSON string mode: Get value as JSON string and parse it
-        json_value: str | None = source.get("value")
 
-        # Detect if data is in native object format
-        if isinstance(json_value, dict):
-            msg = (
-                f"Data for key '{key}' appears to be in native object format, but store is configured "
-                "for JSON string mode. This indicates a storage mode mismatch. "
-                "You may need to migrate existing data or use the correct storage mode."
-            )
-            raise TypeError(msg)
+        # Try to read as JSON string format
+        if isinstance(value, str):
+            # JSON string format: parse the JSON string
+            return ManagedEntry.from_json(json_str=value)
 
-        if not isinstance(json_value, str):
-            return None
-
-        return ManagedEntry.from_json(json_str=json_value)
+        # Unexpected type
+        return None
 
     @property
     def _should_refresh_on_put(self) -> bool:
