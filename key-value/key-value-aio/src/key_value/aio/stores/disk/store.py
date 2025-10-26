@@ -14,8 +14,6 @@ except ImportError as e:
     msg = "DiskStore requires py-key-value-aio[disk]"
     raise ImportError(msg) from e
 
-DEFAULT_DISK_STORE_MAX_SIZE = 1 * 1024 * 1024 * 1024  # 1GB
-
 
 class DiskStore(BaseContextManagerStore, BaseStore):
     """A disk-based store that uses the diskcache library to store data."""
@@ -24,7 +22,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
     @overload
     def __init__(self, *, disk_cache: Cache, default_collection: str | None = None) -> None:
-        """Initialize the disk cache.
+        """Initialize the disk store.
 
         Args:
             disk_cache: An existing diskcache Cache instance to use.
@@ -33,11 +31,11 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
     @overload
     def __init__(self, *, directory: Path | str, max_size: int | None = None, default_collection: str | None = None) -> None:
-        """Initialize the disk cache.
+        """Initialize the disk store.
 
         Args:
-            directory: The directory to use for the disk cache.
-            max_size: The maximum size of the disk cache. Defaults to 1GB.
+            directory: The directory to use for the disk store.
+            max_size: The maximum size of the disk store. Defaults to an unlimited size disk store
             default_collection: The default collection to use if no collection is provided.
         """
 
@@ -49,12 +47,12 @@ class DiskStore(BaseContextManagerStore, BaseStore):
         max_size: int | None = None,
         default_collection: str | None = None,
     ) -> None:
-        """Initialize the disk cache.
+        """Initialize the disk store.
 
         Args:
             disk_cache: An existing diskcache Cache instance to use.
-            directory: The directory to use for the disk cache.
-            max_size: The maximum size of the disk cache. Defaults to 1GB.
+            directory: The directory to use for the disk store.
+            max_size: The maximum size of the disk store.
             default_collection: The default collection to use if no collection is provided.
         """
         if disk_cache is not None and directory is not None:
@@ -72,7 +70,12 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
             directory.mkdir(parents=True, exist_ok=True)
 
-            self._cache = Cache(directory=directory, size_limit=max_size or DEFAULT_DISK_STORE_MAX_SIZE)
+            if max_size is not None and max_size > 0:
+                self._cache = Cache(directory=directory, size_limit=max_size)
+            else:
+                self._cache = Cache(directory=directory, eviction_policy="none")
+
+        self._stable_api = True
 
         super().__init__(default_collection=default_collection)
 

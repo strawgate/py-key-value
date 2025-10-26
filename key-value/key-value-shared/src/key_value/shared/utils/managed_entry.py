@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, SupportsFloat, cast
@@ -18,7 +19,7 @@ class ManagedEntry:
     - If `expires_at` is provided but `ttl` is not, a live TTL will be computed on access.
     """
 
-    value: dict[str, Any]
+    value: Mapping[str, Any]
 
     created_at: datetime | None = field(default=None)
     ttl: float | None = field(default=None)
@@ -53,7 +54,7 @@ class ManagedEntry:
             if include_expiration and self.expires_at:
                 data["expires_at"] = self.expires_at.isoformat()
         else:
-            data = self.value
+            data = dict(self.value)
 
         return dump_to_json(obj=data)
 

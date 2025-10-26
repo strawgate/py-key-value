@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, SupportsFloat
 
 from typing_extensions import override
@@ -155,7 +155,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         return [key_to_value[key] for key in keys]
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         _ = await self.cache_key_value.delete(collection=collection, key=key)
 
         await self.primary_key_value.put(collection=collection, key=key, value=value, ttl=ttl)
@@ -164,7 +164,7 @@ class PassthroughCacheWrapper(BaseWrapper):
     async def put_many(
         self,
         keys: list[str],
-        values: Sequence[dict[str, Any]],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,

@@ -7,7 +7,7 @@ Base abstract class for managed key-value store implementations.
 
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from threading import Lock
 from types import TracebackType
 from typing import Any, SupportsFloat
@@ -62,6 +62,12 @@ class BaseStore(KeyValueProtocol, ABC):
         self._setup_collection_complete = defaultdict(bool)
 
         self.default_collection = default_collection or DEFAULT_COLLECTION_NAME
+
+        if not hasattr(self, "_stable_api"):
+            self._stable_api = False
+
+        if not self._stable_api:
+            self._warn_about_stability()
 
         super().__init__()
 
@@ -126,7 +132,7 @@ class BaseStore(KeyValueProtocol, ABC):
         if managed_entry.is_expired:
             return None
 
-        return managed_entry.value
+        return dict(managed_entry.value)
 
     @override
     def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
@@ -134,7 +140,7 @@ class BaseStore(KeyValueProtocol, ABC):
         self.setup_collection(collection=collection)
 
         entries = self._get_managed_entries(keys=keys, collection=collection)
-        return [entry.value if entry and (not entry.is_expired) else None for entry in entries]
+        return [dict(entry.value) if entry and (not entry.is_expired) else None for entry in entries]
 
     @override
     def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
@@ -146,7 +152,7 @@ class BaseStore(KeyValueProtocol, ABC):
         if not managed_entry or managed_entry.is_expired:
             return (None, None)
 
-        return (managed_entry.value, managed_entry.ttl)
+        return (dict(managed_entry.value), managed_entry.ttl)
 
     @override
     def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
@@ -159,7 +165,7 @@ class BaseStore(KeyValueProtocol, ABC):
         self.setup_collection(collection=collection)
 
         entries = self._get_managed_entries(keys=keys, collection=collection)
-        return [(entry.value, entry.ttl) if entry and (not entry.is_expired) else (None, None) for entry in entries]
+        return [(dict(entry.value), entry.ttl) if entry and (not entry.is_expired) else (None, None) for entry in entries]
 
     @abstractmethod
     def _put_managed_entry(self, *, collection: str, key: str, managed_entry: ManagedEntry) -> None:
@@ -173,7 +179,7 @@ class BaseStore(KeyValueProtocol, ABC):
             self._put_managed_entry(collection=collection, key=key, managed_entry=managed_entry)
 
     @override
-    def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Store a key-value pair in the specified collection with optional TTL."""
         collection = collection or self.default_collection
         self.setup_collection(collection=collection)
@@ -183,8 +189,8 @@ class BaseStore(KeyValueProtocol, ABC):
         self._put_managed_entry(collection=collection, key=key, managed_entry=managed_entry)
 
     def _prepare_put_many(
-        self, *, keys: list[str], values: Sequence[dict[str, Any]], ttl: Sequence[SupportsFloat | None] | SupportsFloat | None
-    ) -> tuple[list[str], Sequence[dict[str, Any]], list[float | None]]:
+        self, *, keys: list[str], values: Sequence[Mapping[str, Any]], ttl: Sequence[SupportsFloat | None] | SupportsFloat | None
+    ) -> tuple[list[str], Sequence[Mapping[str, Any]], list[float | None]]:
         """Prepare multiple managed entries for a put_many operation.
 
         Inheriting classes can use this method if they need to modify a put_many operation."""
@@ -205,7 +211,7 @@ class BaseStore(KeyValueProtocol, ABC):
     def put_many(
         self,
         keys: list[str],
-        values: Sequence[dict[str, Any]],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,
@@ -253,6 +259,16 @@ class BaseStore(KeyValueProtocol, ABC):
         self.setup_collection(collection=collection)
 
         return self._delete_managed_entries(keys=keys, collection=collection)
+
+    def _warn_about_stability(self) -> None:
+        """Warn about the stability of the store."""
+        from warnings import warn
+
+        warn(
+            message="A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.",
+            category=UserWarning,
+            stacklevel=2,
+        )
 
 
 class BaseEnumerateKeysStore(BaseStore, EnumerateKeysProtocol, ABC):
