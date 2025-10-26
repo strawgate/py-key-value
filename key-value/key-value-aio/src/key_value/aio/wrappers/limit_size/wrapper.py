@@ -93,7 +93,7 @@ class LimitSizeWrapper(BaseWrapper):
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
-        filtered_keys: Sequence[str] = []
+        filtered_keys: list[str] = []
         filtered_values: list[Mapping[str, Any]] = []
         filtered_ttls: list[SupportsFloat | None] | None = None
 

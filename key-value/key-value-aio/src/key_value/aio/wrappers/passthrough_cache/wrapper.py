@@ -75,7 +75,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         )
 
         entries_to_cache: list[dict[str, Any]] = []
-        entries_to_cache_keys: Sequence[str] = []
+        entries_to_cache_keys: list[str] = []
         entries_to_cache_ttls: list[float | None] = []
 
         for i, key in enumerate(uncached_keys):
@@ -132,7 +132,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         )
 
         entries_to_cache: list[dict[str, Any]] = []
-        entries_to_cache_keys: Sequence[str] = []
+        entries_to_cache_keys: list[str] = []
         entries_to_cache_ttls: list[float | None] = []
 
         for i, key in enumerate(uncached_keys):

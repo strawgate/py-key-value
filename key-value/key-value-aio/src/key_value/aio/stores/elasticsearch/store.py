@@ -1,8 +1,5 @@
 from typing import TYPE_CHECKING, Any, overload
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json
 from key_value.shared.utils.sanitize import (
@@ -256,7 +253,7 @@ class ElasticsearchStore(
         if not (hits := get_hits_from_response(response=result)):
             return []
 
-        all_keys: Sequence[str] = []
+        all_keys: list[str] = []
 
         for hit in hits:
             if not (key := get_first_value_from_field_in_hit(hit=hit, field="key", value_type=str)):

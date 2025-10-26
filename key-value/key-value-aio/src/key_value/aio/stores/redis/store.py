@@ -1,8 +1,5 @@
-from typing import TYPE_CHECKING, Any, overload
+from typing import Any, overload
 from urllib.parse import urlparse
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 from key_value.shared.type_checking.bear_spray import bear_spray
 from key_value.shared.utils.compound import compound_key, get_keys_from_compound_keys
@@ -131,7 +128,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
         # redis.asyncio scan returns tuple(cursor, keys)
         _cursor: int
-        keys: Sequence[str]
+        keys: list[str]
         _cursor, keys = await self._client.scan(cursor=0, match=pattern, count=limit)  # pyright: ignore[reportUnknownMemberType, reportAny]
 
         return get_keys_from_compound_keys(compound_keys=keys, collection=collection)
