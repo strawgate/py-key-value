@@ -4,7 +4,6 @@
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from key_value.shared_test.cases import LARGE_TEST_DATA_ARGNAMES, LARGE_TEST_DATA_ARGVALUES, LARGE_TEST_DATA_IDS
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
@@ -34,7 +33,6 @@ class TestWindowsRegistryStore(BaseStoreTests):
     def test_not_unbounded(self, store: BaseStore): ...
 
     @override
-    @pytest.mark.parametrize(argnames=LARGE_TEST_DATA_ARGNAMES, argvalues=LARGE_TEST_DATA_ARGVALUES, ids=LARGE_TEST_DATA_IDS)
     def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str):
         store.put(collection="test", key="test", value=data)
         assert store.get(collection="test", key="test") == data
