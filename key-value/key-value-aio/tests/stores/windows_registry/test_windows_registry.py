@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pytest
 from typing_extensions import override
@@ -28,8 +28,3 @@ class TestWindowsRegistryStore(BaseStoreTests):
     @override
     @pytest.mark.skip(reason="We do not test boundedness of registry stores")
     async def test_not_unbounded(self, store: BaseStore): ...
-
-    @override
-    async def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str):
-        await store.put(collection="test", key="test", value=data)
-        assert await store.get(collection="test", key="test") == data

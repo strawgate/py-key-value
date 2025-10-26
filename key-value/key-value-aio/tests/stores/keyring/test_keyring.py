@@ -27,6 +27,5 @@ class TestKeychainStore(BaseStoreTests):
 
     @override
     @pytest.mark.skipif(condition=detect_on_windows(), reason="Keyrings do not support large values on Windows")
-    async def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str):
-        await store.put(collection="test", key="test", value=data)
-        assert await store.get(collection="test", key="test") == data
+    async def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):  # pyright: ignore[reportUnusedParameter]
+        await super().test_get_large_put_get(store, data, json, round_trip=data)

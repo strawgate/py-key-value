@@ -14,12 +14,12 @@ def test_dump_to_json(data: dict[str, Any], json: str, round_trip: dict[str, Any
     assert dump_to_json(data) == json
 
 
-@SIMPLE_CASES.parametrize()
+@PositiveCases.parametrize(cases=SIMPLE_CASES)
 def test_load_from_json(data: dict[str, Any], json: str, round_trip: dict[str, Any]):
     assert load_from_json(json) == data
 
 
-@SIMPLE_CASES.parametrize()
+@PositiveCases.parametrize(cases=SIMPLE_CASES)
 def test_roundtrip_json(data: dict[str, Any], json: str, round_trip: dict[str, Any]):
     dumped_json: str = dump_to_json(data)
     assert dumped_json == json
