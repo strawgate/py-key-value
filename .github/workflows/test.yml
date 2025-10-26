@@ -4,9 +4,15 @@ on:
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - '**/*.md'
+      - '.github/workflows/claude-*.yml'
   push:
     branches:
       - main
+    paths-ignore:
+      - '**/*.md'
+      - '.github/workflows/claude-*.yml'
   workflow_dispatch:
 
 jobs:
