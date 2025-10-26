@@ -116,7 +116,7 @@ class CompressionWrapper(BaseWrapper):
         return self._decompress_value(value)
 
     @override
-    async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         values = await self.key_value.get_many(keys=keys, collection=collection)
         return [self._decompress_value(value) for value in values]
 
@@ -126,7 +126,7 @@ class CompressionWrapper(BaseWrapper):
         return self._decompress_value(value), ttl
 
     @override
-    async def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         results = await self.key_value.ttl_many(keys=keys, collection=collection)
         return [(self._decompress_value(value), ttl) for value, ttl in results]
 
@@ -138,7 +138,7 @@ class CompressionWrapper(BaseWrapper):
     @override
     async def put_many(
         self,
-        keys: list[str],
+        keys: Sequence[str],
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
