@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, Literal, SupportsFloat, overload
 
 from key_value.shared.errors import MissingKeyError
@@ -138,7 +138,7 @@ class RaiseOnMissingAdapter:
 
         return results
 
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Store a key-value pair in the specified collection with optional TTL.
 
         Args:
@@ -153,7 +153,7 @@ class RaiseOnMissingAdapter:
     async def put_many(
         self,
         keys: list[str],
-        values: Sequence[dict[str, Any]],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,

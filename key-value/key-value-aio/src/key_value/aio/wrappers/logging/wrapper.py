@@ -1,6 +1,6 @@
 import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, Literal, SupportsFloat
 
 from typing_extensions import override
@@ -59,7 +59,7 @@ class LoggingWrapper(BaseWrapper):
         action: str,
         keys: list[str] | str,
         collection: str | None,
-        values: dict[str, Any] | Sequence[dict[str, Any]] | None = None,
+        values: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None = None,
         extra: dict[str, Any] | None = None,
     ) -> str:
         if self.structured_logs:
@@ -92,7 +92,7 @@ class LoggingWrapper(BaseWrapper):
         action: str,
         keys: list[str] | str,
         collection: str | None,
-        values: dict[str, Any] | Sequence[dict[str, Any]] | None = None,
+        values: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None = None,
         extra: dict[str, Any] | None = None,
     ) -> None:
         self.logger.log(
@@ -146,7 +146,7 @@ class LoggingWrapper(BaseWrapper):
         return results
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         self._log(state="start", action="PUT", keys=key, collection=collection, values=value, extra={"ttl": ttl})
 
         await self.key_value.put(key=key, value=value, collection=collection, ttl=ttl)
@@ -157,7 +157,7 @@ class LoggingWrapper(BaseWrapper):
     async def put_many(
         self,
         keys: list[str],
-        values: Sequence[dict[str, Any]],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,

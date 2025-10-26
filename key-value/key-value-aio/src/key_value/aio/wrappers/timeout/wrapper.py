@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, SupportsFloat
 
 from typing_extensions import override
@@ -49,14 +49,14 @@ class TimeoutWrapper(BaseWrapper):
         return await asyncio.wait_for(self.key_value.ttl_many(keys=keys, collection=collection), timeout=self.timeout)
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         return await asyncio.wait_for(self.key_value.put(key=key, value=value, collection=collection, ttl=ttl), timeout=self.timeout)
 
     @override
     async def put_many(
         self,
         keys: list[str],
-        values: Sequence[dict[str, Any]],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,
