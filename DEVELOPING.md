@@ -7,8 +7,19 @@ This monorepo contains two Python packages:
 
 ## Prerequisites
 
+### Option 1: DevContainer (Recommended)
+
+- Docker Desktop or compatible container runtime
+- Visual Studio Code with the Dev Containers extension
+- Open the repository in VSCode and select "Reopen in Container" when prompted
+
+The DevContainer provides a pre-configured development environment with all dependencies installed automatically.
+
+### Option 2: Local Development
+
 - Python 3.10 (the sync codegen targets 3.10)
 - `uv` for dependency management and running tools
+- Node.js and npm for markdown linting
 
 ## Setup
 
