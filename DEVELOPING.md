@@ -22,12 +22,7 @@ This monorepo contains two Python packages:
 ## Setup
 
 ```bash
-# Using Makefile (recommended)
 make sync
-
-# Or manually
-uv sync --all-packages
-npm install -g markdownlint-cli
 ```
 
 ## Common Commands
@@ -43,11 +38,6 @@ make lint
 
 # Lint a specific project
 make lint PROJECT=key-value/key-value-aio
-
-# Manual commands
-uv run ruff format .
-uv run ruff check --fix .
-markdownlint --fix -c .markdownlint.jsonc .
 ```
 
 ### Type Checking
@@ -58,9 +48,6 @@ make typecheck
 
 # Type check a specific project
 make typecheck PROJECT=key-value/key-value-aio
-
-# Manual command
-uv run basedpyright
 ```
 
 ### Testing
@@ -76,10 +63,6 @@ make test PROJECT=key-value/key-value-aio
 make test-aio      # async package
 make test-sync     # sync package
 make test-shared   # shared package
-
-# Manual commands
-uv run pytest key-value/key-value-aio/tests -vv
-uv run pytest key-value/key-value-sync/tests -vv
 ```
 
 ### Building
@@ -90,9 +73,6 @@ make build
 
 # Build a specific project
 make build PROJECT=key-value/key-value-aio
-
-# Manual command
-cd key-value/key-value-aio && uv build .
 ```
 
 ## Generate/Update Sync Package
@@ -101,11 +81,7 @@ The sync package is generated from the async package. After changes to the
 async code, regenerate the sync package:
 
 ```bash
-# Using Makefile
 make codegen
-
-# Or manually
-uv run python scripts/build_sync_library.py
 ```
 
 Notes:
