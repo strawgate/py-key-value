@@ -1,6 +1,6 @@
 import base64
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, SupportsFloat
 
 from key_value.shared.errors.key_value import SerializationError
@@ -143,7 +143,7 @@ class BaseEncryptionWrapper(BaseWrapper):
         return self._decrypt_value(value)
 
     @override
-    async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         values = await self.key_value.get_many(keys=keys, collection=collection)
         return [self._decrypt_value(value) for value in values]
 
@@ -153,23 +153,23 @@ class BaseEncryptionWrapper(BaseWrapper):
         return self._decrypt_value(value), ttl
 
     @override
-    async def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         results = await self.key_value.ttl_many(keys=keys, collection=collection)
         return [(self._decrypt_value(value), ttl) for value, ttl in results]
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
-        encrypted_value = self._encrypt_value(value)
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+        encrypted_value = self._encrypt_value(dict(value))
         return await self.key_value.put(key=key, value=encrypted_value, collection=collection, ttl=ttl)
 
     @override
     async def put_many(
         self,
-        keys: list[str],
-        values: Sequence[dict[str, Any]],
+        keys: Sequence[str],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
-        encrypted_values = [self._encrypt_value(value) for value in values]
+        encrypted_values = [self._encrypt_value(dict(value)) for value in values]
         return await self.key_value.put_many(keys=keys, values=encrypted_values, collection=collection, ttl=ttl)

@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, SupportsFloat, overload
 
 from key_value.shared.utils.time_to_live import prepare_ttl
@@ -44,19 +44,16 @@ class TTLClampWrapper(BaseWrapper):
         return max(self.min_ttl, min(ttl, self.max_ttl))
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         await self.key_value.put(collection=collection, key=key, value=value, ttl=self._ttl_clamp(ttl=ttl))
 
     @override
     async def put_many(
         self,
-        keys: list[str],
-        values: Sequence[dict[str, Any]],
+        keys: Sequence[str],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
-        if isinstance(ttl, Sequence):
-            ttl = [self._ttl_clamp(ttl=t) for t in ttl]
-
-        await self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
+        await self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=self._ttl_clamp(ttl=ttl))

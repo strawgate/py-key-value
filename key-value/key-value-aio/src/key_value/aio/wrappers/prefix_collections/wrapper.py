@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, SupportsFloat
 
 from key_value.shared.utils.compound import prefix_collection, unprefix_collection
@@ -37,7 +37,7 @@ class PrefixCollectionsWrapper(BaseWrapper):
         return await self.key_value.get(key=key, collection=new_collection)
 
     @override
-    async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         new_collection: str = self._prefix_collection(collection=collection)
         return await self.key_value.get_many(keys=keys, collection=new_collection)
 
@@ -47,23 +47,23 @@ class PrefixCollectionsWrapper(BaseWrapper):
         return await self.key_value.ttl(key=key, collection=new_collection)
 
     @override
-    async def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         new_collection: str = self._prefix_collection(collection=collection)
         return await self.key_value.ttl_many(keys=keys, collection=new_collection)
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         new_collection: str = self._prefix_collection(collection=collection)
         return await self.key_value.put(key=key, value=value, collection=new_collection, ttl=ttl)
 
     @override
     async def put_many(
         self,
-        keys: list[str],
-        values: Sequence[dict[str, Any]],
+        keys: Sequence[str],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         new_collection: str = self._prefix_collection(collection=collection)
         return await self.key_value.put_many(keys=keys, values=values, collection=new_collection, ttl=ttl)
@@ -74,6 +74,6 @@ class PrefixCollectionsWrapper(BaseWrapper):
         return await self.key_value.delete(key=key, collection=new_collection)
 
     @override
-    async def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         new_collection: str = self._prefix_collection(collection=collection)
         return await self.key_value.delete_many(keys=keys, collection=new_collection)

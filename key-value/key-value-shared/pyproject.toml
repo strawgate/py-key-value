@@ -16,7 +16,7 @@ classifiers = [
 ]
 dependencies = [
     "typing-extensions>=4.15.0",
-    "beartype>=0.22.2",
+    "beartype>=0.20.0",
 ]
 
 
@@ -41,22 +41,11 @@ markers = [
 ]
 timeout = 10
 
-
-
 env_files = [".env"]
 
 [dependency-groups]
 dev = [
-    "pytest",
-    "pytest-mock",
-    "pytest-xdist>=3.6.0",
-    "ruff",
-    "pytest-dotenv>=0.5.2",
-    "dirty-equals>=0.10.0",
-    "inline-snapshot>=0.29.0",
-    "basedpyright>=1.31.5",
-    "pytest-timeout>=2.4.0",
-    "py-key-value-shared-test>=0.2.0",
+    "py-key-value[dev]",
 ]
 
 [tool.uv.sources]

@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Any, SupportsFloat
 
 import pytest
@@ -15,7 +16,7 @@ class FailingStore(MemoryStore):
         msg = "Primary store unavailable"
         raise ConnectionError(msg)
 
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None):  # noqa: ARG002
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None):  # noqa: ARG002
         msg = "Primary store unavailable"
         raise ConnectionError(msg)
 

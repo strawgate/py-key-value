@@ -26,7 +26,7 @@ REDIS_VERSIONS_TO_TEST = ["4.0.0", "7.0.0"]
 def ping_redis() -> bool:
     client: Redis = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
     try:
-        return client.ping()  # pyright: ignore[reportUnknownMemberType, reportAny, reportReturnType]
+        return client.ping()  # pyright: ignore[reportUnknownMemberType, reportAny, reportReturnType, reportUnknownVariableType, reportGeneralTypeIssues]
     except Exception:
         return False
 

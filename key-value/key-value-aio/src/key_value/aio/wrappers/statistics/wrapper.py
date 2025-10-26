@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, SupportsFloat
 
@@ -135,7 +135,7 @@ class StatisticsWrapper(BaseWrapper):
         return None, None
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         collection = collection or DEFAULT_COLLECTION_NAME
 
         await self.key_value.put(collection=collection, key=key, value=value, ttl=ttl)
@@ -155,7 +155,7 @@ class StatisticsWrapper(BaseWrapper):
         return False
 
     @override
-    async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         collection = collection or DEFAULT_COLLECTION_NAME
 
         results: list[dict[str, Any] | None] = await self.key_value.get_many(keys=keys, collection=collection)
@@ -171,11 +171,11 @@ class StatisticsWrapper(BaseWrapper):
     @override
     async def put_many(
         self,
-        keys: list[str],
-        values: Sequence[dict[str, Any]],
+        keys: Sequence[str],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         collection = collection or DEFAULT_COLLECTION_NAME
 
@@ -184,7 +184,7 @@ class StatisticsWrapper(BaseWrapper):
         self.statistics.get_collection(collection=collection).put.increment(increment=len(keys))
 
     @override
-    async def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         collection = collection or DEFAULT_COLLECTION_NAME
 
         deleted_count: int = await self.key_value.delete_many(keys=keys, collection=collection)
@@ -198,7 +198,7 @@ class StatisticsWrapper(BaseWrapper):
         return deleted_count
 
     @override
-    async def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         collection = collection or DEFAULT_COLLECTION_NAME
 
         results: list[tuple[dict[str, Any] | None, float | None]] = await self.key_value.ttl_many(keys=keys, collection=collection)

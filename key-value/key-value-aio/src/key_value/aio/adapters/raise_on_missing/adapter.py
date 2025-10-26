@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, Literal, SupportsFloat, overload
 
 from key_value.shared.errors import MissingKeyError
@@ -50,16 +50,16 @@ class RaiseOnMissingAdapter:
 
     @overload
     async def get_many(
-        self, keys: list[str], *, collection: str | None = None, raise_on_missing: Literal[False] = False
+        self, keys: Sequence[str], *, collection: str | None = None, raise_on_missing: Literal[False] = False
     ) -> list[dict[str, Any] | None]: ...
 
     @overload
     async def get_many(
-        self, keys: list[str], *, collection: str | None = None, raise_on_missing: Literal[True]
+        self, keys: Sequence[str], *, collection: str | None = None, raise_on_missing: Literal[True]
     ) -> list[dict[str, Any]]: ...
 
     async def get_many(
-        self, keys: list[str], *, collection: str | None = None, raise_on_missing: bool = False
+        self, keys: Sequence[str], *, collection: str | None = None, raise_on_missing: bool = False
     ) -> list[dict[str, Any]] | list[dict[str, Any] | None]:
         """Retrieve multiple values by key from the specified collection.
 
@@ -113,16 +113,16 @@ class RaiseOnMissingAdapter:
 
     @overload
     async def ttl_many(
-        self, keys: list[str], *, collection: str | None = None, raise_on_missing: Literal[False] = False
+        self, keys: Sequence[str], *, collection: str | None = None, raise_on_missing: Literal[False] = False
     ) -> list[tuple[dict[str, Any] | None, float | None]]: ...
 
     @overload
     async def ttl_many(
-        self, keys: list[str], *, collection: str | None = None, raise_on_missing: Literal[True]
+        self, keys: Sequence[str], *, collection: str | None = None, raise_on_missing: Literal[True]
     ) -> list[tuple[dict[str, Any], float | None]]: ...
 
     async def ttl_many(
-        self, keys: list[str], *, collection: str | None = None, raise_on_missing: bool = False
+        self, keys: Sequence[str], *, collection: str | None = None, raise_on_missing: bool = False
     ) -> list[tuple[dict[str, Any], float | None]] | list[tuple[dict[str, Any] | None, float | None]]:
         """Retrieve multiple values and TTL information by key from the specified collection.
 
@@ -138,7 +138,7 @@ class RaiseOnMissingAdapter:
 
         return results
 
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Store a key-value pair in the specified collection with optional TTL.
 
         Args:
@@ -152,11 +152,11 @@ class RaiseOnMissingAdapter:
 
     async def put_many(
         self,
-        keys: list[str],
-        values: Sequence[dict[str, Any]],
+        keys: Sequence[str],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         """Store multiple key-value pairs in the specified collection.
 
@@ -164,8 +164,9 @@ class RaiseOnMissingAdapter:
             keys: The keys to store the values in.
             values: The values to store.
             collection: The collection to store keys in. If no collection is provided, it will use the default collection.
-            ttl: The optional time-to-live (expiry duration) for the key-value pairs. Defaults to no TTL. Note: The
-                backend store will convert the provided format to its own internal format.
+            ttl: The optional time-to-live (expiry duration) for all key-value pairs. The same TTL will be applied to all
+                items in the batch. Defaults to no TTL. Note: The backend store will convert the provided format to its own
+                internal format.
         """
         return await self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
 
@@ -178,7 +179,7 @@ class RaiseOnMissingAdapter:
         """
         return await self.key_value.delete(key=key, collection=collection)
 
-    async def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         """Delete multiple key-value pairs from the specified collection.
 
         Args:

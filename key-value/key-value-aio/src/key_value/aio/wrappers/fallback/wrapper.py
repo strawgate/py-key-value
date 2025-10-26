@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, SupportsFloat
 
 from typing_extensions import override
@@ -50,7 +50,7 @@ class FallbackWrapper(BaseWrapper):
             return await self.fallback_key_value.get(key=key, collection=collection)
 
     @override
-    async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         try:
             return await self.primary_key_value.get_many(keys=keys, collection=collection)
         except self.fallback_on:
@@ -64,14 +64,14 @@ class FallbackWrapper(BaseWrapper):
             return await self.fallback_key_value.ttl(key=key, collection=collection)
 
     @override
-    async def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         try:
             return await self.primary_key_value.ttl_many(keys=keys, collection=collection)
         except self.fallback_on:
             return await self.fallback_key_value.ttl_many(keys=keys, collection=collection)
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         if self.write_to_fallback:
             try:
                 return await self.primary_key_value.put(key=key, value=value, collection=collection, ttl=ttl)
@@ -83,11 +83,11 @@ class FallbackWrapper(BaseWrapper):
     @override
     async def put_many(
         self,
-        keys: list[str],
-        values: Sequence[dict[str, Any]],
+        keys: Sequence[str],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         if self.write_to_fallback:
             try:
@@ -108,7 +108,7 @@ class FallbackWrapper(BaseWrapper):
             return await self.primary_key_value.delete(key=key, collection=collection)
 
     @override
-    async def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         if self.write_to_fallback:
             try:
                 return await self.primary_key_value.delete_many(keys=keys, collection=collection)

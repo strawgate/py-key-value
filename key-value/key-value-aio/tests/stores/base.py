@@ -9,12 +9,11 @@ from key_value.shared.code_gen.gather import async_gather
 from key_value.shared.code_gen.sleep import asleep
 from key_value.shared.errors import InvalidTTLError, SerializationError
 from key_value.shared_test.cases import (
-    LARGE_TEST_DATA_ARGNAMES,
-    LARGE_TEST_DATA_ARGVALUES,
-    LARGE_TEST_DATA_IDS,
-    SIMPLE_TEST_DATA_ARGNAMES,
-    SIMPLE_TEST_DATA_ARGVALUES,
-    SIMPLE_TEST_DATA_IDS,
+    LARGE_DATA_CASES,
+    NEGATIVE_SIMPLE_CASES,
+    SIMPLE_CASES,
+    NegativeCases,
+    PositiveCases,
 )
 from pydantic import AnyHttpUrl
 
@@ -46,7 +45,7 @@ class BaseStoreTests(ABC):
         assert ttl == (None, None)
 
     async def test_put_serialization_errors(self, store: BaseStore):
-        """Tests that the put method does not raise an exception when called on a new store."""
+        """Tests that the put method raises SerializationError for non-JSON-serializable Pydantic types."""
         with pytest.raises(SerializationError):
             await store.put(collection="test", key="test", value={"test": AnyHttpUrl("https://test.com")})
 
@@ -55,15 +54,22 @@ class BaseStoreTests(ABC):
         await store.put(collection="test", key="test", value={"test": "test"})
         assert await store.get(collection="test", key="test") == {"test": "test"}
 
-    @pytest.mark.parametrize(argnames=SIMPLE_TEST_DATA_ARGNAMES, argvalues=SIMPLE_TEST_DATA_ARGVALUES, ids=SIMPLE_TEST_DATA_IDS)
-    async def test_get_complex_put_get(self, store: BaseStore, data: dict[str, Any], json: str):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]  # noqa: ARG002
+    @PositiveCases.parametrize(cases=SIMPLE_CASES)
+    async def test_models_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]  # noqa: ARG002
         await store.put(collection="test", key="test", value=data)
-        assert await store.get(collection="test", key="test") == data
+        retrieved_data = await store.get(collection="test", key="test")
+        assert retrieved_data is not None
+        assert retrieved_data == round_trip
 
-    @pytest.mark.parametrize(argnames=LARGE_TEST_DATA_ARGNAMES, argvalues=LARGE_TEST_DATA_ARGVALUES, ids=LARGE_TEST_DATA_IDS)
-    async def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]  # noqa: ARG002
+    @NegativeCases.parametrize(cases=NEGATIVE_SIMPLE_CASES)
+    async def test_negative_models_put_get(self, store: BaseStore, data: dict[str, Any], error: type[Exception]):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]
+        with pytest.raises(error):
+            await store.put(collection="test", key="test", value=data)
+
+    @PositiveCases.parametrize(cases=[LARGE_DATA_CASES])
+    async def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]  # noqa: ARG002
         await store.put(collection="test", key="test", value=data)
-        assert await store.get(collection="test", key="test") == data
+        assert await store.get(collection="test", key="test") == round_trip
 
     async def test_put_many_get(self, store: BaseStore):
         await store.put_many(collection="test", keys=["test", "test_2"], values=[{"test": "test"}, {"test": "test_2"}])
@@ -197,7 +203,7 @@ class BaseStoreTests(ABC):
         assert await store.get(collection="test_collection", key="test_key_0") is None
         assert await store.get(collection="test_collection", key="test_key_999") is not None
 
-    @pytest.mark.skipif(condition=not async_running_in_event_loop(), reason="Cannot run concurrent operations in event loop")
+    @pytest.mark.skipif(condition=not async_running_in_event_loop(), reason="Cannot run concurrent operations outside of event loop")
     async def test_concurrent_operations(self, store: BaseStore):
         """Tests that the store can handle concurrent operations."""
 
