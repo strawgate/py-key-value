@@ -22,7 +22,7 @@ WAIT_FOR_VALKEY_TIMEOUT = 30
 # Released Apr 2024
 # Released Sep 2024
 # Released Oct 2025
-VALKEY_VERSIONS_TO_TEST = ["7.2.0", "8.0.0", "9.0.0"]
+VALKEY_VERSIONS_TO_TEST = ["7.2.5", "8.0.0", "9.0.0"]
 
 
 class ValkeyFailedToStartError(Exception):
