@@ -20,7 +20,6 @@ class TestDuckDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         await duckdb_store.close()
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
-    @override
     async def test_not_unbounded(self, store: BaseStore): ...
 
 
@@ -36,7 +35,6 @@ class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
             await duckdb_store.close()
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
-    @override
     async def test_not_unbounded(self, store: BaseStore): ...
 
 
@@ -138,5 +136,4 @@ class TestDuckDBStoreSpecific:
         await store.close()
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
-    @override
     async def test_not_unbounded(self, store: BaseStore): ...

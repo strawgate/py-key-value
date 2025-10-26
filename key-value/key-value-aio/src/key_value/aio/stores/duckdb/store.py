@@ -19,10 +19,15 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
     DuckDB is an in-process SQL OLAP database that provides excellent performance
     for analytical workloads while supporting standard SQL operations. This store
     can operate in memory-only mode or persist data to disk.
+
+    Note on connection ownership: When you provide an existing connection, the store
+    will take ownership and close it when the store is closed or garbage collected.
+    If you need to reuse a connection, create separate DuckDB connections for each store.
     """
 
     _connection: duckdb.DuckDBPyConnection
     _is_closed: bool
+    _owns_connection: bool
 
     @overload
     def __init__(
@@ -33,6 +38,10 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         seed: SEED_DATA_TYPE | None = None,
     ) -> None:
         """Initialize the DuckDB store with an existing connection.
+
+        Warning: The store will take ownership of the connection and close it
+        when the store is closed or garbage collected. If you need to reuse
+        a connection, create separate DuckDB connections for each store.
 
         Args:
             connection: An existing DuckDB connection to use.
@@ -78,6 +87,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
 
         if connection is not None:
             self._connection = connection
+            self._owns_connection = True  # We take ownership even of provided connections
         else:
             # Convert Path to string if needed
             if isinstance(database_path, Path):
@@ -88,6 +98,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
                 self._connection = duckdb.connect(":memory:")
             else:
                 self._connection = duckdb.connect(database=database_path)
+            self._owns_connection = True
 
         self._is_closed = False
         self._stable_api = False
@@ -96,7 +107,18 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
 
     @override
     async def _setup(self) -> None:
-        """Initialize the database schema for key-value storage."""
+        """Initialize the database schema for key-value storage.
+
+        Note: The schema stores created_at, ttl, and expires_at as separate columns
+        in addition to the serialized ManagedEntry in value_json. This duplication
+        is intentional for future features:
+        - The expires_at column with its index enables efficient expiration-based
+          cleanup queries (e.g., DELETE FROM kv_entries WHERE expires_at < now())
+        - The separate columns allow for metadata queries without deserializing JSON
+        - Currently, only value_json is read during _get_managed_entry
+
+        This design trades storage space for query flexibility and future extensibility.
+        """
         # Create the main table for storing key-value entries
         self._connection.execute("""
             CREATE TABLE IF NOT EXISTS kv_entries (
@@ -116,7 +138,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             ON kv_entries(collection)
         """)
 
-        # Create index for expiration-based queries
+        # Create index for expiration-based queries (for future cleanup features)
         self._connection.execute("""
             CREATE INDEX IF NOT EXISTS idx_kv_expires_at
             ON kv_entries(expires_at)
@@ -125,6 +147,10 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         """Retrieve a managed entry by key from the specified collection."""
+        if self._is_closed:
+            msg = "Cannot operate on closed DuckDBStore"
+            raise RuntimeError(msg)
+
         result = self._connection.execute(
             "SELECT value_json FROM kv_entries WHERE collection = ? AND key = ?",
             [collection, key],
@@ -145,6 +171,10 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         managed_entry: ManagedEntry,
     ) -> None:
         """Store a managed entry by key in the specified collection."""
+        if self._is_closed:
+            msg = "Cannot operate on closed DuckDBStore"
+            raise RuntimeError(msg)
+
         # Insert or replace the entry
         self._connection.execute(
             """
@@ -165,6 +195,10 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         """Delete a managed entry by key from the specified collection."""
+        if self._is_closed:
+            msg = "Cannot operate on closed DuckDBStore"
+            raise RuntimeError(msg)
+
         result = self._connection.execute(
             "DELETE FROM kv_entries WHERE collection = ? AND key = ? RETURNING key",
             [collection, key],
@@ -177,12 +211,16 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _close(self) -> None:
         """Close the DuckDB connection."""
-        if not self._is_closed:
+        if not self._is_closed and self._owns_connection:
             self._connection.close()
             self._is_closed = True
 
     def __del__(self) -> None:
         """Clean up the DuckDB connection on deletion."""
-        if not self._is_closed:
-            self._connection.close()
-            self._is_closed = True
+        try:
+            if not self._is_closed and self._owns_connection and hasattr(self, "_connection"):
+                self._connection.close()
+                self._is_closed = True
+        except Exception:  # noqa: S110
+            # Suppress errors during cleanup to avoid issues during interpreter shutdown
+            pass
