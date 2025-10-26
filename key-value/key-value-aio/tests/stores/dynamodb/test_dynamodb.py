@@ -91,4 +91,5 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
-    async def test_not_unbounded(self, store: BaseStore): ...
+    async def test_not_unbounded(self, store: BaseStore):
+        pass
