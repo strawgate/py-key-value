@@ -32,7 +32,8 @@ npm install -g markdownlint-cli
 
 ## Common Commands
 
-Run `make help` to see all available targets. The Makefile supports both whole-repo and per-project operations.
+Run `make help` to see all available targets. The Makefile supports both
+whole-repo and per-project operations.
 
 ### Lint and Format
 
@@ -125,7 +126,8 @@ This runs linting, type checking, and code generation.
 
 ## Using Makefile in CI
 
-The Makefile targets support per-project operations, making them suitable for CI workflows:
+The Makefile targets support per-project operations, making them
+suitable for CI workflows:
 
 ```yaml
 # Example: CI workflow step
