@@ -65,7 +65,7 @@ class ReadOnlyWrapper(BaseWrapper):
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         if self.raise_on_write:
             raise ReadOnlyError(operation="put_many", collection=collection, key=f"{len(keys)} keys")

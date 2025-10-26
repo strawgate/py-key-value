@@ -74,26 +74,13 @@ class PassthroughCacheWrapper(BaseWrapper):
             collection=collection, keys=uncached_keys
         )
 
-        entries_to_cache: list[dict[str, Any]] = []
-        entries_to_cache_keys: list[str] = []
-        entries_to_cache_ttls: list[float | None] = []
-
+        # Cache entries individually since they may have different TTLs
         for i, key in enumerate(uncached_keys):
             entry, ttl = uncached_entries[i]
             if entry is not None:
-                entries_to_cache_keys.append(key)
-                entries_to_cache.append(entry)
-                entries_to_cache_ttls.append(ttl)
+                await self.cache_key_value.put(collection=collection, key=key, value=entry, ttl=ttl)
 
             key_to_value[key] = entry
-
-        if entries_to_cache:
-            await self.cache_key_value.put_many(
-                collection=collection,
-                keys=entries_to_cache_keys,
-                values=entries_to_cache,
-                ttl=entries_to_cache_ttls,
-            )
 
         return [key_to_value[key] for key in keys]
 
@@ -131,26 +118,13 @@ class PassthroughCacheWrapper(BaseWrapper):
             collection=collection, keys=uncached_keys
         )
 
-        entries_to_cache: list[dict[str, Any]] = []
-        entries_to_cache_keys: list[str] = []
-        entries_to_cache_ttls: list[float | None] = []
-
+        # Cache entries individually since they may have different TTLs
         for i, key in enumerate(uncached_keys):
             entry, ttl = uncached_entries[i]
             if entry is not None:
-                entries_to_cache_keys.append(key)
-                entries_to_cache.append(entry)
-                entries_to_cache_ttls.append(ttl)
+                await self.cache_key_value.put(collection=collection, key=key, value=entry, ttl=ttl)
 
             key_to_value[key] = (entry, ttl)
-
-        if entries_to_cache:
-            await self.cache_key_value.put_many(
-                collection=collection,
-                keys=entries_to_cache_keys,
-                values=entries_to_cache,
-                ttl=entries_to_cache_ttls,
-            )
 
         return [key_to_value[key] for key in keys]
 
@@ -167,7 +141,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         _ = await self.cache_key_value.delete_many(collection=collection, keys=keys)
 

@@ -41,7 +41,7 @@ class ReadOnlyWrapper(BaseWrapper):
         return self.key_value.get(key=key, collection=collection)
 
     @override
-    def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         return self.key_value.get_many(keys=keys, collection=collection)
 
     @override
@@ -49,7 +49,7 @@ class ReadOnlyWrapper(BaseWrapper):
         return self.key_value.ttl(key=key, collection=collection)
 
     @override
-    def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         return self.key_value.ttl_many(keys=keys, collection=collection)
 
     @override
@@ -59,12 +59,7 @@ class ReadOnlyWrapper(BaseWrapper):
 
     @override
     def put_many(
-        self,
-        keys: list[str],
-        values: Sequence[Mapping[str, Any]],
-        *,
-        collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        self, keys: Sequence[str], values: Sequence[Mapping[str, Any]], *, collection: str | None = None, ttl: SupportsFloat | None = None
     ) -> None:
         if self.raise_on_write:
             raise ReadOnlyError(operation="put_many", collection=collection, key=f"{len(keys)} keys")
@@ -76,7 +71,7 @@ class ReadOnlyWrapper(BaseWrapper):
         return False
 
     @override
-    def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         if self.raise_on_write:
             raise ReadOnlyError(operation="delete_many", collection=collection, key=f"{len(keys)} keys")
         return 0
