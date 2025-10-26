@@ -1,4 +1,4 @@
-.PHONY: bump-version bump-version-dry codegen lint typecheck sync precommit
+.PHONY: bump-version bump-version-dry codegen lint typecheck sync setup install test test-aio test-sync precommit
 
 
 bump-version:
@@ -29,5 +29,23 @@ sync:
 	@echo "Syncing..."
 	@uv sync --all-packages
 	@npm install -g markdownlint-cli
+
+# Alias for sync (for consistency with common conventions)
+setup: sync
+
+install: sync
+
+test:
+	@echo "Running all tests..."
+	@uv run pytest key-value/key-value-aio/tests -vv
+	@uv run pytest key-value/key-value-sync/tests -vv
+
+test-aio:
+	@echo "Running async tests..."
+	@uv run pytest key-value/key-value-aio/tests -vv
+
+test-sync:
+	@echo "Running sync tests..."
+	@uv run pytest key-value/key-value-sync/tests -vv
 
 precommit: lint typecheck codegen
