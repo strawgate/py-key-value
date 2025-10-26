@@ -64,10 +64,25 @@ class ElasticsearchStore(
     _native_storage: bool
 
     @overload
-    def __init__(self, *, elasticsearch_client: AsyncElasticsearch, index_prefix: str, default_collection: str | None = None, native_storage: bool = False) -> None: ...
+    def __init__(
+        self,
+        *,
+        elasticsearch_client: AsyncElasticsearch,
+        index_prefix: str,
+        default_collection: str | None = None,
+        native_storage: bool = False,
+    ) -> None: ...
 
     @overload
-    def __init__(self, *, url: str, api_key: str | None = None, index_prefix: str, default_collection: str | None = None, native_storage: bool = False) -> None: ...
+    def __init__(
+        self,
+        *,
+        url: str,
+        api_key: str | None = None,
+        index_prefix: str,
+        default_collection: str | None = None,
+        native_storage: bool = False,
+    ) -> None: ...
 
     def __init__(
         self,
@@ -142,7 +157,7 @@ class ElasticsearchStore(
                 },
                 "value": {
                     "type": "flattened" if self._native_storage else "keyword",
-                    **({"index": False} if not self._native_storage else {}),
+                    **({"index": False, "doc_values": False} if not self._native_storage else {}),
                 },
             },
         }
@@ -154,7 +169,10 @@ class ElasticsearchStore(
         try:
             mapping_response = await self._client.indices.get_mapping(index=index_name)
             mappings = mapping_response.get(index_name, {}).get("mappings", {})
-            value_field_type = mappings.get("properties", {}).get("value", {}).get("type")
+            props = mappings.get("properties", {})
+            value_field_type = props.get("value", {}).get("type")
+            created_type = props.get("created_at", {}).get("type")
+            expires_type = props.get("expires_at", {}).get("type")
 
             expected_type = "flattened" if self._native_storage else "keyword"
 
@@ -166,16 +184,24 @@ class ElasticsearchStore(
                     f"To fix this, either: 1) Use the correct storage mode when initializing the store, "
                     f"or 2) Delete and recreate the index with the new mapping."
                 )
-                raise ValueError(msg)
-        except Exception as e:
-            # If we can't get the mapping, log a warning but don't fail
-            # This allows the store to work even if mapping validation fails
-            if not isinstance(e, ValueError):
-                # Only suppress non-ValueError exceptions (e.g., connection issues)
-                pass
-            else:
-                # Re-raise ValueError from our validation
-                raise
+                raise ValueError(msg)  # noqa: TRY301
+
+            # Enforce date types for timestamps (both modes)
+            for field_name, field_type in (("created_at", created_type), ("expires_at", expires_type)):
+                if field_type not in ("date", None):  # None => not yet created; will be added on first write
+                    msg = (
+                        f"Index mapping mismatch for collection '{collection}': "
+                        f"'{field_name}' is mapped as '{field_type}', expected 'date'. "
+                        f"Delete and recreate the index or fix the mapping."
+                    )
+                    raise ValueError(msg)  # noqa: TRY301
+        except ValueError:
+            raise
+        except Exception:
+            # Log a warning but do not fail hard (keep behavior)
+            import logging
+
+            logging.getLogger(__name__).warning("Failed to validate mapping for index '%s' (collection '%s')", index_name, collection)
 
     def _sanitize_index_name(self, collection: str) -> str:
         return sanitize_string(
@@ -208,8 +234,9 @@ class ElasticsearchStore(
 
         if self._native_storage:
             # Native storage mode: Get value as flattened object
-            if not (value := source.get("value")):
+            if "value" not in source:
                 return None
+            value = source["value"]
 
             # Detect if data is in JSON string format
             if isinstance(value, str):
@@ -218,7 +245,7 @@ class ElasticsearchStore(
                     "for native_storage mode. This indicates a storage mode mismatch. "
                     "You may need to migrate existing data or use the correct storage mode."
                 )
-                raise ValueError(msg)
+                raise TypeError(msg)
 
             if not isinstance(value, dict):
                 return None
@@ -231,23 +258,22 @@ class ElasticsearchStore(
                 created_at=created_at,
                 expires_at=expires_at,
             )
-        else:
-            # JSON string mode: Get value as JSON string and parse it
-            json_value: str | None = source.get("value")
+        # JSON string mode: Get value as JSON string and parse it
+        json_value: str | None = source.get("value")
 
-            # Detect if data is in native object format
-            if isinstance(json_value, dict):
-                msg = (
-                    f"Data for key '{key}' appears to be in native object format, but store is configured "
-                    "for JSON string mode. This indicates a storage mode mismatch. "
-                    "You may need to migrate existing data or use the correct storage mode."
-                )
-                raise ValueError(msg)
+        # Detect if data is in native object format
+        if isinstance(json_value, dict):
+            msg = (
+                f"Data for key '{key}' appears to be in native object format, but store is configured "
+                "for JSON string mode. This indicates a storage mode mismatch. "
+                "You may need to migrate existing data or use the correct storage mode."
+            )
+            raise TypeError(msg)
 
-            if not isinstance(json_value, str):
-                return None
+        if not isinstance(json_value, str):
+            return None
 
-            return ManagedEntry.from_json(json_str=json_value)
+        return ManagedEntry.from_json(json_str=json_value)
 
     @property
     def _should_refresh_on_put(self) -> bool:

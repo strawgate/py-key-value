@@ -71,7 +71,13 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
     @overload
     def __init__(
-        self, *, url: str, db_name: str | None = None, coll_name: str | None = None, default_collection: str | None = None, native_storage: bool = False
+        self,
+        *,
+        url: str,
+        db_name: str | None = None,
+        coll_name: str | None = None,
+        default_collection: str | None = None,
+        native_storage: bool = False,
     ) -> None:
         """Initialize the MongoDB store.
 
@@ -175,11 +181,19 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
                     f"To fix this, either: 1) Recreate the collection with native_storage=True, "
                     f"or 2) Manually create the TTL index: db.{collection}.createIndex({{expires_at: 1}}, {{expireAfterSeconds: 0}})"
                 )
-                raise ValueError(msg)
+                raise ValueError(msg)  # noqa: TRY301
+            if not self._native_storage and has_ttl_index:
+                msg = (
+                    f"Collection '{collection}' has a TTL index on 'expires_at' field, "
+                    f"but store is configured for JSON string mode (native_storage=False). "
+                    f"This may cause unexpected behavior. Consider either: "
+                    f"1) Using native_storage=True, or 2) Dropping the TTL index."
+                )
+                raise ValueError(msg)  # noqa: TRY301
         except ValueError:
             # Re-raise our validation errors
             raise
-        except Exception:
+        except Exception:  # noqa: S110
             # Suppress other errors (e.g., connection issues) to allow store to work
             pass
 
@@ -197,7 +211,11 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
             value: dict[str, Any] | None = doc.get("value")
 
             if not isinstance(value, dict):
-                return None
+                msg = (
+                    f"Data for key '{key}' has invalid value type: expected dict but got {type(value).__name__}. "
+                    f"This may indicate the collection contains JSON-mode data but native_storage=True."
+                )
+                raise TypeError(msg)
 
             # Parse datetime objects directly and validate types
             created_at: datetime | None = doc.get("created_at")
@@ -222,14 +240,17 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
                 created_at=created_at,
                 expires_at=expires_at,
             )
-        else:
-            # JSON string mode: Get value as JSON string and parse it
-            json_value: str | None = doc.get("value")
+        # JSON string mode: Get value as JSON string and parse it
+        json_value: str | None = doc.get("value")
 
-            if not isinstance(json_value, str):
-                return None
+        if not isinstance(json_value, str):
+            msg = (
+                f"Data for key '{key}' has invalid value type: expected str but got {type(json_value).__name__}. "
+                f"This may indicate the collection contains native-mode data but native_storage=False."
+            )
+            raise TypeError(msg)
 
-            return ManagedEntry.from_json(json_str=json_value)
+        return ManagedEntry.from_json(json_str=json_value)
 
     @override
     async def _put_managed_entry(
@@ -253,13 +274,18 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
             # Store as datetime objects (use $setOnInsert for immutable fields)
             if managed_entry.created_at:
                 set_on_insert_fields["created_at"] = managed_entry.created_at
-            if managed_entry.expires_at:
-                # expires_at can change, so use $set
-                set_fields["expires_at"] = managed_entry.expires_at
 
+            # Build update document
             update_doc: dict[str, Any] = {"$set": set_fields}
             if set_on_insert_fields:
                 update_doc["$setOnInsert"] = set_on_insert_fields
+
+            # Always handle expires_at to support removing expiration
+            if managed_entry.expires_at is not None:
+                set_fields["expires_at"] = managed_entry.expires_at
+            else:
+                # Use $unset to remove the field when expires_at is None
+                update_doc["$unset"] = {"expires_at": ""}
 
             _ = await self._collections_by_name[collection].update_one(
                 filter={"key": key},
