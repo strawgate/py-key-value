@@ -15,7 +15,13 @@ from key_value.sync.code_gen.stores.base import BaseStore
 try:
     import winreg  # pyright: ignore[reportUnusedImport]  # noqa: F401
 
-    from key_value.sync.code_gen.stores.windows_registry.utils import delete_reg_sz_value, get_reg_sz_value, set_reg_sz_value
+    from key_value.sync.code_gen.stores.windows_registry.utils import (
+        create_key,
+        delete_reg_sz_value,
+        get_reg_sz_value,
+        has_key,
+        set_reg_sz_value,
+    )
 except ImportError as e:
     msg = "WindowsRegistryStore requires Windows platform (winreg module)"
     raise ImportError(msg) from e
@@ -68,6 +74,12 @@ class WindowsRegistryStore(BaseStore):
         """Get the full registry path for a collection."""
         sanitized_collection = self._sanitize_collection_name(collection=collection)
         return f"{self._registry_path}\\{sanitized_collection}"
+
+    @override
+    def _setup_collection(self, *, collection: str) -> None:
+        registry_path = self._get_registry_path(collection=collection)
+        if not has_key(hive=self._hive, sub_key=registry_path):
+            create_key(hive=self._hive, sub_key=registry_path)
 
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
