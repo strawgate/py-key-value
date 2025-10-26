@@ -95,7 +95,13 @@ class PydanticAdapter(Generic[T]):
 
         return default
 
-    async def get_many(self, keys: Sequence[str], *, collection: str | None = None, default: T | None = None) -> list[T | None]:
+    @overload
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None, default: T) -> list[T]: ...
+
+    @overload
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None, default: None = None) -> list[T | None]: ...
+
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None, default: T | None = None) -> list[T] | list[T | None]:
         """Batch get and validate models by keys, preserving order.
 
         Args:

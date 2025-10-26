@@ -2,6 +2,7 @@
 # from the original file 'store.py'
 # DO NOT CHANGE! Change the original file instead.
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, SupportsFloat
@@ -103,26 +104,63 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
     max_entries_per_collection: int
 
     _cache: dict[str, MemoryCollection]
+    _seed: Mapping[str, Mapping[str, Mapping[str, Any]]]
 
-    def __init__(self, *, max_entries_per_collection: int = DEFAULT_MAX_ENTRIES_PER_COLLECTION, default_collection: str | None = None):
+    def __init__(
+        self,
+        *,
+        max_entries_per_collection: int = DEFAULT_MAX_ENTRIES_PER_COLLECTION,
+        default_collection: str | None = None,
+        seed: Mapping[str, Mapping[str, Mapping[str, Any]]] | None = None,
+    ):
         """Initialize a fixed-size in-memory store.
 
         Args:
             max_entries_per_collection: The maximum number of entries per collection. Defaults to 10000.
             default_collection: The default collection to use if no collection is provided.
+            seed: Optional seed data to pre-populate the store. Format: {collection: {key: {field: value, ...}}}.
+                Each value must be a mapping (dict) that will be stored as the entry's value.
+                Seeding occurs lazily when each collection is first accessed.
         """
 
         self.max_entries_per_collection = max_entries_per_collection
 
         self._cache = {}
+        self._seed = seed or {}
 
         self._stable_api = True
 
         super().__init__(default_collection=default_collection)
 
+    def _create_collection(self, collection: str) -> MemoryCollection:
+        """Create a new collection.
+
+        Args:
+            collection: The collection name.
+
+        Returns:
+            The created MemoryCollection instance.
+        """
+        collection_cache = MemoryCollection(max_entries=self.max_entries_per_collection)
+        self._cache[collection] = collection_cache
+        return collection_cache
+
     @override
     def _setup_collection(self, *, collection: str) -> None:
-        self._cache[collection] = MemoryCollection(max_entries=self.max_entries_per_collection)
+        """Set up a collection, creating it and seeding it if seed data is available.
+
+        Args:
+            collection: The collection name.
+        """
+        # Create the collection
+        collection_cache = self._create_collection(collection)
+
+        # Seed the collection if seed data is available for it
+        if collection in self._seed:
+            items = self._seed[collection]
+            for key, value in items.items():
+                managed_entry = ManagedEntry(value=value)
+                collection_cache.put(key=key, value=managed_entry)
 
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
