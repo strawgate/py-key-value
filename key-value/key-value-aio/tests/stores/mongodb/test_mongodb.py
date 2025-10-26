@@ -20,6 +20,11 @@ MONGODB_TEST_DB = "kv-store-adapter-tests"
 
 WAIT_FOR_MONGODB_TIMEOUT = 30
 
+MONGODB_VERSIONS_TO_TEST = [
+    "5.0",  # Older supported version
+    "8.0",  # Latest stable version
+]
+
 
 async def ping_mongodb() -> bool:
     try:
@@ -37,11 +42,13 @@ class MongoDBFailedToStartError(Exception):
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 class TestMongoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session")
-    async def setup_mongodb(self) -> AsyncGenerator[None, None]:
-        with docker_container("mongodb-test", "mongo:7", {"27017": 27017}):
+    @pytest.fixture(autouse=True, scope="session", params=MONGODB_VERSIONS_TO_TEST)
+    async def setup_mongodb(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+        version = request.param
+
+        with docker_container("mongodb-test", f"mongo:{version}", {str(MONGODB_HOST_PORT): MONGODB_HOST_PORT}):
             if not await async_wait_for_true(bool_fn=ping_mongodb, tries=30, wait_time=1):
-                msg = "MongoDB failed to start"
+                msg = f"MongoDB {version} failed to start"
                 raise MongoDBFailedToStartError(msg)
 
             yield

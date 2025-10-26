@@ -14,9 +14,13 @@ from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 # Memcached test configuration
 MEMCACHED_HOST = "localhost"
 MEMCACHED_PORT = 11211
-MEMCACHED_IMAGE = "memcached:1.6"
 
 WAIT_FOR_MEMCACHED_TIMEOUT = 30
+
+MEMCACHED_VERSIONS_TO_TEST = [
+    "1.5-alpine",  # Older stable version
+    "1.6-alpine",  # Latest stable version
+]
 
 
 async def ping_memcached() -> bool:
@@ -38,18 +42,20 @@ class MemcachedFailedToStartError(Exception):
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session")
-    async def setup_memcached(self) -> AsyncGenerator[None, None]:
-        with docker_container("memcached-test", MEMCACHED_IMAGE, {"11211": MEMCACHED_PORT}):
+    @pytest.fixture(autouse=True, scope="session", params=MEMCACHED_VERSIONS_TO_TEST)
+    async def setup_memcached(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+        version = request.param
+
+        with docker_container("memcached-test", f"memcached:{version}", {"11211": MEMCACHED_PORT}):
             if not await async_wait_for_true(bool_fn=ping_memcached, tries=30, wait_time=1):
-                msg = "Memcached failed to start"
+                msg = f"Memcached {version} failed to start"
                 raise MemcachedFailedToStartError(msg)
 
             yield
 
     @override
     @pytest.fixture
-    async def store(self, setup_memcached: MemcachedStore) -> MemcachedStore:
+    async def store(self, setup_memcached: None) -> MemcachedStore:
         store = MemcachedStore(host=MEMCACHED_HOST, port=MEMCACHED_PORT)
         _ = await store._client.flush_all()  # pyright: ignore[reportPrivateUsage]
         return store

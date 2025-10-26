@@ -18,6 +18,11 @@ VALKEY_DB = 15
 
 WAIT_FOR_VALKEY_TIMEOUT = 30
 
+VALKEY_VERSIONS_TO_TEST = [
+    "7.2",  # Older supported version
+    "8.0",  # Latest stable version
+]
+
 
 class ValkeyFailedToStartError(Exception):
     pass
@@ -44,11 +49,13 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         return True
 
-    @pytest.fixture(scope="session")
-    async def setup_valkey(self) -> AsyncGenerator[None, None]:
-        with docker_container("valkey-test", "valkey/valkey:latest", {"6379": VALKEY_PORT}):
+    @pytest.fixture(scope="session", params=VALKEY_VERSIONS_TO_TEST)
+    async def setup_valkey(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+        version = request.param
+
+        with docker_container("valkey-test", f"valkey/valkey:{version}", {"6379": VALKEY_PORT}):
             if not await async_wait_for_true(bool_fn=self.ping_valkey, tries=30, wait_time=1):
-                msg = "Valkey failed to start"
+                msg = f"Valkey {version} failed to start"
                 raise ValkeyFailedToStartError(msg)
 
             yield

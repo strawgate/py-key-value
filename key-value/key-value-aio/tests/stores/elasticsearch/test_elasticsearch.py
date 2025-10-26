@@ -15,8 +15,11 @@ TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
 ES_HOST = "localhost"
 ES_PORT = 9200
 ES_URL = f"http://{ES_HOST}:{ES_PORT}"
-ES_VERSION = "9.1.4"
-ES_IMAGE = f"docker.elastic.co/elasticsearch/elasticsearch:{ES_VERSION}"
+
+ELASTICSEARCH_VERSIONS_TO_TEST = [
+    "9.0.0",  # Minimum supported version
+    "9.2.0",  # Latest stable version
+]
 
 
 def get_elasticsearch_client() -> AsyncElasticsearch:
@@ -36,13 +39,16 @@ class ElasticsearchFailedToStartError(Exception):
 
 @pytest.mark.skipif(os.getenv("ES_URL") is None, reason="Elasticsearch is not configured")
 class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session")
-    async def setup_elasticsearch(self) -> AsyncGenerator[None, None]:
+    @pytest.fixture(autouse=True, scope="session", params=ELASTICSEARCH_VERSIONS_TO_TEST)
+    async def setup_elasticsearch(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+        version = request.param
+        es_image = f"docker.elastic.co/elasticsearch/elasticsearch:{version}"
+
         with docker_container(
-            "elasticsearch-test", ES_IMAGE, {"9200": ES_PORT}, {"discovery.type": "single-node", "xpack.security.enabled": "false"}
+            "elasticsearch-test", es_image, {"9200": ES_PORT}, {"discovery.type": "single-node", "xpack.security.enabled": "false"}
         ):
             if not await async_wait_for_true(bool_fn=ping_elasticsearch, tries=30, wait_time=2):
-                msg = "Elasticsearch failed to start"
+                msg = f"Elasticsearch {version} failed to start"
                 raise ElasticsearchFailedToStartError(msg)
 
             yield

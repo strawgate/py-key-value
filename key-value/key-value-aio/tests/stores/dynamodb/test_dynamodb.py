@@ -18,6 +18,11 @@ DYNAMODB_TEST_TABLE = "kv-store-test"
 
 WAIT_FOR_DYNAMODB_TIMEOUT = 30
 
+DYNAMODB_VERSIONS_TO_TEST = [
+    "2.0.0",  # Older stable version
+    "latest",  # Latest version
+]
+
 
 async def ping_dynamodb() -> bool:
     """Check if DynamoDB Local is running."""
@@ -43,16 +48,18 @@ class DynamoDBFailedToStartError(Exception):
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session")
-    async def setup_dynamodb(self) -> AsyncGenerator[None, None]:
+    @pytest.fixture(autouse=True, scope="session", params=DYNAMODB_VERSIONS_TO_TEST)
+    async def setup_dynamodb(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+        version = request.param
+
         # DynamoDB Local container
         with docker_container(
             "dynamodb-test",
-            "amazon/dynamodb-local:latest",
+            f"amazon/dynamodb-local:{version}",
             {"8000": DYNAMODB_HOST_PORT},
         ):
             if not await async_wait_for_true(bool_fn=ping_dynamodb, tries=30, wait_time=1):
-                msg = "DynamoDB failed to start"
+                msg = f"DynamoDB {version} failed to start"
                 raise DynamoDBFailedToStartError(msg)
 
             yield

@@ -16,6 +16,11 @@ VAULT_PORT = 8200
 VAULT_TOKEN = "dev-root-token"  # noqa: S105
 VAULT_MOUNT_POINT = "secret"
 
+VAULT_VERSIONS_TO_TEST = [
+    "1.12",  # Older supported version
+    "1.18",  # Latest stable version
+]
+
 
 class VaultFailedToStartError(Exception):
     pass
@@ -35,11 +40,13 @@ class TestVaultStore(BaseStoreTests):
         except Exception:
             return False
 
-    @pytest.fixture(scope="session")
-    async def setup_vault(self) -> AsyncGenerator[None, None]:
+    @pytest.fixture(scope="session", params=VAULT_VERSIONS_TO_TEST)
+    async def setup_vault(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+        version = request.param
+
         with docker_container(
             "vault-test",
-            "hashicorp/vault:latest",
+            f"hashicorp/vault:{version}",
             {"8200": VAULT_PORT},
             environment={
                 "VAULT_DEV_ROOT_TOKEN_ID": VAULT_TOKEN,
@@ -47,7 +54,7 @@ class TestVaultStore(BaseStoreTests):
             },
         ):
             if not await async_wait_for_true(bool_fn=self.ping_vault, tries=30, wait_time=1):
-                msg = "Vault failed to start"
+                msg = f"Vault {version} failed to start"
                 raise VaultFailedToStartError(msg)
 
             yield
