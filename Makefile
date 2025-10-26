@@ -75,7 +75,7 @@ ifdef PROJECT
 	@cd $(PROJECT) && uv sync --locked --group dev
 else
 	@echo "Syncing all packages..."
-	@uv sync --all-packages
+	@uv sync --all-packages --group dev
 	@npm install -g markdownlint-cli
 endif
 
