@@ -10,7 +10,7 @@ from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
 from key_value.sync.code_gen.stores.elasticsearch import ElasticsearchStore
-from tests.code_gen.conftest import docker_container
+from tests.code_gen.conftest import docker_container, should_skip_docker_tests
 from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
@@ -40,6 +40,7 @@ class ElasticsearchFailedToStartError(Exception):
     pass
 
 
+@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
 class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=ELASTICSEARCH_VERSIONS_TO_TEST)
     def setup_elasticsearch(self, request: pytest.FixtureRequest) -> Generator[None, None, None]:
