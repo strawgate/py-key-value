@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any, Generic, SupportsFloat, TypeVar, get_origin
+from typing import Any, Generic, SupportsFloat, TypeVar, get_origin, overload
 
 from key_value.shared.errors import DeserializationError, SerializationError
 from key_value.shared.type_checking.bear_spray import bear_spray
@@ -64,6 +64,12 @@ class PydanticAdapter(Generic[T]):
         except PydanticSerializationError as e:
             msg = f"Invalid Pydantic model: {e}"
             raise SerializationError(msg) from e
+
+    @overload
+    async def get(self, key: str, *, collection: str | None = None, default: T) -> T: ...
+
+    @overload
+    async def get(self, key: str, *, collection: str | None = None, default: None = None) -> T | None: ...
 
     async def get(self, key: str, *, collection: str | None = None, default: T | None = None) -> T | None:
         """Get and validate a model by key.

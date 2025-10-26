@@ -148,10 +148,12 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
             if collection not in self._cache:
                 self._cache[collection] = MemoryCollection(max_entries=self.max_entries_per_collection)
 
-            # Add items directly to the collection
+            collection_cache = self._cache[collection]
+
+            # Add items using the same logic as put
             for key, value in items.items():
                 managed_entry = ManagedEntry(value=value)
-                self._cache[collection].put(key=key, value=managed_entry)
+                collection_cache.put(key=key, value=managed_entry)
 
     @override
     async def _setup_collection(self, *, collection: str) -> None:
