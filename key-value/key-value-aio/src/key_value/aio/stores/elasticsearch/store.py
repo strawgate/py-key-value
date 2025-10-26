@@ -81,11 +81,13 @@ class ElasticsearchStore(
 
     _index_prefix: str
 
-    @overload
-    def __init__(self, *, elasticsearch_client: AsyncElasticsearch, index_prefix: str, default_collection: str | None = None) -> None: ...
+    _native_storage: bool
 
     @overload
-    def __init__(self, *, url: str, api_key: str | None = None, index_prefix: str, default_collection: str | None = None) -> None: ...
+    def __init__(self, *, elasticsearch_client: AsyncElasticsearch, index_prefix: str, default_collection: str | None = None, native_storage: bool = False) -> None: ...
+
+    @overload
+    def __init__(self, *, url: str, api_key: str | None = None, index_prefix: str, default_collection: str | None = None, native_storage: bool = False) -> None: ...
 
     def __init__(
         self,
@@ -95,6 +97,7 @@ class ElasticsearchStore(
         api_key: str | None = None,
         index_prefix: str,
         default_collection: str | None = None,
+        native_storage: bool = False,
     ) -> None:
         """Initialize the elasticsearch store.
 
@@ -104,6 +107,8 @@ class ElasticsearchStore(
             api_key: The api key to use.
             index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
             default_collection: The default collection to use if no collection is provided.
+            native_storage: If True, store values as flattened objects. If False (default),
+                store values as JSON strings. WARNING: Switching between modes requires re-indexing.
         """
         if elasticsearch_client is None and url is None:
             msg = "Either elasticsearch_client or url must be provided"
@@ -121,6 +126,7 @@ class ElasticsearchStore(
 
         self._index_prefix = index_prefix
         self._is_serverless = False
+        self._native_storage = native_storage
 
         super().__init__(default_collection=default_collection)
 
@@ -137,7 +143,29 @@ class ElasticsearchStore(
         if await self._client.options(ignore_status=404).indices.exists(index=index_name):
             return
 
-        _ = await self._client.options(ignore_status=404).indices.create(index=index_name, mappings=DEFAULT_MAPPING, settings={})
+        # Create mapping based on storage mode
+        mapping = {
+            "properties": {
+                "created_at": {
+                    "type": "date",
+                },
+                "expires_at": {
+                    "type": "date",
+                },
+                "collection": {
+                    "type": "keyword",
+                },
+                "key": {
+                    "type": "keyword",
+                },
+                "value": {
+                    "type": "flattened" if self._native_storage else "keyword",
+                    **({"index": False} if not self._native_storage else {}),
+                },
+            },
+        }
+
+        _ = await self._client.options(ignore_status=404).indices.create(index=index_name, mappings=mapping, settings={})
 
     def _sanitize_index_name(self, collection: str) -> str:
         return sanitize_string(
@@ -168,18 +196,27 @@ class ElasticsearchStore(
         if not (source := get_source_from_body(body=body)):
             return None
 
-        # Get value as flattened object instead of JSON string
-        if not (value := source.get("value")) or not isinstance(value, dict):
-            return None
+        if self._native_storage:
+            # Native storage mode: Get value as flattened object
+            if not (value := source.get("value")) or not isinstance(value, dict):
+                return None
 
-        created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
-        expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
+            created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
+            expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
 
-        return ManagedEntry(
-            value=value,
-            created_at=created_at,
-            expires_at=expires_at,
-        )
+            return ManagedEntry(
+                value=value,
+                created_at=created_at,
+                expires_at=expires_at,
+            )
+        else:
+            # JSON string mode: Get value as JSON string and parse it
+            json_value: str | None = source.get("value")
+
+            if not isinstance(json_value, str):
+                return None
+
+            return ManagedEntry.from_json(json_str=json_value)
 
     @property
     def _should_refresh_on_put(self) -> bool:
@@ -195,23 +232,39 @@ class ElasticsearchStore(
     ) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        document: dict[str, Any] = {
-            "collection": collection,
-            "key": key,
-            "value": managed_entry.value,  # Store as flattened object
-        }
+        if self._native_storage:
+            # Native storage mode: Store value as flattened object
+            document: dict[str, Any] = {
+                "collection": collection,
+                "key": key,
+                "value": managed_entry.value,  # Store as flattened object
+            }
 
-        if managed_entry.created_at:
-            document["created_at"] = managed_entry.created_at.isoformat()
-        if managed_entry.expires_at:
-            document["expires_at"] = managed_entry.expires_at.isoformat()
+            if managed_entry.created_at:
+                document["created_at"] = managed_entry.created_at.isoformat()
+            if managed_entry.expires_at:
+                document["expires_at"] = managed_entry.expires_at.isoformat()
 
-        _ = await self._client.index(
-            index=self._sanitize_index_name(collection=collection),
-            id=self._sanitize_document_id(key=combo_key),
-            body=document,
-            refresh=self._should_refresh_on_put,
-        )
+            _ = await self._client.index(
+                index=self._sanitize_index_name(collection=collection),
+                id=self._sanitize_document_id(key=combo_key),
+                body=document,
+                refresh=self._should_refresh_on_put,
+            )
+        else:
+            # JSON string mode: Store value as JSON string
+            document: dict[str, Any] = {
+                "collection": collection,
+                "key": key,
+                "value": managed_entry.to_json(),  # Store as JSON string
+            }
+
+            _ = await self._client.index(
+                index=self._sanitize_index_name(collection=collection),
+                id=self._sanitize_document_id(key=combo_key),
+                body=document,
+                refresh=self._should_refresh_on_put,
+            )
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:

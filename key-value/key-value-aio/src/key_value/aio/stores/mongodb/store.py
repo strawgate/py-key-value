@@ -46,6 +46,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
     _client: AsyncMongoClient[dict[str, Any]]
     _db: AsyncDatabase[dict[str, Any]]
     _collections_by_name: dict[str, AsyncCollection[dict[str, Any]]]
+    _native_storage: bool
 
     @overload
     def __init__(
@@ -55,6 +56,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         db_name: str | None = None,
         coll_name: str | None = None,
         default_collection: str | None = None,
+        native_storage: bool = False,
     ) -> None:
         """Initialize the MongoDB store.
 
@@ -63,11 +65,13 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
             db_name: The name of the MongoDB database.
             coll_name: The name of the MongoDB collection.
             default_collection: The default collection to use if no collection is provided.
+            native_storage: If True, store values as native BSON documents. If False (default),
+                store values as JSON strings. WARNING: Switching between modes requires data migration.
         """
 
     @overload
     def __init__(
-        self, *, url: str, db_name: str | None = None, coll_name: str | None = None, default_collection: str | None = None
+        self, *, url: str, db_name: str | None = None, coll_name: str | None = None, default_collection: str | None = None, native_storage: bool = False
     ) -> None:
         """Initialize the MongoDB store.
 
@@ -76,6 +80,8 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
             db_name: The name of the MongoDB database.
             coll_name: The name of the MongoDB collection.
             default_collection: The default collection to use if no collection is provided.
+            native_storage: If True, store values as native BSON documents. If False (default),
+                store values as JSON strings. WARNING: Switching between modes requires data migration.
         """
 
     def __init__(
@@ -86,8 +92,15 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         db_name: str | None = None,
         coll_name: str | None = None,
         default_collection: str | None = None,
+        native_storage: bool = False,
     ) -> None:
-        """Initialize the MongoDB store."""
+        """Initialize the MongoDB store.
+
+        Args:
+            native_storage: If True, store values as native BSON documents with datetime objects.
+                If False (default), store values as JSON strings with ISO date strings.
+                WARNING: Switching between modes is a breaking change that requires data migration.
+        """
 
         if client:
             self._client = client
@@ -102,6 +115,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
         self._db = self._client[db_name]
         self._collections_by_name = {}
+        self._native_storage = native_storage
 
         super().__init__(default_collection=default_collection)
 
@@ -134,8 +148,10 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         new_collection: AsyncCollection[dict[str, Any]] = await self._db.create_collection(name=collection)
 
         _ = await new_collection.create_index(keys="key")
-        # Create TTL index for automatic expiration
-        _ = await new_collection.create_index(keys="expires_at", expireAfterSeconds=0)
+
+        # Create TTL index for automatic expiration (only when using native storage)
+        if self._native_storage:
+            _ = await new_collection.create_index(keys="expires_at", expireAfterSeconds=0)
 
         self._collections_by_name[collection] = new_collection
 
@@ -148,21 +164,30 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         if not doc:
             return None
 
-        # Get value as BSON document instead of JSON string
-        value: dict[str, Any] | None = doc.get("value")
+        if self._native_storage:
+            # Native storage mode: Get value as BSON document
+            value: dict[str, Any] | None = doc.get("value")
 
-        if not isinstance(value, dict):
-            return None
+            if not isinstance(value, dict):
+                return None
 
-        # Parse datetime objects directly
-        created_at: datetime | None = doc.get("created_at")
-        expires_at: datetime | None = doc.get("expires_at")
+            # Parse datetime objects directly
+            created_at: datetime | None = doc.get("created_at")
+            expires_at: datetime | None = doc.get("expires_at")
 
-        return ManagedEntry(
-            value=value,
-            created_at=created_at,
-            expires_at=expires_at,
-        )
+            return ManagedEntry(
+                value=value,
+                created_at=created_at,
+                expires_at=expires_at,
+            )
+        else:
+            # JSON string mode: Get value as JSON string and parse it
+            json_value: str | None = doc.get("value")
+
+            if not isinstance(json_value, str):
+                return None
+
+            return ManagedEntry.from_json(json_str=json_value)
 
     @override
     async def _put_managed_entry(
@@ -174,24 +199,39 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
     ) -> None:
         collection = self._sanitize_collection_name(collection=collection)
 
-        document: dict[str, Any] = {
-            "collection": collection,
-            "key": key,
-            "value": managed_entry.value,  # Store as BSON document
-            "updated_at": now(),
-        }
+        if self._native_storage:
+            # Native storage mode: Store value as BSON document
+            document: dict[str, Any] = {
+                "collection": collection,
+                "key": key,
+                "value": managed_entry.value,  # Store as BSON document
+                "updated_at": now(),
+            }
 
-        # Store as datetime objects
-        if managed_entry.created_at:
-            document["created_at"] = managed_entry.created_at
-        if managed_entry.expires_at:
-            document["expires_at"] = managed_entry.expires_at
+            # Store as datetime objects
+            if managed_entry.created_at:
+                document["created_at"] = managed_entry.created_at
+            if managed_entry.expires_at:
+                document["expires_at"] = managed_entry.expires_at
 
-        _ = await self._collections_by_name[collection].update_one(
-            filter={"key": key},
-            update={"$set": document},
-            upsert=True,
-        )
+            _ = await self._collections_by_name[collection].update_one(
+                filter={"key": key},
+                update={"$set": document},
+                upsert=True,
+            )
+        else:
+            # JSON string mode: Store value as JSON string
+            document: dict[str, Any] = {
+                "collection": collection,
+                "key": key,
+                "value": managed_entry.to_json(),  # Store as JSON string
+            }
+
+            _ = await self._collections_by_name[collection].update_one(
+                filter={"key": key},
+                update={"$set": document},
+                upsert=True,
+            )
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
