@@ -184,7 +184,7 @@ class BaseStoreTests(ABC):
     @pytest.mark.timeout(10)
     async def test_put_expired_get_none(self, store: BaseStore):
         """Tests that a put call with a negative ttl will return None when getting the key."""
-        await store.put(collection="test_collection", key="test_key", value={"test": "test"}, ttl=1)
+        await store.put(collection="test_collection", key="test_key", value={"test": "test"}, ttl=2)
         assert await store.get(collection="test_collection", key="test_key") is not None
         await asleep(seconds=1)
 
