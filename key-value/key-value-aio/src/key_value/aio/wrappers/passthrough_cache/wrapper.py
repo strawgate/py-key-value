@@ -59,7 +59,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         return uncached_entry
 
     @override
-    async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         key_to_value: dict[str, dict[str, Any] | None] = dict.fromkeys(keys, None)
 
         # First check the cache store for the entries
@@ -114,7 +114,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         return uncached_entry, ttl
 
     @override
-    async def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         key_to_value: dict[str, tuple[dict[str, Any] | None, float | None]] = dict.fromkeys(keys, (None, None))  # type: ignore
 
         # First check the cache store for the entries
@@ -163,7 +163,7 @@ class PassthroughCacheWrapper(BaseWrapper):
     @override
     async def put_many(
         self,
-        keys: list[str],
+        keys: Sequence[str],
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
@@ -180,7 +180,7 @@ class PassthroughCacheWrapper(BaseWrapper):
         return await self.primary_key_value.delete(collection=collection, key=key)
 
     @override
-    async def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         _ = await self.cache_key_value.delete_many(collection=collection, keys=keys)
 
         return await self.primary_key_value.delete_many(collection=collection, keys=keys)
