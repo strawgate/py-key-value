@@ -1,10 +1,10 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, SupportsFloat
 
+from key_value.shared.type_checking.bear_spray import bear_enforce
 from typing_extensions import override
 
 from key_value.aio.protocols.key_value import AsyncKeyValue
-from key_value.shared.type_checking.bear_spray import bear_enforce
 
 
 class BaseWrapper(AsyncKeyValue):
