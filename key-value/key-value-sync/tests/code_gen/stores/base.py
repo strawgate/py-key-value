@@ -14,6 +14,7 @@ from key_value.shared.errors import InvalidTTLError, SerializationError
 from key_value.shared_test.cases import LARGE_DATA_CASES, NEGATIVE_SIMPLE_CASES, SIMPLE_CASES, NegativeCases, PositiveCases
 from pydantic import AnyHttpUrl
 
+from key_value.sync.code_gen.protocols.key_value import KeyValueProtocol
 from key_value.sync.code_gen.stores.base import BaseContextManagerStore, BaseStore
 from tests.code_gen.conftest import running_in_event_loop
 
@@ -26,9 +27,11 @@ class BaseStoreTests(ABC):
     @abstractmethod
     def store(self) -> BaseStore | Generator[BaseStore, None, None]: ...
 
-    # The first test requires a docker pull, so we only time the actual test
+    @pytest.mark.timeout(60)
+    def test_store(self, store: BaseStore):
+        """Tests that the store is a valid KeyValueProtocol."""
+        assert isinstance(store, KeyValueProtocol) is True
 
-    @pytest.mark.timeout(5, func_only=True)
     def test_empty_get(self, store: BaseStore):
         """Tests that the get method returns None from an empty store."""
         assert store.get(collection="test", key="test") is None
@@ -53,19 +56,19 @@ class BaseStoreTests(ABC):
         assert store.get(collection="test", key="test") == {"test": "test"}
 
     @PositiveCases.parametrize(cases=SIMPLE_CASES)
-    def test_models_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]
+    def test_models_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):
         store.put(collection="test", key="test", value=data)
         retrieved_data = store.get(collection="test", key="test")
         assert retrieved_data is not None
         assert retrieved_data == round_trip
 
     @NegativeCases.parametrize(cases=NEGATIVE_SIMPLE_CASES)
-    def test_negative_models_put_get(self, store: BaseStore, data: dict[str, Any], error: type[Exception]):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]
+    def test_negative_models_put_get(self, store: BaseStore, data: dict[str, Any], error: type[Exception]):
         with pytest.raises(error):
             store.put(collection="test", key="test", value=data)
 
     @PositiveCases.parametrize(cases=[LARGE_DATA_CASES])
-    def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]
+    def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):
         store.put(collection="test", key="test", value=data)
         assert store.get(collection="test", key="test") == round_trip
 

@@ -39,9 +39,9 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")
     async def setup_elasticsearch(self) -> AsyncGenerator[None, None]:
         with docker_container(
-            "elasticsearch-test", ES_IMAGE, {"9200": 9200}, {"discovery.type": "single-node", "xpack.security.enabled": "false"}
+            "elasticsearch-test", ES_IMAGE, {"9200": ES_PORT}, {"discovery.type": "single-node", "xpack.security.enabled": "false"}
         ):
-            if not await async_wait_for_true(bool_fn=ping_elasticsearch, tries=30, wait_time=1):
+            if not await async_wait_for_true(bool_fn=ping_elasticsearch, tries=30, wait_time=2):
                 msg = "Elasticsearch failed to start"
                 raise ElasticsearchFailedToStartError(msg)
 

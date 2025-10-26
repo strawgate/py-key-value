@@ -21,15 +21,6 @@ class CollectionRoutingWrapper(RoutingWrapper):
             },
             default_store=disk_store
         )
-
-        # Gets from redis_store
-        await router.get("session_id", collection="sessions")
-
-        # Gets from dynamo_store
-        await router.get("user_id", collection="users")
-
-        # Gets from disk_store (default)
-        await router.get("other_key", collection="unmapped_collection")
     """
 
     def __init__(

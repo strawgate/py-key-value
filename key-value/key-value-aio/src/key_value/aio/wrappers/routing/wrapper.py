@@ -12,7 +12,7 @@ RoutingFunction = Callable[[str | None], AsyncKeyValue | None]
 class RoutingWrapper(BaseWrapper):
     """Routes operations to different stores based on a routing function.
 
-    The routing function receives the collection name and key and returns the appropriate store.
+    The routing function receives the collection name and returns the appropriate store.
     This allows dynamic routing of requests to different backing stores based on
     collection name or other custom logic.
 

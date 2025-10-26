@@ -39,7 +39,7 @@ class PydanticAdapter(Generic[T]):
         origin = get_origin(pydantic_model)
         self._is_list_model: bool = origin is not None and issubclass(origin, Sequence)
 
-        self._type_adapter = TypeAdapter[T](pydantic_model)
+        self._type_adapter: TypeAdapter[T] = TypeAdapter[T](pydantic_model)
         self._default_collection: str | None = default_collection
         self._raise_on_validation_error: bool = raise_on_validation_error
 
@@ -60,7 +60,7 @@ class PydanticAdapter(Generic[T]):
             if self._is_list_model:
                 return {"items": self._type_adapter.dump_python(value, mode="json")}
 
-            return self._type_adapter.dump_python(value, mode="json")
+            return self._type_adapter.dump_python(value, mode="json")  # pyright: ignore[reportAny]
         except PydanticSerializationError as e:
             msg = f"Invalid Pydantic model: {e}"
             raise SerializationError(msg) from e

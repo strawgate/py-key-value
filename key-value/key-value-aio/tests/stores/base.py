@@ -17,6 +17,7 @@ from key_value.shared_test.cases import (
 )
 from pydantic import AnyHttpUrl
 
+from key_value.aio.protocols.key_value import AsyncKeyValueProtocol
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
 from tests.conftest import async_running_in_event_loop
 
@@ -29,8 +30,11 @@ class BaseStoreTests(ABC):
     @abstractmethod
     async def store(self) -> BaseStore | AsyncGenerator[BaseStore, None]: ...
 
-    # The first test requires a docker pull, so we only time the actual test
-    @pytest.mark.timeout(5, func_only=True)
+    @pytest.mark.timeout(60)
+    async def test_store(self, store: BaseStore):
+        """Tests that the store is a valid AsyncKeyValueProtocol."""
+        assert isinstance(store, AsyncKeyValueProtocol) is True
+
     async def test_empty_get(self, store: BaseStore):
         """Tests that the get method returns None from an empty store."""
         assert await store.get(collection="test", key="test") is None
@@ -55,19 +59,19 @@ class BaseStoreTests(ABC):
         assert await store.get(collection="test", key="test") == {"test": "test"}
 
     @PositiveCases.parametrize(cases=SIMPLE_CASES)
-    async def test_models_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]
+    async def test_models_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):
         await store.put(collection="test", key="test", value=data)
         retrieved_data = await store.get(collection="test", key="test")
         assert retrieved_data is not None
         assert retrieved_data == round_trip
 
     @NegativeCases.parametrize(cases=NEGATIVE_SIMPLE_CASES)
-    async def test_negative_models_put_get(self, store: BaseStore, data: dict[str, Any], error: type[Exception]):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]
+    async def test_negative_models_put_get(self, store: BaseStore, data: dict[str, Any], error: type[Exception]):
         with pytest.raises(error):
             await store.put(collection="test", key="test", value=data)
 
     @PositiveCases.parametrize(cases=[LARGE_DATA_CASES])
-    async def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]
+    async def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):
         await store.put(collection="test", key="test", value=data)
         assert await store.get(collection="test", key="test") == round_trip
 

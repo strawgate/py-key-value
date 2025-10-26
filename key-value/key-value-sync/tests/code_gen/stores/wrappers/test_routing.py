@@ -6,6 +6,7 @@ from dirty_equals import IsFloat
 from typing_extensions import override
 
 from key_value.sync.code_gen.protocols.key_value import KeyValue
+from key_value.sync.code_gen.stores.base import BaseStore
 from key_value.sync.code_gen.stores.memory.store import MemoryStore
 from key_value.sync.code_gen.wrappers.routing import CollectionRoutingWrapper, RoutingWrapper
 from tests.code_gen.stores.base import BaseStoreTests
@@ -56,12 +57,12 @@ class TestRoutingWrapper(BaseStoreTests):
 
     @override
     @pytest.mark.skip(reason="RoutingWrapper is unbounded")
-    def test_not_unbounded(self, store: RoutingWrapper): ...
+    def test_not_unbounded(self, store: BaseStore): ...
 
     def test_routing_get_and_get_many(
         self, store_with_data: RoutingWrapper, memory_store: MemoryStore, second_store: MemoryStore, default_store: MemoryStore
-    ):  # pyright: ignore[reportUnusedParameter]
-        "Test basic routing sends gets"
+    ):
+        """Test basic routing sends gets"""
         assert memory_store.get(key=KEY_ONE, collection=COLLECTION_ONE) == VALUE_ONE
         assert memory_store.get(key=KEY_TWO, collection=COLLECTION_TWO) is None
         assert memory_store.get(key=KEY_UNMAPPED, collection=COLLECTION_UNMAPPED) is None
