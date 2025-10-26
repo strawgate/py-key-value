@@ -40,26 +40,6 @@ if TYPE_CHECKING:
 
 DEFAULT_INDEX_PREFIX = "kv_store"
 
-DEFAULT_MAPPING = {
-    "properties": {
-        "created_at": {
-            "type": "date",
-        },
-        "expires_at": {
-            "type": "date",
-        },
-        "collection": {
-            "type": "keyword",
-        },
-        "key": {
-            "type": "keyword",
-        },
-        "value": {
-            "type": "flattened",
-        },
-    },
-}
-
 DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
 
@@ -141,6 +121,8 @@ class ElasticsearchStore(
         index_name = self._sanitize_index_name(collection=collection)
 
         if await self._client.options(ignore_status=404).indices.exists(index=index_name):
+            # Validate that existing index mapping matches the storage mode
+            await self._validate_index_mapping(index_name=index_name, collection=collection)
             return
 
         # Create mapping based on storage mode
@@ -166,6 +148,34 @@ class ElasticsearchStore(
         }
 
         _ = await self._client.options(ignore_status=404).indices.create(index=index_name, mappings=mapping, settings={})
+
+    async def _validate_index_mapping(self, *, index_name: str, collection: str) -> None:
+        """Validate that the index mapping matches the configured storage mode."""
+        try:
+            mapping_response = await self._client.indices.get_mapping(index=index_name)
+            mappings = mapping_response.get(index_name, {}).get("mappings", {})
+            value_field_type = mappings.get("properties", {}).get("value", {}).get("type")
+
+            expected_type = "flattened" if self._native_storage else "keyword"
+
+            if value_field_type != expected_type:
+                msg = (
+                    f"Index mapping mismatch for collection '{collection}': "
+                    f"index has 'value' field type '{value_field_type}', "
+                    f"but store is configured for '{expected_type}' (native_storage={self._native_storage}). "
+                    f"To fix this, either: 1) Use the correct storage mode when initializing the store, "
+                    f"or 2) Delete and recreate the index with the new mapping."
+                )
+                raise ValueError(msg)
+        except Exception as e:
+            # If we can't get the mapping, log a warning but don't fail
+            # This allows the store to work even if mapping validation fails
+            if not isinstance(e, ValueError):
+                # Only suppress non-ValueError exceptions (e.g., connection issues)
+                pass
+            else:
+                # Re-raise ValueError from our validation
+                raise
 
     def _sanitize_index_name(self, collection: str) -> str:
         return sanitize_string(
@@ -198,7 +208,19 @@ class ElasticsearchStore(
 
         if self._native_storage:
             # Native storage mode: Get value as flattened object
-            if not (value := source.get("value")) or not isinstance(value, dict):
+            if not (value := source.get("value")):
+                return None
+
+            # Detect if data is in JSON string format
+            if isinstance(value, str):
+                msg = (
+                    f"Data for key '{key}' appears to be in JSON string format, but store is configured "
+                    "for native_storage mode. This indicates a storage mode mismatch. "
+                    "You may need to migrate existing data or use the correct storage mode."
+                )
+                raise ValueError(msg)
+
+            if not isinstance(value, dict):
                 return None
 
             created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
@@ -212,6 +234,15 @@ class ElasticsearchStore(
         else:
             # JSON string mode: Get value as JSON string and parse it
             json_value: str | None = source.get("value")
+
+            # Detect if data is in native object format
+            if isinstance(json_value, dict):
+                msg = (
+                    f"Data for key '{key}' appears to be in native object format, but store is configured "
+                    "for JSON string mode. This indicates a storage mode mismatch. "
+                    "You may need to migrate existing data or use the correct storage mode."
+                )
+                raise ValueError(msg)
 
             if not isinstance(json_value, str):
                 return None
@@ -258,6 +289,12 @@ class ElasticsearchStore(
                 "key": key,
                 "value": managed_entry.to_json(),  # Store as JSON string
             }
+
+            # Store timestamps at top level for culling to work
+            if managed_entry.created_at:
+                document["created_at"] = managed_entry.created_at.isoformat()
+            if managed_entry.expires_at:
+                document["expires_at"] = managed_entry.expires_at.isoformat()
 
             _ = await self._client.index(
                 index=self._sanitize_index_name(collection=collection),
