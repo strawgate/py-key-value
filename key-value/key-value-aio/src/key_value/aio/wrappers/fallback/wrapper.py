@@ -50,7 +50,7 @@ class FallbackWrapper(BaseWrapper):
             return await self.fallback_key_value.get(key=key, collection=collection)
 
     @override
-    async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         try:
             return await self.primary_key_value.get_many(keys=keys, collection=collection)
         except self.fallback_on:
@@ -64,7 +64,7 @@ class FallbackWrapper(BaseWrapper):
             return await self.fallback_key_value.ttl(key=key, collection=collection)
 
     @override
-    async def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         try:
             return await self.primary_key_value.ttl_many(keys=keys, collection=collection)
         except self.fallback_on:
@@ -83,7 +83,7 @@ class FallbackWrapper(BaseWrapper):
     @override
     async def put_many(
         self,
-        keys: list[str],
+        keys: Sequence[str],
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
@@ -108,7 +108,7 @@ class FallbackWrapper(BaseWrapper):
             return await self.primary_key_value.delete(key=key, collection=collection)
 
     @override
-    async def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         if self.write_to_fallback:
             try:
                 return await self.primary_key_value.delete_many(keys=keys, collection=collection)

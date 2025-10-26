@@ -57,7 +57,7 @@ class AsyncKeyValueProtocol(Protocol):
         """
         ...
 
-    async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         """Retrieve multiple values by key from the specified collection.
 
         Args:
@@ -69,7 +69,7 @@ class AsyncKeyValueProtocol(Protocol):
         """
         ...
 
-    async def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         """Retrieve multiple values and TTL information by key from the specified collection.
 
         Args:
@@ -84,7 +84,7 @@ class AsyncKeyValueProtocol(Protocol):
 
     async def put_many(
         self,
-        keys: list[str],
+        keys: Sequence[str],
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
@@ -101,7 +101,7 @@ class AsyncKeyValueProtocol(Protocol):
         """
         ...
 
-    async def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         """Delete multiple key-value pairs from the specified collection.
 
         Args:
