@@ -1,5 +1,3 @@
-import contextlib
-import winreg
 from typing import TYPE_CHECKING
 
 import pytest
@@ -21,14 +19,9 @@ class TestWindowsRegistryStore(BaseStoreTests):
     def cleanup(self):
         from winreg import HKEY_CURRENT_USER
 
-        # Delete every key under the test registry path
-        with winreg.OpenKey(key=HKEY_CURRENT_USER, sub_key=TEST_REGISTRY_PATH) as reg_key:
-            index = 0
-            while True:
-                if key := winreg.EnumKey(reg_key, index):
-                    with contextlib.suppress(Exception):
-                        winreg.DeleteKey(HKEY_CURRENT_USER, key)
-                    index += 1
+        from key_value.aio.stores.windows_registry.utils import delete_sub_keys
+
+        delete_sub_keys(hive=HKEY_CURRENT_USER, sub_key=TEST_REGISTRY_PATH)
 
     @override
     @pytest.fixture
