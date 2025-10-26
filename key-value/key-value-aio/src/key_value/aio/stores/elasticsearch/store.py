@@ -1,3 +1,4 @@
+from datetime import datetime  # noqa: TC003
 from typing import TYPE_CHECKING, Any, overload
 
 from key_value.shared.utils.compound import compound_key
@@ -34,8 +35,6 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 if TYPE_CHECKING:
-    from datetime import datetime
-
     from elastic_transport import ObjectApiResponse
 
 DEFAULT_INDEX_PREFIX = "kv_store"
