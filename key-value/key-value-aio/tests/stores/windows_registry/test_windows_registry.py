@@ -1,4 +1,5 @@
 import contextlib
+import winreg
 from typing import TYPE_CHECKING
 
 import pytest
@@ -18,10 +19,16 @@ TEST_REGISTRY_PATH = "software\\py-key-value-test"
 @pytest.mark.skipif(condition=not detect_on_windows(), reason="WindowsRegistryStore is only available on Windows")
 class TestWindowsRegistryStore(BaseStoreTests):
     def cleanup(self):
-        from winreg import HKEY_CURRENT_USER, DeleteKey
+        from winreg import HKEY_CURRENT_USER
 
-        with contextlib.suppress(Exception):
-            DeleteKey(HKEY_CURRENT_USER, TEST_REGISTRY_PATH)
+        # Delete every key under the test registry path
+        with winreg.OpenKey(key=HKEY_CURRENT_USER, sub_key=TEST_REGISTRY_PATH) as reg_key:
+            index = 0
+            while True:
+                if key := winreg.EnumKey(reg_key, index):
+                    with contextlib.suppress(Exception):
+                        winreg.DeleteKey(HKEY_CURRENT_USER, key)
+                    index += 1
 
     @override
     @pytest.fixture
