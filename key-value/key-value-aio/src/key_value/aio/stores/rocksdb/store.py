@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
 from typing import Any, overload
 
@@ -128,7 +129,16 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         self._db[combo_key] = json_value.encode("utf-8")
 
     @override
-    async def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    async def _put_managed_entries(
+        self,
+        *,
+        collection: str,
+        keys: Sequence[str],
+        managed_entries: Sequence[ManagedEntry],
+        ttl: float | None,
+        created_at: datetime,
+        expires_at: datetime | None,
+    ) -> None:
         self._fail_on_closed_store()
 
         if not keys:

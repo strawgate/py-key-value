@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, overload
 
 from key_value.shared.utils.compound import compound_key
@@ -35,8 +36,6 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 if TYPE_CHECKING:
-    from datetime import datetime
-
     from elastic_transport import ObjectApiResponse
 
 DEFAULT_INDEX_PREFIX = "kv_store"
@@ -267,15 +266,22 @@ class ElasticsearchStore(
         )
 
     @override
-    async def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    async def _put_managed_entries(
+        self,
+        *,
+        collection: str,
+        keys: Sequence[str],
+        managed_entries: Sequence[ManagedEntry],
+        ttl: float | None,
+        created_at: datetime,
+        expires_at: datetime | None,
+    ) -> None:
         if not keys:
             return
 
-        # All entries in a batch have the same timestamps (from BaseStore.put_many)
-        # Extract timestamps once from the first entry
-        first_entry = managed_entries[0]
-        created_at_iso: str | None = first_entry.created_at.isoformat() if first_entry.created_at else None
-        expires_at_iso: str | None = first_entry.expires_at.isoformat() if first_entry.expires_at else None
+        # Convert timestamps to ISO format for Elasticsearch
+        created_at_iso: str = created_at.isoformat()
+        expires_at_iso: str | None = expires_at.isoformat() if expires_at else None
 
         # Use bulk API for efficient batch indexing
         operations: list[dict[str, Any]] = []
@@ -286,10 +292,9 @@ class ElasticsearchStore(
                 "collection": collection,
                 "key": key,
                 "value": managed_entry.to_json(include_metadata=False),
+                "created_at": created_at_iso,
             }
 
-            if created_at_iso:
-                document["created_at"] = created_at_iso
             if expires_at_iso:
                 document["expires_at"] = expires_at_iso
 

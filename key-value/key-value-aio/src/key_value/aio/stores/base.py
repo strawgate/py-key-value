@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from asyncio.locks import Lock
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from datetime import datetime, timedelta
 from types import MappingProxyType, TracebackType
 from typing import Any, SupportsFloat
 
@@ -206,9 +207,26 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         """Store a managed entry by key in the specified collection."""
         ...
 
-    async def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
-        """Store multiple managed entries by key in the specified collection."""
+    async def _put_managed_entries(
+        self,
+        *,
+        collection: str,
+        keys: Sequence[str],
+        managed_entries: Sequence[ManagedEntry],
+        ttl: float | None,  # noqa: ARG002
+        created_at: datetime,  # noqa: ARG002
+        expires_at: datetime | None,  # noqa: ARG002
+    ) -> None:
+        """Store multiple managed entries by key in the specified collection.
 
+        Args:
+            collection: The collection to store entries in
+            keys: The keys for the entries
+            managed_entries: The managed entries to store
+            ttl: The TTL in seconds (None for no expiration)
+            created_at: The creation timestamp for all entries
+            expires_at: The expiration timestamp for all entries (None if no TTL)
+        """
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             await self._put_managed_entry(
                 collection=collection,
@@ -261,9 +279,20 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         keys, values, ttl_for_entries = self._prepare_put_many(keys=keys, values=values, ttl=ttl)
 
-        managed_entries: list[ManagedEntry] = [ManagedEntry(value=value, ttl=ttl_for_entries, created_at=now()) for value in values]
+        # Pre-calculate timestamps once for all entries
+        created_at = now()
+        expires_at = created_at + timedelta(seconds=ttl_for_entries) if ttl_for_entries is not None else None
 
-        await self._put_managed_entries(collection=collection, keys=keys, managed_entries=managed_entries)
+        managed_entries: list[ManagedEntry] = [ManagedEntry(value=value, ttl=ttl_for_entries, created_at=created_at) for value in values]
+
+        await self._put_managed_entries(
+            collection=collection,
+            keys=keys,
+            managed_entries=managed_entries,
+            ttl=ttl_for_entries,
+            created_at=created_at,
+            expires_at=expires_at,
+        )
 
     @abstractmethod
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:

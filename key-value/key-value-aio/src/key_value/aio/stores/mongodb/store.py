@@ -203,17 +203,24 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         )
 
     @override
-    async def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    async def _put_managed_entries(
+        self,
+        *,
+        collection: str,
+        keys: Sequence[str],
+        managed_entries: Sequence[ManagedEntry],
+        ttl: float | None,
+        created_at: datetime,
+        expires_at: datetime | None,
+    ) -> None:
         if not keys:
             return
 
         collection = self._sanitize_collection_name(collection=collection)
 
-        # All entries in a batch have the same timestamps (from BaseStore.put_many)
-        # Extract timestamps once from the first entry
-        first_entry = managed_entries[0]
-        created_at_iso: str | None = first_entry.created_at.isoformat() if first_entry.created_at else None
-        expires_at_iso: str | None = first_entry.expires_at.isoformat() if first_entry.expires_at else None
+        # Convert timestamps to ISO format for MongoDB
+        created_at_iso: str = created_at.isoformat()
+        expires_at_iso: str | None = expires_at.isoformat() if expires_at else None
         updated_at_iso: str = now().isoformat()
 
         # Use bulk_write for efficient batch operations

@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any, overload
 from urllib.parse import urlparse
 
@@ -134,17 +135,24 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             _ = await self._client.set(name=combo_key, value=json_value)  # pyright: ignore[reportAny]
 
     @override
-    async def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    async def _put_managed_entries(
+        self,
+        *,
+        collection: str,
+        keys: Sequence[str],
+        managed_entries: Sequence[ManagedEntry],
+        ttl: float | None,
+        created_at: datetime,
+        expires_at: datetime | None,
+    ) -> None:
         if not keys:
             return
 
-        # All entries in a batch have the same TTL (from BaseStore.put_many)
-        # Extract TTL once from the first entry
-        first_entry = managed_entries[0]
+        # Convert TTL to integer seconds for Redis
         ttl_seconds: int | None = None
-        if first_entry.ttl is not None:
+        if ttl is not None:
             # Redis does not support <= 0 TTLs
-            ttl_seconds = max(int(first_entry.ttl), 1)
+            ttl_seconds = max(int(ttl), 1)
 
         # Use pipeline for bulk operations
         pipeline = self._client.pipeline()
