@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, overload
 
-from elastic_transport import ObjectApiResponse
+from elastic_transport import ObjectApiResponse  # noqa: TC002
 from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json
 from key_value.shared.utils.sanitize import (
     ALPHANUMERIC_CHARACTERS,
