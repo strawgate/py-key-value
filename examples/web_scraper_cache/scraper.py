@@ -54,7 +54,9 @@ class WebScraperCache:
         # Generate or use provided encryption key
         if encryption_key is None:
             encryption_key = Fernet.generate_key()
-            logger.warning(f"Generated new encryption key: {encryption_key.decode()}")
+            # Generate a safe fingerprint for identification (never log the actual key!)
+            key_fingerprint = hashlib.sha256(encryption_key).hexdigest()[:16]
+            logger.warning(f"Generated new encryption key (fingerprint: {key_fingerprint})")
             logger.warning("Store this key securely! Data encrypted with different keys cannot be decrypted.")
 
         self.encryption_key = encryption_key
@@ -199,7 +201,9 @@ async def main():
     """Demonstrate the web scraper cache."""
     # Generate a key for this demo (in production, load from secure storage)
     encryption_key = Fernet.generate_key()
-    print(f"Using encryption key: {encryption_key.decode()}\n")
+    # Only show fingerprint, never the actual key
+    key_fingerprint = hashlib.sha256(encryption_key).hexdigest()[:16]
+    print(f"Using encryption key (fingerprint: {key_fingerprint})\n")
 
     cache = WebScraperCache(cache_dir=".demo_scraper_cache", encryption_key=encryption_key)
 

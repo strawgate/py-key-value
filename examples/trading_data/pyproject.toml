@@ -5,7 +5,7 @@ description = "Trading data caching using py-key-value with compression and mult
 requires-python = ">=3.10"
 dependencies = [
     "py-key-value-aio>=0.2.8",
-    "pydantic>=2.0.0",
+    "pydantic>=2.0.0,<3.0.0",
 ]
 
 [project.optional-dependencies]
@@ -13,6 +13,9 @@ dev = [
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
 ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
 
 [build-system]
 requires = ["hatchling"]
