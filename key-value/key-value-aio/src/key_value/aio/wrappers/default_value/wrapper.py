@@ -45,43 +45,16 @@ class DefaultValueWrapper(BaseWrapper):
 
     @override
     async def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
-        """Get a value by key, returning the default value if not found.
-
-        Args:
-            key: The key to retrieve.
-            collection: The collection to use.
-
-        Returns:
-            The value associated with the key, or the default value if not found.
-        """
         result = await self.key_value.get(key=key, collection=collection)
         return result if result is not None else self._new_default_value()
 
     @override
     async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
-        """Get multiple values by keys, returning the default value for missing keys.
-
-        Args:
-            keys: The keys to retrieve.
-            collection: The collection to use.
-
-        Returns:
-            A list of values, with default values for missing keys.
-        """
         results = await self.key_value.get_many(keys=keys, collection=collection)
         return [result if result is not None else self._new_default_value() for result in results]
 
     @override
     async def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
-        """Get a value and its TTL, returning the default value if not found.
-
-        Args:
-            key: The key to retrieve.
-            collection: The collection to use.
-
-        Returns:
-            A tuple of (value, ttl), with default value and default TTL if not found.
-        """
         result, ttl_value = await self.key_value.ttl(key=key, collection=collection)
         if result is None:
             return (self._new_default_value(), self._default_ttl)
@@ -89,15 +62,6 @@ class DefaultValueWrapper(BaseWrapper):
 
     @override
     async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
-        """Get multiple values with TTLs, returning the default value for missing keys.
-
-        Args:
-            keys: The keys to retrieve.
-            collection: The collection to use.
-
-        Returns:
-            A list of (value, ttl) tuples, with default values and default TTL for missing keys.
-        """
         results = await self.key_value.ttl_many(keys=keys, collection=collection)
         return [
             (result, ttl_value) if result is not None else (self._new_default_value(), self._default_ttl) for result, ttl_value in results
