@@ -134,7 +134,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         if managed_entry.is_expired:
             return None
 
-        return managed_entry.value
+        return dict(managed_entry.value)
 
     @override
     async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
@@ -142,7 +142,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         await self.setup_collection(collection=collection)
 
         entries = await self._get_managed_entries(keys=keys, collection=collection)
-        return [entry.value if entry and not entry.is_expired else None for entry in entries]
+        return [dict(entry.value) if entry and not entry.is_expired else None for entry in entries]
 
     @override
     async def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
@@ -154,7 +154,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         if not managed_entry or managed_entry.is_expired:
             return (None, None)
 
-        return (managed_entry.value, managed_entry.ttl)
+        return (dict(managed_entry.value), managed_entry.ttl)
 
     @override
     async def ttl_many(
@@ -172,7 +172,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         await self.setup_collection(collection=collection)
 
         entries = await self._get_managed_entries(keys=keys, collection=collection)
-        return [(entry.value, entry.ttl) if entry and not entry.is_expired else (None, None) for entry in entries]
+        return [(dict(entry.value), entry.ttl) if entry and not entry.is_expired else (None, None) for entry in entries]
 
     @abstractmethod
     async def _put_managed_entry(self, *, collection: str, key: str, managed_entry: ManagedEntry) -> None:

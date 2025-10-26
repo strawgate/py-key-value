@@ -62,7 +62,7 @@ class LoggingWrapper(BaseWrapper):
         action: str,
         keys: list[str] | str,
         collection: str | None,
-        values: dict[str, Any] | Sequence[dict[str, Any]] | None = None,
+        values: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None = None,
         extra: dict[str, Any] | None = None,
     ) -> str:
         if self.structured_logs:
@@ -90,7 +90,7 @@ class LoggingWrapper(BaseWrapper):
         action: str,
         keys: list[str] | str,
         collection: str | None,
-        values: dict[str, Any] | Sequence[dict[str, Any]] | None = None,
+        values: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None = None,
         extra: dict[str, Any] | None = None,
     ) -> None:
         self.logger.log(

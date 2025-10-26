@@ -54,7 +54,7 @@ class ManagedEntry:
             if include_expiration and self.expires_at:
                 data["expires_at"] = self.expires_at.isoformat()
         else:
-            data = self.value
+            data = dict(self.value)
 
         return dump_to_json(obj=data)
 
