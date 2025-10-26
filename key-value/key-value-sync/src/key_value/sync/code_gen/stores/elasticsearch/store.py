@@ -3,8 +3,9 @@
 # DO NOT CHANGE! Change the original file instead.
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, overload
+from typing import Any, overload
 
+from elastic_transport import ObjectApiResponse  # noqa: TC002
 from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, LOWERCASE_ALPHABET, NUMBERS, sanitize_string
 from key_value.shared.utils.time_to_live import now_as_epoch, try_parse_datetime_str
@@ -33,9 +34,6 @@ try:
 except ImportError as e:
     msg = "ElasticsearchStore requires py-key-value-aio[elasticsearch]"
     raise ImportError(msg) from e
-
-if TYPE_CHECKING:
-    from elastic_transport import ObjectApiResponse
 
 DEFAULT_INDEX_PREFIX = "kv_store"
 

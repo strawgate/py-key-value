@@ -1,7 +1,8 @@
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, overload
+from typing import Any, overload
 
+from elastic_transport import ObjectApiResponse
 from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json
 from key_value.shared.utils.sanitize import (
     ALPHANUMERIC_CHARACTERS,
@@ -35,8 +36,6 @@ except ImportError as e:
     msg = "ElasticsearchStore requires py-key-value-aio[elasticsearch]"
     raise ImportError(msg) from e
 
-if TYPE_CHECKING:
-    from elastic_transport import ObjectApiResponse
 
 DEFAULT_INDEX_PREFIX = "kv_store"
 
