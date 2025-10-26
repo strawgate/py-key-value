@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, TypedDict, overload
+from typing import Any, cast, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
@@ -31,13 +31,6 @@ PAGE_LIMIT = 10000
 # So limit the collection name to 200 bytes
 MAX_COLLECTION_LENGTH = 200
 COLLECTION_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
-
-
-class MongoDBStoreDocument(TypedDict):
-    value: dict[str, Any]
-
-    created_at: datetime | None
-    expires_at: datetime | None
 
 
 class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
@@ -167,11 +160,15 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         """Validate that the collection indexes match the configured storage mode."""
         try:
             coll = self._collections_by_name[collection]
-            indexes = await coll.list_indexes().to_list(length=None)
+            # The type checker has trouble with pymongo types, so we use type: ignore
+            indexes: list[dict[str, Any]] = await coll.list_indexes().to_list(length=None)  # type: ignore[attr-defined]
 
             # Check for TTL index on expires_at
-            has_ttl_index = any(
-                idx.get("key", {}).get("expires_at") is not None and idx.get("expireAfterSeconds") is not None for idx in indexes
+            # Type checker has trouble with the structure here, but it's runtime safe
+            has_ttl_index: bool = any(
+                cast("dict[str, Any]", idx.get("key", {})).get("expires_at") is not None  # type: ignore[union-attr]
+                and idx.get("expireAfterSeconds") is not None  # type: ignore[union-attr]
+                for idx in indexes  # type: ignore[misc]
             )
 
             if self._native_storage and not has_ttl_index:
@@ -217,18 +214,19 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
                 )
                 raise TypeError(msg)
 
-            # Parse datetime objects directly and validate types
+            # Parse datetime objects directly
             created_at: datetime | None = doc.get("created_at")
             expires_at: datetime | None = doc.get("expires_at")
 
             # Validate datetime types to detect storage mode mismatches
-            if created_at is not None and not isinstance(created_at, datetime):
+            # Note: MongoDB returns datetime objects natively in BSON, but we check for safety
+            if created_at is not None and type(created_at) is not datetime:
                 msg = (
                     f"Data for key '{key}' has invalid created_at type: expected datetime but got {type(created_at).__name__}. "
                     f"This may indicate a storage mode mismatch."
                 )
                 raise TypeError(msg)
-            if expires_at is not None and not isinstance(expires_at, datetime):
+            if expires_at is not None and type(expires_at) is not datetime:
                 msg = (
                     f"Data for key '{key}' has invalid expires_at type: expected datetime but got {type(expires_at).__name__}. "
                     f"This may indicate a storage mode mismatch."
@@ -294,14 +292,14 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
             )
         else:
             # JSON string mode: Store value as JSON string
-            set_fields: dict[str, Any] = {
+            json_set_fields: dict[str, Any] = {
                 "value": managed_entry.to_json(),  # Store as JSON string
                 "updated_at": now(),
             }
 
             _ = await self._collections_by_name[collection].update_one(
                 filter={"key": key},
-                update={"$set": set_fields},
+                update={"$set": json_set_fields},
                 upsert=True,
             )
 

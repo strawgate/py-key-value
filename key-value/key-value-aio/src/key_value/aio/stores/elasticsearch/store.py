@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Any, overload
+import logging
+from typing import TYPE_CHECKING, Any, cast, overload
 
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
@@ -199,9 +200,9 @@ class ElasticsearchStore(
             raise
         except Exception:
             # Log a warning but do not fail hard (keep behavior)
-            import logging
-
-            logging.getLogger(__name__).warning("Failed to validate mapping for index '%s' (collection '%s')", index_name, collection)
+            logging.getLogger(__name__).warning(
+                "Failed to validate mapping for index '%s' (collection '%s')", index_name, collection, exc_info=True
+            )
 
     def _sanitize_index_name(self, collection: str) -> str:
         return sanitize_string(
@@ -250,11 +251,14 @@ class ElasticsearchStore(
             if not isinstance(value, dict):
                 return None
 
+            # Cast to the correct type for ManagedEntry (value is guaranteed to be dict here)
+            value_dict = cast("dict[str, Any]", value)
+
             created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
             expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
 
             return ManagedEntry(
-                value=value,
+                value=value_dict,
                 created_at=created_at,
                 expires_at=expires_at,
             )
@@ -289,9 +293,10 @@ class ElasticsearchStore(
     ) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
+        document: dict[str, Any]
         if self._native_storage:
             # Native storage mode: Store value as flattened object
-            document: dict[str, Any] = {
+            document = {
                 "collection": collection,
                 "key": key,
                 "value": managed_entry.value,  # Store as flattened object
@@ -301,16 +306,9 @@ class ElasticsearchStore(
                 document["created_at"] = managed_entry.created_at.isoformat()
             if managed_entry.expires_at:
                 document["expires_at"] = managed_entry.expires_at.isoformat()
-
-            _ = await self._client.index(
-                index=self._sanitize_index_name(collection=collection),
-                id=self._sanitize_document_id(key=combo_key),
-                body=document,
-                refresh=self._should_refresh_on_put,
-            )
         else:
             # JSON string mode: Store value as JSON string
-            document: dict[str, Any] = {
+            document = {
                 "collection": collection,
                 "key": key,
                 "value": managed_entry.to_json(),  # Store as JSON string
@@ -322,12 +320,12 @@ class ElasticsearchStore(
             if managed_entry.expires_at:
                 document["expires_at"] = managed_entry.expires_at.isoformat()
 
-            _ = await self._client.index(
-                index=self._sanitize_index_name(collection=collection),
-                id=self._sanitize_document_id(key=combo_key),
-                body=document,
-                refresh=self._should_refresh_on_put,
-            )
+        _ = await self._client.index(
+            index=self._sanitize_index_name(collection=collection),
+            id=self._sanitize_document_id(key=combo_key),
+            body=document,
+            refresh=self._should_refresh_on_put,
+        )
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
