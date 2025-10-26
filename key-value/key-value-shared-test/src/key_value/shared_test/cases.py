@@ -175,7 +175,7 @@ NEGATIVE_FLOAT_CASES: NegativeCases = NegativeCases(
 
 STRING_CASES: PositiveCases = PositiveCases(
     Case(name="string", data={"string_key": "string_value"}, json='{"string_key": "string_value"}'),
-    Case(name="large-value", data={"large_string_key": "a" * 2048}, json=f'{{"large_string_key": "{"a" * 10000}"}}'),
+    Case(name="large-value", data={"large_string_key": "a" * 2048}, json=f'{{"large_string_key": "{"a" * 2048}"}}'),
     Case(
         name="unicode",
         data={"unicode_key": "Hello 世界 🌍 émojis"},
