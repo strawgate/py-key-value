@@ -119,10 +119,6 @@ If you are using py-key-value-aio for caching, stability may not be a concern fo
 you. If you are using py-key-value-aio for long-term storage, stability is a
 concern and you should consider using a stable store.
 
-A ✅ means a store is available, a ☑️ under async means a store is available
-but the underlying implementation is synchronous. A ✖️ means a store is not
-available.
-
 #### Local stores
 
 Local stores are stored in memory or on disk, local to the application.
