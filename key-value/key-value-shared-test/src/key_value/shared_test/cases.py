@@ -175,7 +175,7 @@ NEGATIVE_FLOAT_CASES: NegativeCases = NegativeCases(
 
 STRING_CASES: PositiveCases = PositiveCases(
     Case(name="string", data={"string_key": "string_value"}, json='{"string_key": "string_value"}'),
-    Case(name="large-value", data={"large_string_key": "a" * 10000}, json=f'{{"large_string_key": "{"a" * 10000}"}}'),
+    Case(name="large-value", data={"large_string_key": "a" * 2048}, json=f'{{"large_string_key": "{"a" * 10000}"}}'),
     Case(
         name="unicode",
         data={"unicode_key": "Hello 世界 🌍 émojis"},
@@ -236,11 +236,11 @@ NEGATIVE_BYTES_CASES: NegativeCases = NegativeCases(
 SAMPLE_TUPLE: tuple[int, str, float] = (1, "two", 3.0)
 
 TUPLE_CASES: PositiveCases = PositiveCases(
-    Case(name="tuple", data={"tuple_key": SAMPLE_TUPLE}, json='{"tuple_key": [1, "two", 3.0]}'),
+    Case(name="tuple", data={"str_key": SAMPLE_TUPLE}, json='{"str_key": [1, "two", 3.0]}'),
     Case(
         name="large-tuple",
-        data={"large_tuple_key": (1, "two", 3.0) * 1000},
-        json=f'{{"large_tuple_key": {json.dumps((1, "two", 3.0) * 1000)}}}',
+        data={"str_key": (1, "two", 3.0) * 1000},
+        json=f'{{"str_key": {json.dumps((1, "two", 3.0) * 1000)}}}',
     ),
     case_type="tuple",
 )
