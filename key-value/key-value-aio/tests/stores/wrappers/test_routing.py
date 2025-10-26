@@ -63,7 +63,7 @@ class TestRoutingWrapper:
     async def test_routing_no_default_raises_error(self):
         """Test that ValueError is raised when no store is found and no default."""
 
-        def route(collection: str | None) -> AsyncKeyValue | None:  # noqa: ARG001
+        def route(collection: str | None) -> AsyncKeyValue | None:
             return None
 
         wrapper = RoutingWrapper(routing_function=route)
@@ -76,7 +76,7 @@ class TestRoutingWrapper:
         """Test get_many operation routes correctly."""
         store1 = MemoryStore()
 
-        def route(collection: str | None) -> AsyncKeyValue | None:  # noqa: ARG001
+        def route(collection: str | None) -> AsyncKeyValue | None:
             return store1
 
         wrapper = RoutingWrapper(routing_function=route)
@@ -96,7 +96,7 @@ class TestRoutingWrapper:
         """Test delete operations route correctly."""
         store1 = MemoryStore()
 
-        def route(collection: str | None) -> AsyncKeyValue | None:  # noqa: ARG001
+        def route(collection: str | None) -> AsyncKeyValue | None:
             return store1
 
         wrapper = RoutingWrapper(routing_function=route)
@@ -124,7 +124,7 @@ class TestRoutingWrapper:
         """Test TTL operations route correctly."""
         store1 = MemoryStore()
 
-        def route(collection: str | None) -> AsyncKeyValue | None:  # noqa: ARG001
+        def route(collection: str | None) -> AsyncKeyValue | None:
             return store1
 
         wrapper = RoutingWrapper(routing_function=route)
@@ -143,7 +143,7 @@ class TestRoutingWrapper:
             keys=["key2", "key3"],
             values=[{"data": "v2"}, {"data": "v3"}],
             collection="test",
-            ttl=[3600, 7200],
+            ttl=3600,
         )
 
         # TTL many

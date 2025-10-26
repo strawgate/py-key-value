@@ -73,7 +73,7 @@ class RoutingWrapper(BaseWrapper):
         return await store.get(key=key, collection=collection)
 
     @override
-    async def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         store = self._get_store(collection)
         return await store.get_many(keys=keys, collection=collection)
 
@@ -83,7 +83,7 @@ class RoutingWrapper(BaseWrapper):
         return await store.ttl(key=key, collection=collection)
 
     @override
-    async def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         store = self._get_store(collection)
         return await store.ttl_many(keys=keys, collection=collection)
 
@@ -95,11 +95,11 @@ class RoutingWrapper(BaseWrapper):
     @override
     async def put_many(
         self,
-        keys: list[str],
+        keys: Sequence[str],
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         store = self._get_store(collection)
         return await store.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
@@ -110,6 +110,6 @@ class RoutingWrapper(BaseWrapper):
         return await store.delete(key=key, collection=collection)
 
     @override
-    async def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         store = self._get_store(collection)
         return await store.delete_many(keys=keys, collection=collection)
