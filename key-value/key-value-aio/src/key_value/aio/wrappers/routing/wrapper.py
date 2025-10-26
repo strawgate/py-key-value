@@ -14,7 +14,7 @@ class RoutingWrapper(BaseWrapper):
 
     The routing function receives the collection name and returns the appropriate store.
     This allows dynamic routing of requests to different backing stores based on
-    collection name, key patterns, or any other custom logic.
+    collection name or other custom logic.
 
     Example:
         def route_by_collection(collection: str | None) -> AsyncKeyValue | None:

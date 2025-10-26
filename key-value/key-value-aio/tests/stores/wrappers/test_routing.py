@@ -151,6 +151,10 @@ class TestRoutingWrapper:
         assert len(results) == 2
         assert results[0][0] == {"data": "v2"}
         assert results[1][0] == {"data": "v3"}
+        assert results[0][1] is not None
+        assert results[0][1] > 0
+        assert results[1][1] is not None
+        assert results[1][1] > 0
 
 
 class TestCollectionRoutingWrapper:
