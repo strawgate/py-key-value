@@ -1,4 +1,3 @@
-import asyncio
 import hashlib
 from collections.abc import Sequence
 from typing import overload
@@ -115,32 +114,9 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
             exptime=exptime,
         )
 
-    @override
-    async def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
-        if not keys:
-            return
-
-        # All entries in a batch have the same TTL (from BaseStore.put_many)
-        # Extract TTL once from the first entry
-        first_entry = managed_entries[0]
-        exptime: int
-        if first_entry.ttl is None:  # noqa: SIM108
-            exptime = 0
-        else:
-            exptime = max(int(first_entry.ttl), 1)
-
-        # aiomcache doesn't have a native multi_set, so we use concurrent individual sets
-        async def put_single(key: str, managed_entry: ManagedEntry) -> None:
-            combo_key: str = self.sanitize_key(compound_key(collection=collection, key=key))
-            json_value: str = managed_entry.to_json()
-
-            _ = await self._client.set(
-                key=combo_key.encode(encoding="utf-8"),
-                value=json_value.encode(encoding="utf-8"),
-                exptime=exptime,
-            )
-
-        await asyncio.gather(*(put_single(key, entry) for key, entry in zip(keys, managed_entries, strict=True)))
+    # Note: aiomcache doesn't have a native multi_set API
+    # The base implementation's loop is equivalent to what we would do here
+    # so we use the default BaseStore implementation
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:

@@ -129,6 +129,10 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
 
         _ = await self._client.set(key=combo_key, value=json_value, expiry=expiry)
 
+    # Note: Valkey doesn't have a true bulk write API with per-key TTL support
+    # The base implementation's loop is equivalent to what we would do here
+    # so we use the default BaseStore implementation
+
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
