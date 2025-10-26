@@ -61,6 +61,8 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
             self._client_config = GlideClientConfiguration(addresses=addresses, database_id=db, credentials=credentials)
             self._connected_client = None
 
+        self._stable_api = True
+
         super().__init__(default_collection=default_collection)
 
     @override

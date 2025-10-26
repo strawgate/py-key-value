@@ -63,6 +63,12 @@ class BaseStore(KeyValueProtocol, ABC):
 
         self.default_collection = default_collection or DEFAULT_COLLECTION_NAME
 
+        if not hasattr(self, "_stable_api"):
+            self._stable_api = False
+
+        if not self._stable_api:
+            self._warn_about_stability()
+
         super().__init__()
 
     def _setup(self) -> None:
@@ -253,6 +259,16 @@ class BaseStore(KeyValueProtocol, ABC):
         self.setup_collection(collection=collection)
 
         return self._delete_managed_entries(keys=keys, collection=collection)
+
+    def _warn_about_stability(self) -> None:
+        """Warn about the stability of the store."""
+        from warnings import warn
+
+        warn(
+            message="A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.",
+            category=UserWarning,
+            stacklevel=2,
+        )
 
 
 class BaseEnumerateKeysStore(BaseStore, EnumerateKeysProtocol, ABC):

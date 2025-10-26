@@ -19,8 +19,6 @@ except ImportError as e:
     msg = "DiskStore requires py-key-value-aio[disk]"
     raise ImportError(msg) from e
 
-DEFAULT_DISK_STORE_SIZE_LIMIT = 1 * 1024 * 1024 * 1024  # 1GB
-
 CacheFactory = Callable[[str], Cache]
 
 
@@ -31,8 +29,9 @@ def _sanitize_collection_for_filesystem(collection: str) -> str:
 
 
 class MultiDiskStore(BaseContextManagerStore, BaseStore):
-    """A disk-based store that uses the diskcache library to store data. The MultiDiskStore creates one diskcache Cache
-    instance per collection."""
+    """A disk-based store that uses the diskcache library to store data. The MultiDiskStore by default creates
+    one diskcache Cache instance per collection created by the caller but a custom factory function can be provided
+    to tightly control the creation of the diskcache Cache instances."""
 
     _cache: dict[str, Cache]
 
@@ -40,11 +39,11 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
 
     _base_directory: Path
 
-    _max_size: int | None
-
     @overload
     def __init__(self, *, disk_cache_factory: CacheFactory, default_collection: str | None = None) -> None:
-        """Initialize the disk caches.
+        """Initialize a multi-disk store with a custom factory function. The function will be called for each
+        collection created by the caller with the collection name as the argument. Use this to tightly
+        control the creation of the diskcache Cache instances.
 
         Args:
             disk_cache_factory: A factory function that creates a diskcache Cache instance for a given collection.
@@ -53,11 +52,11 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
 
     @overload
     def __init__(self, *, base_directory: Path, max_size: int | None = None, default_collection: str | None = None) -> None:
-        """Initialize the disk caches.
+        """Initialize a multi-disk store that creates one diskcache Cache instance per collection created by the caller.
 
         Args:
             base_directory: The directory to use for the disk caches.
-            max_size: The maximum size of the disk caches. Defaults to 1GB.
+            max_size: The maximum size of the disk caches.
             default_collection: The default collection to use if no collection is provided.
         """
 
@@ -74,7 +73,7 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
         Args:
             disk_cache_factory: A factory function that creates a diskcache Cache instance for a given collection.
             base_directory: The directory to use for the disk caches.
-            max_size: The maximum size of the disk caches. Defaults to 1GB.
+            max_size: The maximum size of the disk caches.
             default_collection: The default collection to use if no collection is provided.
         """
         if disk_cache_factory is None and base_directory is None:
@@ -84,22 +83,26 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
         if base_directory is None:
             base_directory = Path.cwd()
 
-        self._max_size = max_size
-
         self._base_directory = base_directory.resolve()
 
         def default_disk_cache_factory(collection: str) -> Cache:
+            """Create a default disk cache factory that creates a diskcache Cache instance for a given collection."""
             sanitized_collection: str = _sanitize_collection_for_filesystem(collection=collection)
 
             cache_directory: Path = self._base_directory / sanitized_collection
 
             cache_directory.mkdir(parents=True, exist_ok=True)
 
-            return Cache(directory=cache_directory, size_limit=self._max_size or DEFAULT_DISK_STORE_SIZE_LIMIT)
+            if max_size is not None and max_size > 0:
+                return Cache(directory=cache_directory, size_limit=max_size)
+
+            return Cache(directory=cache_directory, eviction_policy="none")
 
         self._disk_cache_factory = disk_cache_factory or default_disk_cache_factory
 
         self._cache = {}
+
+        self._stable_api = True
 
         super().__init__(default_collection=default_collection)
 

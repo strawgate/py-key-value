@@ -105,32 +105,43 @@ ttl_many(keys: list[str], collection: str | None = None) -> list[tuple[dict[str,
 The library provides a variety of stores that implement the protocol.
 
 A ✅ means a store is available, a ☑️ under async means a store is available
-but the underlying implementation is synchronous. A ✖️ means a store is not
-available.
+but the underlying implementation is synchronous. A ✖️ means a store is
+not available.
+
+Stability is a measure of the likelihood that the way data is stored will change
+in a backwards incompatible way.
+
+- A stable store is one we do not intend to change in a backwards incompatible way.
+- A preview store is one that is unlikely to change in a backwards incompatible way.
+- An unstable store is one that is likely to change in a backwards incompatible way.
+
+If you are using py-key-value-aio for caching, stability may not be a concern for
+you. If you are using py-key-value-aio for long-term storage, stability is a
+concern and you should consider using a stable store.
 
 #### Local stores
 
 Local stores are stored in memory or on disk, local to the application.
 
-| Local Stores     | Async | Sync | Example |
-|------------------|:-----:|:----:|:-------|
-| Memory           |  ✅  |  ✅  | `MemoryStore()` |
-| Disk             |  ☑️  |  ✅  | `DiskStore(directory="./cache")` |
-| Disk (Per-Collection) |  ☑️  |  ✅  | `MultiDiskStore(directory="./cache")` |
-| Null (test)      |  ✅  |  ✅  | `NullStore()` |
-| RocksDB          |  ☑️  |  ✅  | `RocksDBStore(path="./rocksdb")` |
-| Simple (test)    |  ✅  |  ✅  | `SimpleStore()` |
-| Windows Registry |  ☑️  |   ✅   | `WindowsRegistryStore(hive="HKEY_CURRENT_USER", registry_path="Software\\py-key-value")` |
+| Local Stores     | Stability | Async | Sync | Example |
+|------------------|:---------:|:-----:|:----:|:-------|
+| Memory           | N/A | ✅  |  ✅  | `MemoryStore()` |
+| Disk             | Stable | ☑️  |  ✅  | `DiskStore(directory="./cache")` |
+| Disk (Per-Collection) | Stable | ☑️  |  ✅  | `MultiDiskStore(directory="./cache")` |
+| Null (test)      | N/A | ✅  |  ✅  | `NullStore()` |
+| RocksDB          | Unstable | ☑️  |  ✅  | `RocksDBStore(path="./rocksdb")` |
+| Simple (test)    | N/A | ✅  |  ✅  | `SimpleStore()` |
+| Windows Registry | Unstable | ☑️  |   ✅   | `WindowsRegistryStore(hive="HKEY_CURRENT_USER", registry_path="Software\\py-key-value")` |
 
 #### Local - Secret stores
 
 Secret stores are stores that are used to store sensitive data, typically in
 an Operating System's secret store.
 
-| Secret Stores | Async | Sync | Example |
-|------------------|:-----:|:----:|:-------|
-| Keyring          |  ☑️  |   ✅   | `KeyringStore(service_name="py-key-value")` |
-| Vault            |  ☑️  |   ✅   | `VaultStore(url="http://localhost:8200", token="your-token")` |
+| Secret Stores | Stability | Async | Sync | Example |
+|---------------|:---------:|:-----:|:----:|:-------|
+| Keyring       | Stable    | ✅  |   ✅   | `KeyringStore(service_name="py-key-value")` |
+| Vault         | Unstable  | ✅  |   ✅   | `VaultStore(url="http://localhost:8200", token="your-token")` |
 
 Note: The Windows Keyring has strict limits on the length of values which may
 cause issues with large values.
@@ -140,14 +151,14 @@ cause issues with large values.
 Distributed stores are stores that are used to store data in a distributed
 system, for access across multiple application nodes.
 
-| Distributed Stores | Async | Sync | Example |
-|------------------|:-----:|:----:|:-------|
-| DynamoDB         |  ✅  |  ✖️   | `DynamoDBStore(table_name="kv-store", region_name="us-east-1")` |
-| Elasticsearch    |  ✅  |  ✅  | `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key", index="kv-store")` |
-| Memcached        |  ✅  |  ✖️   | `MemcachedStore(host="127.0.0.1", port=11211")` |
-| MongoDB          |  ✅  |  ✅  | `MongoDBStore(url="mongodb://localhost:27017/test")` |
-| Redis            |  ✅  |  ✅  | `RedisStore(url="redis://localhost:6379/0")` |
-| Valkey           |  ✅  |  ✅  | `ValkeyStore(host="localhost", port=6379)` |
+| Distributed Stores | Stability | Async | Sync | Example |
+|------------------|:---------:|:-----:|:----:|:-------|
+| DynamoDB         | Unstable | ✅  |  ✖️   | `DynamoDBStore(table_name="kv-store", region_name="us-east-1")` |
+| Elasticsearch    | Unstable | ✅  |  ✅  | `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key", index="kv-store")` |
+| Memcached        | Unstable | ✅  |  ✖️   | `MemcachedStore(host="127.0.0.1", port=11211")` |
+| MongoDB          | Unstable | ✅  |  ✅  | `MongoDBStore(url="mongodb://localhost:27017/test")` |
+| Redis            | Stable | ✅  |  ✅  | `RedisStore(url="redis://localhost:6379/0")` |
+| Valkey           | Stable | ✅  |  ✅  | `ValkeyStore(host="localhost", port=6379)` |
 
 ### Adapters
 
@@ -159,7 +170,7 @@ functionality. While your application will accept an instance that implements
 the protocol, your application code might be simplified by using an adapter.
 
 | Adapter | Description | Example |
-|---------|-------------|---------|
+|---------|:------------|:------------------|
 | PydanticAdapter | Type-safe storage/retrieval of Pydantic models with transparent serialization/deserialization. | `PydanticAdapter(key_value=memory_store, pydantic_model=User)` |
 | RaiseOnMissingAdapter | Optional raise-on-missing behavior for `get`, `get_many`, `ttl`, and `ttl_many`. | `RaiseOnMissingAdapter(key_value=memory_store)` |
 

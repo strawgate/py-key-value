@@ -50,7 +50,7 @@ jobs:
         working-directory: ${{ matrix.project }}
 
       - name: "Format"
-        run: uv run ruff format --check . 
+        run: uv run ruff format --check .
         working-directory: ${{ matrix.project }}
 
       - name: "Type Check"
@@ -66,7 +66,15 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10"]
-        platform: [ubuntu-latest, macos-latest, windows-latest]
+        platform:
+          [
+            ubuntu-22.04,
+            ubuntu-latest,
+            macos-14,
+            macos-latest,
+            windows-2022,
+            windows-latest,
+          ]
         project:
           - "key-value/key-value-aio"
           - "key-value/key-value-shared"
@@ -80,11 +88,19 @@ jobs:
       - name: "Install uv"
         uses: astral-sh/setup-uv@v6
 
-      - name: "Install"
+      - name: "Install latest dependencies"
         run: uv sync --locked --group dev --python ${{ matrix.python-version }}
         working-directory: ${{ matrix.project }}
 
-      - name: "Test"
+      - name: "Test with latest dependencies"
+        run: uv run pytest tests . -vv
+        working-directory: ${{ matrix.project }}
+
+      - name: "Install oldest dependencies"
+        run: uv sync --group dev --python ${{ matrix.python-version }} --resolution lowest-direct
+        working-directory: ${{ matrix.project }}
+
+      - name: "Test with oldest dependencies"
         run: uv run pytest tests . -vv
         working-directory: ${{ matrix.project }}
 
@@ -99,10 +115,10 @@ jobs:
     timeout-minutes: 20
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12", "3.13"]
         platform:
           [
-            #ubuntu-22.04,
+            ubuntu-22.04,
             ubuntu-latest,
             macos-14,
             macos-latest,
@@ -123,11 +139,19 @@ jobs:
       - name: "Install uv"
         uses: astral-sh/setup-uv@v6
 
-      - name: "Install"
+      - name: "Install latest dependencies"
         run: uv sync --locked --group dev --python ${{ matrix.python-version }}
         working-directory: ${{ matrix.project }}
 
-      - name: "Test"
+      - name: "Test with latest dependencies"
+        run: uv run pytest tests . -vv
+        working-directory: ${{ matrix.project }}
+
+      - name: "Install oldest dependencies"
+        run: uv sync --group dev --python ${{ matrix.python-version }} --resolution lowest-direct
+        working-directory: ${{ matrix.project }}
+
+      - name: "Test with oldest dependencies"
         run: uv run pytest tests . -vv
         working-directory: ${{ matrix.project }}
 

@@ -1,3 +1,4 @@
 # py-key-value-aio
 
-See the root [README.md](../../README.md) for more information.
+See the [README.md for the project on GitHub](https://github.com/strawgate/py-key-value)
+for more information.
