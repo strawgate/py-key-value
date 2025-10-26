@@ -46,9 +46,29 @@ class BaseStoreTests(ABC):
         assert ttl == (None, None)
 
     async def test_put_serialization_errors(self, store: BaseStore):
-        """Tests that the put method does not raise an exception when called on a new store."""
+        """Tests that the put method raises SerializationError for non-JSON-serializable Pydantic types."""
         with pytest.raises(SerializationError):
             await store.put(collection="test", key="test", value={"test": AnyHttpUrl("https://test.com")})
+
+    @pytest.mark.parametrize(
+        "name,value",
+        [
+            ("datetime", __import__("datetime").datetime.now(__import__("datetime").timezone.utc)),
+            ("date", __import__("datetime").date(2025, 1, 1)),
+            ("time", __import__("datetime").time(12, 0, 0)),
+            ("uuid", __import__("uuid").UUID("12345678-1234-5678-1234-567812345678")),
+            ("bytes", b"hello world"),
+            ("tuple", (1, 2, 3)),
+            ("set", {1, 2, 3}),
+            ("function", lambda x: x),
+            ("type", type("TestClass", (), {})),
+        ],
+        ids=["datetime", "date", "time", "uuid", "bytes", "tuple", "set", "function", "type"],
+    )
+    async def test_put_nonserializable_types(self, store: BaseStore, name: str, value: Any):  # pyright: ignore[reportUnusedParameter] # noqa: ARG002
+        """Tests that non-JSON-serializable Python types raise SerializationError."""
+        with pytest.raises(SerializationError):
+            await store.put(collection="test", key="test", value={"test": value})
 
     async def test_get_put_get(self, store: BaseStore):
         assert await store.get(collection="test", key="test") is None

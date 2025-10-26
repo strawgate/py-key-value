@@ -51,7 +51,8 @@ LIST_CASE_THREE: Case = Case(
     name="list-three", data={"list_key_1": [1, True, 3.0, "string"]}, json='{"list_key_1": [1, true, 3.0, "string"]}'
 )
 
-# Datetime cases (serialized as ISO format strings)
+# ISO format string cases (these test string handling, not datetime object handling)
+# Note: Actual datetime/date/time objects are tested in negative test cases (base.py)
 DATETIME_CASE: Case = Case(
     name="datetime",
     data={"datetime_key": FIXED_DATETIME.isoformat()},
@@ -68,14 +69,16 @@ TIME_CASE: Case = Case(
     json='{"time_key": "00:00:00"}',
 )
 
-# UUID case (serialized as string)
+# UUID string case (tests string handling, not UUID object handling)
+# Note: Actual UUID objects are tested in negative test cases (base.py)
 UUID_CASE: Case = Case(
     name="uuid",
     data={"uuid_key": str(FIXED_UUID)},
     json='{"uuid_key": "12345678-1234-5678-1234-567812345678"}',
 )
 
-# Bytes case (base64 encoded)
+# Base64-encoded string case (tests string handling, not bytes object handling)
+# Note: Actual bytes objects are tested in negative test cases (base.py)
 BYTES_VALUE = b"hello world"
 BYTES_CASE: Case = Case(
     name="bytes",
@@ -83,14 +86,16 @@ BYTES_CASE: Case = Case(
     json=f'{{"bytes_key": "{base64.b64encode(BYTES_VALUE).decode("ascii")}"}}',
 )
 
-# Tuple case (serializes as list in JSON)
+# List case (tests list handling, not tuple object handling)
+# Note: Actual tuple objects are tested in negative test cases (base.py)
 TUPLE_CASE: Case = Case(
     name="tuple",
     data={"tuple_key": [1, "two", 3.0]},
     json='{"tuple_key": [1, "two", 3.0]}',
 )
 
-# Set case (serializes as sorted list in JSON)
+# List case (tests list handling, not set object handling)
+# Note: Actual set objects are tested in negative test cases (base.py)
 SET_CASE: Case = Case(
     name="set",
     data={"set_key": [1, 2, 3]},
