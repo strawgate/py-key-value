@@ -1,13 +1,12 @@
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Any, TypedDict, overload
+from typing import Any, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
 from typing_extensions import Self, override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseStore
-from key_value.aio.stores.mongodb.utils import managed_entry_to_document
 
 try:
     from pymongo import AsyncMongoClient
@@ -34,11 +33,21 @@ MAX_COLLECTION_LENGTH = 200
 COLLECTION_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
 
 
-class MongoDBStoreDocument(TypedDict):
-    value: dict[str, Any]
+def document_to_managed_entry(document: dict[str, Any]) -> ManagedEntry:
+    """
+    Convert a MongoDB document to a ManagedEntry.
+    """
+    return ManagedEntry.from_dict(data=document, stringified_value=True)
 
-    created_at: datetime | None
-    expires_at: datetime | None
+
+def managed_entry_to_document(key: str, managed_entry: ManagedEntry) -> dict[str, Any]:
+    """
+    Convert a ManagedEntry to a MongoDB document.
+    """
+    return {
+        "key": key,
+        **managed_entry.to_dict(include_metadata=True, include_expiration=True, include_creation=True, stringify_value=True),
+    }
 
 
 class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
@@ -140,40 +149,30 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        doc: dict[str, Any] | None = await self._collections_by_name[collection].find_one(filter={"key": key})
+        if doc := await self._collections_by_name[sanitized_collection].find_one(filter={"key": key}):
+            return ManagedEntry.from_dict(data=doc, stringified_value=True)
 
-        if not doc:
-            return None
-
-        json_value: str | None = doc.get("value")
-
-        if not isinstance(json_value, str):
-            return None
-
-        return ManagedEntry.from_json(json_str=json_value)
+        return None
 
     @override
     async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
         if not keys:
             return []
 
-        collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection_name(collection=collection)
 
         # Use find with $in operator to get multiple documents at once
-        cursor = self._collections_by_name[collection].find(filter={"key": {"$in": keys}})
+        cursor = self._collections_by_name[sanitized_collection].find(filter={"key": {"$in": keys}})
 
-        docs_by_key: dict[str, ManagedEntry | None] = dict.fromkeys(keys)
+        managed_entries_by_key: dict[str, ManagedEntry | None] = dict.fromkeys(keys)
 
         async for doc in cursor:
-            doc_key = doc.get("key")
-            json_value = doc.get("value")
+            if key := doc.get("key"):
+                managed_entries_by_key[key] = document_to_managed_entry(document=doc)
 
-            if doc_key and isinstance(json_value, str):
-                docs_by_key[doc_key] = ManagedEntry.from_json(json_str=json_value)
-
-        return [docs_by_key[key] for key in keys]
+        return [managed_entries_by_key[key] for key in keys]
 
     @override
     async def _put_managed_entry(
@@ -207,7 +206,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         if not keys:
             return
 
-        collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection_name(collection=collection)
 
         # Use bulk_write for efficient batch operations
         from pymongo import UpdateOne
@@ -224,13 +223,13 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
                 )
             )
 
-        _ = await self._collections_by_name[collection].bulk_write(operations)  # pyright: ignore[reportUnknownMemberType]
+        _ = await self._collections_by_name[sanitized_collection].bulk_write(operations)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        result: DeleteResult = await self._collections_by_name[collection].delete_one(filter={"key": key})
+        result: DeleteResult = await self._collections_by_name[sanitized_collection].delete_one(filter={"key": key})
         return bool(result.deleted_count)
 
     @override
@@ -238,10 +237,11 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         if not keys:
             return 0
 
-        collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection_name(collection=collection)
 
         # Use delete_many with $in operator for efficient batch deletion
-        result: DeleteResult = await self._collections_by_name[collection].delete_many(filter={"key": {"$in": keys}})
+        result: DeleteResult = await self._collections_by_name[sanitized_collection].delete_many(filter={"key": {"$in": keys}})
+
         return result.deleted_count
 
     @override
@@ -254,11 +254,11 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
     @override
     async def _delete_collection(self, *, collection: str) -> bool:
-        collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        _ = await self._db.drop_collection(name_or_collection=collection)
-        if collection in self._collections_by_name:
-            del self._collections_by_name[collection]
+        _ = await self._db.drop_collection(name_or_collection=sanitized_collection)
+        if sanitized_collection in self._collections_by_name:
+            del self._collections_by_name[sanitized_collection]
         return True
 
     @override

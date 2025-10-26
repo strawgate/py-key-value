@@ -23,6 +23,20 @@ DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
 
 
+def managed_entry_to_json(managed_entry: ManagedEntry) -> str:
+    """
+    Convert a ManagedEntry to a JSON string.
+    """
+    return managed_entry.to_json(include_metadata=True, include_expiration=True, include_creation=True)
+
+
+def json_to_managed_entry(json_str: str) -> ManagedEntry:
+    """
+    Convert a JSON string to a ManagedEntry.
+    """
+    return ManagedEntry.from_json(json_str=json_str, includes_metadata=True)
+
+
 class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):
     """Redis-based key-value store."""
 
@@ -89,7 +103,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         if not isinstance(redis_response, str):
             return None
 
-        managed_entry: ManagedEntry = ManagedEntry.from_json(json_str=redis_response)
+        managed_entry: ManagedEntry = json_to_managed_entry(json_str=redis_response)
 
         return managed_entry
 
@@ -105,7 +119,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         entries: list[ManagedEntry | None] = []
         for redis_response in redis_responses:
             if isinstance(redis_response, str):
-                entries.append(ManagedEntry.from_json(json_str=redis_response))
+                entries.append(json_to_managed_entry(json_str=redis_response))
             else:
                 entries.append(None)
 
@@ -115,7 +129,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        json_value: str = managed_entry.to_json()
+        json_value: str = managed_entry_to_json(managed_entry=managed_entry)
 
         if managed_entry.ttl is not None:
             # Redis does not support <= 0 TTLs
@@ -141,7 +155,12 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
         if ttl is None:
             # If there is no TTL, we can just do a simple mset
-            self._client.mset(mapping={key: managed_entry.to_json() for (key, managed_entry) in zip(keys, managed_entries, strict=True)})
+            mapping: dict[str, str] = {
+                compound_key(collection=collection, key=key): managed_entry_to_json(managed_entry=managed_entry)
+                for (key, managed_entry) in zip(keys, managed_entries, strict=True)
+            }
+
+            self._client.mset(mapping=mapping)
 
             return
 
@@ -153,7 +172,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             combo_key: str = compound_key(collection=collection, key=key)
-            json_value: str = managed_entry.to_json()
+            json_value: str = managed_entry_to_json(managed_entry=managed_entry)
 
             pipeline.setex(name=combo_key, time=ttl_seconds, value=json_value)
 

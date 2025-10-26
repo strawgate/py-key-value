@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Any, overload
 
 from elastic_transport import ObjectApiResponse  # noqa: TC002
+from key_value.shared.errors import DeserializationError
 from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json
 from key_value.shared.utils.sanitize import (
     ALPHANUMERIC_CHARACTERS,
@@ -21,7 +22,7 @@ from key_value.aio.stores.base import (
     BaseEnumerateKeysStore,
     BaseStore,
 )
-from key_value.aio.stores.elasticsearch.utils import managed_entry_to_document, new_bulk_action
+from key_value.aio.stores.elasticsearch.utils import new_bulk_action
 
 try:
     from elasticsearch import AsyncElasticsearch
@@ -70,6 +71,36 @@ ALLOWED_KEY_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
 MAX_INDEX_LENGTH = 240
 ALLOWED_INDEX_CHARACTERS: str = LOWERCASE_ALPHABET + NUMBERS + "_" + "-" + "."
+
+
+def managed_entry_to_document(collection: str, key: str, managed_entry: ManagedEntry) -> dict[str, Any]:
+    document: dict[str, Any] = {
+        "collection": collection,
+        "key": key,
+        "value": managed_entry.to_json(include_metadata=False),
+    }
+
+    if managed_entry.created_at:
+        document["created_at"] = managed_entry.created_at.isoformat()
+    if managed_entry.expires_at:
+        document["expires_at"] = managed_entry.expires_at.isoformat()
+
+    return document
+
+
+def source_to_managed_entry(source: dict[str, Any]) -> ManagedEntry:
+    if not (value_str := source.get("value")) or not isinstance(value_str, str):
+        msg = "Value is not a string"
+        raise DeserializationError(msg)
+
+    created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
+    expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
+
+    return ManagedEntry(
+        value=load_from_json(value_str),
+        created_at=created_at,
+        expires_at=expires_at,
+    )
 
 
 class ElasticsearchStore(
@@ -203,33 +234,18 @@ class ElasticsearchStore(
 
         entries_by_id: dict[str, ManagedEntry | None] = {}
         for doc in docs_result:
-            doc_id = doc.get("_id")
-            if not doc.get("found"):
-                if doc_id:
-                    entries_by_id[doc_id] = None
+            if not (doc_id := doc.get("_id")):
                 continue
 
-            source = doc.get("_source")
-            if not source:
-                if doc_id:
-                    entries_by_id[doc_id] = None
+            if "found" not in doc:
+                entries_by_id[doc_id] = None
                 continue
 
-            value_str = source.get("value")
-            if not value_str or not isinstance(value_str, str):
-                if doc_id:
-                    entries_by_id[doc_id] = None
+            if not (source := doc.get("_source")):
+                entries_by_id[doc_id] = None
                 continue
 
-            created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
-            expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
-
-            if doc_id:
-                entries_by_id[doc_id] = ManagedEntry(
-                    value=load_from_json(value_str),
-                    created_at=created_at,
-                    expires_at=expires_at,
-                )
+            entries_by_id[doc_id] = source_to_managed_entry(source=source)
 
         # Return entries in the same order as input keys
         return [entries_by_id.get(document_id) for document_id in document_ids]
