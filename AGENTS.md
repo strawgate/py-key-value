@@ -106,7 +106,10 @@ pip install py-key-value-aio[mongodb]    # MongoDB support
 
 **Never edit files in `key-value/key-value-sync/` directly**. Any changes
 will be overwritten when `make codegen` runs. Always make changes in the
-async package and regenerate.
+async package and regenerate. Always run `make codegen` after making changes
+to the async package. You will need to include the generated code in your pull
+request. Nobody will generate it for you. This also means pull requests will contain
+two copies of your changes, this is intentional!
 
 ## Make Commands Reference
 

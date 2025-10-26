@@ -296,6 +296,7 @@ The following wrappers are available:
 
 | Wrapper | Description | Example |
 |---------|---------------|-----|
+| CollectionRoutingWrapper | Route operations to different stores based on a collection name. | `CollectionRoutingWrapper(collection_map={"sessions": redis_store, "users": dynamo_store}, default_store=memory_store)` |
 | CompressionWrapper | Compress values before storing and decompress on retrieval. | `CompressionWrapper(key_value=memory_store, min_size_to_compress=0)` |
 | FernetEncryptionWrapper | Encrypt values before storing and decrypt on retrieval. | `FernetEncryptionWrapper(key_value=memory_store, source_material="your-source-material", salt="your-salt")` |
 | FallbackWrapper | Fallback to a secondary store when the primary store fails. | `FallbackWrapper(primary_key_value=memory_store, fallback_key_value=memory_store)` |
@@ -306,6 +307,7 @@ The following wrappers are available:
 | PrefixKeysWrapper | Prefix all keys with a given prefix. | `PrefixKeysWrapper(key_value=memory_store, prefix="users")` |
 | ReadOnlyWrapper | Prevent all write operations on the underlying store. | `ReadOnlyWrapper(key_value=memory_store, raise_on_write=True)` |
 | RetryWrapper | Retry failed operations with exponential backoff. | `RetryWrapper(key_value=memory_store, max_retries=3, initial_delay=0.1, max_delay=10.0, exponential_base=2.0)` |
+| RoutingWrapper | Route operations to different stores based on a routing function. | `RoutingWrapper(routing_function=lambda collection: redis_store if collection == "sessions" else dynamo_store, default_store=memory_store)` |
 | SingleCollectionWrapper | Wrap a store to only use a single collection. | `SingleCollectionWrapper(key_value=memory_store, single_collection="users")` |
 | TTLClampWrapper | Clamp the TTL to a given range. | `TTLClampWrapper(key_value=memory_store, min_ttl=60, max_ttl=3600)` |
 | StatisticsWrapper | Track operation statistics for the store. | `StatisticsWrapper(key_value=memory_store)` |

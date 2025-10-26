@@ -75,8 +75,8 @@ class BaseStore(KeyValueProtocol, ABC):
     def _setup(self) -> None:
         """Initialize the store (called once before first use)."""
 
-    def _setup_collection(self, *, collection: str) -> None:  # pyright: ignore[reportUnusedParameter]
-        "Initialize the collection (called once before first use of the collection)."
+    def _setup_collection(self, *, collection: str) -> None:
+        """Initialize the collection (called once before first use of the collection)."""
 
     def setup(self) -> None:
         if not self._setup_complete:
