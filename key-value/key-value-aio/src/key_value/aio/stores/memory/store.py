@@ -137,6 +137,19 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         if seed:
             self._seed_store_sync(seed)
 
+    def _create_collection(self, collection: str) -> MemoryCollection:
+        """Create a new collection.
+
+        Args:
+            collection: The collection name.
+
+        Returns:
+            The created MemoryCollection instance.
+        """
+        collection_cache = MemoryCollection(max_entries=self.max_entries_per_collection)
+        self._cache[collection] = collection_cache
+        return collection_cache
+
     def _seed_store_sync(self, seed: Mapping[str, Mapping[str, Mapping[str, Any]]]) -> None:
         """Seed the store with initial data synchronously.
 
@@ -145,10 +158,7 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         """
         for collection, items in seed.items():
             # Ensure collection exists
-            if collection not in self._cache:
-                self._cache[collection] = MemoryCollection(max_entries=self.max_entries_per_collection)
-
-            collection_cache = self._cache[collection]
+            collection_cache = self._create_collection(collection) if collection not in self._cache else self._cache[collection]
 
             # Add items using the same logic as put
             for key, value in items.items():
@@ -157,7 +167,7 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
 
     @override
     async def _setup_collection(self, *, collection: str) -> None:
-        self._cache[collection] = MemoryCollection(max_entries=self.max_entries_per_collection)
+        self._create_collection(collection)
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:

@@ -14,15 +14,22 @@ class DefaultValueWrapper(BaseWrapper):
     allowing you to specify a default value to return instead of None when a key doesn't exist.
     """
 
-    def __init__(self, key_value: AsyncKeyValue, default_value: Mapping[str, Any]) -> None:
+    def __init__(
+        self,
+        key_value: AsyncKeyValue,
+        default_value: Mapping[str, Any],
+        default_ttl: float | None = None,
+    ) -> None:
         """Initialize the DefaultValueWrapper.
 
         Args:
             key_value: The underlying key-value store to wrap.
             default_value: The default value to return when a key is not found.
+            default_ttl: The TTL to return for default values. Defaults to None.
         """
         self.key_value = key_value
         self._default_value = default_value
+        self._default_ttl = default_ttl
 
     @override
     async def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
@@ -61,10 +68,12 @@ class DefaultValueWrapper(BaseWrapper):
             collection: The collection to use.
 
         Returns:
-            A tuple of (value, ttl), with default value and None TTL if not found.
+            A tuple of (value, ttl), with default value and default TTL if not found.
         """
         result, ttl_value = await self.key_value.ttl(key=key, collection=collection)
-        return (result if result is not None else dict(self._default_value), ttl_value)
+        if result is None:
+            return (dict(self._default_value), self._default_ttl)
+        return (result, ttl_value)
 
     @override
     async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
@@ -75,7 +84,9 @@ class DefaultValueWrapper(BaseWrapper):
             collection: The collection to use.
 
         Returns:
-            A list of (value, ttl) tuples, with default values for missing keys.
+            A list of (value, ttl) tuples, with default values and default TTL for missing keys.
         """
         results = await self.key_value.ttl_many(keys=keys, collection=collection)
-        return [(result if result is not None else dict(self._default_value), ttl_value) for result, ttl_value in results]
+        return [
+            (result, ttl_value) if result is not None else (dict(self._default_value), self._default_ttl) for result, ttl_value in results
+        ]
