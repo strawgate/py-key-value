@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, SupportsFloat
 
 from key_value.shared.utils.compound import prefix_collection, unprefix_collection
@@ -52,7 +52,7 @@ class PrefixCollectionsWrapper(BaseWrapper):
         return await self.key_value.ttl_many(keys=keys, collection=new_collection)
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         new_collection: str = self._prefix_collection(collection=collection)
         return await self.key_value.put(key=key, value=value, collection=new_collection, ttl=ttl)
 
@@ -60,7 +60,7 @@ class PrefixCollectionsWrapper(BaseWrapper):
     async def put_many(
         self,
         keys: list[str],
-        values: Sequence[dict[str, Any]],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,

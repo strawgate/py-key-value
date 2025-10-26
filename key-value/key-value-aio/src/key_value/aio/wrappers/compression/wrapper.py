@@ -1,7 +1,7 @@
 import base64
 import gzip
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, SupportsFloat
 
 from key_value.shared.utils.managed_entry import ManagedEntry
@@ -131,18 +131,18 @@ class CompressionWrapper(BaseWrapper):
         return [(self._decompress_value(value), ttl) for value, ttl in results]
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
-        compressed_value = self._compress_value(value)
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+        compressed_value = self._compress_value(dict(value))
         return await self.key_value.put(key=key, value=compressed_value, collection=collection, ttl=ttl)
 
     @override
     async def put_many(
         self,
         keys: list[str],
-        values: Sequence[dict[str, Any]],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
-        compressed_values = [self._compress_value(value) for value in values]
+        compressed_values = [self._compress_value(dict(value)) for value in values]
         return await self.key_value.put_many(keys=keys, values=compressed_values, collection=collection, ttl=ttl)

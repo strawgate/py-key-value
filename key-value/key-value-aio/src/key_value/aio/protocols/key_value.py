@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, Protocol, SupportsFloat, runtime_checkable
 
 
@@ -36,7 +36,7 @@ class AsyncKeyValueProtocol(Protocol):
         """
         ...
 
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Store a key-value pair in the specified collection with optional TTL.
 
         Args:
@@ -85,7 +85,7 @@ class AsyncKeyValueProtocol(Protocol):
     async def put_many(
         self,
         keys: list[str],
-        values: Sequence[dict[str, Any]],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,

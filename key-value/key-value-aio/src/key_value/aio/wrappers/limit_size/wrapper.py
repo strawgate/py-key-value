@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, SupportsFloat
 
 from key_value.shared.errors.wrappers.limit_size import EntryTooLargeError, EntryTooSmallError
@@ -80,28 +80,28 @@ class LimitSizeWrapper(BaseWrapper):
         return True
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
-        if self._within_size_limit(value=value, collection=collection, key=key):
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+        if self._within_size_limit(value=dict(value), collection=collection, key=key):
             await self.key_value.put(collection=collection, key=key, value=value, ttl=ttl)
 
     @override
     async def put_many(
         self,
         keys: list[str],
-        values: Sequence[dict[str, Any]],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
         filtered_keys: list[str] = []
-        filtered_values: list[dict[str, Any]] = []
+        filtered_values: list[Mapping[str, Any]] = []
         filtered_ttls: list[SupportsFloat | None] | None = None
 
         if isinstance(ttl, Sequence):
             filtered_ttls = []
 
         for i, (k, v) in enumerate(zip(keys, values, strict=True)):
-            if self._within_size_limit(value=v, collection=collection, key=k):
+            if self._within_size_limit(value=dict(v), collection=collection, key=k):
                 filtered_keys.append(k)
                 filtered_values.append(v)
                 if isinstance(ttl, Sequence):
