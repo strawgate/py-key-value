@@ -101,11 +101,12 @@ needs while keeping your framework code clean and backend-agnostic.
 - **No Live Objects**: Even when using the in-memory store, "live" objects are
   never returned from the store. You get a dictionary or a Pydantic model,
   hopefully a copy of what you stored, but never the same instance in memory.
-- **Dislike of Bear Bros**: Beartype is used for runtime type checking, it will
-  report warnings if you get too cheeky with what you're passing around. If you
-  are not a fan of beartype, you can disable it by setting the
-  `PY_KEY_VALUE_DISABLE_BEARTYPE` environment variable to `true` or you can
-  disable the warnings via the warn module.
+- **Dislike of Bear Bros**: Beartype is used for runtime type checking. Core
+  protocol methods in store and wrapper implementations (put/get/delete/ttl
+  and their batch variants) enforce types and will raise TypeError for
+  violations. Other code produces warnings. You can disable all beartype
+  checks by setting `PY_KEY_VALUE_DISABLE_BEARTYPE=true` or suppress warnings
+  via the warnings module.
 
 ## Installation
 

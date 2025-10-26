@@ -14,6 +14,7 @@ from typing import Any, SupportsFloat
 
 from key_value.shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.shared.errors import StoreSetupError
+from key_value.shared.type_checking.bear_spray import bear_enforce
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.time_to_live import now, prepare_ttl
 from typing_extensions import Self, override
@@ -140,6 +141,7 @@ class BaseStore(KeyValueProtocol, ABC):
 
         return [self._get_managed_entry(collection=collection, key=key) for key in keys]
 
+    @bear_enforce
     @override
     def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
         """Retrieve a value by key from the specified collection.
@@ -164,6 +166,7 @@ class BaseStore(KeyValueProtocol, ABC):
 
         return dict(managed_entry.value)
 
+    @bear_enforce
     @override
     def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         collection = collection or self.default_collection
@@ -172,6 +175,7 @@ class BaseStore(KeyValueProtocol, ABC):
         entries = self._get_managed_entries(keys=keys, collection=collection)
         return [dict(entry.value) if entry and (not entry.is_expired) else None for entry in entries]
 
+    @bear_enforce
     @override
     def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
         collection = collection or self.default_collection
@@ -184,6 +188,7 @@ class BaseStore(KeyValueProtocol, ABC):
 
         return (dict(managed_entry.value), managed_entry.ttl)
 
+    @bear_enforce
     @override
     def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         """Retrieve multiple values and TTLs by key from the specified collection.
@@ -208,6 +213,7 @@ class BaseStore(KeyValueProtocol, ABC):
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             self._put_managed_entry(collection=collection, key=key, managed_entry=managed_entry)
 
+    @bear_enforce
     @override
     def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Store a key-value pair in the specified collection with optional TTL."""
@@ -233,6 +239,7 @@ class BaseStore(KeyValueProtocol, ABC):
 
         return (keys, values, ttl_for_entries)
 
+    @bear_enforce
     @override
     def put_many(
         self, keys: Sequence[str], values: Sequence[Mapping[str, Any]], *, collection: str | None = None, ttl: SupportsFloat | None = None
@@ -264,6 +271,7 @@ class BaseStore(KeyValueProtocol, ABC):
 
         return deleted_count
 
+    @bear_enforce
     @override
     def delete(self, key: str, *, collection: str | None = None) -> bool:
         collection = collection or self.default_collection
@@ -271,6 +279,7 @@ class BaseStore(KeyValueProtocol, ABC):
 
         return self._delete_managed_entry(key=key, collection=collection)
 
+    @bear_enforce
     @override
     def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         """Delete multiple managed entries by key from the specified collection."""
