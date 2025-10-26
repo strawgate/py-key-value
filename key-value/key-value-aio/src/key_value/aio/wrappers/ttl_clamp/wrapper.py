@@ -54,9 +54,6 @@ class TTLClampWrapper(BaseWrapper):
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
-        if isinstance(ttl, Sequence):
-            ttl = [self._ttl_clamp(ttl=t) for t in ttl]
-
-        await self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
+        await self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=self._ttl_clamp(ttl=ttl))

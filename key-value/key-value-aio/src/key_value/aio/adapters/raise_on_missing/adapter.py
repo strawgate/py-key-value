@@ -156,7 +156,7 @@ class RaiseOnMissingAdapter:
         values: Sequence[dict[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         """Store multiple key-value pairs in the specified collection.
 
@@ -164,8 +164,9 @@ class RaiseOnMissingAdapter:
             keys: The keys to store the values in.
             values: The values to store.
             collection: The collection to store keys in. If no collection is provided, it will use the default collection.
-            ttl: The optional time-to-live (expiry duration) for the key-value pairs. Defaults to no TTL. Note: The
-                backend store will convert the provided format to its own internal format.
+            ttl: The optional time-to-live (expiry duration) for all key-value pairs. The same TTL will be applied to all
+                items in the batch. Defaults to no TTL. Note: The backend store will convert the provided format to its own
+                internal format.
         """
         return await self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
 

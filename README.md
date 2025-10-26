@@ -91,7 +91,7 @@ get(key: str, collection: str | None = None) -> dict[str, Any] | None:
 get_many(keys: list[str], collection: str | None = None) -> list[dict[str, Any] | None]:
 
 put(key: str, value: dict[str, Any], collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
-put_many(keys: list[str], values: Sequence[dict[str, Any]], collection: str | None = None, ttl: Sequence[SupportsFloat | None] | None = None) -> None:
+put_many(keys: list[str], values: Sequence[dict[str, Any]], collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
 
 delete(key: str, collection: str | None = None) -> bool:
 delete_many(keys: list[str], collection: str | None = None) -> int:
