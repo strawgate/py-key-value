@@ -40,7 +40,7 @@ class PrefixCollectionsWrapper(BaseWrapper):
         return self.key_value.get(key=key, collection=new_collection)
 
     @override
-    def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         new_collection: str = self._prefix_collection(collection=collection)
         return self.key_value.get_many(keys=keys, collection=new_collection)
 
@@ -50,7 +50,7 @@ class PrefixCollectionsWrapper(BaseWrapper):
         return self.key_value.ttl(key=key, collection=new_collection)
 
     @override
-    def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         new_collection: str = self._prefix_collection(collection=collection)
         return self.key_value.ttl_many(keys=keys, collection=new_collection)
 
@@ -61,12 +61,7 @@ class PrefixCollectionsWrapper(BaseWrapper):
 
     @override
     def put_many(
-        self,
-        keys: list[str],
-        values: Sequence[Mapping[str, Any]],
-        *,
-        collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        self, keys: Sequence[str], values: Sequence[Mapping[str, Any]], *, collection: str | None = None, ttl: SupportsFloat | None = None
     ) -> None:
         new_collection: str = self._prefix_collection(collection=collection)
         return self.key_value.put_many(keys=keys, values=values, collection=new_collection, ttl=ttl)
@@ -77,6 +72,6 @@ class PrefixCollectionsWrapper(BaseWrapper):
         return self.key_value.delete(key=key, collection=new_collection)
 
     @override
-    def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         new_collection: str = self._prefix_collection(collection=collection)
         return self.key_value.delete_many(keys=keys, collection=new_collection)

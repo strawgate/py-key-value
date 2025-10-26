@@ -142,7 +142,7 @@ class BaseEncryptionWrapper(BaseWrapper):
         return self._decrypt_value(value)
 
     @override
-    def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         values = self.key_value.get_many(keys=keys, collection=collection)
         return [self._decrypt_value(value) for value in values]
 
@@ -152,7 +152,7 @@ class BaseEncryptionWrapper(BaseWrapper):
         return (self._decrypt_value(value), ttl)
 
     @override
-    def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         results = self.key_value.ttl_many(keys=keys, collection=collection)
         return [(self._decrypt_value(value), ttl) for (value, ttl) in results]
 
@@ -163,12 +163,7 @@ class BaseEncryptionWrapper(BaseWrapper):
 
     @override
     def put_many(
-        self,
-        keys: list[str],
-        values: Sequence[Mapping[str, Any]],
-        *,
-        collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        self, keys: Sequence[str], values: Sequence[Mapping[str, Any]], *, collection: str | None = None, ttl: SupportsFloat | None = None
     ) -> None:
         encrypted_values = [self._encrypt_value(dict(value)) for value in values]
         return self.key_value.put_many(keys=keys, values=encrypted_values, collection=collection, ttl=ttl)

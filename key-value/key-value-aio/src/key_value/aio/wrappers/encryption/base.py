@@ -169,7 +169,7 @@ class BaseEncryptionWrapper(BaseWrapper):
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         encrypted_values = [self._encrypt_value(dict(value)) for value in values]
         return await self.key_value.put_many(keys=keys, values=encrypted_values, collection=collection, ttl=ttl)

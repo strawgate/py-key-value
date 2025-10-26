@@ -160,7 +160,7 @@ class LoggingWrapper(BaseWrapper):
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         self._log(state="start", action="PUT_MANY", keys=keys, collection=collection, values=values, extra={"ttl": ttl})
 
