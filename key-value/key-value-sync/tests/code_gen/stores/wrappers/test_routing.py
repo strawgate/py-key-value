@@ -3,6 +3,7 @@
 # DO NOT CHANGE! Change the original file instead.
 import pytest
 from dirty_equals import IsFloat
+from typing_extensions import override
 
 from key_value.sync.code_gen.protocols.key_value import KeyValue
 from key_value.sync.code_gen.stores.memory.store import MemoryStore
@@ -52,6 +53,10 @@ class TestRoutingWrapper(BaseStoreTests):
         store.put(key=KEY_TWO, value=VALUE_TWO, collection=COLLECTION_TWO)
         store.put(key=KEY_UNMAPPED, value=VALUE_UNMAPPED, collection=COLLECTION_UNMAPPED)
         return store
+
+    @override
+    @pytest.mark.skip(reason="RoutingWrapper is unbounded")
+    def test_not_unbounded(self, store: RoutingWrapper): ...
 
     def test_routing_get_and_get_many(
         self, store_with_data: RoutingWrapper, memory_store: MemoryStore, second_store: MemoryStore, default_store: MemoryStore

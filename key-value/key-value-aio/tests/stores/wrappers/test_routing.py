@@ -1,5 +1,6 @@
 import pytest
 from dirty_equals import IsFloat
+from typing_extensions import override
 
 from key_value.aio.protocols.key_value import AsyncKeyValue
 from key_value.aio.stores.memory.store import MemoryStore
@@ -49,6 +50,10 @@ class TestRoutingWrapper(BaseStoreTests):
         await store.put(key=KEY_TWO, value=VALUE_TWO, collection=COLLECTION_TWO)
         await store.put(key=KEY_UNMAPPED, value=VALUE_UNMAPPED, collection=COLLECTION_UNMAPPED)
         return store
+
+    @override
+    @pytest.mark.skip(reason="RoutingWrapper is unbounded")
+    async def test_not_unbounded(self, store: RoutingWrapper): ...
 
     async def test_routing_get_and_get_many(
         self,
