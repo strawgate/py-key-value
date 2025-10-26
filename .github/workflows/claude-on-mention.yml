@@ -42,6 +42,9 @@ jobs:
           1. Call the generate_agents_md tool to get a high-level summary of the project you're working in
           2. Get the ${{ github.event_name == 'issues' && 'issue' || 'pull request' }} ${{ github.event.issue.number || github.event.pull_request.number }} in the GitHub repository: ${{ github.repository }}.
           3. Don't forget about your MCP tools to call search_code, get_files, etc. to search the repository and other repositories to identify the related classes, methods, docs, tests, etc that are relevant to the code.
+
+          # Using Make and Git Commands
+          You can run make commands (e.g., `make lint`, `make typecheck`, `make sync`) to build, test, or lint the code. You can also run git commands (e.g., `git status`, `git log`, `git diff`) to inspect the repository. You cannot run arbitrary bash commands - only make and git commands are allowed.
           PROMPT_END
           EOF
 
