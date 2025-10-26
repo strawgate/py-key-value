@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from threading import Lock
-from types import TracebackType
+from types import MappingProxyType, TracebackType
 from typing import Any, SupportsFloat
 
 from key_value.shared.constants import DEFAULT_COLLECTION_NAME
@@ -26,6 +26,19 @@ from key_value.sync.code_gen.protocols.key_value import (
     EnumerateKeysProtocol,
     KeyValueProtocol,
 )
+
+SEED_DATA_TYPE = Mapping[str, Mapping[str, Mapping[str, Any]]]
+FROZEN_SEED_DATA_TYPE = MappingProxyType[str, MappingProxyType[str, MappingProxyType[str, Any]]]
+DEFAULT_SEED_DATA: FROZEN_SEED_DATA_TYPE = MappingProxyType({})
+
+
+def _seed_to_frozen_seed_data(seed: SEED_DATA_TYPE) -> FROZEN_SEED_DATA_TYPE:
+    return MappingProxyType(
+        {
+            collection: MappingProxyType({key: MappingProxyType(value) for (key, value) in items.items()})
+            for (collection, items) in seed.items()
+        }
+    )
 
 
 class BaseStore(KeyValueProtocol, ABC):
@@ -46,20 +59,27 @@ class BaseStore(KeyValueProtocol, ABC):
     _setup_collection_locks: defaultdict[str, Lock]
     _setup_collection_complete: defaultdict[str, bool]
 
+    _seed: FROZEN_SEED_DATA_TYPE
+
     default_collection: str
 
-    def __init__(self, *, default_collection: str | None = None) -> None:
+    def __init__(self, *, default_collection: str | None = None, seed: SEED_DATA_TYPE | None = None) -> None:
         """Initialize the managed key-value store.
 
         Args:
             default_collection: The default collection to use if no collection is provided.
                 Defaults to "default_collection".
+            seed: Optional seed data to pre-populate the store. Format: {collection: {key: {field: value, ...}}}.
+                Seeding occurs once during store initialization (when the store is first entered or when the
+                first operation is performed on the store).
         """
 
         self._setup_complete = False
         self._setup_lock = Lock()
         self._setup_collection_locks = defaultdict(Lock)
         self._setup_collection_complete = defaultdict(bool)
+
+        self._seed = _seed_to_frozen_seed_data(seed=seed or {})
 
         self.default_collection = default_collection or DEFAULT_COLLECTION_NAME
 
@@ -77,6 +97,13 @@ class BaseStore(KeyValueProtocol, ABC):
     def _setup_collection(self, *, collection: str) -> None:
         """Initialize the collection (called once before first use of the collection)."""
 
+    def _seed_store(self) -> None:
+        """Seed the store with the data from the seed."""
+        for collection, items in self._seed.items():
+            self.setup_collection(collection=collection)
+            for key, value in items.items():
+                self.put(key=key, value=dict(value), collection=collection)
+
     def setup(self) -> None:
         if not self._setup_complete:
             with self._setup_lock:
@@ -87,7 +114,10 @@ class BaseStore(KeyValueProtocol, ABC):
                         raise StoreSetupError(
                             message=f"Failed to setup key value store: {e}", extra_info={"store": self.__class__.__name__}
                         ) from e
+
                     self._setup_complete = True
+
+                    self._seed_store()
 
     def setup_collection(self, *, collection: str) -> None:
         self.setup()
