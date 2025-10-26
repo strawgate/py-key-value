@@ -1,4 +1,5 @@
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, SupportsFloat
@@ -109,12 +110,20 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
 
     _cache: dict[str, MemoryCollection]
 
-    def __init__(self, *, max_entries_per_collection: int = DEFAULT_MAX_ENTRIES_PER_COLLECTION, default_collection: str | None = None):
+    def __init__(
+        self,
+        *,
+        max_entries_per_collection: int = DEFAULT_MAX_ENTRIES_PER_COLLECTION,
+        default_collection: str | None = None,
+        seed: Mapping[str, Mapping[str, Mapping[str, Any]]] | None = None,
+    ):
         """Initialize a fixed-size in-memory store.
 
         Args:
             max_entries_per_collection: The maximum number of entries per collection. Defaults to 10000.
             default_collection: The default collection to use if no collection is provided.
+            seed: Optional seed data to pre-populate the store. Format: {collection: {key: value}}.
+                  Example: {"users": {"user1": {"name": "Alice"}, "user2": {"name": "Bob"}}}
         """
 
         self.max_entries_per_collection = max_entries_per_collection
@@ -124,6 +133,22 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         self._stable_api = True
 
         super().__init__(default_collection=default_collection)
+
+        # Seed the store if seed data is provided
+        if seed:
+            import asyncio
+
+            asyncio.run(self._seed_store(seed=seed))
+
+    async def _seed_store(self, *, seed: Mapping[str, Mapping[str, Mapping[str, Any]]]) -> None:
+        """Seed the store with initial data.
+
+        Args:
+            seed: Dictionary mapping collections to keys to values.
+        """
+        for collection, entries in seed.items():
+            for key, value in entries.items():
+                await self.put(key=key, value=value, collection=collection)
 
     @override
     async def _setup_collection(self, *, collection: str) -> None:
