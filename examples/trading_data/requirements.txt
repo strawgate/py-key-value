@@ -1,0 +1,2 @@
+py-key-value-aio>=0.2.8
+pydantic>=2.0.0

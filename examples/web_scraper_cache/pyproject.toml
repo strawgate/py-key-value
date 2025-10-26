@@ -1,0 +1,20 @@
+[project]
+name = "web-scraper-cache-example"
+version = "0.1.0"
+description = "Web scraper cache using py-key-value with encryption and size limits"
+requires-python = ">=3.10"
+dependencies = [
+    "py-key-value-aio>=0.2.8",
+    "pydantic>=2.0.0",
+    "cryptography>=41.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
