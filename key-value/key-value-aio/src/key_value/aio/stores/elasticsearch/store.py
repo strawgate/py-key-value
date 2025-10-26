@@ -1,4 +1,5 @@
 import logging
+from datetime import timezone
 from typing import TYPE_CHECKING, Any, cast, overload
 
 from key_value.shared.utils.compound import compound_key
@@ -171,7 +172,8 @@ class ElasticsearchStore(
             mapping_response = await self._client.indices.get_mapping(index=index_name)
             mappings = mapping_response.get(index_name, {}).get("mappings", {})
             props = mappings.get("properties", {})
-            value_field_type = props.get("value", {}).get("type")
+            value_field = props.get("value", {})
+            value_field_type = value_field.get("type")
             created_type = props.get("created_at", {}).get("type")
             expires_type = props.get("expires_at", {}).get("type")
 
@@ -184,6 +186,14 @@ class ElasticsearchStore(
                     f"but store is configured for '{expected_type}' (native_storage={self._native_storage}). "
                     f"To fix this, either: 1) Use the correct storage mode when initializing the store, "
                     f"or 2) Delete and recreate the index with the new mapping."
+                )
+                raise ValueError(msg)  # noqa: TRY301
+
+            # In JSON mode ensure doc_values is disabled
+            if not self._native_storage and value_field.get("doc_values", True) is not False:
+                msg = (
+                    f"Index mapping mismatch for collection '{collection}': "
+                    f"'value.doc_values' should be False in JSON mode to avoid columnar storage bloat."
                 )
                 raise ValueError(msg)  # noqa: TRY301
 
@@ -247,6 +257,12 @@ class ElasticsearchStore(
             created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
             expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
 
+            # Normalize parsed timestamps to UTC-aware to avoid naive/aware comparison errors
+            if created_at is not None and created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            if expires_at is not None and expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+
             return ManagedEntry(
                 value=value_dict,
                 created_at=created_at,
@@ -258,8 +274,10 @@ class ElasticsearchStore(
             # JSON string format: parse the JSON string
             return ManagedEntry.from_json(json_str=value)
 
-        # Unexpected type
-        return None
+        # Unexpected type - raise error instead of silently returning None
+        got = type(value).__name__
+        msg = f"Invalid 'value' type for key '{key}': expected dict or str, got {got}."
+        raise TypeError(msg)
 
     @property
     def _should_refresh_on_put(self) -> bool:

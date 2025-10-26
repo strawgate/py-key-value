@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, cast, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
@@ -130,7 +130,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         await self._client.__aexit__(exc_type, exc_val, exc_tb)
 
     def _sanitize_collection_name(self, collection: str) -> str:
-        return sanitize_string(value=collection, max_length=MAX_COLLECTION_LENGTH, allowed_characters=ALPHANUMERIC_CHARACTERS)
+        return sanitize_string(value=collection, max_length=MAX_COLLECTION_LENGTH, allowed_characters=COLLECTION_ALLOWED_CHARACTERS)
 
     @override
     async def _setup_collection(self, *, collection: str) -> None:
@@ -148,7 +148,8 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
         new_collection: AsyncCollection[dict[str, Any]] = await self._db.create_collection(name=collection)
 
-        _ = await new_collection.create_index(keys="key")
+        # Create unique index on key field to prevent duplicate keys
+        _ = await new_collection.create_index(keys="key", unique=True)
 
         # Create TTL index for automatic expiration (only when using native storage)
         if self._native_storage:
@@ -163,18 +164,33 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
             # The type checker has trouble with pymongo types, so we use type: ignore
             indexes: list[dict[str, Any]] = await coll.list_indexes().to_list(length=None)  # type: ignore[attr-defined]
 
-            # Check for TTL index on expires_at
+            # Check for unique index on key field
             # Type checker has trouble with the structure here, but it's runtime safe
-            has_ttl_index: bool = any(
-                cast("dict[str, Any]", idx.get("key", {})).get("expires_at") is not None  # type: ignore[union-attr]
-                and idx.get("expireAfterSeconds") is not None  # type: ignore[union-attr]
+            has_unique_key: bool = any(
+                cast("dict[str, Any]", idx.get("key", {})).get("key") is not None  # type: ignore[union-attr]
+                and idx.get("unique") is True  # type: ignore[union-attr]
                 for idx in indexes  # type: ignore[misc]
             )
 
+            if not has_unique_key:
+                msg = (
+                    f"Collection '{collection}' is missing a unique index on 'key' field. "
+                    f"To fix this, manually create the unique index: "
+                    f"db.{collection}.createIndex({{key: 1}}, {{unique: true}})"
+                )
+                raise ValueError(msg)  # noqa: TRY301
+
+            # Check for TTL index on expires_at with correct expireAfterSeconds value
+            def _has_valid_ttl(idx: dict[str, Any]) -> bool:
+                key_spec = cast("dict[str, Any]", idx.get("key", {}))  # type: ignore[union-attr]
+                return key_spec.get("expires_at") is not None and idx.get("expireAfterSeconds") == 0
+
+            has_ttl_index: bool = any(_has_valid_ttl(idx) for idx in indexes)  # type: ignore[misc]
+
             if self._native_storage and not has_ttl_index:
                 msg = (
-                    f"Collection '{collection}' is missing TTL index on 'expires_at' field, "
-                    f"but store is configured for native_storage mode. "
+                    f"Collection '{collection}' is missing TTL index on 'expires_at' field "
+                    f"with expireAfterSeconds=0, but store is configured for native_storage mode. "
                     f"To fix this, either: 1) Recreate the collection with native_storage=True, "
                     f"or 2) Manually create the TTL index: db.{collection}.createIndex({{expires_at: 1}}, {{expireAfterSeconds: 0}})"
                 )
@@ -227,6 +243,13 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
                 )
                 raise TypeError(msg)
 
+            # Normalize to UTC-aware to avoid naive/aware comparison errors
+            # MongoDB may return naive datetimes depending on client configuration
+            if created_at is not None and created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            if expires_at is not None and expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+
             return ManagedEntry(
                 value=value,
                 created_at=created_at,
@@ -238,8 +261,10 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
             # JSON string format: parse the JSON string
             return ManagedEntry.from_json(json_str=value)
 
-        # Unexpected type or None
-        return None
+        # Unexpected type or None - raise error instead of silently returning None
+        got = type(value).__name__ if value is not None else "None"
+        msg = f"Data for key '{key}' has invalid value type: expected dict or str, got {got}."
+        raise TypeError(msg)
 
     @override
     async def _put_managed_entry(
