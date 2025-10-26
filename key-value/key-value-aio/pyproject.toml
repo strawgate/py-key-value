@@ -70,7 +70,7 @@ dev = [
     "py-key-value-aio[keyring]",
     "py-key-value-aio[pydantic]",
     "py-key-value-aio[wrappers-encryption]",
-    "py-key-value",
+    "py-key-value[dev]",
 ]
 
 [tool.ruff]

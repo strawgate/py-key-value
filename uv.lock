@@ -1458,7 +1458,7 @@ provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "vault", "mem
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "py-key-value", editable = "." },
+    { name = "py-key-value", extras = ["dev"], editable = "." },
     { name = "py-key-value-aio", extras = ["keyring"] },
     { name = "py-key-value-aio", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb", "vault", "dynamodb", "rocksdb"] },
     { name = "py-key-value-aio", extras = ["pydantic"] },
@@ -1487,7 +1487,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "py-key-value", editable = "." }]
+dev = [{ name = "py-key-value", extras = ["dev"], editable = "." }]
 
 [[package]]
 name = "py-key-value-shared-test"
@@ -1612,7 +1612,7 @@ provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "vault", "mem
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "py-key-value", editable = "." },
+    { name = "py-key-value", extras = ["dev"], editable = "." },
     { name = "py-key-value-sync", extras = ["keyring"] },
     { name = "py-key-value-sync", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb", "vault", "rocksdb"] },
     { name = "py-key-value-sync", extras = ["pydantic"] },

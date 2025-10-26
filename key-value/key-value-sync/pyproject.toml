@@ -69,7 +69,7 @@ dev = [
     "py-key-value-sync[pydantic]",
     "py-key-value-sync[keyring]",
     "py-key-value-sync[wrappers-encryption]",
-    "py-key-value",
+    "py-key-value[dev]",
 ]
 
 [tool.ruff]

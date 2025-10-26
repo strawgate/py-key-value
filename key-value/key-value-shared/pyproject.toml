@@ -45,7 +45,7 @@ env_files = [".env"]
 
 [dependency-groups]
 dev = [
-    "py-key-value",
+    "py-key-value[dev]",
 ]
 
 [tool.uv.sources]
