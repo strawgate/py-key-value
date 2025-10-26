@@ -125,17 +125,9 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
 
         _ = self._client.set(key=combo_key, value=json_value, expiry=expiry)
 
-    @override
-    def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
-        if not keys:
-            return
-
-        # Valkey's mset doesn't support per-key TTL, so we use individual set commands
-        for key, managed_entry in zip(keys, managed_entries, strict=True):
-            combo_key: str = compound_key(collection=collection, key=key)
-            json_value: str = managed_entry.to_json()
-            expiry: ExpirySet | None = ExpirySet(expiry_type=ExpiryType.SEC, value=int(managed_entry.ttl)) if managed_entry.ttl else None
-            _ = self._client.set(key=combo_key, value=json_value, expiry=expiry)
+    # Note: Valkey doesn't have a true bulk write API with per-key TTL support
+    # The base implementation's loop is equivalent to what we would do here
+    # so we use the default BaseStore implementation
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:

@@ -114,10 +114,6 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
             exptime=exptime,
         )
 
-    # Note: aiomcache doesn't have a native multi_set API
-    # The base implementation's loop is equivalent to what we would do here
-    # so we use the default BaseStore implementation
-
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = self.sanitize_key(compound_key(collection=collection, key=key))

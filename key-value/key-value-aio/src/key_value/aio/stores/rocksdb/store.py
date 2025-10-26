@@ -144,7 +144,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         if not keys:
             return
 
-        # Use WriteBatch for efficient batch writes
         batch = WriteBatch()
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             combo_key: str = compound_key(collection=collection, key=key)
@@ -159,11 +158,10 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
         combo_key: str = compound_key(collection=collection, key=key)
 
-        # Check if key exists before deleting
+        # Check if key exists before deleting, this is only used for tracking deleted count
         exists = combo_key in self._db
 
-        if exists:
-            self._db.delete(combo_key)
+        self._db.delete(combo_key)
 
         return exists
 
@@ -183,8 +181,9 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
             # Check if key exists before deleting
             if combo_key in self._db:
-                batch.delete(combo_key)
                 deleted_count += 1
+
+            batch.delete(combo_key)
 
         if deleted_count > 0:
             self._db.write(batch)

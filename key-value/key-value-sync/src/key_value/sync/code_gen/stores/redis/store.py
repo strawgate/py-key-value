@@ -2,6 +2,7 @@
 # from the original file 'store.py'
 # DO NOT CHANGE! Change the original file instead.
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any, overload
 from urllib.parse import urlparse
 
@@ -125,25 +126,36 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             _ = self._client.set(name=combo_key, value=json_value)  # pyright: ignore[reportAny]
 
     @override
-    def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    def _put_managed_entries(
+        self,
+        *,
+        collection: str,
+        keys: Sequence[str],
+        managed_entries: Sequence[ManagedEntry],
+        ttl: float | None,
+        created_at: datetime,
+        expires_at: datetime | None,
+    ) -> None:
         if not keys:
             return
 
+        if ttl is None:
+            # If there is no TTL, we can just do a simple mset
+            self._client.mset(mapping={key: managed_entry.to_json() for (key, managed_entry) in zip(keys, managed_entries, strict=True)})
+
+            return
+
+        # Convert TTL to integer seconds for Redis
+        ttl_seconds: int = max(int(ttl), 1)
+
         # Use pipeline for bulk operations
-        # Note: We can't use mset for entries with TTL since each may have different TTL
-        # We'll use a pipeline to batch the operations
         pipeline = self._client.pipeline()
 
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             combo_key: str = compound_key(collection=collection, key=key)
             json_value: str = managed_entry.to_json()
 
-            if managed_entry.ttl is not None:
-                # Redis does not support <= 0 TTLs
-                ttl = max(int(managed_entry.ttl), 1)
-                pipeline.setex(name=combo_key, time=ttl, value=json_value)
-            else:
-                pipeline.set(name=combo_key, value=json_value)
+            pipeline.setex(name=combo_key, time=ttl_seconds, value=json_value)
 
         pipeline.execute()  # pyright: ignore[reportAny]
 

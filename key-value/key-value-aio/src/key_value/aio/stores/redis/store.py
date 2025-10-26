@@ -148,11 +148,14 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         if not keys:
             return
 
+        if ttl is None:
+            # If there is no TTL, we can just do a simple mset
+            self._client.mset(mapping={key: managed_entry.to_json() for key, managed_entry in zip(keys, managed_entries, strict=True)})
+
+            return
+
         # Convert TTL to integer seconds for Redis
-        ttl_seconds: int | None = None
-        if ttl is not None:
-            # Redis does not support <= 0 TTLs
-            ttl_seconds = max(int(ttl), 1)
+        ttl_seconds: int = max(int(ttl), 1)
 
         # Use pipeline for bulk operations
         pipeline = self._client.pipeline()
@@ -161,10 +164,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             combo_key: str = compound_key(collection=collection, key=key)
             json_value: str = managed_entry.to_json()
 
-            if ttl_seconds is not None:
-                pipeline.setex(name=combo_key, time=ttl_seconds, value=json_value)
-            else:
-                pipeline.set(name=combo_key, value=json_value)
+            pipeline.setex(name=combo_key, time=ttl_seconds, value=json_value)
 
         await pipeline.execute()  # pyright: ignore[reportAny]
 

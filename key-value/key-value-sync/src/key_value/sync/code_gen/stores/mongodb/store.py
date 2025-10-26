@@ -7,7 +7,6 @@ from typing import Any, TypedDict, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
-from key_value.shared.utils.time_to_live import now
 from typing_extensions import Self, override
 
 from key_value.sync.code_gen.stores.base import (
@@ -16,6 +15,7 @@ from key_value.sync.code_gen.stores.base import (
     BaseEnumerateCollectionsStore,
     BaseStore,
 )
+from key_value.sync.code_gen.stores.mongodb.utils import managed_entry_to_document
 
 try:
     from pymongo import MongoClient
@@ -184,27 +184,23 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
     @override
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
-        json_value: str = managed_entry.to_json()
+        mongo_doc: dict[str, Any] = managed_entry_to_document(key=key, managed_entry=managed_entry)
 
-        collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        _ = self._collections_by_name[collection].update_one(
-            filter={"key": key},
-            update={
-                "$set": {
-                    "collection": collection,
-                    "key": key,
-                    "value": json_value,
-                    "created_at": managed_entry.created_at.isoformat() if managed_entry.created_at else None,
-                    "expires_at": managed_entry.expires_at.isoformat() if managed_entry.expires_at else None,
-                    "updated_at": now().isoformat(),
-                }
-            },
-            upsert=True,
-        )
+        _ = self._collections_by_name[sanitized_collection].update_one(filter={"key": key}, update={"$set": mongo_doc}, upsert=True)
 
     @override
-    def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    def _put_managed_entries(
+        self,
+        *,
+        collection: str,
+        keys: Sequence[str],
+        managed_entries: Sequence[ManagedEntry],
+        ttl: float | None,
+        created_at: datetime,
+        expires_at: datetime | None,
+    ) -> None:
         if not keys:
             return
 
@@ -215,24 +211,9 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
         operations: list[UpdateOne] = []
         for key, managed_entry in zip(keys, managed_entries, strict=True):
-            json_value: str = managed_entry.to_json()
+            mongo_doc: dict[str, Any] = managed_entry_to_document(key=key, managed_entry=managed_entry)
 
-            operations.append(
-                UpdateOne(
-                    filter={"key": key},
-                    update={
-                        "$set": {
-                            "collection": collection,
-                            "key": key,
-                            "value": json_value,
-                            "created_at": managed_entry.created_at.isoformat() if managed_entry.created_at else None,
-                            "expires_at": managed_entry.expires_at.isoformat() if managed_entry.expires_at else None,
-                            "updated_at": now().isoformat(),
-                        }
-                    },
-                    upsert=True,
-                )
-            )
+            operations.append(UpdateOne(filter={"key": key}, update={"$set": mongo_doc}, upsert=True))
 
         _ = self._collections_by_name[collection].bulk_write(operations)  # pyright: ignore[reportUnknownMemberType]
 

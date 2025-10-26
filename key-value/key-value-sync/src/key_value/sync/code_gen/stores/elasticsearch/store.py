@@ -2,9 +2,9 @@
 # from the original file 'store.py'
 # DO NOT CHANGE! Change the original file instead.
 from collections.abc import Sequence
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, overload
 
-from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, LOWERCASE_ALPHABET, NUMBERS, sanitize_string
 from key_value.shared.utils.time_to_live import now_as_epoch, try_parse_datetime_str
@@ -18,6 +18,7 @@ from key_value.sync.code_gen.stores.base import (
     BaseEnumerateKeysStore,
     BaseStore,
 )
+from key_value.sync.code_gen.stores.elasticsearch.utils import managed_entry_to_document, new_bulk_action
 
 try:
     from elasticsearch import Elasticsearch
@@ -34,8 +35,6 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 if TYPE_CHECKING:
-    from datetime import datetime
-
     from elastic_transport import ObjectApiResponse
 
 DEFAULT_INDEX_PREFIX = "kv_store"
@@ -140,13 +139,17 @@ class ElasticsearchStore(
     def _sanitize_document_id(self, key: str) -> str:
         return sanitize_string(value=key, replacement_character="_", max_length=MAX_KEY_LENGTH, allowed_characters=ALLOWED_KEY_CHARACTERS)
 
+    def _get_destination(self, *, collection: str, key: str) -> tuple[str, str]:
+        index_name: str = self._sanitize_index_name(collection=collection)
+        document_id: str = self._sanitize_document_id(key=key)
+
+        return (index_name, document_id)
+
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        combo_key: str = compound_key(collection=collection, key=key)
+        (index_name, document_id) = self._get_destination(collection=collection, key=key)
 
-        elasticsearch_response = self._client.options(ignore_status=404).get(
-            index=self._sanitize_index_name(collection=collection), id=self._sanitize_document_id(key=combo_key)
-        )
+        elasticsearch_response = self._client.options(ignore_status=404).get(index=index_name, id=document_id)
 
         body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
 
@@ -166,14 +169,12 @@ class ElasticsearchStore(
         if not keys:
             return []
 
-        combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
-
         # Use mget for efficient batch retrieval
-        docs = [{"_id": self._sanitize_document_id(key=combo_key)} for combo_key in combo_keys]
+        index_name = self._sanitize_index_name(collection=collection)
+        document_ids = [self._sanitize_document_id(key=key) for key in keys]
+        docs = [{"_id": document_id} for document_id in document_ids]
 
-        elasticsearch_response = self._client.options(ignore_status=404).mget(
-            index=self._sanitize_index_name(collection=collection), docs=docs
-        )
+        elasticsearch_response = self._client.options(ignore_status=404).mget(index=index_name, docs=docs)
 
         body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
         docs_result = body.get("docs", [])
@@ -205,7 +206,7 @@ class ElasticsearchStore(
                 entries_by_id[doc_id] = ManagedEntry(value=load_from_json(value_str), created_at=created_at, expires_at=expires_at)
 
         # Return entries in the same order as input keys
-        return [entries_by_id.get(self._sanitize_document_id(key=combo_key)) for combo_key in combo_keys]
+        return [entries_by_id.get(document_id) for document_id in document_ids]
 
     @property
     def _should_refresh_on_put(self) -> bool:
@@ -213,54 +214,48 @@ class ElasticsearchStore(
 
     @override
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
-        combo_key: str = compound_key(collection=collection, key=key)
+        index_name: str = self._sanitize_index_name(collection=collection)
+        document_id: str = self._sanitize_document_id(key=key)
 
-        document: dict[str, Any] = {"collection": collection, "key": key, "value": managed_entry.to_json(include_metadata=False)}
+        document: dict[str, Any] = managed_entry_to_document(collection=collection, key=key, managed_entry=managed_entry)
 
-        if managed_entry.created_at:
-            document["created_at"] = managed_entry.created_at.isoformat()
-        if managed_entry.expires_at:
-            document["expires_at"] = managed_entry.expires_at.isoformat()
-
-        _ = self._client.index(
-            index=self._sanitize_index_name(collection=collection),
-            id=self._sanitize_document_id(key=combo_key),
-            body=document,
-            refresh=self._should_refresh_on_put,
-        )
+        _ = self._client.index(index=index_name, id=document_id, body=document, refresh=self._should_refresh_on_put)
 
     @override
-    def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    def _put_managed_entries(
+        self,
+        *,
+        collection: str,
+        keys: Sequence[str],
+        managed_entries: Sequence[ManagedEntry],
+        ttl: float | None,
+        created_at: datetime,
+        expires_at: datetime | None,
+    ) -> None:
         if not keys:
             return
 
-        # Use bulk API for efficient batch indexing
         operations: list[dict[str, Any]] = []
+
+        index_name: str = self._sanitize_index_name(collection=collection)
+
         for key, managed_entry in zip(keys, managed_entries, strict=True):
-            combo_key: str = compound_key(collection=collection, key=key)
+            document_id: str = self._sanitize_document_id(key=key)
 
-            document: dict[str, Any] = {"collection": collection, "key": key, "value": managed_entry.to_json(include_metadata=False)}
+            index_action: dict[str, Any] = new_bulk_action(action="index", index=index_name, document_id=document_id)
 
-            if managed_entry.created_at:
-                document["created_at"] = managed_entry.created_at.isoformat()
-            if managed_entry.expires_at:
-                document["expires_at"] = managed_entry.expires_at.isoformat()
+            document: dict[str, Any] = managed_entry_to_document(collection=collection, key=key, managed_entry=managed_entry)
 
-            index_action: dict[str, Any] = {
-                "index": {"_index": self._sanitize_index_name(collection=collection), "_id": self._sanitize_document_id(key=combo_key)}
-            }
-            operations.append(index_action)
-            operations.append(document)
+            operations.extend([index_action, document])
 
         _ = self._client.bulk(operations=operations, refresh=self._should_refresh_on_put)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        combo_key: str = compound_key(collection=collection, key=key)
+        index_name: str = self._sanitize_index_name(collection=collection)
+        document_id: str = self._sanitize_document_id(key=key)
 
-        elasticsearch_response: ObjectApiResponse[Any] = self._client.options(ignore_status=404).delete(
-            index=self._sanitize_index_name(collection=collection), id=self._sanitize_document_id(key=combo_key)
-        )
+        elasticsearch_response: ObjectApiResponse[Any] = self._client.options(ignore_status=404).delete(index=index_name, id=document_id)
 
         body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
 
@@ -274,13 +269,13 @@ class ElasticsearchStore(
         if not keys:
             return 0
 
-        # Use bulk API for efficient batch deletion
         operations: list[dict[str, Any]] = []
+
         for key in keys:
-            combo_key: str = compound_key(collection=collection, key=key)
-            delete_action: dict[str, Any] = {
-                "delete": {"_index": self._sanitize_index_name(collection=collection), "_id": self._sanitize_document_id(key=combo_key)}
-            }
+            (index_name, document_id) = self._get_destination(collection=collection, key=key)
+
+            delete_action: dict[str, Any] = new_bulk_action(action="delete", index=index_name, document_id=document_id)
+
             operations.append(delete_action)
 
         elasticsearch_response = self._client.bulk(operations=operations)  # pyright: ignore[reportUnknownMemberType]

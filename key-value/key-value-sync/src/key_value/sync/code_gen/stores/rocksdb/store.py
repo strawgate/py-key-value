@@ -2,6 +2,7 @@
 # from the original file 'store.py'
 # DO NOT CHANGE! Change the original file instead.
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
 from typing import Any, overload
 
@@ -119,13 +120,21 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         self._db[combo_key] = json_value.encode("utf-8")
 
     @override
-    def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    def _put_managed_entries(
+        self,
+        *,
+        collection: str,
+        keys: Sequence[str],
+        managed_entries: Sequence[ManagedEntry],
+        ttl: float | None,
+        created_at: datetime,
+        expires_at: datetime | None,
+    ) -> None:
         self._fail_on_closed_store()
 
         if not keys:
             return
 
-        # Use WriteBatch for efficient batch writes
         batch = WriteBatch()
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             combo_key: str = compound_key(collection=collection, key=key)
@@ -140,11 +149,10 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
         combo_key: str = compound_key(collection=collection, key=key)
 
-        # Check if key exists before deleting
+        # Check if key exists before deleting, this is only used for tracking deleted count
         exists = combo_key in self._db
 
-        if exists:
-            self._db.delete(combo_key)
+        self._db.delete(combo_key)
 
         return exists
 
@@ -164,8 +172,9 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
             # Check if key exists before deleting
             if combo_key in self._db:
-                batch.delete(combo_key)
                 deleted_count += 1
+
+            batch.delete(combo_key)
 
         if deleted_count > 0:
             self._db.write(batch)

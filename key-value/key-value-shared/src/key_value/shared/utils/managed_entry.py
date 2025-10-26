@@ -25,8 +25,6 @@ class ManagedEntry:
     ttl: float | None = field(default=None)
     expires_at: datetime | None = field(default=None)
 
-    _dumped_json: str | None = field(default=None)
-
     def __post_init__(self) -> None:
         if self.ttl is not None and self.expires_at is None:
             self.expires_at = now_plus(seconds=self.ttl)

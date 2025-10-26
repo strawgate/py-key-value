@@ -55,7 +55,7 @@ def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, now: float) -> float:
     return float(expiration_epoch)
 
 
-def _memory_cache_getsizeof(value: MemoryCacheEntry) -> int:  # noqa: ARG001
+def _memory_cache_getsizeof(value: MemoryCacheEntry) -> int:
     "Return size of cache entry (always 1 for entry counting)."
     return 1
 

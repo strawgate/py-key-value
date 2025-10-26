@@ -4,10 +4,10 @@ from typing import Any, TypedDict, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
-from key_value.shared.utils.time_to_live import now
 from typing_extensions import Self, override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseStore
+from key_value.aio.stores.mongodb.utils import managed_entry_to_document
 
 try:
     from pymongo import AsyncMongoClient
@@ -183,22 +183,13 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
-        json_value: str = managed_entry.to_json()
+        mongo_doc: dict[str, Any] = managed_entry_to_document(key=key, managed_entry=managed_entry)
 
-        collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        _ = await self._collections_by_name[collection].update_one(
+        _ = await self._collections_by_name[sanitized_collection].update_one(
             filter={"key": key},
-            update={
-                "$set": {
-                    "collection": collection,
-                    "key": key,
-                    "value": json_value,
-                    "created_at": managed_entry.created_at.isoformat() if managed_entry.created_at else None,
-                    "expires_at": managed_entry.expires_at.isoformat() if managed_entry.expires_at else None,
-                    "updated_at": now().isoformat(),
-                }
-            },
+            update={"$set": mongo_doc},
             upsert=True,
         )
 
@@ -218,31 +209,17 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
         collection = self._sanitize_collection_name(collection=collection)
 
-        # Convert timestamps to ISO format for MongoDB
-        created_at_iso: str = created_at.isoformat()
-        expires_at_iso: str | None = expires_at.isoformat() if expires_at else None
-        updated_at_iso: str = now().isoformat()
-
         # Use bulk_write for efficient batch operations
         from pymongo import UpdateOne
 
         operations: list[UpdateOne] = []
         for key, managed_entry in zip(keys, managed_entries, strict=True):
-            json_value: str = managed_entry.to_json()
+            mongo_doc: dict[str, Any] = managed_entry_to_document(key=key, managed_entry=managed_entry)
 
             operations.append(
                 UpdateOne(
                     filter={"key": key},
-                    update={
-                        "$set": {
-                            "collection": collection,
-                            "key": key,
-                            "value": json_value,
-                            "created_at": created_at_iso,
-                            "expires_at": expires_at_iso,
-                            "updated_at": updated_at_iso,
-                        }
-                    },
+                    update={"$set": mongo_doc},
                     upsert=True,
                 )
             )

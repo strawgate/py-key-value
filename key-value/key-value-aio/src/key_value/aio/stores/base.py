@@ -6,14 +6,14 @@ from abc import ABC, abstractmethod
 from asyncio.locks import Lock
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timedelta
+from datetime import datetime
 from types import MappingProxyType, TracebackType
 from typing import Any, SupportsFloat
 
 from key_value.shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.shared.errors import StoreSetupError
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.time_to_live import now, prepare_ttl
+from key_value.shared.utils.time_to_live import prepare_entry_timestamps
 from typing_extensions import Self, override
 
 from key_value.aio.protocols.key_value import (
@@ -203,7 +203,13 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         return [(dict(entry.value), entry.ttl) if entry and not entry.is_expired else (None, None) for entry in entries]
 
     @abstractmethod
-    async def _put_managed_entry(self, *, collection: str, key: str, managed_entry: ManagedEntry) -> None:
+    async def _put_managed_entry(
+        self,
+        *,
+        collection: str,
+        key: str,
+        managed_entry: ManagedEntry,
+    ) -> None:
         """Store a managed entry by key in the specified collection."""
         ...
 
@@ -240,28 +246,15 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         collection = collection or self.default_collection
         await self.setup_collection(collection=collection)
 
-        managed_entry: ManagedEntry = ManagedEntry(value=value, ttl=prepare_ttl(t=ttl), created_at=now())
+        created_at, ttl_seconds, expires_at = prepare_entry_timestamps(ttl=ttl)
+
+        managed_entry: ManagedEntry = ManagedEntry(value=value, ttl=ttl_seconds, created_at=created_at, expires_at=expires_at)
 
         await self._put_managed_entry(
             collection=collection,
             key=key,
             managed_entry=managed_entry,
         )
-
-    def _prepare_put_many(
-        self, *, keys: Sequence[str], values: Sequence[Mapping[str, Any]], ttl: SupportsFloat | None
-    ) -> tuple[Sequence[str], Sequence[Mapping[str, Any]], float | None]:
-        """Prepare multiple managed entries for a put_many operation.
-
-        Inheriting classes can use this method if they need to modify a put_many operation."""
-
-        if len(keys) != len(values):
-            msg = "put_many called but a different number of keys and values were provided"
-            raise ValueError(msg) from None
-
-        ttl_for_entries: float | None = prepare_ttl(t=ttl)
-
-        return (keys, values, ttl_for_entries)
 
     @override
     async def put_many(
@@ -277,19 +270,21 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         collection = collection or self.default_collection
         await self.setup_collection(collection=collection)
 
-        keys, values, ttl_for_entries = self._prepare_put_many(keys=keys, values=values, ttl=ttl)
+        if len(keys) != len(values):
+            msg = "put_many called but a different number of keys and values were provided"
+            raise ValueError(msg) from None
 
-        # Pre-calculate timestamps once for all entries
-        created_at = now()
-        expires_at = created_at + timedelta(seconds=ttl_for_entries) if ttl_for_entries is not None else None
+        created_at, ttl_seconds, expires_at = prepare_entry_timestamps(ttl=ttl)
 
-        managed_entries: list[ManagedEntry] = [ManagedEntry(value=value, ttl=ttl_for_entries, created_at=created_at) for value in values]
+        managed_entries: list[ManagedEntry] = [
+            ManagedEntry(value=value, ttl=ttl_seconds, created_at=created_at, expires_at=expires_at) for value in values
+        ]
 
         await self._put_managed_entries(
             collection=collection,
             keys=keys,
             managed_entries=managed_entries,
-            ttl=ttl_for_entries,
+            ttl=ttl_seconds,
             created_at=created_at,
             expires_at=expires_at,
         )
