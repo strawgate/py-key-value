@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, SupportsFloat, TypeVar
 
 from key_value.shared.code_gen.run import async_retry_operation
@@ -104,7 +104,7 @@ class RetryWrapper(BaseWrapper):
         )
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         return await async_retry_operation(
             max_retries=self.max_retries,
             retry_on=self.retry_on,
@@ -122,7 +122,7 @@ class RetryWrapper(BaseWrapper):
     async def put_many(
         self,
         keys: list[str],
-        values: Sequence[dict[str, Any]],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,

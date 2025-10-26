@@ -3,7 +3,7 @@
 # DO NOT CHANGE! Change the original file instead.
 import base64
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, SupportsFloat
 
 from key_value.shared.errors.key_value import SerializationError
@@ -157,18 +157,18 @@ class BaseEncryptionWrapper(BaseWrapper):
         return [(self._decrypt_value(value), ttl) for (value, ttl) in results]
 
     @override
-    def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
-        encrypted_value = self._encrypt_value(value)
+    def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+        encrypted_value = self._encrypt_value(dict(value))
         return self.key_value.put(key=key, value=encrypted_value, collection=collection, ttl=ttl)
 
     @override
     def put_many(
         self,
         keys: list[str],
-        values: Sequence[dict[str, Any]],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,
     ) -> None:
-        encrypted_values = [self._encrypt_value(value) for value in values]
+        encrypted_values = [self._encrypt_value(dict(value)) for value in values]
         return self.key_value.put_many(keys=keys, values=encrypted_values, collection=collection, ttl=ttl)

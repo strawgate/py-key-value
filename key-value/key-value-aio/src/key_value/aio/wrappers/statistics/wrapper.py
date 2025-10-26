@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, SupportsFloat
 
@@ -135,7 +135,7 @@ class StatisticsWrapper(BaseWrapper):
         return None, None
 
     @override
-    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
+    async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         collection = collection or DEFAULT_COLLECTION_NAME
 
         await self.key_value.put(collection=collection, key=key, value=value, ttl=ttl)
@@ -172,7 +172,7 @@ class StatisticsWrapper(BaseWrapper):
     async def put_many(
         self,
         keys: list[str],
-        values: Sequence[dict[str, Any]],
+        values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
         ttl: Sequence[SupportsFloat | None] | None = None,
