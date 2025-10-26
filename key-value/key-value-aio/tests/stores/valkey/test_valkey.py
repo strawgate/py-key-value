@@ -20,8 +20,9 @@ VALKEY_CONTAINER_PORT = 6379
 WAIT_FOR_VALKEY_TIMEOUT = 30
 
 VALKEY_VERSIONS_TO_TEST = [
-    "7.2",  # Older supported version
-    "8.0",  # Latest stable version
+    "7.2.0",  # Released Apr 2024
+    "8.0.0",  # Released Sep 2024
+    "9.0.0",  # Released Oct 2025
 ]
 
 

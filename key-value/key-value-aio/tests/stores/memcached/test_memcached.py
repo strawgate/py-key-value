@@ -19,8 +19,8 @@ MEMCACHED_CONTAINER_PORT = 11211
 WAIT_FOR_MEMCACHED_TIMEOUT = 30
 
 MEMCACHED_VERSIONS_TO_TEST = [
-    "1.5-alpine",  # Older stable version
-    "1.6-alpine",  # Latest stable version
+    "1.6.0-alpine",  # Released Mar 2020
+    "1.6.39-alpine",  # Released Sep 2025
 ]
 
 

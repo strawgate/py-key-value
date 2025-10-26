@@ -1,4 +1,3 @@
-import os
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -20,8 +19,8 @@ ES_CONTAINER_PORT = 9200
 WAIT_FOR_ELASTICSEARCH_TIMEOUT = 30
 
 ELASTICSEARCH_VERSIONS_TO_TEST = [
-    "9.0.0",  # Minimum supported version
-    "9.2.0",  # Latest stable version
+    "9.0.0",  # Released Apr 2025
+    "9.2.0",  # Released Oct 2025
 ]
 
 
@@ -40,7 +39,6 @@ class ElasticsearchFailedToStartError(Exception):
     pass
 
 
-@pytest.mark.skipif(os.getenv("ES_URL") is None, reason="Elasticsearch is not configured")
 class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=ELASTICSEARCH_VERSIONS_TO_TEST)
     async def setup_elasticsearch(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:

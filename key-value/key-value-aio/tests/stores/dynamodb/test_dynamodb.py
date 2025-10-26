@@ -19,8 +19,8 @@ DYNAMODB_TEST_TABLE = "kv-store-test"
 WAIT_FOR_DYNAMODB_TIMEOUT = 30
 
 DYNAMODB_VERSIONS_TO_TEST = [
-    "2.0.0",  # Older stable version
-    "latest",  # Latest version
+    "2.0.0",  # Released Jul 2023
+    "3.1.0",  # Released Sep 2025
 ]
 
 DYNAMODB_CONTAINER_PORT = 8000

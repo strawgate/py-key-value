@@ -15,8 +15,13 @@ from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMi
 VALKEY_HOST = "localhost"
 VALKEY_PORT = 6380  # normally 6379, avoid clashing with Redis tests
 VALKEY_DB = 15
+VALKEY_CONTAINER_PORT = 6379
 
 WAIT_FOR_VALKEY_TIMEOUT = 30
+# Released Apr 2024
+# Released Sep 2024
+# Released Oct 2025
+VALKEY_VERSIONS_TO_TEST = ["7.2.0", "8.0.0", "9.0.0"]
 
 
 class ValkeyFailedToStartError(Exception):
@@ -36,19 +41,28 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
         return GlideClient.create(config=client_config)
 
     def ping_valkey(self) -> bool:
+        import contextlib
+
+        client = None
         try:
             client = self.get_valkey_client()
-            _ = client.ping()
+            client.ping()
         except Exception:
             return False
+        else:
+            return True
+        finally:
+            if client is not None:
+                with contextlib.suppress(Exception):
+                    client.close()
 
-        return True
+    @pytest.fixture(scope="session", params=VALKEY_VERSIONS_TO_TEST)
+    def setup_valkey(self, request: pytest.FixtureRequest) -> Generator[None, None, None]:
+        version = request.param
 
-    @pytest.fixture(scope="session")
-    def setup_valkey(self) -> Generator[None, None, None]:
-        with docker_container("valkey-test", "valkey/valkey:latest", {"6379": VALKEY_PORT}):
-            if not wait_for_true(bool_fn=self.ping_valkey, tries=30, wait_time=1):
-                msg = "Valkey failed to start"
+        with docker_container(f"valkey-test-{version}", f"valkey/valkey:{version}", {str(VALKEY_CONTAINER_PORT): VALKEY_PORT}):
+            if not wait_for_true(bool_fn=self.ping_valkey, tries=WAIT_FOR_VALKEY_TIMEOUT, wait_time=1):
+                msg = f"Valkey {version} failed to start"
                 raise ValkeyFailedToStartError(msg)
 
             yield

@@ -20,8 +20,8 @@ VAULT_CONTAINER_PORT = 8200
 WAIT_FOR_VAULT_TIMEOUT = 30
 
 VAULT_VERSIONS_TO_TEST = [
-    "1.12",  # Older supported version
-    "1.18",  # Latest stable version
+    "1.12.0",  # Released Oct 2022
+    "1.21.0",  # Released Oct 2025
 ]
 
 
