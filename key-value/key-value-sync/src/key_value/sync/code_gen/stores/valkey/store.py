@@ -11,7 +11,6 @@ from typing_extensions import override
 from key_value.sync.code_gen.stores.base import BaseContextManagerStore, BaseStore
 
 try:
-    # Use redis-py asyncio client to communicate with a Valkey server (protocol compatible)
     from glide_shared.commands.core_options import ExpirySet, ExpiryType
     from glide_sync.config import GlideClientConfiguration, NodeAddress, ServerCredentials
     from glide_sync.glide_client import BaseClient, GlideClient
@@ -84,6 +83,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
             # This should never happen, makes the type checker happy though
             msg = "Client is not connected"
             raise ValueError(msg)
+
         return self._connected_client
 
     @override
@@ -91,9 +91,12 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         combo_key: str = compound_key(collection=collection, key=key)
 
         response: bytes | None = self._client.get(key=combo_key)
+
         if not isinstance(response, bytes):
             return None
+
         decoded_response: str = response.decode("utf-8")
+
         return ManagedEntry.from_json(json_str=decoded_response)
 
     @override
@@ -125,10 +128,6 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
 
         _ = self._client.set(key=combo_key, value=json_value, expiry=expiry)
 
-    # Note: Valkey doesn't have a true bulk write API with per-key TTL support
-    # The base implementation's loop is equivalent to what we would do here
-    # so we use the default BaseStore implementation
-
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
@@ -140,6 +139,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
             return 0
 
         combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
+
         deleted_count: int = self._client.delete(keys=combo_keys)  # pyright: ignore[reportArgumentType]
 
         return deleted_count
