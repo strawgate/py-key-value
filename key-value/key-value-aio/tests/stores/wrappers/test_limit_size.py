@@ -107,13 +107,12 @@ class TestLimitSizeWrapper(BaseStoreTests):
     async def test_put_many_with_ttl_sequence(self, memory_store: MemoryStore):
         limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=100, raise_on_too_large=False)
 
-        # Mix of small and large values with TTLs
+        # Mix of small and large values with single TTL
         keys = ["small1", "large1", "small2"]
         values = [{"data": "x"}, {"data": "x" * 1000}, {"data": "y"}]
-        ttls = [100, 200, 300]
 
-        # Should filter out large value and its corresponding TTL
-        await limit_size_store.put_many(collection="test", keys=keys, values=values, ttl=ttls)
+        # Should filter out large value
+        await limit_size_store.put_many(collection="test", keys=keys, values=values, ttl=100)
 
         # Verify only small values were stored
         results = await limit_size_store.get_many(collection="test", keys=keys)

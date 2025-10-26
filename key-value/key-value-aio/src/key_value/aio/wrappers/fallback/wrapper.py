@@ -87,7 +87,7 @@ class FallbackWrapper(BaseWrapper):
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         if self.write_to_fallback:
             try:

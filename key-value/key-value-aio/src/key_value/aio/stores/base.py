@@ -234,9 +234,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         keys, values, ttl_for_entries = self._prepare_put_many(keys=keys, values=values, ttl=ttl)
 
-        managed_entries: list[ManagedEntry] = [
-            ManagedEntry(value=value, ttl=ttl_for_entries, created_at=now()) for value in values
-        ]
+        managed_entries: list[ManagedEntry] = [ManagedEntry(value=value, ttl=ttl_for_entries, created_at=now()) for value in values]
 
         await self._put_managed_entries(collection=collection, keys=keys, managed_entries=managed_entries)
 

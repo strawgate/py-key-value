@@ -1,5 +1,4 @@
 import time
-from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from numbers import Real
 from typing import Any, SupportsFloat, overload
@@ -73,5 +72,3 @@ def prepare_ttl(t: SupportsFloat | None) -> float | None:
         raise InvalidTTLError(ttl=t)
 
     return ttl
-
-

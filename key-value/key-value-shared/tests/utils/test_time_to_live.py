@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 import pytest
-from inline_snapshot import snapshot
 
 from key_value.shared.errors.key_value import InvalidTTLError
 from key_value.shared.utils.time_to_live import prepare_ttl
