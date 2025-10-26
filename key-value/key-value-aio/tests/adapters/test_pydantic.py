@@ -79,17 +79,17 @@ class TestPydanticAdapter:
 
         assert await user_adapter.delete(collection=TEST_COLLECTION, key=TEST_KEY)
 
-        cached_user = await user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
-        assert cached_user is None
+        assert await user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
 
     async def test_simple_adapter_with_default(self, user_adapter: PydanticAdapter[User]):
-        cached_user = await user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY, default=SAMPLE_USER)
-        assert cached_user == SAMPLE_USER
+        assert await user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY, default=SAMPLE_USER) == SAMPLE_USER
 
         await user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER_2)
+        assert await user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY, default=SAMPLE_USER) == SAMPLE_USER_2
 
-        cached_users = await user_adapter.get_many(collection=TEST_COLLECTION, keys=[TEST_KEY, TEST_KEY_2], default=SAMPLE_USER)
-        assert sorted(cached_users, key=lambda x: x.name) == [SAMPLE_USER_2, SAMPLE_USER]
+        assert await user_adapter.get_many(collection=TEST_COLLECTION, keys=[TEST_KEY, TEST_KEY_2], default=SAMPLE_USER) == snapshot(
+            [SAMPLE_USER_2, SAMPLE_USER]
+        )
 
     async def test_simple_adapter_with_validation_error_ignore(
         self, user_adapter: PydanticAdapter[User], updated_user_adapter: PydanticAdapter[UpdatedUser]
@@ -109,12 +109,10 @@ class TestPydanticAdapter:
 
     async def test_complex_adapter(self, order_adapter: PydanticAdapter[Order]):
         await order_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_ORDER, ttl=10)
-        cached_order: Order | None = await order_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
-        assert cached_order == SAMPLE_ORDER
+        assert await order_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) == SAMPLE_ORDER
 
         assert await order_adapter.delete(collection=TEST_COLLECTION, key=TEST_KEY)
-        cached_order = await order_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
-        assert cached_order is None
+        assert await order_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
 
     async def test_complex_adapter_with_list(self, product_list_adapter: PydanticAdapter[list[Product]], store: MemoryStore):
         await product_list_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=[SAMPLE_PRODUCT, SAMPLE_PRODUCT], ttl=10)
@@ -138,5 +136,4 @@ class TestPydanticAdapter:
         )
 
         assert await product_list_adapter.delete(collection=TEST_COLLECTION, key=TEST_KEY)
-        cached_products = await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
-        assert cached_products is None
+        assert await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
