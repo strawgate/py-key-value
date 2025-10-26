@@ -70,9 +70,8 @@ class BaseStore(KeyValueProtocol, ABC):
             default_collection: The default collection to use if no collection is provided.
                 Defaults to "default_collection".
             seed: Optional seed data to pre-populate the store. Format: {collection: {key: {field: value, ...}}}.
-                Each value must be a mapping (dict) that will be stored as the entry's value.
-                Seeding occurs during every store setup (when the store is entered or when the first operation
-                is performed on the store).
+                Seeding occurs once during store initialization (when the store is first entered or when the
+                first operation is performed on the store).
         """
 
         self._setup_complete = False
