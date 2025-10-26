@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from asyncio.locks import Lock
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from types import TracebackType
+from types import MappingProxyType, TracebackType
 from typing import Any, SupportsFloat
 
 from key_value.shared.constants import DEFAULT_COLLECTION_NAME
@@ -25,6 +25,14 @@ from key_value.aio.protocols.key_value import (
 )
 
 SEED_DATA_TYPE = Mapping[str, Mapping[str, Mapping[str, Any]]]
+FROZEN_SEED_DATA_TYPE = MappingProxyType[str, MappingProxyType[str, MappingProxyType[str, Any]]]
+DEFAULT_SEED_DATA: FROZEN_SEED_DATA_TYPE = MappingProxyType({})
+
+
+def _seed_to_frozen_seed_data(seed: SEED_DATA_TYPE) -> FROZEN_SEED_DATA_TYPE:
+    return MappingProxyType(
+        {collection: MappingProxyType({key: MappingProxyType(value) for key, value in items.items()}) for collection, items in seed.items()}
+    )
 
 
 class BaseStore(AsyncKeyValueProtocol, ABC):
@@ -45,7 +53,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
     _setup_collection_locks: defaultdict[str, Lock]
     _setup_collection_complete: defaultdict[str, bool]
 
-    _seed: SEED_DATA_TYPE
+    _seed: FROZEN_SEED_DATA_TYPE
 
     default_collection: str
 
@@ -66,7 +74,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         self._setup_collection_locks = defaultdict(Lock)
         self._setup_collection_complete = defaultdict(bool)
 
-        self._seed = seed or {}
+        self._seed = _seed_to_frozen_seed_data(seed=seed or {})
 
         self.default_collection = default_collection or DEFAULT_COLLECTION_NAME
 
@@ -89,7 +97,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         for collection, items in self._seed.items():
             await self.setup_collection(collection=collection)
             for key, value in items.items():
-                await self.put(key=key, value=value, collection=collection)
+                await self.put(key=key, value=dict(value), collection=collection)
 
     async def setup(self) -> None:
         if not self._setup_complete:
