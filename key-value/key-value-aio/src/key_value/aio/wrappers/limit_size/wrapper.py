@@ -91,20 +91,14 @@ class LimitSizeWrapper(BaseWrapper):
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         filtered_keys: list[str] = []
         filtered_values: list[Mapping[str, Any]] = []
-        filtered_ttls: list[SupportsFloat | None] | None = None
 
-        if isinstance(ttl, Sequence):
-            filtered_ttls = []
-
-        for i, (k, v) in enumerate(zip(keys, values, strict=True)):
+        for k, v in zip(keys, values, strict=True):
             if self._within_size_limit(value=dict(v), collection=collection, key=k):
                 filtered_keys.append(k)
                 filtered_values.append(v)
-                if isinstance(ttl, Sequence):
-                    filtered_ttls.append(ttl[i])  # type: ignore[union-attr]
 
-        await self.key_value.put_many(keys=filtered_keys, values=filtered_values, collection=collection, ttl=filtered_ttls)
+        await self.key_value.put_many(keys=filtered_keys, values=filtered_values, collection=collection, ttl=ttl)
