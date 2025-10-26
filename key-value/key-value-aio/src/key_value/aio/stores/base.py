@@ -12,7 +12,7 @@ from typing import Any, SupportsFloat
 from key_value.shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.shared.errors import StoreSetupError
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.time_to_live import now, prepare_ttl, prepare_ttls
+from key_value.shared.utils.time_to_live import now, prepare_ttl
 from typing_extensions import Self, override
 
 from key_value.aio.protocols.key_value import (
@@ -204,8 +204,8 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         )
 
     def _prepare_put_many(
-        self, *, keys: Sequence[str], values: Sequence[Mapping[str, Any]], ttl: Sequence[SupportsFloat | None] | SupportsFloat | None
-    ) -> tuple[Sequence[str], Sequence[Mapping[str, Any]], list[float | None]]:
+        self, *, keys: Sequence[str], values: Sequence[Mapping[str, Any]], ttl: SupportsFloat | None
+    ) -> tuple[Sequence[str], Sequence[Mapping[str, Any]], float | None]:
         """Prepare multiple managed entries for a put_many operation.
 
         Inheriting classes can use this method if they need to modify a put_many operation."""
@@ -214,11 +214,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
             msg = "put_many called but a different number of keys and values were provided"
             raise ValueError(msg) from None
 
-        if ttl and isinstance(ttl, Sequence) and len(ttl) != len(keys):
-            msg = "put_many called but a different number of keys and ttl values were provided"
-            raise ValueError(msg) from None
-
-        ttl_for_entries: list[float | None] = prepare_ttls(t=ttl, count=len(keys))
+        ttl_for_entries: float | None = prepare_ttl(t=ttl)
 
         return (keys, values, ttl_for_entries)
 
@@ -229,7 +225,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         """Store multiple key-value pairs in the specified collection."""
 
@@ -238,9 +234,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         keys, values, ttl_for_entries = self._prepare_put_many(keys=keys, values=values, ttl=ttl)
 
-        managed_entries: list[ManagedEntry] = [
-            ManagedEntry(value=value, ttl=ttl_for_entries[i], created_at=now()) for i, value in enumerate(values)
-        ]
+        managed_entries: list[ManagedEntry] = [ManagedEntry(value=value, ttl=ttl_for_entries, created_at=now()) for value in values]
 
         await self._put_managed_entries(collection=collection, keys=keys, managed_entries=managed_entries)
 

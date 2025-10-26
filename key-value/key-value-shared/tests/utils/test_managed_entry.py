@@ -1,8 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any
 
-import pytest
-from key_value.shared_test.cases import SIMPLE_TEST_DATA_ARGNAMES, SIMPLE_TEST_DATA_ARGVALUES, SIMPLE_TEST_DATA_IDS
+from key_value.shared_test.cases import SIMPLE_CASES, PositiveCases
 
 from key_value.shared.utils.managed_entry import dump_to_json, load_from_json
 
@@ -10,30 +9,21 @@ FIXED_DATETIME = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 FIXED_DATETIME_STRING = FIXED_DATETIME.isoformat()
 
 
-@pytest.mark.parametrize(
-    argnames=SIMPLE_TEST_DATA_ARGNAMES,
-    argvalues=SIMPLE_TEST_DATA_ARGVALUES,
-    ids=SIMPLE_TEST_DATA_IDS,
-)
-def test_dump_to_json(data: dict[str, Any], json: str):
+@PositiveCases.parametrize(cases=SIMPLE_CASES)
+def test_dump_to_json(data: dict[str, Any], json: str, round_trip: dict[str, Any]):
+    """Test that the dump_to_json function dumps the data to the matching JSON string"""
     assert dump_to_json(data) == json
 
 
-@pytest.mark.parametrize(
-    argnames=SIMPLE_TEST_DATA_ARGNAMES,
-    argvalues=SIMPLE_TEST_DATA_ARGVALUES,
-    ids=SIMPLE_TEST_DATA_IDS,
-)
-def test_load_from_json(data: dict[str, Any], json: str):
-    assert load_from_json(json) == data
+@PositiveCases.parametrize(cases=SIMPLE_CASES)
+def test_load_from_json(data: dict[str, Any], json: str, round_trip: dict[str, Any]):
+    """Test that the load_from_json function loads the data (round-trip) from the matching JSON string"""
+    assert load_from_json(json) == round_trip
 
 
-@pytest.mark.parametrize(
-    argnames=SIMPLE_TEST_DATA_ARGNAMES,
-    argvalues=SIMPLE_TEST_DATA_ARGVALUES,
-    ids=SIMPLE_TEST_DATA_IDS,
-)
-def test_roundtrip_json(data: dict[str, Any], json: str):
+@PositiveCases.parametrize(cases=SIMPLE_CASES)
+def test_roundtrip_json(data: dict[str, Any], json: str, round_trip: dict[str, Any]):
+    """Test that the dump_to_json and load_from_json functions roundtrip the data"""
     dumped_json: str = dump_to_json(data)
     assert dumped_json == json
-    assert load_from_json(dumped_json) == data
+    assert load_from_json(dumped_json) == round_trip

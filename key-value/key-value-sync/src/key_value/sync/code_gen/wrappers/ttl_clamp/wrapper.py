@@ -52,14 +52,6 @@ class TTLClampWrapper(BaseWrapper):
 
     @override
     def put_many(
-        self,
-        keys: list[str],
-        values: Sequence[Mapping[str, Any]],
-        *,
-        collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        self, keys: Sequence[str], values: Sequence[Mapping[str, Any]], *, collection: str | None = None, ttl: SupportsFloat | None = None
     ) -> None:
-        if isinstance(ttl, Sequence):
-            ttl = [self._ttl_clamp(ttl=t) for t in ttl]
-
-        self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
+        self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=self._ttl_clamp(ttl=ttl))

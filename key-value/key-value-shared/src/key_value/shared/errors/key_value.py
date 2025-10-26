@@ -33,13 +33,3 @@ class InvalidTTLError(KeyValueOperationError):
             message="A TTL is invalid.",
             extra_info={"ttl": str(ttl), **(extra_info or {})},
         )
-
-
-class IncorrectTTLCountError(KeyValueOperationError):
-    """Raised when the number of TTLs is incorrect."""
-
-    def __init__(self, ttl: Any, count: int):
-        super().__init__(
-            message="The number of TTLs is incorrect.",
-            extra_info={"ttl": ttl, "count": count},
-        )

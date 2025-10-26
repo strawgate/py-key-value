@@ -68,7 +68,7 @@ class SingleCollectionWrapper(BaseWrapper):
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         new_keys: Sequence[str] = [self._prefix_key(key=key, collection=collection) for key in keys]
         return await self.key_value.put_many(keys=new_keys, values=values, collection=self.single_collection, ttl=ttl)

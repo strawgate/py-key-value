@@ -125,7 +125,7 @@ class RetryWrapper(BaseWrapper):
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         return await async_retry_operation(
             max_retries=self.max_retries,

@@ -142,7 +142,7 @@ class CompressionWrapper(BaseWrapper):
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         compressed_values = [self._compress_value(dict(value)) for value in values]
         return await self.key_value.put_many(keys=keys, values=compressed_values, collection=collection, ttl=ttl)
