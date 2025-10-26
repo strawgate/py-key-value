@@ -109,9 +109,10 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
                         raise StoreSetupError(
                             message=f"Failed to setup key value store: {e}", extra_info={"store": self.__class__.__name__}
                         ) from e
+
                     self._setup_complete = True
 
-                await self._seed_store()
+                    await self._seed_store()
 
     async def setup_collection(self, *, collection: str) -> None:
         await self.setup()

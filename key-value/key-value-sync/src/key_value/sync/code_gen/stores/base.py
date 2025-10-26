@@ -115,9 +115,10 @@ class BaseStore(KeyValueProtocol, ABC):
                         raise StoreSetupError(
                             message=f"Failed to setup key value store: {e}", extra_info={"store": self.__class__.__name__}
                         ) from e
+
                     self._setup_complete = True
 
-                self._seed_store()
+                    self._seed_store()
 
     def setup_collection(self, *, collection: str) -> None:
         self.setup()
