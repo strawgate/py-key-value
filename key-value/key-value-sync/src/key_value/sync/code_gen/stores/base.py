@@ -27,6 +27,8 @@ from key_value.sync.code_gen.protocols.key_value import (
     KeyValueProtocol,
 )
 
+SEED_DATA_TYPE = Mapping[str, Mapping[str, Mapping[str, Any]]]
+
 
 class BaseStore(KeyValueProtocol, ABC):
     """An opinionated Abstract base class for managed key-value stores using ManagedEntry objects.
@@ -46,20 +48,28 @@ class BaseStore(KeyValueProtocol, ABC):
     _setup_collection_locks: defaultdict[str, Lock]
     _setup_collection_complete: defaultdict[str, bool]
 
+    _seed: SEED_DATA_TYPE
+
     default_collection: str
 
-    def __init__(self, *, default_collection: str | None = None) -> None:
+    def __init__(self, *, default_collection: str | None = None, seed: SEED_DATA_TYPE | None = None) -> None:
         """Initialize the managed key-value store.
 
         Args:
             default_collection: The default collection to use if no collection is provided.
                 Defaults to "default_collection".
+            seed: Optional seed data to pre-populate the store. Format: {collection: {key: {field: value, ...}}}.
+                Each value must be a mapping (dict) that will be stored as the entry's value.
+                Seeding occurs during every store setup (when the store is entered or when the first operation
+                is performed on the store).
         """
 
         self._setup_complete = False
         self._setup_lock = Lock()
         self._setup_collection_locks = defaultdict(Lock)
         self._setup_collection_complete = defaultdict(bool)
+
+        self._seed = seed or {}
 
         self.default_collection = default_collection or DEFAULT_COLLECTION_NAME
 
@@ -77,6 +87,13 @@ class BaseStore(KeyValueProtocol, ABC):
     def _setup_collection(self, *, collection: str) -> None:
         """Initialize the collection (called once before first use of the collection)."""
 
+    def _seed_store(self) -> None:
+        """Seed the store with the data from the seed."""
+        for collection, items in self._seed.items():
+            self.setup_collection(collection=collection)
+            for key, value in items.items():
+                self.put(key=key, value=value, collection=collection)
+
     def setup(self) -> None:
         if not self._setup_complete:
             with self._setup_lock:
@@ -88,6 +105,8 @@ class BaseStore(KeyValueProtocol, ABC):
                             message=f"Failed to setup key value store: {e}", extra_info={"store": self.__class__.__name__}
                         ) from e
                     self._setup_complete = True
+
+                self._seed_store()
 
     def setup_collection(self, *, collection: str) -> None:
         self.setup()

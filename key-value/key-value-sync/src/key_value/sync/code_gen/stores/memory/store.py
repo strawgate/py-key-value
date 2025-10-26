@@ -2,7 +2,6 @@
 # from the original file 'store.py'
 # DO NOT CHANGE! Change the original file instead.
 import sys
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, SupportsFloat
@@ -12,6 +11,7 @@ from key_value.shared.utils.time_to_live import epoch_to_datetime
 from typing_extensions import Self, override
 
 from key_value.sync.code_gen.stores.base import (
+    SEED_DATA_TYPE,
     BaseDestroyCollectionStore,
     BaseDestroyStore,
     BaseEnumerateCollectionsStore,
@@ -104,14 +104,13 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
     max_entries_per_collection: int
 
     _cache: dict[str, MemoryCollection]
-    _seed: Mapping[str, Mapping[str, Mapping[str, Any]]]
 
     def __init__(
         self,
         *,
         max_entries_per_collection: int = DEFAULT_MAX_ENTRIES_PER_COLLECTION,
         default_collection: str | None = None,
-        seed: Mapping[str, Mapping[str, Mapping[str, Any]]] | None = None,
+        seed: SEED_DATA_TYPE | None = None,
     ):
         """Initialize a fixed-size in-memory store.
 
@@ -126,24 +125,15 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         self.max_entries_per_collection = max_entries_per_collection
 
         self._cache = {}
-        self._seed = seed or {}
 
         self._stable_api = True
 
-        super().__init__(default_collection=default_collection)
+        super().__init__(default_collection=default_collection, seed=seed)
 
-    def _create_collection(self, collection: str) -> MemoryCollection:
-        """Create a new collection.
-
-        Args:
-            collection: The collection name.
-
-        Returns:
-            The created MemoryCollection instance.
-        """
-        collection_cache = MemoryCollection(max_entries=self.max_entries_per_collection)
-        self._cache[collection] = collection_cache
-        return collection_cache
+    @override
+    def _setup(self) -> None:
+        for collection in self._seed:
+            self._setup_collection(collection=collection)
 
     @override
     def _setup_collection(self, *, collection: str) -> None:
@@ -152,15 +142,11 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         Args:
             collection: The collection name.
         """
-        # Create the collection
-        collection_cache = self._create_collection(collection)
+        if collection in self._cache:
+            return
 
-        # Seed the collection if seed data is available for it
-        if collection in self._seed:
-            items = self._seed[collection]
-            for key, value in items.items():
-                managed_entry = ManagedEntry(value=value)
-                collection_cache.put(key=key, value=managed_entry)
+        collection_cache = MemoryCollection(max_entries=self.max_entries_per_collection)
+        self._cache[collection] = collection_cache
 
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
