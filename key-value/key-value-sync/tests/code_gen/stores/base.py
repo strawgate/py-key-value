@@ -53,7 +53,7 @@ class BaseStoreTests(ABC):
         assert store.get(collection="test", key="test") == {"test": "test"}
 
     @PositiveCases.parametrize(cases=SIMPLE_CASES)
-    def test_models_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]  # noqa: ARG002
+    def test_models_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]
         store.put(collection="test", key="test", value=data)
         retrieved_data = store.get(collection="test", key="test")
         assert retrieved_data is not None
@@ -65,7 +65,7 @@ class BaseStoreTests(ABC):
             store.put(collection="test", key="test", value=data)
 
     @PositiveCases.parametrize(cases=[LARGE_DATA_CASES])
-    def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]  # noqa: ARG002
+    def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):  # pyright: ignore[reportUnusedParameter, reportUnusedParameter]
         store.put(collection="test", key="test", value=data)
         assert store.get(collection="test", key="test") == round_trip
 
