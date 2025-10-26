@@ -102,8 +102,9 @@ needs while keeping your framework code clean and backend-agnostic.
   never returned from the store. You get a dictionary or a Pydantic model,
   hopefully a copy of what you stored, but never the same instance in memory.
 - **Dislike of Bear Bros**: Beartype is used for runtime type checking. Core
-  protocol methods (put/get/delete/ttl) enforce types and will raise TypeError
-  for violations. Other code produces warnings. You can disable all beartype
+  protocol methods in store and wrapper implementations (put/get/delete/ttl
+  and their batch variants) enforce types and will raise TypeError for
+  violations. Other code produces warnings. You can disable all beartype
   checks by setting `PY_KEY_VALUE_DISABLE_BEARTYPE=true` or suppress warnings
   via the warnings module.
 

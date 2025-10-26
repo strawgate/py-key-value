@@ -108,8 +108,6 @@ NULL_CASES: PositiveCases = PositiveCases(
     ),
     Case(name="no-implicit-serialization-in-keys", data={"null": "str_value"}, json='{"null": "str_value"}'),
     Case(name="no-implicit-serialization-in-values", data={"str_key": "null"}, json='{"str_key": "null"}'),
-    # Removed: implicit-serialization-of-null-key - violates Mapping[str, Any] type signature
-    # Removed: nested-dict-keys with None key - violates type signature for nested dicts
     case_type="null",
 )
 
@@ -126,9 +124,6 @@ BOOLEAN_CASES: PositiveCases = PositiveCases(
     ),
     Case(name="no-implicit-serialization-in-keys", data={"true": "str_value"}, json='{"true": "str_value"}'),
     Case(name="no-implicit-serialization-in-values", data={"str_key": "true"}, json='{"str_key": "true"}'),
-    # Removed: implicit-serialization-of-true-key - violates Mapping[str, Any] type signature
-    # Removed: implicit-serialization-of-false-key - violates Mapping[str, Any] type signature
-    # Removed: nested-dict-keys with True key - violates type signature for nested dicts
     case_type="boolean",
 )
 
@@ -142,7 +137,6 @@ INTEGER_CASES: PositiveCases = PositiveCases(
     Case(name="large-value", data={"large_int_key": 1 * 10**18}, json=f'{{"large_int_key": {1 * 10**18}}}'),
     Case(name="no-implicit-serialization-in-keys", data={"1": "str_value"}, json='{"1": "str_value"}'),
     Case(name="no-implicit-serialization-in-values", data={"str_key": "1"}, json='{"str_key": "1"}'),
-    # Removed: integer key - violates Mapping[str, Any] type signature
     case_type="integer",
 )
 
@@ -155,7 +149,6 @@ FLOAT_CASES: PositiveCases = PositiveCases(
     Case(name="large-value", data={"large_float_key": 1.0 * 10**63}, json=f'{{"large_float_key": {1.0 * 10**63}}}'),
     Case(name="no-implicit-serialization-in-keys", data={"1.0": "str_value"}, json='{"1.0": "str_value"}'),
     Case(name="no-implicit-serialization-in-values", data={"str_key": "1.0"}, json='{"str_key": "1.0"}'),
-    # Removed: implicit-serialization-of-float-key - violates Mapping[str, Any] type signature
     case_type="float",
 )
 
@@ -179,7 +172,6 @@ STRING_CASES: PositiveCases = PositiveCases(
 DATETIME_CASES: PositiveCases = PositiveCases(case_type="datetime")
 
 NEGATIVE_DATETIME_CASES: NegativeCases = NegativeCases(
-    # Removed: datetime-key, date-key, time-key - violate Mapping[str, Any] type signature (caught by beartype)
     NegativeCase(name="datetime-value", data={"str_key": FIXED_DATETIME}),
     NegativeCase(name="date-value", data={"str_key": FIXED_DATETIME.date()}),
     NegativeCase(name="time-value", data={"str_key": FIXED_TIME}),
@@ -201,7 +193,6 @@ UUID_CASES: PositiveCases = PositiveCases(
 )
 
 NEGATIVE_UUID_CASES: NegativeCases = NegativeCases(
-    # Removed: UUID key - violates Mapping[str, Any] type signature (caught by beartype)
     NegativeCase(name="value", data={"str_key": FIXED_UUID}),
     case_type="uuid",
 )
@@ -216,7 +207,6 @@ BYTES_CASES: PositiveCases = PositiveCases(
 )
 
 NEGATIVE_BYTES_CASES: NegativeCases = NegativeCases(
-    # Removed: bytes key - violates Mapping[str, Any] type signature (caught by beartype)
     NegativeCase(name="bytes-value", data={"str_key": B_HELLO_WORLD}),
     case_type="bytes",
 )
@@ -234,7 +224,6 @@ TUPLE_CASES: PositiveCases = PositiveCases(
 )
 
 NEGATIVE_TUPLE_CASES: NegativeCases = NegativeCases(
-    # Removed: tuple key - violates Mapping[str, Any] type signature (caught by beartype)
     NegativeCase(name="value", data={"str_key": SAMPLE_TUPLE}),
     case_type="tuple",
 )
