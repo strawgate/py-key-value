@@ -1,3 +1,4 @@
+import contextlib
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -43,8 +44,6 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
         return await GlideClient.create(config=client_config)
 
     async def ping_valkey(self) -> bool:
-        import contextlib
-
         client = None
         try:
             client = await self.get_valkey_client()
