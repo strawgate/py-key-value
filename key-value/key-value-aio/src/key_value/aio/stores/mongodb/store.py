@@ -155,7 +155,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         return ManagedEntry.from_json(json_str=json_value)
 
     @override
-    async def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
+    async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
         if not keys:
             return []
 
@@ -203,7 +203,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         )
 
     @override
-    async def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    async def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
         if not keys:
             return
 
@@ -212,7 +212,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         # Use bulk_write for efficient batch operations
         from pymongo import UpdateOne
 
-        operations = []
+        operations: list[UpdateOne] = []
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             json_value: str = managed_entry.to_json()
 
@@ -233,7 +233,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
                 )
             )
 
-        _ = await self._collections_by_name[collection].bulk_write(operations)
+        _ = await self._collections_by_name[collection].bulk_write(operations)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
@@ -243,7 +243,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         return bool(result.deleted_count)
 
     @override
-    async def _delete_managed_entries(self, *, keys: list[str], collection: str) -> int:
+    async def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
         if not keys:
             return 0
 

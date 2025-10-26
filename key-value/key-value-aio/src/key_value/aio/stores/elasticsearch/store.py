@@ -185,7 +185,7 @@ class ElasticsearchStore(
         )
 
     @override
-    async def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
+    async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
         if not keys:
             return []
 
@@ -267,12 +267,12 @@ class ElasticsearchStore(
         )
 
     @override
-    async def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    async def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
         if not keys:
             return
 
         # Use bulk API for efficient batch indexing
-        operations = []
+        operations: list[dict[str, Any]] = []
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             combo_key: str = compound_key(collection=collection, key=key)
 
@@ -287,7 +287,7 @@ class ElasticsearchStore(
             if managed_entry.expires_at:
                 document["expires_at"] = managed_entry.expires_at.isoformat()
 
-            index_action = {
+            index_action: dict[str, Any] = {
                 "index": {
                     "_index": self._sanitize_index_name(collection=collection),
                     "_id": self._sanitize_document_id(key=combo_key),
@@ -296,7 +296,7 @@ class ElasticsearchStore(
             operations.append(index_action)
             operations.append(document)
 
-        _ = await self._client.bulk(operations=operations, refresh=self._should_refresh_on_put)
+        _ = await self._client.bulk(operations=operations, refresh=self._should_refresh_on_put)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
@@ -314,15 +314,15 @@ class ElasticsearchStore(
         return result == "deleted"
 
     @override
-    async def _delete_managed_entries(self, *, keys: list[str], collection: str) -> int:
+    async def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
         if not keys:
             return 0
 
         # Use bulk API for efficient batch deletion
-        operations = []
+        operations: list[dict[str, Any]] = []
         for key in keys:
             combo_key: str = compound_key(collection=collection, key=key)
-            delete_action = {
+            delete_action: dict[str, Any] = {
                 "delete": {
                     "_index": self._sanitize_index_name(collection=collection),
                     "_id": self._sanitize_document_id(key=combo_key),
@@ -330,7 +330,7 @@ class ElasticsearchStore(
             }
             operations.append(delete_action)
 
-        elasticsearch_response = await self._client.bulk(operations=operations)
+        elasticsearch_response = await self._client.bulk(operations=operations)  # pyright: ignore[reportUnknownMemberType]
 
         body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
 

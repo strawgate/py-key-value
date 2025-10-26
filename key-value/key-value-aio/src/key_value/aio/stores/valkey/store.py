@@ -101,7 +101,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
 
         combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
 
-        responses: list[bytes | None] = await self._client.mget(keys=combo_keys)  # pyright: ignore[reportUnknownMemberType]
+        responses: list[bytes | None] = await self._client.mget(keys=combo_keys)  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
 
         entries: list[ManagedEntry | None] = []
         for response in responses:
@@ -152,7 +152,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
             return 0
 
         combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
-        deleted_count: int = await self._client.delete(keys=combo_keys)
+        deleted_count: int = await self._client.delete(keys=combo_keys)  # pyright: ignore[reportArgumentType]
 
         return deleted_count
 
