@@ -15,6 +15,12 @@ T = TypeVar("T", bound=BaseModel | Sequence[BaseModel])
 class PydanticAdapter(Generic[T]):
     """Adapter around a KVStore-compliant Store that allows type-safe persistence of Pydantic models."""
 
+    _key_value: AsyncKeyValue
+    _is_list_model: bool
+    _type_adapter: TypeAdapter[T]
+    _default_collection: str | None
+    _raise_on_validation_error: bool
+
     # Beartype doesn't like our `type[T] includes a bound on Sequence[...] as the subscript is not checkable at runtime
     # For just the next 20 or so lines we are no longer bear bros but have no fear, we will be back soon!
     @bear_spray
@@ -34,14 +40,14 @@ class PydanticAdapter(Generic[T]):
             raise_on_validation_error: Whether to raise a ValidationError if the model is invalid.
         """
 
-        self._key_value: AsyncKeyValue = key_value
+        self._key_value = key_value
 
         origin = get_origin(pydantic_model)
-        self._is_list_model: bool = origin is not None and issubclass(origin, Sequence)
+        self._is_list_model = origin is not None and isinstance(origin, type) and issubclass(origin, Sequence)
 
         self._type_adapter = TypeAdapter[T](pydantic_model)
-        self._default_collection: str | None = default_collection
-        self._raise_on_validation_error: bool = raise_on_validation_error
+        self._default_collection = default_collection
+        self._raise_on_validation_error = raise_on_validation_error
 
     def _validate_model(self, value: dict[str, Any]) -> T | None:
         try:
@@ -60,7 +66,7 @@ class PydanticAdapter(Generic[T]):
             if self._is_list_model:
                 return {"items": self._type_adapter.dump_python(value, mode="json")}
 
-            return self._type_adapter.dump_python(value, mode="json")
+            return self._type_adapter.dump_python(value, mode="json")  # pyright: ignore[reportAny]
         except PydanticSerializationError as e:
             msg = f"Invalid Pydantic model: {e}"
             raise SerializationError(msg) from e
