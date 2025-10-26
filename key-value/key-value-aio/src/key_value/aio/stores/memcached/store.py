@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 from collections.abc import Sequence
 from typing import overload
@@ -68,7 +69,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         return ManagedEntry.from_json(json_str=json_str)
 
     @override
-    async def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
+    async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
         if not keys:
             return []
 
@@ -115,13 +116,12 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         )
 
     @override
-    async def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    async def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
         if not keys:
             return
 
-        # aiomcache doesn't have a native multi_set, so we'll batch individual sets
-        # We could use asyncio.gather but aiomcache Client might not be thread-safe
-        for key, managed_entry in zip(keys, managed_entries, strict=True):
+        # aiomcache doesn't have a native multi_set, so we use concurrent individual sets
+        async def put_single(key: str, managed_entry: ManagedEntry) -> None:
             combo_key: str = self.sanitize_key(compound_key(collection=collection, key=key))
 
             exptime: int
@@ -137,6 +137,8 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
                 value=json_value.encode(encoding="utf-8"),
                 exptime=exptime,
             )
+
+        await asyncio.gather(*(put_single(key, entry) for key, entry in zip(keys, managed_entries, strict=True)))
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:

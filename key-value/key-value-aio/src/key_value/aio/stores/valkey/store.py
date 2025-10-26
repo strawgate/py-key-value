@@ -95,7 +95,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         return ManagedEntry.from_json(json_str=decoded_response)
 
     @override
-    async def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
+    async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
         if not keys:
             return []
 
@@ -130,13 +130,11 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         _ = await self._client.set(key=combo_key, value=json_value, expiry=expiry)
 
     @override
-    async def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    async def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
         if not keys:
             return
 
-        # Valkey's mset doesn't support per-key TTL, so we need to use a different approach
-        # We'll use a pipeline-like approach with individual set commands
-        # Note: BaseClient supports pipelining through transaction
+        # Valkey's mset doesn't support per-key TTL, so we use individual set commands
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             combo_key: str = compound_key(collection=collection, key=key)
             json_value: str = managed_entry.to_json()
@@ -149,7 +147,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         return await self._client.delete(keys=[combo_key]) != 0
 
     @override
-    async def _delete_managed_entries(self, *, keys: list[str], collection: str) -> int:
+    async def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
         if not keys:
             return 0
 

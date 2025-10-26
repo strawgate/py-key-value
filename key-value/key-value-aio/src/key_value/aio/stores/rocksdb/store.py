@@ -10,7 +10,7 @@ from typing_extensions import override
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
 
 try:
-    from rocksdict import Options, Rdict
+    from rocksdict import Options, Rdict, WriteBatch
 except ImportError as e:
     msg = "RocksDBStore requires py-key-value-aio[rocksdb]"
     raise ImportError(msg) from e
@@ -128,15 +128,13 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         self._db[combo_key] = json_value.encode("utf-8")
 
     @override
-    async def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    async def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
         self._fail_on_closed_store()
 
         if not keys:
             return
 
         # Use WriteBatch for efficient batch writes
-        from rocksdict import WriteBatch
-
         batch = WriteBatch()
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             combo_key: str = compound_key(collection=collection, key=key)
@@ -160,15 +158,13 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         return exists
 
     @override
-    async def _delete_managed_entries(self, *, keys: list[str], collection: str) -> int:
+    async def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
         self._fail_on_closed_store()
 
         if not keys:
             return 0
 
         # Use WriteBatch for efficient batch deletes
-        from rocksdict import WriteBatch
-
         batch = WriteBatch()
         deleted_count = 0
 

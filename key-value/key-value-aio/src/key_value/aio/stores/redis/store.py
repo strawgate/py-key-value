@@ -96,7 +96,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         return managed_entry
 
     @override
-    async def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
+    async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
         if not keys:
             return []
 
@@ -134,7 +134,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             _ = await self._client.set(name=combo_key, value=json_value)  # pyright: ignore[reportAny]
 
     @override
-    async def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
+    async def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
         if not keys:
             return
 
@@ -163,7 +163,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         return await self._client.delete(combo_key) != 0  # pyright: ignore[reportAny]
 
     @override
-    async def _delete_managed_entries(self, *, keys: list[str], collection: str) -> int:
+    async def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
         if not keys:
             return 0
 
