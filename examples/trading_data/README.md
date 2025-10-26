@@ -1,20 +1,19 @@
 # Trading Data Cache Example
 
 A trading data caching application demonstrating advanced py-key-value patterns
-including compression, multi-tier caching, and retry logic.
+including logging, multi-tier caching, and retry logic.
 
 ## Overview
 
 This example shows how to build an efficient trading data cache using
 py-key-value. The implementation features a two-tier caching strategy
-(memory + disk) with compression for optimal storage efficiency and fast access
-to recent data.
+(memory + disk) with logging for observability and fast access to recent data.
 
 ## Features
 
 - **Type-safe price data storage** using PydanticAdapter
 - **Multi-tier caching** with PassthroughCacheWrapper (memory → disk)
-- **Data compression** with CompressionWrapper for efficient storage
+- **Operation logging** with LoggingWrapper for debugging and observability
 - **Automatic retry** with RetryWrapper for transient failure handling
 - **Cache metrics** tracking with StatisticsWrapper
 - **Symbol-based isolation** using collection-based storage
@@ -26,15 +25,14 @@ The wrapper stack (applied inside-out):
 1. **StatisticsWrapper** - Tracks cache hit/miss metrics and operation counts
 2. **RetryWrapper** - Handles transient failures with exponential backoff (3
    retries)
-3. **CompressionWrapper** - Compresses data before writing to disk
+3. **LoggingWrapper** - Logs all operations for debugging and monitoring
 4. **PassthroughCacheWrapper** - Two-tier caching: fast memory cache with disk
    persistence
 
 Data flow:
 
-- **Write**: Data → Memory cache → Compressed → Disk storage
-- **Read**: Check memory cache → If miss, load from disk → Decompress → Cache in
-  memory
+- **Write**: Data → Memory cache → Logged → Disk storage
+- **Read**: Check memory cache → If miss, load from disk → Log → Cache in memory
 
 ## Requirements
 
@@ -224,9 +222,14 @@ from key_value.aio.stores.redis.store import RedisStore
 memory_cache = RedisStore(url="redis://localhost:6379/0")
 disk_cache = DiskStore(root_directory="historical_data")
 
+# Build wrapper stack with logging
+stats = StatisticsWrapper(key_value=disk_cache)
+retry_wrapper = RetryWrapper(key_value=stats, max_retries=3, base_delay=0.1)
+disk_with_logging = LoggingWrapper(key_value=retry_wrapper)
+
 cache_store = PassthroughCacheWrapper(
     cache=memory_cache,
-    key_value=CompressionWrapper(key_value=disk_cache)
+    key_value=disk_with_logging
 )
 ```
 
@@ -235,8 +238,12 @@ Example with encryption:
 ```python
 from key_value.aio.wrappers.encryption.wrapper import FernetEncryptionWrapper
 
-encrypted_disk = FernetEncryptionWrapper(
-    key_value=disk_cache,
+# Add encryption to the wrapper stack
+stats = StatisticsWrapper(key_value=disk_cache)
+encrypted_stats = FernetEncryptionWrapper(
+    key_value=stats,
     key=b"your-32-byte-encryption-key-here"
 )
+retry_wrapper = RetryWrapper(key_value=encrypted_stats, max_retries=3, base_delay=0.1)
+disk_with_logging = LoggingWrapper(key_value=retry_wrapper)
 ```

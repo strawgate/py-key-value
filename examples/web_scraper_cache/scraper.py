@@ -25,8 +25,6 @@ from key_value.aio.wrappers.limit_size.wrapper import LimitSizeWrapper
 from key_value.aio.wrappers.ttl_clamp.wrapper import TTLClampWrapper
 from pydantic import BaseModel
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -199,6 +197,9 @@ async def simulate_scrape(url: str) -> tuple[str, dict[str, str]]:
 
 async def main():
     """Demonstrate the web scraper cache."""
+    # Configure logging for the demo
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
     # Generate a key for this demo (in production, load from secure storage)
     encryption_key = Fernet.generate_key()
     # Only show fingerprint, never the actual key

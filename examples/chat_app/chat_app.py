@@ -19,9 +19,6 @@ from key_value.aio.wrappers.statistics.wrapper import StatisticsWrapper
 from key_value.aio.wrappers.ttl_clamp.wrapper import TTLClampWrapper
 from pydantic import BaseModel
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
 
 class ChatMessage(BaseModel):
     """A chat message with sender, content, and timestamp."""
@@ -47,12 +44,9 @@ class ChatApp:
         # 1. StatisticsWrapper - Track operation metrics
         # 2. TTLClampWrapper - Enforce max TTL of 24 hours (86400 seconds)
         # 3. LoggingWrapper - Log all operations for debugging
-        wrapped_store = LoggingWrapper(
-            key_value=TTLClampWrapper(
-                key_value=StatisticsWrapper(key_value=base_store),
-                max_ttl=86400,  # 24 hours in seconds
-            )
-        )
+        stats = StatisticsWrapper(key_value=base_store)
+        ttl_clamped = TTLClampWrapper(key_value=stats, max_ttl=86400)  # 24 hours
+        wrapped_store = LoggingWrapper(key_value=ttl_clamped)
 
         # PydanticAdapter for type-safe message storage/retrieval
         self.adapter: PydanticAdapter[ChatMessage] = PydanticAdapter[ChatMessage](
@@ -61,7 +55,7 @@ class ChatApp:
         )
 
         # Store reference to statistics wrapper for metrics
-        self.stats_wrapper = wrapped_store.key_value.key_value  # type: ignore[attr-defined]
+        self.stats_wrapper = stats
 
     async def send_message(self, conversation_id: str, sender: str, content: str) -> str:
         """
@@ -136,6 +130,9 @@ class ChatApp:
 
 async def main():
     """Demonstrate the chat application."""
+    # Configure logging for the demo
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
     chat = ChatApp()
 
     # Send some messages

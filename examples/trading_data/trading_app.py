@@ -3,7 +3,7 @@ Trading data caching application demonstrating advanced py-key-value patterns.
 
 This example shows how to:
 - Use PydanticAdapter for type-safe price data storage
-- Apply CompressionWrapper for efficient historical data storage
+- Use LoggingWrapper for observability and debugging
 - Use PassthroughCacheWrapper for multi-tier caching (memory + disk)
 - Use RetryWrapper for handling transient failures
 - Use StatisticsWrapper to track cache hit/miss metrics
@@ -17,14 +17,11 @@ from pathlib import Path
 from key_value.aio.adapters.pydantic import PydanticAdapter
 from key_value.aio.stores.disk.store import DiskStore
 from key_value.aio.stores.memory.store import MemoryStore
-from key_value.aio.wrappers.compression.wrapper import CompressionWrapper
+from key_value.aio.wrappers.logging.wrapper import LoggingWrapper
 from key_value.aio.wrappers.passthrough_cache.wrapper import PassthroughCacheWrapper
 from key_value.aio.wrappers.retry.wrapper import RetryWrapper
 from key_value.aio.wrappers.statistics.wrapper import StatisticsWrapper
 from pydantic import BaseModel
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 
 class PriceData(BaseModel):
@@ -38,11 +35,11 @@ class PriceData(BaseModel):
 
 class TradingDataCache:
     """
-    Trading data cache with multi-tier caching and compression.
+    Trading data cache with multi-tier caching and logging.
 
     Uses a memory cache for fast access to recent data, with disk-backed
-    persistence for historical data. Compression reduces storage requirements
-    for large datasets.
+    persistence for historical data. Logging provides observability into
+    cache operations.
     """
 
     def __init__(self, cache_dir: str = ".trading_cache"):
@@ -52,19 +49,19 @@ class TradingDataCache:
         # Tier 1: Memory cache for fast access
         memory_cache = MemoryStore()
 
-        # Tier 2: Disk cache with compression for historical data
+        # Tier 2: Disk cache for historical data
         disk_cache = DiskStore(root_directory=cache_dir)
 
         # Wrapper stack (applied inside-out):
         # 1. StatisticsWrapper - Track cache metrics
         # 2. RetryWrapper - Handle transient failures (3 retries with exponential backoff)
-        # 3. CompressionWrapper - Compress data before storage
+        # 3. LoggingWrapper - Log operations for debugging
         # 4. PassthroughCacheWrapper - Two-tier caching (memory → disk)
-        disk_with_compression = CompressionWrapper(
-            key_value=RetryWrapper(key_value=StatisticsWrapper(key_value=disk_cache), max_retries=3, base_delay=0.1)
-        )
+        stats = StatisticsWrapper(key_value=disk_cache)
+        retry_wrapper = RetryWrapper(key_value=stats, max_retries=3, base_delay=0.1)
+        disk_with_logging = LoggingWrapper(key_value=retry_wrapper)
 
-        cache_store = PassthroughCacheWrapper(cache=memory_cache, key_value=disk_with_compression)
+        cache_store = PassthroughCacheWrapper(cache=memory_cache, key_value=disk_with_logging)
 
         # PydanticAdapter for type-safe price data storage/retrieval
         self.adapter: PydanticAdapter[PriceData] = PydanticAdapter[PriceData](
@@ -73,7 +70,7 @@ class TradingDataCache:
         )
 
         # Store reference to statistics wrapper for metrics
-        self.stats_wrapper = disk_with_compression.key_value.key_value  # type: ignore[attr-defined]
+        self.stats_wrapper = stats
         self.cache_dir = cache_dir
 
     async def store_price(self, symbol: str, price: float, volume: int, ttl: int | None = None) -> str:
@@ -170,6 +167,9 @@ class TradingDataCache:
 
 async def main():
     """Demonstrate the trading data cache."""
+    # Configure logging for the demo
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
     cache = TradingDataCache(cache_dir=".demo_trading_cache")
 
     try:
