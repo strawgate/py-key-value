@@ -122,7 +122,8 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         Args:
             max_entries_per_collection: The maximum number of entries per collection. Defaults to 10000.
             default_collection: The default collection to use if no collection is provided.
-            seed: Optional seed data to pre-populate the store. Format: {collection: {key: value}}.
+            seed: Optional seed data to pre-populate the store. Format: {collection: {key: {field: value, ...}}}.
+                Each value must be a mapping (dict) that will be stored as the entry's value.
         """
 
         self.max_entries_per_collection = max_entries_per_collection
@@ -154,7 +155,8 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         """Seed the store with initial data synchronously.
 
         Args:
-            seed: Seed data in format {collection: {key: value}}.
+            seed: Seed data in format {collection: {key: {field: value, ...}}}.
+                Each value must be a mapping (dict) that will be stored as the entry's value.
         """
         for collection, items in seed.items():
             # Ensure collection exists
