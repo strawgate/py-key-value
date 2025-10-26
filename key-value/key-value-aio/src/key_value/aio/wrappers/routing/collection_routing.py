@@ -23,6 +23,8 @@ class CollectionRoutingWrapper(RoutingWrapper):
         )
     """
 
+    _collection_map: MappingProxyType[str, AsyncKeyValue]
+
     def __init__(
         self,
         collection_map: Mapping[str, AsyncKeyValue],
@@ -35,11 +37,11 @@ class CollectionRoutingWrapper(RoutingWrapper):
                            name is mapped to its corresponding backing store.
             default_store: Store to use for unmapped collections.
         """
-        self.collection_map: MappingProxyType[str, AsyncKeyValue] = MappingProxyType(mapping=dict(collection_map))
+        self._collection_map = MappingProxyType(mapping=dict(collection_map))
 
         def route_by_collection(collection: str | None) -> AsyncKeyValue | None:
             if collection is not None:
-                return self.collection_map.get(collection)
+                return self._collection_map.get(collection)
 
             return None
 

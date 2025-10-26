@@ -43,7 +43,7 @@ class PydanticAdapter(Generic[T]):
         self._key_value = key_value
 
         origin = get_origin(pydantic_model)
-        self._is_list_model = origin is not None and issubclass(origin, Sequence)
+        self._is_list_model = origin is not None and isinstance(origin, type) and issubclass(origin, Sequence)
 
         self._type_adapter = TypeAdapter[T](pydantic_model)
         self._default_collection = default_collection

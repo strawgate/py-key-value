@@ -33,6 +33,9 @@ class RoutingWrapper(BaseWrapper):
         )
     """
 
+    _routing_function: RoutingFunction
+    _default_store: KeyValue
+
     def __init__(self, routing_function: RoutingFunction, default_store: KeyValue) -> None:
         """Initialize the routing wrapper.
 
@@ -41,8 +44,8 @@ class RoutingWrapper(BaseWrapper):
                              Should return None if no specific store is found.
             default_store: Fallback store if routing_function returns None.
         """
-        self.routing_function = routing_function
-        self.default_store = default_store
+        self._routing_function = routing_function
+        self._default_store = default_store
 
     def _get_store(self, collection: str | None) -> KeyValue:
         """Get the appropriate store for the given collection.
@@ -52,13 +55,10 @@ class RoutingWrapper(BaseWrapper):
 
         Returns:
             The KeyValue store to use for this collection.
-
-        Raises:
-            ValueError: If no store is found for the collection and no default store is configured.
         """
-        store: KeyValue | None = self.routing_function(collection)
+        store: KeyValue | None = self._routing_function(collection)
         if store is None:
-            return self.default_store
+            return self._default_store
         return store
 
     @override

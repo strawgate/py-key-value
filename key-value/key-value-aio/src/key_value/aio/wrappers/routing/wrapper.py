@@ -30,6 +30,9 @@ class RoutingWrapper(BaseWrapper):
         )
     """
 
+    _routing_function: RoutingFunction
+    _default_store: AsyncKeyValue
+
     def __init__(
         self,
         routing_function: RoutingFunction,
@@ -42,8 +45,8 @@ class RoutingWrapper(BaseWrapper):
                              Should return None if no specific store is found.
             default_store: Fallback store if routing_function returns None.
         """
-        self.routing_function = routing_function
-        self.default_store = default_store
+        self._routing_function = routing_function
+        self._default_store = default_store
 
     def _get_store(self, collection: str | None) -> AsyncKeyValue:
         """Get the appropriate store for the given collection.
@@ -53,13 +56,10 @@ class RoutingWrapper(BaseWrapper):
 
         Returns:
             The AsyncKeyValue store to use for this collection.
-
-        Raises:
-            ValueError: If no store is found for the collection and no default store is configured.
         """
-        store: AsyncKeyValue | None = self.routing_function(collection)
+        store: AsyncKeyValue | None = self._routing_function(collection)
         if store is None:
-            return self.default_store
+            return self._default_store
         return store
 
     @override
