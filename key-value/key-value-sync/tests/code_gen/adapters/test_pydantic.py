@@ -41,11 +41,13 @@ FIXED_CREATED_AT: datetime = datetime(year=2021, month=1, day=1, hour=12, minute
 FIXED_UPDATED_AT: datetime = datetime(year=2021, month=1, day=1, hour=15, minute=0, second=0, tzinfo=timezone.utc)
 
 SAMPLE_USER: User = User(name="John Doe", email="john.doe@example.com", age=30)
+SAMPLE_USER_2: User = User(name="Jane Doe", email="jane.doe@example.com", age=25)
 SAMPLE_PRODUCT: Product = Product(name="Widget", price=29.99, quantity=10, url=AnyHttpUrl(url="https://example.com"))
 SAMPLE_ORDER: Order = Order(created_at=datetime.now(), updated_at=datetime.now(), user=SAMPLE_USER, product=SAMPLE_PRODUCT, paid=False)
 
 TEST_COLLECTION: str = "test_collection"
 TEST_KEY: str = "test_key"
+TEST_KEY_2: str = "test_key_2"
 
 
 class TestPydanticAdapter:
@@ -80,8 +82,17 @@ class TestPydanticAdapter:
 
         assert user_adapter.delete(collection=TEST_COLLECTION, key=TEST_KEY)
 
-        cached_user = user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
-        assert cached_user is None
+        assert user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
+
+    def test_simple_adapter_with_default(self, user_adapter: PydanticAdapter[User]):
+        assert user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY, default=SAMPLE_USER) == SAMPLE_USER
+
+        user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER_2)
+        assert user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY, default=SAMPLE_USER) == SAMPLE_USER_2
+
+        assert user_adapter.get_many(collection=TEST_COLLECTION, keys=[TEST_KEY, TEST_KEY_2], default=SAMPLE_USER) == snapshot(
+            [SAMPLE_USER_2, SAMPLE_USER]
+        )
 
     def test_simple_adapter_with_validation_error_ignore(
         self, user_adapter: PydanticAdapter[User], updated_user_adapter: PydanticAdapter[UpdatedUser]
@@ -101,12 +112,10 @@ class TestPydanticAdapter:
 
     def test_complex_adapter(self, order_adapter: PydanticAdapter[Order]):
         order_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_ORDER, ttl=10)
-        cached_order: Order | None = order_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
-        assert cached_order == SAMPLE_ORDER
+        assert order_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) == SAMPLE_ORDER
 
         assert order_adapter.delete(collection=TEST_COLLECTION, key=TEST_KEY)
-        cached_order = order_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
-        assert cached_order is None
+        assert order_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
 
     def test_complex_adapter_with_list(self, product_list_adapter: PydanticAdapter[list[Product]], store: MemoryStore):
         product_list_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=[SAMPLE_PRODUCT, SAMPLE_PRODUCT], ttl=10)
@@ -130,5 +139,4 @@ class TestPydanticAdapter:
         )
 
         assert product_list_adapter.delete(collection=TEST_COLLECTION, key=TEST_KEY)
-        cached_products = product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
-        assert cached_products is None
+        assert product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
