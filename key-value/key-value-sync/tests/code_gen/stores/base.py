@@ -113,6 +113,14 @@ class BaseStoreTests(ABC):
         store.put_many(collection="test", keys=["test", "test_2"], values=({"test": "test"}, {"test": "test_2"}))
         assert store.get_many(collection="test", keys=["test", "test_2"]) == [{"test": "test"}, {"test": "test_2"}]
 
+    def test_delete(self, store: BaseStore):
+        assert store.delete(collection="test", key="test") is False
+
+    def test_put_delete_delete(self, store: BaseStore):
+        store.put(collection="test", key="test", value={"test": "test"})
+        assert store.delete(collection="test", key="test")
+        assert store.delete(collection="test", key="test") is False
+
     def test_delete_many(self, store: BaseStore):
         assert store.delete_many(collection="test", keys=["test", "test_2"]) == 0
 
