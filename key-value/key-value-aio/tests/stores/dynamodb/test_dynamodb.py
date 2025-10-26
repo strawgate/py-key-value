@@ -23,6 +23,8 @@ DYNAMODB_VERSIONS_TO_TEST = [
     "latest",  # Latest version
 ]
 
+DYNAMODB_CONTAINER_PORT = 8000
+
 
 async def ping_dynamodb() -> bool:
     """Check if DynamoDB Local is running."""
@@ -54,11 +56,11 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         # DynamoDB Local container
         with docker_container(
-            "dynamodb-test",
+            f"dynamodb-test-{version}",
             f"amazon/dynamodb-local:{version}",
-            {"8000": DYNAMODB_HOST_PORT},
+            {str(DYNAMODB_CONTAINER_PORT): DYNAMODB_HOST_PORT},
         ):
-            if not await async_wait_for_true(bool_fn=ping_dynamodb, tries=30, wait_time=1):
+            if not await async_wait_for_true(bool_fn=ping_dynamodb, tries=WAIT_FOR_DYNAMODB_TIMEOUT, wait_time=1):
                 msg = f"DynamoDB {version} failed to start"
                 raise DynamoDBFailedToStartError(msg)
 

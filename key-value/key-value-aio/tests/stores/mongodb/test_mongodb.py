@@ -46,8 +46,8 @@ class TestMongoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     async def setup_mongodb(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
         version = request.param
 
-        with docker_container("mongodb-test", f"mongo:{version}", {str(MONGODB_HOST_PORT): MONGODB_HOST_PORT}):
-            if not await async_wait_for_true(bool_fn=ping_mongodb, tries=30, wait_time=1):
+        with docker_container(f"mongodb-test-{version}", f"mongo:{version}", {str(MONGODB_HOST_PORT): MONGODB_HOST_PORT}):
+            if not await async_wait_for_true(bool_fn=ping_mongodb, tries=WAIT_FOR_MONGODB_TIMEOUT, wait_time=1):
                 msg = f"MongoDB {version} failed to start"
                 raise MongoDBFailedToStartError(msg)
 

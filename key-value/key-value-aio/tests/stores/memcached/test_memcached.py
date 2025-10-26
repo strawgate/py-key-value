@@ -14,6 +14,7 @@ from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 # Memcached test configuration
 MEMCACHED_HOST = "localhost"
 MEMCACHED_PORT = 11211
+MEMCACHED_CONTAINER_PORT = 11211
 
 WAIT_FOR_MEMCACHED_TIMEOUT = 30
 
@@ -46,8 +47,8 @@ class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
     async def setup_memcached(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
         version = request.param
 
-        with docker_container("memcached-test", f"memcached:{version}", {"11211": MEMCACHED_PORT}):
-            if not await async_wait_for_true(bool_fn=ping_memcached, tries=30, wait_time=1):
+        with docker_container(f"memcached-test-{version}", f"memcached:{version}", {str(MEMCACHED_CONTAINER_PORT): MEMCACHED_PORT}):
+            if not await async_wait_for_true(bool_fn=ping_memcached, tries=WAIT_FOR_MEMCACHED_TIMEOUT, wait_time=1):
                 msg = f"Memcached {version} failed to start"
                 raise MemcachedFailedToStartError(msg)
 
