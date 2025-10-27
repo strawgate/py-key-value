@@ -8,8 +8,8 @@ This monorepo contains two libraries:
 
 ## Why use this library?
 
-- **Multiple backends**: DynamoDB, Elasticsearch, Memcached, MongoDB, Redis,
-  RocksDB, Valkey, and In-memory, Disk, etc
+- **Multiple backends**: DynamoDB, Elasticsearch, Memcached, MongoDB,
+  PostgreSQL, Redis, RocksDB, Valkey, and In-memory, Disk, etc
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
 - **Adapters**: Pydantic model support, raise-on-missing behavior, etc
@@ -123,7 +123,7 @@ pip install py-key-value-aio[memory]
 pip install py-key-value-aio[disk]
 pip install py-key-value-aio[dynamodb]
 pip install py-key-value-aio[elasticsearch]
-# or: redis, mongodb, memcached, valkey, vault, registry, rocksdb, see below for all options
+# or: redis, mongodb, postgresql, memcached, valkey, vault, registry, rocksdb, see below for all options
 ```
 
 ```python
@@ -231,6 +231,7 @@ system, for access across multiple application nodes.
 | Elasticsearch    | Unstable | ✅  |  ✅  | `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key", index="kv-store")` |
 | Memcached        | Unstable | ✅  |  ✖️   | `MemcachedStore(host="127.0.0.1", port=11211")` |
 | MongoDB          | Unstable | ✅  |  ✅  | `MongoDBStore(url="mongodb://localhost:27017/test")` |
+| PostgreSQL       | Unstable | ✅  |  ✖️   | `PostgreSQLStore(url="postgresql://localhost:5432/mydb")` |
 | Redis            | Stable | ✅  |  ✅  | `RedisStore(url="redis://localhost:6379/0")` |
 | Valkey           | Stable | ✅  |  ✅  | `ValkeyStore(host="localhost", port=6379)` |
 
