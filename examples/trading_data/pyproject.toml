@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Trading data caching using py-key-value with compression and multi-tier caching"
 requires-python = ">=3.10"
 dependencies = [
-    "py-key-value-aio>=0.2.8",
+    "py-key-value-aio[disk,memory]>=0.2.8",
     "pydantic>=2.0.0,<3.0.0",
 ]
 
@@ -16,6 +16,9 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
 
 [build-system]
 requires = ["hatchling"]

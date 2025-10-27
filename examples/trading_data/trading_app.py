@@ -50,22 +50,24 @@ class TradingDataCache:
         memory_cache = MemoryStore()
 
         # Tier 2: Disk cache for historical data
-        disk_cache = DiskStore(root_directory=cache_dir)
+        disk_cache = DiskStore(directory=cache_dir)
 
         # Wrapper stack (applied inside-out):
-        # 1. StatisticsWrapper - Track cache metrics
-        # 2. RetryWrapper - Handle transient failures (3 retries with exponential backoff)
-        # 3. LoggingWrapper - Log operations for debugging
-        # 4. PassthroughCacheWrapper - Two-tier caching (memory → disk)
-        stats = StatisticsWrapper(key_value=disk_cache)
-        retry_wrapper = RetryWrapper(key_value=stats, max_retries=3, base_delay=0.1)
+        # 1. RetryWrapper - Handle transient failures on disk (3 retries with exponential backoff)
+        # 2. LoggingWrapper - Log disk operations for debugging
+        # 3. PassthroughCacheWrapper - Two-tier caching (memory → disk)
+        # 4. StatisticsWrapper - Track all cache metrics (wraps everything)
+        retry_wrapper = RetryWrapper(key_value=disk_cache, max_retries=3, initial_delay=0.1)
         disk_with_logging = LoggingWrapper(key_value=retry_wrapper)
 
-        cache_store = PassthroughCacheWrapper(cache=memory_cache, key_value=disk_with_logging)
+        cache_store = PassthroughCacheWrapper(primary_key_value=disk_with_logging, cache_key_value=memory_cache)
+
+        # Wrap the entire cache stack with statistics to track all operations
+        stats = StatisticsWrapper(key_value=cache_store)
 
         # PydanticAdapter for type-safe price data storage/retrieval
         self.adapter: PydanticAdapter[PriceData] = PydanticAdapter[PriceData](
-            key_value=cache_store,
+            key_value=stats,
             pydantic_model=PriceData,
         )
 
@@ -138,25 +140,28 @@ class TradingDataCache:
         """
         return await self.adapter.delete(collection=f"symbol:{symbol}", key=data_id)
 
-    def get_cache_statistics(self) -> dict[str, int]:
+    def get_cache_statistics(self) -> dict[str, int | float]:
         """
-        Get cache performance statistics.
+        Get cache performance statistics across all symbols.
 
         Returns:
-            Dictionary with cache metrics (hits, misses, operations)
+            Dictionary with aggregated cache metrics (hits, misses, operations)
         """
         if isinstance(self.stats_wrapper, StatisticsWrapper):
-            total_gets = self.stats_wrapper.total_gets
-            hits = self.stats_wrapper.get_hits
-            misses = self.stats_wrapper.get_misses
+            # Aggregate statistics across all collections (symbols)
+            total_puts = sum(coll_stats.put.count for coll_stats in self.stats_wrapper.statistics.collections.values())
+            total_gets = sum(coll_stats.get.count for coll_stats in self.stats_wrapper.statistics.collections.values())
+            total_deletes = sum(coll_stats.delete.count for coll_stats in self.stats_wrapper.statistics.collections.values())
+            hits = sum(coll_stats.get.hit for coll_stats in self.stats_wrapper.statistics.collections.values())
+            misses = sum(coll_stats.get.miss for coll_stats in self.stats_wrapper.statistics.collections.values())
 
             return {
                 "total_gets": total_gets,
                 "cache_hits": hits,
                 "cache_misses": misses,
                 "hit_rate_percent": round((hits / total_gets * 100) if total_gets > 0 else 0, 2),
-                "total_puts": self.stats_wrapper.total_puts,
-                "total_deletes": self.stats_wrapper.total_deletes,
+                "total_puts": total_puts,
+                "total_deletes": total_deletes,
             }
         return {}
 

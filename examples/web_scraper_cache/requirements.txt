@@ -1,3 +1,3 @@
-py-key-value-aio>=0.2.8
+py-key-value-aio[disk,memory]>=0.2.8
 pydantic>=2.0.0,<3.0.0
 cryptography>=41.0.0

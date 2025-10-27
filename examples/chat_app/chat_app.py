@@ -42,10 +42,10 @@ class ChatApp:
 
         # Wrapper stack (applied inside-out):
         # 1. StatisticsWrapper - Track operation metrics
-        # 2. TTLClampWrapper - Enforce max TTL of 24 hours (86400 seconds)
+        # 2. TTLClampWrapper - Enforce TTL between 1 hour and 24 hours
         # 3. LoggingWrapper - Log all operations for debugging
         stats = StatisticsWrapper(key_value=base_store)
-        ttl_clamped = TTLClampWrapper(key_value=stats, max_ttl=86400)  # 24 hours
+        ttl_clamped = TTLClampWrapper(key_value=stats, min_ttl=3600, max_ttl=86400)  # 1 hour min, 24 hours max
         wrapped_store = LoggingWrapper(key_value=ttl_clamped)
 
         # PydanticAdapter for type-safe message storage/retrieval
@@ -112,18 +112,25 @@ class ChatApp:
 
     def get_statistics(self) -> dict[str, int]:
         """
-        Get operation statistics.
+        Get operation statistics across all conversations.
 
         Returns:
-            Dictionary with operation counts (puts, gets, deletes, etc.)
+            Dictionary with aggregated operation counts (puts, gets, deletes, etc.)
         """
         if isinstance(self.stats_wrapper, StatisticsWrapper):
+            # Aggregate statistics across all collections (conversations)
+            total_puts = sum(coll_stats.put.count for coll_stats in self.stats_wrapper.statistics.collections.values())
+            total_gets = sum(coll_stats.get.count for coll_stats in self.stats_wrapper.statistics.collections.values())
+            total_deletes = sum(coll_stats.delete.count for coll_stats in self.stats_wrapper.statistics.collections.values())
+            get_hits = sum(coll_stats.get.hit for coll_stats in self.stats_wrapper.statistics.collections.values())
+            get_misses = sum(coll_stats.get.miss for coll_stats in self.stats_wrapper.statistics.collections.values())
+
             return {
-                "total_puts": self.stats_wrapper.total_puts,
-                "total_gets": self.stats_wrapper.total_gets,
-                "total_deletes": self.stats_wrapper.total_deletes,
-                "get_hits": self.stats_wrapper.get_hits,
-                "get_misses": self.stats_wrapper.get_misses,
+                "total_puts": total_puts,
+                "total_gets": total_gets,
+                "total_deletes": total_deletes,
+                "get_hits": get_hits,
+                "get_misses": get_misses,
             }
         return {}
 

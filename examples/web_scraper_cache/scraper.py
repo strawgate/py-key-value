@@ -19,7 +19,7 @@ from cryptography.fernet import Fernet
 from key_value.aio.adapters.pydantic import PydanticAdapter
 from key_value.aio.stores.disk.store import DiskStore
 from key_value.aio.stores.memory.store import MemoryStore
-from key_value.aio.wrappers.encryption.wrapper import FernetEncryptionWrapper
+from key_value.aio.wrappers.encryption.fernet import FernetEncryptionWrapper
 from key_value.aio.wrappers.fallback.wrapper import FallbackWrapper
 from key_value.aio.wrappers.limit_size.wrapper import LimitSizeWrapper
 from key_value.aio.wrappers.ttl_clamp.wrapper import TTLClampWrapper
@@ -60,10 +60,13 @@ class WebScraperCache:
         self.encryption_key = encryption_key
 
         # Primary store: Disk with encryption and size limits
-        disk_store = DiskStore(root_directory=cache_dir)
+        disk_store = DiskStore(directory=cache_dir)
 
         # Fallback store: Memory (for when disk fails)
         fallback_store = MemoryStore()
+
+        # Create Fernet instance for encryption
+        fernet = Fernet(encryption_key)
 
         # Wrapper stack (applied inside-out):
         # 1. TTLClampWrapper - Enforce cache duration (min 1 hour, max 7 days)
@@ -73,10 +76,11 @@ class WebScraperCache:
         primary_with_wrappers = TTLClampWrapper(
             key_value=LimitSizeWrapper(
                 key_value=FernetEncryptionWrapper(
-                    key_value=FallbackWrapper(key_value=disk_store, fallback=fallback_store),
-                    key=encryption_key,
+                    key_value=FallbackWrapper(primary_key_value=disk_store, fallback_key_value=fallback_store),
+                    fernet=fernet,
+                    raise_on_decryption_error=False,  # Return None on decryption failure instead of raising
                 ),
-                max_size_bytes=5 * 1024 * 1024,  # 5MB limit
+                max_size=5 * 1024 * 1024,  # 5MB limit
             ),
             min_ttl=3600,  # 1 hour minimum
             max_ttl=7 * 24 * 3600,  # 7 days maximum
