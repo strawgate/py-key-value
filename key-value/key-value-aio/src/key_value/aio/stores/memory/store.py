@@ -155,7 +155,11 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        collection_cache: MemoryCollection = self._cache[collection]
+        collection_cache: MemoryCollection | None = self._cache.get(collection)
+
+        if collection_cache is None:
+            msg = f"Collection '{collection}' has not been setup. Call setup_collection() first."
+            raise KeyError(msg)
 
         return collection_cache.get(key=key)
 
@@ -167,19 +171,31 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
-        collection_cache: MemoryCollection = self._cache[collection]
+        collection_cache: MemoryCollection | None = self._cache.get(collection)
+
+        if collection_cache is None:
+            msg = f"Collection '{collection}' has not been setup. Call setup_collection() first."
+            raise KeyError(msg)
 
         collection_cache.put(key=key, value=managed_entry)
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        collection_cache: MemoryCollection = self._cache[collection]
+        collection_cache: MemoryCollection | None = self._cache.get(collection)
+
+        if collection_cache is None:
+            msg = f"Collection '{collection}' has not been setup. Call setup_collection() first."
+            raise KeyError(msg)
 
         return collection_cache.delete(key=key)
 
     @override
     async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
-        collection_cache: MemoryCollection = self._cache[collection]
+        collection_cache: MemoryCollection | None = self._cache.get(collection)
+
+        if collection_cache is None:
+            msg = f"Collection '{collection}' has not been setup. Call setup_collection() first."
+            raise KeyError(msg)
 
         return collection_cache.keys(limit=limit)
 

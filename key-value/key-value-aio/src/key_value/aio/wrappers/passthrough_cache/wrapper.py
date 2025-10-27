@@ -130,9 +130,9 @@ class PassthroughCacheWrapper(BaseWrapper):
 
     @override
     async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
-        _ = await self.cache_key_value.delete(collection=collection, key=key)
-
         await self.primary_key_value.put(collection=collection, key=key, value=value, ttl=ttl)
+
+        _ = await self.cache_key_value.delete(collection=collection, key=key)
 
     @override
     async def put_many(
@@ -143,18 +143,22 @@ class PassthroughCacheWrapper(BaseWrapper):
         collection: str | None = None,
         ttl: SupportsFloat | None = None,
     ) -> None:
-        _ = await self.cache_key_value.delete_many(collection=collection, keys=keys)
-
         await self.primary_key_value.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
+
+        _ = await self.cache_key_value.delete_many(collection=collection, keys=keys)
 
     @override
     async def delete(self, key: str, *, collection: str | None = None) -> bool:
+        result = await self.primary_key_value.delete(collection=collection, key=key)
+
         _ = await self.cache_key_value.delete(collection=collection, key=key)
 
-        return await self.primary_key_value.delete(collection=collection, key=key)
+        return result
 
     @override
     async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
+        result = await self.primary_key_value.delete_many(collection=collection, keys=keys)
+
         _ = await self.cache_key_value.delete_many(collection=collection, keys=keys)
 
-        return await self.primary_key_value.delete_many(collection=collection, keys=keys)
+        return result
