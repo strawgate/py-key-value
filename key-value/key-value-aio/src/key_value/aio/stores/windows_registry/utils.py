@@ -1,6 +1,8 @@
 import contextlib
 import winreg
 
+from key_value.shared.errors.store import StoreSetupError
+
 HiveType = int
 
 
@@ -23,7 +25,7 @@ def get_reg_sz_value(hive: HiveType, sub_key: str, value_name: str) -> str | Non
         return None
 
 
-def set_reg_sz_value(hive: HiveType, sub_key: str, value_name: str, value: str) -> bool:
+def set_reg_sz_value(hive: HiveType, sub_key: str, value_name: str, value: str) -> None:
     """Set a string value in the Windows Registry.
 
     Args:
@@ -32,15 +34,18 @@ def set_reg_sz_value(hive: HiveType, sub_key: str, value_name: str, value: str) 
         value_name: The name of the registry value to set.
         value: The string value to write.
 
-    Returns:
-        True if the value was set, False if the key doesn't exist or couldn't be accessed.
+    Raises:
+        StoreSetupError: If the registry key doesn't exist or the value couldn't be set.
     """
     try:
         with winreg.OpenKey(key=hive, sub_key=sub_key, access=winreg.KEY_WRITE) as reg_key:
             winreg.SetValueEx(reg_key, value_name, 0, winreg.REG_SZ, value)
-            return True
-    except (FileNotFoundError, OSError):
-        return False
+    except FileNotFoundError as e:
+        msg = f"Registry key '{sub_key}' does not exist"
+        raise StoreSetupError(msg) from e
+    except OSError as e:
+        msg = f"Failed to set registry value '{value_name}' at '{sub_key}'"
+        raise StoreSetupError(msg) from e
 
 
 def delete_reg_sz_value(hive: HiveType, sub_key: str, value_name: str) -> bool:
@@ -79,22 +84,21 @@ def has_key(hive: HiveType, sub_key: str) -> bool:
         return False
 
 
-def create_key(hive: HiveType, sub_key: str) -> bool:
+def create_key(hive: HiveType, sub_key: str) -> None:
     """Create a new registry key.
 
     Args:
         hive: The registry hive (e.g., winreg.HKEY_CURRENT_USER).
         sub_key: The registry subkey path to create.
 
-    Returns:
-        True if the key was created or already exists, False on error.
+    Raises:
+        StoreSetupError: If the registry key couldn't be created.
     """
     try:
         winreg.CreateKey(hive, sub_key)
-    except OSError:
-        return False
-    else:
-        return True
+    except OSError as e:
+        msg = f"Failed to create registry key '{sub_key}'"
+        raise StoreSetupError(msg) from e
 
 
 def delete_key(hive: HiveType, sub_key: str) -> bool:
