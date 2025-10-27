@@ -41,7 +41,11 @@ class ManagedEntry:
     @property
     def value_as_json(self) -> str:
         """Return the value as a JSON string."""
-        return dump_to_json(obj=dict(self.value))
+        return dump_to_json(obj=self.value_as_dict)
+
+    @property
+    def value_as_dict(self) -> dict[str, Any]:
+        return dict(self.value)
 
     def recalculate_ttl(self) -> None:
         if self.expires_at is not None and self.ttl is None:
