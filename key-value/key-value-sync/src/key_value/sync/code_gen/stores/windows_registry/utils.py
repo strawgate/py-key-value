@@ -26,7 +26,7 @@ def get_reg_sz_value(hive: HiveType, sub_key: str, value_name: str) -> str | Non
         return None
 
 
-def set_reg_sz_value(hive: HiveType, sub_key: str, value_name: str, value: str) -> None:
+def set_reg_sz_value(hive: HiveType, sub_key: str, value_name: str, value: str) -> bool:
     """Set a string value in the Windows Registry.
 
     Args:
@@ -34,9 +34,16 @@ def set_reg_sz_value(hive: HiveType, sub_key: str, value_name: str, value: str) 
         sub_key: The registry subkey path.
         value_name: The name of the registry value to set.
         value: The string value to write.
+
+    Returns:
+        True if the value was set, False if the key doesn't exist or couldn't be accessed.
     """
-    with winreg.OpenKey(key=hive, sub_key=sub_key, access=winreg.KEY_WRITE) as reg_key:
-        winreg.SetValueEx(reg_key, value_name, 0, winreg.REG_SZ, value)
+    try:
+        with winreg.OpenKey(key=hive, sub_key=sub_key, access=winreg.KEY_WRITE) as reg_key:
+            winreg.SetValueEx(reg_key, value_name, 0, winreg.REG_SZ, value)
+            return True
+    except (FileNotFoundError, OSError):
+        return False
 
 
 def delete_reg_sz_value(hive: HiveType, sub_key: str, value_name: str) -> bool:
@@ -75,14 +82,22 @@ def has_key(hive: HiveType, sub_key: str) -> bool:
         return False
 
 
-def create_key(hive: HiveType, sub_key: str) -> None:
+def create_key(hive: HiveType, sub_key: str) -> bool:
     """Create a new registry key.
 
     Args:
         hive: The registry hive (e.g., winreg.HKEY_CURRENT_USER).
         sub_key: The registry subkey path to create.
+
+    Returns:
+        True if the key was created or already exists, False on error.
     """
-    winreg.CreateKey(hive, sub_key)
+    try:
+        winreg.CreateKey(hive, sub_key)
+    except OSError:
+        return False
+    else:
+        return True
 
 
 def delete_key(hive: HiveType, sub_key: str) -> bool:
@@ -96,17 +111,17 @@ def delete_key(hive: HiveType, sub_key: str) -> bool:
         True if the key was deleted, False if it didn't exist or couldn't be deleted.
     """
     try:
-        with winreg.OpenKey(key=hive, sub_key=sub_key, access=winreg.KEY_WRITE) as reg_key:
-            winreg.DeleteKey(reg_key, sub_key)
-            return True
+        winreg.DeleteKey(hive, sub_key)
     except (FileNotFoundError, OSError):
         return False
+    else:
+        return True
 
 
 def delete_sub_keys(hive: HiveType, sub_key: str) -> None:
-    """Delete all subkeys of a registry key.
+    """Delete all immediate subkeys of a registry key.
 
-    This function recursively deletes all subkeys under the specified registry key.
+    This function deletes all immediate child keys (non-recursive).
 
     Args:
         hive: The registry hive (e.g., winreg.HKEY_CURRENT_USER).
@@ -114,14 +129,16 @@ def delete_sub_keys(hive: HiveType, sub_key: str) -> None:
     """
     try:
         with winreg.OpenKey(key=hive, sub_key=sub_key, access=winreg.KEY_WRITE | winreg.KEY_ENUMERATE_SUB_KEYS) as reg_key:
-            index = 0
             while True:
-                if not (next_child_key := winreg.EnumKey(reg_key, index)):
+                try:
+                    # Always enumerate at index 0 since keys shift after deletion
+                    next_child_key = winreg.EnumKey(reg_key, 0)
+                except OSError:
+                    # No more subkeys
                     break
 
-                with contextlib.suppress(Exception):
+                # Key already deleted or can't be deleted, skip it
+                with contextlib.suppress(FileNotFoundError, OSError):
                     winreg.DeleteKey(reg_key, next_child_key)
-
-                index += 1
     except (FileNotFoundError, OSError):
         return

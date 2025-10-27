@@ -153,6 +153,8 @@ class MemoryCollection:
             key: The key to store under.
             value: The ManagedEntry to store.
         """
+        # Recalculate TTL to get remaining time until expiration
+        value.recalculate_ttl()
         self._cache[key] = MemoryCacheEntry.from_managed_entry(managed_entry=value, ttl=value.ttl)
 
     def delete(self, key: str) -> bool:

@@ -27,7 +27,11 @@ except ImportError as e:
 
 @dataclass
 class MemoryCacheEntry:
-    """A cache entry for the memory store."""
+    """A cache entry for the memory store.
+
+    This dataclass represents an entry in the MemoryStore cache, storing the JSON-serialized
+    value along with expiration metadata and the original TTL value at insertion time.
+    """
 
     json_str: str
 
@@ -37,14 +41,40 @@ class MemoryCacheEntry:
 
     @classmethod
     def from_managed_entry(cls, managed_entry: ManagedEntry, ttl: SupportsFloat | None = None) -> Self:
+        """Create a cache entry from a ManagedEntry.
+
+        Args:
+            managed_entry: The ManagedEntry to convert.
+            ttl: The TTL value at insertion time.
+
+        Returns:
+            A new MemoryCacheEntry.
+        """
         return cls(json_str=managed_entry.to_json(), expires_at=managed_entry.expires_at, ttl_at_insert=ttl)
 
     def to_managed_entry(self) -> ManagedEntry:
+        """Convert this cache entry to a ManagedEntry.
+
+        Returns:
+            A ManagedEntry reconstructed from the stored JSON.
+        """
         return ManagedEntry.from_json(json_str=self.json_str)
 
 
 def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, now: float) -> float:
-    """Calculate time-to-use for cache entries based on their TTL."""
+    """Calculate time-to-use for cache entries based on their TTL.
+
+    This function is used by TLRUCache to determine when entries should expire.
+    It calculates the expiration timestamp and updates the entry's expires_at field.
+
+    Args:
+        _key: The cache key (unused).
+        value: The cache entry.
+        now: The current time as an epoch timestamp.
+
+    Returns:
+        The expiration time as an epoch timestamp, or sys.maxsize if the entry has no TTL.
+    """
     if value.ttl_at_insert is None:
         return float(sys.maxsize)
 
@@ -56,7 +86,17 @@ def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, now: float) -> float:
 
 
 def _memory_cache_getsizeof(value: MemoryCacheEntry) -> int:
-    "Return size of cache entry (always 1 for entry counting)."
+    """Return size of cache entry (always 1 for entry counting).
+
+    This function is used by TLRUCache to determine entry sizes. Since we want to count
+    entries rather than measure memory usage, this always returns 1.
+
+    Args:
+        value: The cache entry (unused).
+
+    Returns:
+        Always returns 1 to enable entry-based size limiting.
+    """
     return 1
 
 
@@ -67,6 +107,12 @@ PAGE_LIMIT = 10000
 
 
 class MemoryCollection:
+    """A fixed-size in-memory collection using TLRUCache.
+
+    This class wraps a time-aware LRU cache to provide TTL-based expiration
+    and automatic eviction of old entries when the cache reaches its size limit.
+    """
+
     _cache: TLRUCache[str, MemoryCacheEntry]
 
     def __init__(self, max_entries: int = DEFAULT_MAX_ENTRIES_PER_COLLECTION):
@@ -78,6 +124,14 @@ class MemoryCollection:
         self._cache = TLRUCache[str, MemoryCacheEntry](maxsize=max_entries, ttu=_memory_cache_ttu, getsizeof=_memory_cache_getsizeof)
 
     def get(self, key: str) -> ManagedEntry | None:
+        """Retrieve an entry from the collection.
+
+        Args:
+            key: The key to retrieve.
+
+        Returns:
+            The ManagedEntry if found and not expired, None otherwise.
+        """
         managed_entry_str: MemoryCacheEntry | None = self._cache.get(key)
 
         if managed_entry_str is None:
@@ -88,9 +142,25 @@ class MemoryCollection:
         return managed_entry
 
     def put(self, key: str, value: ManagedEntry) -> None:
+        """Store an entry in the collection.
+
+        Args:
+            key: The key to store under.
+            value: The ManagedEntry to store.
+        """
+        # Recalculate TTL to get remaining time until expiration
+        value.recalculate_ttl()
         self._cache[key] = MemoryCacheEntry.from_managed_entry(managed_entry=value, ttl=value.ttl)
 
     def delete(self, key: str) -> bool:
+        """Delete an entry from the collection.
+
+        Args:
+            key: The key to delete.
+
+        Returns:
+            True if the key was deleted, False if it didn't exist.
+        """
         return self._cache.pop(key, None) is not None
 
     def keys(self, *, limit: int | None = None) -> list[str]:
