@@ -8,7 +8,7 @@ protocol, so they can be used anywhere a store can be used.
 
 Wrappers follow the decorator pattern - they wrap around a key-value store and
 intercept operations to add additional behavior. Multiple wrappers can be
-stacked together to combine their effects.
+stacked to combine their effects.
 
 ### Wrapper Pattern Example
 
@@ -43,7 +43,7 @@ compression.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
 
 #### Use Cases
 
@@ -88,7 +88,7 @@ encryption.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
 
 #### Use Cases
 
@@ -138,7 +138,7 @@ Provides failover to a secondary store if the primary store fails.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
 
 #### Use Cases
 
@@ -173,7 +173,7 @@ specified size.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
 
 #### Use Cases
 
@@ -210,7 +210,7 @@ Logs all key-value operations for debugging and auditing.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
 
 #### Use Cases
 
@@ -247,7 +247,7 @@ Provides read-through caching with a fast local cache and a slower remote store.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
 
 #### Use Cases
 
@@ -284,7 +284,7 @@ Adds a prefix to all collection names.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
 
 #### Use Cases
 
@@ -321,7 +321,7 @@ Adds a prefix to all keys.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
 
 #### Use Cases
 
@@ -358,7 +358,7 @@ Prevents all write operations, making the store read-only.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
 
 #### Use Cases
 
@@ -390,7 +390,7 @@ Automatically retries failed operations with exponential backoff.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
 
 #### Use Cases
 
@@ -427,7 +427,7 @@ parameter.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
 
 #### Use Cases
 
@@ -461,7 +461,7 @@ bounds.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
 
 #### Use Cases
 
@@ -499,7 +499,7 @@ Tracks operation statistics including counts, hits, and misses.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
         - get_statistics
         - reset_statistics
 
@@ -546,7 +546,7 @@ exceed the specified timeout.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
 
 #### Use Cases
 

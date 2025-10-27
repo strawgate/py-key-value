@@ -15,7 +15,7 @@ provide alternative APIs tailored for specific use cases.
 
 **Adapters:**
 
-- Provide a different API interface
+- Provide a different API
 - Cannot be used in place of a store
 - Add type safety and specialized behavior
 - Transform how you interact with the store
@@ -32,7 +32,7 @@ integrity.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
         - get
         - get_many
         - put
@@ -257,7 +257,7 @@ error instead of returning `None` when a key is not found.
     options:
       show_source: false
       members:
-        - __init__
+        - **init**
         - get
         - get_many
 

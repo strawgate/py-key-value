@@ -9,10 +9,10 @@ type safety, and extensible wrappers.
 py-key-value is a Python framework that offers:
 
 - **Multiple backends**: DynamoDB, Elasticsearch, Memcached, MongoDB, Redis,
-  RocksDB, Valkey, and In-memory, Disk, etc
+  RocksDB, Valkey, and In-memory, Disk, etc.
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
-- **Adapters**: Pydantic model support, raise-on-missing behavior, etc
+- **Adapters**: Pydantic model support, raise-on-missing behavior, etc.
 - **Wrappers**: Statistics tracking, encryption, compression, and more
 - **Collection-based**: Organize keys into logical collections/namespaces
 - **Pluggable architecture**: Easy to add custom store implementations
