@@ -116,7 +116,9 @@ class StatisticsWrapper(BaseWrapper):
     def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
         collection = collection or DEFAULT_COLLECTION_NAME
 
-        if value := self.key_value.get(collection=collection, key=key):
+        value = self.key_value.get(collection=collection, key=key)
+
+        if value is not None:
             self.statistics.get_collection(collection=collection).get.increment_hit()
             return value
 
@@ -130,7 +132,7 @@ class StatisticsWrapper(BaseWrapper):
 
         (value, ttl) = self.key_value.ttl(collection=collection, key=key)
 
-        if value:
+        if value is not None:
             self.statistics.get_collection(collection=collection).ttl.increment_hit()
             return (value, ttl)
 

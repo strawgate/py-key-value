@@ -99,4 +99,5 @@ class LimitSizeWrapper(BaseWrapper):
                 filtered_keys.append(k)
                 filtered_values.append(v)
 
-        self.key_value.put_many(keys=filtered_keys, values=filtered_values, collection=collection, ttl=ttl)
+        if filtered_keys:
+            self.key_value.put_many(keys=filtered_keys, values=filtered_values, collection=collection, ttl=ttl)
