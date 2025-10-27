@@ -17,7 +17,7 @@ class TestKeychainStore(BaseStoreTests):
     async def store(self) -> KeyringStore:
         # Use a test-specific service name to avoid conflicts
         store = KeyringStore(service_name="py-key-value-test")
-        await store.delete_many(collection="test", keys=["test"])
+        await store.delete_many(collection="test", keys=["test", "test_2"])
         await store.delete_many(collection="test_collection", keys=["test_key"])
 
         return store

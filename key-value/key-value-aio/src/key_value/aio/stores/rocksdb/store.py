@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
 from typing import Any, overload
 
@@ -9,7 +11,7 @@ from typing_extensions import override
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
 
 try:
-    from rocksdict import Options, Rdict
+    from rocksdict import Options, Rdict, WriteBatch
 except ImportError as e:
     msg = "RocksDBStore requires py-key-value-aio[rocksdb]"
     raise ImportError(msg) from e
@@ -127,18 +129,66 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         self._db[combo_key] = json_value.encode("utf-8")
 
     @override
+    async def _put_managed_entries(
+        self,
+        *,
+        collection: str,
+        keys: Sequence[str],
+        managed_entries: Sequence[ManagedEntry],
+        ttl: float | None,
+        created_at: datetime,
+        expires_at: datetime | None,
+    ) -> None:
+        self._fail_on_closed_store()
+
+        if not keys:
+            return
+
+        batch = WriteBatch()
+        for key, managed_entry in zip(keys, managed_entries, strict=True):
+            combo_key: str = compound_key(collection=collection, key=key)
+            json_value: str = managed_entry.to_json()
+            batch.put(combo_key, json_value.encode("utf-8"))
+
+        self._db.write(batch)
+
+    @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         self._fail_on_closed_store()
 
         combo_key: str = compound_key(collection=collection, key=key)
 
-        # Check if key exists before deleting
+        # Check if key exists before deleting, this is only used for tracking deleted count
         exists = combo_key in self._db
 
-        if exists:
-            self._db.delete(combo_key)
+        self._db.delete(combo_key)
 
         return exists
+
+    @override
+    async def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
+        self._fail_on_closed_store()
+
+        if not keys:
+            return 0
+
+        # Use WriteBatch for efficient batch deletes
+        batch = WriteBatch()
+        deleted_count = 0
+
+        for key in keys:
+            combo_key: str = compound_key(collection=collection, key=key)
+
+            # Check if key exists before deleting
+            if combo_key in self._db:
+                deleted_count += 1
+
+            batch.delete(combo_key)
+
+        if deleted_count > 0:
+            self._db.write(batch)
+
+        return deleted_count
 
     def __del__(self) -> None:
         self._close_and_flush()

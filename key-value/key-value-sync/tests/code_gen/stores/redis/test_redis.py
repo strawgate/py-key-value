@@ -2,14 +2,19 @@
 # from the original file 'test_redis.py'
 # DO NOT CHANGE! Change the original file instead.
 from collections.abc import Generator
+from datetime import datetime, timedelta, timezone
 
 import pytest
+from dirty_equals import IsFloat
+from inline_snapshot import snapshot
 from key_value.shared.stores.wait import wait_for_true
+from key_value.shared.utils.managed_entry import ManagedEntry
 from redis.client import Redis
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
 from key_value.sync.code_gen.stores.redis import RedisStore
+from key_value.sync.code_gen.stores.redis.store import json_to_managed_entry, managed_entry_to_json
 from tests.code_gen.conftest import docker_container, should_skip_docker_tests
 from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -21,6 +26,25 @@ REDIS_DB = 15  # Use a separate database for tests
 WAIT_FOR_REDIS_TIMEOUT = 30
 
 REDIS_VERSIONS_TO_TEST = ["4.0.0", "7.0.0"]
+
+
+def test_managed_entry_document_conversion():
+    created_at = datetime(year=2025, month=1, day=1, hour=0, minute=0, second=0, tzinfo=timezone.utc)
+    expires_at = created_at + timedelta(seconds=10)
+
+    managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
+    document = managed_entry_to_json(managed_entry=managed_entry)
+
+    assert document == snapshot(
+        '{"value": {"test": "test"}, "created_at": "2025-01-01T00:00:00+00:00", "expires_at": "2025-01-01T00:00:10+00:00"}'
+    )
+
+    round_trip_managed_entry = json_to_managed_entry(json_str=document)
+
+    assert round_trip_managed_entry.value == managed_entry.value
+    assert round_trip_managed_entry.created_at == created_at
+    assert round_trip_managed_entry.ttl == IsFloat(lt=0)
+    assert round_trip_managed_entry.expires_at == expires_at
 
 
 def ping_redis() -> bool:

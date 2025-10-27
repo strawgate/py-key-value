@@ -113,6 +113,26 @@ class BaseStoreTests(ABC):
         store.put_many(collection="test", keys=["test", "test_2"], values=({"test": "test"}, {"test": "test_2"}))
         assert store.get_many(collection="test", keys=["test", "test_2"]) == [{"test": "test"}, {"test": "test_2"}]
 
+    def test_delete(self, store: BaseStore):
+        assert store.delete(collection="test", key="test") is False
+
+    def test_put_delete_delete(self, store: BaseStore):
+        store.put(collection="test", key="test", value={"test": "test"})
+        assert store.delete(collection="test", key="test")
+        assert store.delete(collection="test", key="test") is False
+
+    def test_delete_many(self, store: BaseStore):
+        assert store.delete_many(collection="test", keys=["test", "test_2"]) == 0
+
+    def test_put_delete_many(self, store: BaseStore):
+        store.put(collection="test", key="test", value={"test": "test"})
+        assert store.delete_many(collection="test", keys=["test", "test_2"]) == 1
+
+    def test_delete_many_delete_many(self, store: BaseStore):
+        store.put(collection="test", key="test", value={"test": "test"})
+        assert store.delete_many(collection="test", keys=["test", "test_2"]) == 1
+        assert store.delete_many(collection="test", keys=["test", "test_2"]) == 0
+
     def test_get_put_get_delete_get(self, store: BaseStore):
         """Tests that the get, put, delete, and get methods work together to store and retrieve a value from an empty store."""
 
@@ -161,7 +181,7 @@ class BaseStoreTests(ABC):
     @pytest.mark.timeout(10)
     def test_put_expired_get_none(self, store: BaseStore):
         """Tests that a put call with a negative ttl will return None when getting the key."""
-        store.put(collection="test_collection", key="test_key", value={"test": "test"}, ttl=1)
+        store.put(collection="test_collection", key="test_key", value={"test": "test"}, ttl=2)
         assert store.get(collection="test_collection", key="test_key") is not None
         sleep(seconds=1)
 
