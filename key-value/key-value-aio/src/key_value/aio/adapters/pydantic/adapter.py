@@ -50,6 +50,21 @@ class PydanticAdapter(Generic[T]):
         self._raise_on_validation_error = raise_on_validation_error
 
     def _validate_model(self, value: dict[str, Any]) -> T | None:
+        """Validate and deserialize a dict into the configured Pydantic model.
+
+        This method handles both single models and list models. For list models, it expects the value
+        to contain an "items" key with the list data, following the convention used by `_serialize_model`.
+        If validation fails and `raise_on_validation_error` is False, returns None instead of raising.
+
+        Args:
+            value: The dict to validate and convert to a Pydantic model.
+
+        Returns:
+            The validated model instance, or None if validation fails and errors are suppressed.
+
+        Raises:
+            DeserializationError: If validation fails and `raise_on_validation_error` is True.
+        """
         try:
             if self._is_list_model:
                 return self._type_adapter.validate_python(value.get("items", []))
@@ -62,6 +77,22 @@ class PydanticAdapter(Generic[T]):
             return None
 
     def _serialize_model(self, value: T) -> dict[str, Any]:
+        """Serialize a Pydantic model to a dict for storage.
+
+        This method handles both single models and list models. For list models, it wraps the serialized
+        list in a dict with an "items" key (e.g., {"items": [...]}) to ensure consistent dict-based storage
+        format across all value types. This wrapping convention is expected by `_validate_model` during
+        deserialization.
+
+        Args:
+            value: The Pydantic model instance to serialize.
+
+        Returns:
+            A dict representation of the model suitable for storage.
+
+        Raises:
+            SerializationError: If the model cannot be serialized.
+        """
         try:
             if self._is_list_model:
                 return {"items": self._type_adapter.dump_python(value, mode="json")}

@@ -32,6 +32,18 @@ DEFAULT_SEED_DATA: FROZEN_SEED_DATA_TYPE = MappingProxyType({})
 
 
 def _seed_to_frozen_seed_data(seed: SEED_DATA_TYPE) -> FROZEN_SEED_DATA_TYPE:
+    """Convert mutable seed data to an immutable frozen structure.
+
+    This function converts the nested mapping structure of seed data into immutable MappingProxyType
+    objects at all levels. Using immutable structures prevents accidental modification of seed data
+    after store initialization and ensures thread-safety.
+
+    Args:
+        seed: The mutable seed data mapping: {collection: {key: {field: value}}}.
+
+    Returns:
+        An immutable frozen version of the seed data using MappingProxyType.
+    """
     return MappingProxyType(
         {collection: MappingProxyType({key: MappingProxyType(value) for key, value in items.items()}) for collection, items in seed.items()}
     )
@@ -101,6 +113,15 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
                 await self.put(key=key, value=dict(value), collection=collection)
 
     async def setup(self) -> None:
+        """Initialize the store if not already initialized.
+
+        This method is called automatically before any store operations and uses a lock to ensure
+        thread-safe lazy initialization. It can also be called manually to ensure the store is ready
+        before performing operations. The setup process includes calling the `_setup()` hook and
+        seeding the store with initial data if provided.
+
+        This method is idempotent - calling it multiple times has no additional effect after the first call.
+        """
         if not self._setup_complete:
             async with self._setup_lock:
                 if not self._setup_complete:
@@ -116,6 +137,19 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
                     await self._seed_store()
 
     async def setup_collection(self, *, collection: str) -> None:
+        """Initialize a specific collection if not already initialized.
+
+        This method is called automatically before any collection-specific operations and uses a per-collection
+        lock to ensure thread-safe lazy initialization. It can also be called manually to ensure a collection
+        is ready before performing operations on it. The setup process includes calling the `_setup_collection()`
+        hook for store-specific collection initialization.
+
+        This method is idempotent - calling it multiple times for the same collection has no additional effect
+        after the first call.
+
+        Args:
+            collection: The name of the collection to initialize.
+        """
         await self.setup()
 
         if not self._setup_collection_complete[collection]:
