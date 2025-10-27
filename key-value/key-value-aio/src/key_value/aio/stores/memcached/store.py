@@ -1,4 +1,5 @@
 import hashlib
+from collections.abc import Sequence
 from typing import overload
 
 from key_value.shared.utils.compound import compound_key
@@ -65,6 +66,27 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         json_str: str = raw_value.decode(encoding="utf-8")
 
         return ManagedEntry.from_json(json_str=json_str)
+
+    @override
+    async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
+        if not keys:
+            return []
+
+        combo_keys: list[str] = [self.sanitize_key(compound_key(collection=collection, key=key)) for key in keys]
+
+        # Use multi_get for efficient batch retrieval
+        # multi_get returns a tuple in the same order as keys
+        raw_values: tuple[bytes | None, ...] = await self._client.multi_get(*[k.encode("utf-8") for k in combo_keys])
+
+        entries: list[ManagedEntry | None] = []
+        for raw_value in raw_values:
+            if isinstance(raw_value, (bytes, bytearray)):
+                json_str: str = raw_value.decode(encoding="utf-8")
+                entries.append(ManagedEntry.from_json(json_str=json_str))
+            else:
+                entries.append(None)
+
+        return entries
 
     @override
     async def _put_managed_entry(

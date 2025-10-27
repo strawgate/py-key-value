@@ -13,7 +13,15 @@ from typing_extensions import override
 from key_value.sync.code_gen.stores.base import BaseStore
 
 try:
-    import winreg
+    import winreg  # pyright: ignore[reportUnusedImport]  # noqa: F401
+
+    from key_value.sync.code_gen.stores.windows_registry.utils import (
+        create_key,
+        delete_reg_sz_value,
+        get_reg_sz_value,
+        has_key,
+        set_reg_sz_value,
+    )
 except ImportError as e:
     msg = "WindowsRegistryStore requires Windows platform (winreg module)"
     raise ImportError(msg) from e
@@ -68,17 +76,17 @@ class WindowsRegistryStore(BaseStore):
         return f"{self._registry_path}\\{sanitized_collection}"
 
     @override
+    def _setup_collection(self, *, collection: str) -> None:
+        registry_path = self._get_registry_path(collection=collection)
+        if not has_key(hive=self._hive, sub_key=registry_path):
+            create_key(hive=self._hive, sub_key=registry_path)
+
+    @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         sanitized_key = self._sanitize_key(key=key)
         registry_path = self._get_registry_path(collection=collection)
 
-        try:
-            with winreg.OpenKey(key=self._hive, sub_key=registry_path, reserved=0, access=winreg.KEY_READ) as reg_key:
-                (json_str, _) = winreg.QueryValueEx(reg_key, sanitized_key)
-        except (FileNotFoundError, OSError):
-            return None
-
-        if json_str is None:
+        if not (json_str := get_reg_sz_value(hive=self._hive, sub_key=registry_path, value_name=sanitized_key)):
             return None
 
         return ManagedEntry.from_json(json_str=json_str)
@@ -90,22 +98,11 @@ class WindowsRegistryStore(BaseStore):
 
         json_str: str = managed_entry.to_json()
 
-        try:
-            with winreg.CreateKey(self._hive, registry_path) as reg_key:
-                winreg.SetValueEx(reg_key, sanitized_key, 0, winreg.REG_SZ, json_str)
-        except OSError as e:
-            msg = f"Failed to write to registry: {e}"
-            raise RuntimeError(msg) from e
+        set_reg_sz_value(hive=self._hive, sub_key=registry_path, value_name=sanitized_key, value=json_str)
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         sanitized_key = self._sanitize_key(key=key)
         registry_path = self._get_registry_path(collection=collection)
 
-        try:
-            with winreg.OpenKey(self._hive, registry_path, 0, winreg.KEY_WRITE) as reg_key:
-                winreg.DeleteValue(reg_key, sanitized_key)
-        except (FileNotFoundError, OSError):
-            return False
-        else:
-            return True
+        return delete_reg_sz_value(hive=self._hive, sub_key=registry_path, value_name=sanitized_key)

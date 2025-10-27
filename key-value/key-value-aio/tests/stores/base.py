@@ -116,6 +116,26 @@ class BaseStoreTests(ABC):
         await store.put_many(collection="test", keys=["test", "test_2"], values=({"test": "test"}, {"test": "test_2"}))
         assert await store.get_many(collection="test", keys=["test", "test_2"]) == [{"test": "test"}, {"test": "test_2"}]
 
+    async def test_delete(self, store: BaseStore):
+        assert await store.delete(collection="test", key="test") is False
+
+    async def test_put_delete_delete(self, store: BaseStore):
+        await store.put(collection="test", key="test", value={"test": "test"})
+        assert await store.delete(collection="test", key="test")
+        assert await store.delete(collection="test", key="test") is False
+
+    async def test_delete_many(self, store: BaseStore):
+        assert await store.delete_many(collection="test", keys=["test", "test_2"]) == 0
+
+    async def test_put_delete_many(self, store: BaseStore):
+        await store.put(collection="test", key="test", value={"test": "test"})
+        assert await store.delete_many(collection="test", keys=["test", "test_2"]) == 1
+
+    async def test_delete_many_delete_many(self, store: BaseStore):
+        await store.put(collection="test", key="test", value={"test": "test"})
+        assert await store.delete_many(collection="test", keys=["test", "test_2"]) == 1
+        assert await store.delete_many(collection="test", keys=["test", "test_2"]) == 0
+
     async def test_get_put_get_delete_get(self, store: BaseStore):
         """Tests that the get, put, delete, and get methods work together to store and retrieve a value from an empty store."""
 
@@ -164,7 +184,7 @@ class BaseStoreTests(ABC):
     @pytest.mark.timeout(10)
     async def test_put_expired_get_none(self, store: BaseStore):
         """Tests that a put call with a negative ttl will return None when getting the key."""
-        await store.put(collection="test_collection", key="test_key", value={"test": "test"}, ttl=1)
+        await store.put(collection="test_collection", key="test_key", value={"test": "test"}, ttl=2)
         assert await store.get(collection="test_collection", key="test_key") is not None
         await asleep(seconds=1)
 
