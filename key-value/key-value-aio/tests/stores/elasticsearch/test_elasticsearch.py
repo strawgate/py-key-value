@@ -1,4 +1,3 @@
-import os
 from collections.abc import AsyncGenerator
 
 import pytest
@@ -8,15 +7,21 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.elasticsearch import ElasticsearchStore
-from tests.conftest import docker_container
+from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
 ES_HOST = "localhost"
 ES_PORT = 9200
 ES_URL = f"http://{ES_HOST}:{ES_PORT}"
-ES_VERSION = "9.1.4"
-ES_IMAGE = f"docker.elastic.co/elasticsearch/elasticsearch:{ES_VERSION}"
+ES_CONTAINER_PORT = 9200
+
+WAIT_FOR_ELASTICSEARCH_TIMEOUT = 30
+
+ELASTICSEARCH_VERSIONS_TO_TEST = [
+    "9.0.0",  # Released Apr 2025
+    "9.2.0",  # Released Oct 2025
+]
 
 
 def get_elasticsearch_client() -> AsyncElasticsearch:
@@ -34,15 +39,21 @@ class ElasticsearchFailedToStartError(Exception):
     pass
 
 
-@pytest.mark.skipif(os.getenv("ES_URL") is None, reason="Elasticsearch is not configured")
+@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
 class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session")
-    async def setup_elasticsearch(self) -> AsyncGenerator[None, None]:
+    @pytest.fixture(autouse=True, scope="session", params=ELASTICSEARCH_VERSIONS_TO_TEST)
+    async def setup_elasticsearch(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+        version = request.param
+        es_image = f"docker.elastic.co/elasticsearch/elasticsearch:{version}"
+
         with docker_container(
-            "elasticsearch-test", ES_IMAGE, {"9200": 9200}, {"discovery.type": "single-node", "xpack.security.enabled": "false"}
+            f"elasticsearch-test-{version}",
+            es_image,
+            {str(ES_CONTAINER_PORT): ES_PORT},
+            {"discovery.type": "single-node", "xpack.security.enabled": "false"},
         ):
-            if not await async_wait_for_true(bool_fn=ping_elasticsearch, tries=30, wait_time=1):
-                msg = "Elasticsearch failed to start"
+            if not await async_wait_for_true(bool_fn=ping_elasticsearch, tries=WAIT_FOR_ELASTICSEARCH_TIMEOUT, wait_time=2):
+                msg = f"Elasticsearch {version} failed to start"
                 raise ElasticsearchFailedToStartError(msg)
 
             yield
@@ -55,10 +66,10 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self) -> AsyncGenerator[ElasticsearchStore, None]:
-        es_client = get_elasticsearch_client()
-        indices = await es_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
-        for index in indices:
-            _ = await es_client.options(ignore_status=404).indices.delete(index=index)
+        async with get_elasticsearch_client() as es_client:
+            indices = await es_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
+            for index in indices:
+                _ = await es_client.options(ignore_status=404).indices.delete(index=index)
         async with ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test") as store:
             yield store
 

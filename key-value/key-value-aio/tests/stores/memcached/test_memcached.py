@@ -14,15 +14,20 @@ from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 # Memcached test configuration
 MEMCACHED_HOST = "localhost"
 MEMCACHED_PORT = 11211
+MEMCACHED_CONTAINER_PORT = 11211
 
 WAIT_FOR_MEMCACHED_TIMEOUT = 30
+
+MEMCACHED_VERSIONS_TO_TEST = [
+    "1.6.0-alpine",  # Released Mar 2020
+    "1.6.39-alpine",  # Released Sep 2025
+]
 
 
 async def ping_memcached() -> bool:
     client = Client(host=MEMCACHED_HOST, port=MEMCACHED_PORT)
     try:
-        _ = await client.set(b"ping", b"1", exptime=1)
-        _ = await client.get(b"ping")
+        await client.stats()
     except Exception:
         return False
     else:
@@ -38,18 +43,20 @@ class MemcachedFailedToStartError(Exception):
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session")
-    async def setup_memcached(self) -> AsyncGenerator[None, None]:
-        with docker_container("memcached-test", "memcached:1.6-alpine", {"11211": 11211}):
-            if not await async_wait_for_true(bool_fn=ping_memcached, tries=30, wait_time=1):
-                msg = "Memcached failed to start"
+    @pytest.fixture(autouse=True, scope="session", params=MEMCACHED_VERSIONS_TO_TEST)
+    async def setup_memcached(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+        version = request.param
+
+        with docker_container(f"memcached-test-{version}", f"memcached:{version}", {str(MEMCACHED_CONTAINER_PORT): MEMCACHED_PORT}):
+            if not await async_wait_for_true(bool_fn=ping_memcached, tries=WAIT_FOR_MEMCACHED_TIMEOUT, wait_time=1):
+                msg = f"Memcached {version} failed to start"
                 raise MemcachedFailedToStartError(msg)
 
             yield
 
     @override
     @pytest.fixture
-    async def store(self, setup_memcached: MemcachedStore) -> MemcachedStore:
+    async def store(self, setup_memcached: None) -> MemcachedStore:
         store = MemcachedStore(host=MEMCACHED_HOST, port=MEMCACHED_PORT)
         _ = await store._client.flush_all()  # pyright: ignore[reportPrivateUsage]
         return store

@@ -25,7 +25,6 @@ lint.fixable = ["ALL"]
 lint.ignore = [
     "COM812",
     "PLR0913", # Too many arguments, MCP Servers have a lot of arguments, OKAY?!
-    "ARG001", # Unused argument, Pyright captures this for us
 ]
 lint.extend-select = [
     "A",
@@ -68,6 +67,8 @@ line-length = 140
     "DTZ005", # Ignore datetime.UTC
     "PLR2004", # Ignore magic values
     "E501", # Ignore line length
+    "ARG001", # Unused argument, Pyright captures this for us
+    "ARG002", # Unused argument, Pyright captures this for us
 ]
 
 [project.optional-dependencies]
@@ -99,6 +100,7 @@ pythonVersion = "3.10"
 typeCheckingMode = "strict"
 reportExplicitAny = false
 reportMissingTypeStubs = false
+#reportUnnecessaryTypeIgnoreComment = "error"
 exclude = [
     "**/playground/**",
     "**/node_modules/**",

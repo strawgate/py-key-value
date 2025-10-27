@@ -6,11 +6,12 @@ from abc import ABC, abstractmethod
 from asyncio.locks import Lock
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from types import TracebackType
+from types import MappingProxyType, TracebackType
 from typing import Any, SupportsFloat
 
 from key_value.shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.shared.errors import StoreSetupError
+from key_value.shared.type_checking.bear_spray import bear_enforce
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.time_to_live import now, prepare_ttl
 from typing_extensions import Self, override
@@ -23,6 +24,16 @@ from key_value.aio.protocols.key_value import (
     AsyncEnumerateKeysProtocol,
     AsyncKeyValueProtocol,
 )
+
+SEED_DATA_TYPE = Mapping[str, Mapping[str, Mapping[str, Any]]]
+FROZEN_SEED_DATA_TYPE = MappingProxyType[str, MappingProxyType[str, MappingProxyType[str, Any]]]
+DEFAULT_SEED_DATA: FROZEN_SEED_DATA_TYPE = MappingProxyType({})
+
+
+def _seed_to_frozen_seed_data(seed: SEED_DATA_TYPE) -> FROZEN_SEED_DATA_TYPE:
+    return MappingProxyType(
+        {collection: MappingProxyType({key: MappingProxyType(value) for key, value in items.items()}) for collection, items in seed.items()}
+    )
 
 
 class BaseStore(AsyncKeyValueProtocol, ABC):
@@ -43,20 +54,27 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
     _setup_collection_locks: defaultdict[str, Lock]
     _setup_collection_complete: defaultdict[str, bool]
 
+    _seed: FROZEN_SEED_DATA_TYPE
+
     default_collection: str
 
-    def __init__(self, *, default_collection: str | None = None) -> None:
+    def __init__(self, *, default_collection: str | None = None, seed: SEED_DATA_TYPE | None = None) -> None:
         """Initialize the managed key-value store.
 
         Args:
             default_collection: The default collection to use if no collection is provided.
                 Defaults to "default_collection".
+            seed: Optional seed data to pre-populate the store. Format: {collection: {key: {field: value, ...}}}.
+                Seeding occurs once during store initialization (when the store is first entered or when the
+                first operation is performed on the store).
         """
 
         self._setup_complete = False
         self._setup_lock = Lock()
         self._setup_collection_locks = defaultdict(Lock)
         self._setup_collection_complete = defaultdict(bool)
+
+        self._seed = _seed_to_frozen_seed_data(seed=seed or {})
 
         self.default_collection = default_collection or DEFAULT_COLLECTION_NAME
 
@@ -71,8 +89,15 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
     async def _setup(self) -> None:
         """Initialize the store (called once before first use)."""
 
-    async def _setup_collection(self, *, collection: str) -> None:  # pyright: ignore[reportUnusedParameter]
+    async def _setup_collection(self, *, collection: str) -> None:
         """Initialize the collection (called once before first use of the collection)."""
+
+    async def _seed_store(self) -> None:
+        """Seed the store with the data from the seed."""
+        for collection, items in self._seed.items():
+            await self.setup_collection(collection=collection)
+            for key, value in items.items():
+                await self.put(key=key, value=dict(value), collection=collection)
 
     async def setup(self) -> None:
         if not self._setup_complete:
@@ -84,7 +109,10 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
                         raise StoreSetupError(
                             message=f"Failed to setup key value store: {e}", extra_info={"store": self.__class__.__name__}
                         ) from e
+
                     self._setup_complete = True
+
+                    await self._seed_store()
 
     async def setup_collection(self, *, collection: str) -> None:
         await self.setup()
@@ -107,6 +135,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         return [await self._get_managed_entry(collection=collection, key=key) for key in keys]
 
+    @bear_enforce
     @override
     async def get(
         self,
@@ -136,6 +165,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         return dict(managed_entry.value)
 
+    @bear_enforce
     @override
     async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         collection = collection or self.default_collection
@@ -144,6 +174,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         entries = await self._get_managed_entries(keys=keys, collection=collection)
         return [dict(entry.value) if entry and not entry.is_expired else None for entry in entries]
 
+    @bear_enforce
     @override
     async def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
         collection = collection or self.default_collection
@@ -156,6 +187,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         return (dict(managed_entry.value), managed_entry.ttl)
 
+    @bear_enforce
     @override
     async def ttl_many(
         self,
@@ -189,6 +221,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
                 managed_entry=managed_entry,
             )
 
+    @bear_enforce
     @override
     async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Store a key-value pair in the specified collection with optional TTL."""
@@ -218,6 +251,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         return (keys, values, ttl_for_entries)
 
+    @bear_enforce
     @override
     async def put_many(
         self,
@@ -254,6 +288,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         return deleted_count
 
+    @bear_enforce
     @override
     async def delete(self, key: str, *, collection: str | None = None) -> bool:
         collection = collection or self.default_collection
@@ -261,6 +296,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         return await self._delete_managed_entry(key=key, collection=collection)
 
+    @bear_enforce
     @override
     async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         """Delete multiple managed entries by key from the specified collection."""

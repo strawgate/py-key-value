@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any, Generic, SupportsFloat, TypeVar, get_origin
+from typing import Any, Generic, SupportsFloat, TypeVar, get_origin, overload
 
 from key_value.shared.errors import DeserializationError, SerializationError
 from key_value.shared.type_checking.bear_spray import bear_spray
@@ -14,6 +14,12 @@ T = TypeVar("T", bound=BaseModel | Sequence[BaseModel])
 
 class PydanticAdapter(Generic[T]):
     """Adapter around a KVStore-compliant Store that allows type-safe persistence of Pydantic models."""
+
+    _key_value: AsyncKeyValue
+    _is_list_model: bool
+    _type_adapter: TypeAdapter[T]
+    _default_collection: str | None
+    _raise_on_validation_error: bool
 
     # Beartype doesn't like our `type[T] includes a bound on Sequence[...] as the subscript is not checkable at runtime
     # For just the next 20 or so lines we are no longer bear bros but have no fear, we will be back soon!
@@ -34,14 +40,14 @@ class PydanticAdapter(Generic[T]):
             raise_on_validation_error: Whether to raise a ValidationError if the model is invalid.
         """
 
-        self._key_value: AsyncKeyValue = key_value
+        self._key_value = key_value
 
         origin = get_origin(pydantic_model)
-        self._is_list_model: bool = origin is not None and issubclass(origin, Sequence)
+        self._is_list_model = origin is not None and isinstance(origin, type) and issubclass(origin, Sequence)
 
         self._type_adapter = TypeAdapter[T](pydantic_model)
-        self._default_collection: str | None = default_collection
-        self._raise_on_validation_error: bool = raise_on_validation_error
+        self._default_collection = default_collection
+        self._raise_on_validation_error = raise_on_validation_error
 
     def _validate_model(self, value: dict[str, Any]) -> T | None:
         try:
@@ -60,16 +66,27 @@ class PydanticAdapter(Generic[T]):
             if self._is_list_model:
                 return {"items": self._type_adapter.dump_python(value, mode="json")}
 
-            return self._type_adapter.dump_python(value, mode="json")
+            return self._type_adapter.dump_python(value, mode="json")  # pyright: ignore[reportAny]
         except PydanticSerializationError as e:
             msg = f"Invalid Pydantic model: {e}"
             raise SerializationError(msg) from e
 
-    async def get(self, key: str, *, collection: str | None = None) -> T | None:
+    @overload
+    async def get(self, key: str, *, collection: str | None = None, default: T) -> T: ...
+
+    @overload
+    async def get(self, key: str, *, collection: str | None = None, default: None = None) -> T | None: ...
+
+    async def get(self, key: str, *, collection: str | None = None, default: T | None = None) -> T | None:
         """Get and validate a model by key.
 
+        Args:
+            key: The key to retrieve.
+            collection: The collection to use. If not provided, uses the default collection.
+            default: The default value to return if the key doesn't exist or validation fails.
+
         Returns:
-            The parsed model instance, or None if not present.
+            The parsed model instance if found and valid, or the default value if key doesn't exist or validation fails.
 
         Raises:
             DeserializationError if the stored data cannot be validated as the model and the PydanticAdapter is configured to
@@ -78,15 +95,28 @@ class PydanticAdapter(Generic[T]):
         collection = collection or self._default_collection
 
         if value := await self._key_value.get(key=key, collection=collection):
-            return self._validate_model(value=value)
+            validated = self._validate_model(value=value)
+            if validated is not None:
+                return validated
 
-        return None
+        return default
 
-    async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[T | None]:
+    @overload
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None, default: T) -> list[T]: ...
+
+    @overload
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None, default: None = None) -> list[T | None]: ...
+
+    async def get_many(self, keys: Sequence[str], *, collection: str | None = None, default: T | None = None) -> list[T] | list[T | None]:
         """Batch get and validate models by keys, preserving order.
 
+        Args:
+            keys: The list of keys to retrieve.
+            collection: The collection to use. If not provided, uses the default collection.
+            default: The default value to return for keys that don't exist or fail validation.
+
         Returns:
-            A list of parsed model instances, or None if missing.
+            A list of parsed model instances, with default values for missing keys or validation failures.
 
         Raises:
             DeserializationError if the stored data cannot be validated as the model and the PydanticAdapter is configured to
@@ -96,7 +126,14 @@ class PydanticAdapter(Generic[T]):
 
         values: list[dict[str, Any] | None] = await self._key_value.get_many(keys=keys, collection=collection)
 
-        return [self._validate_model(value=value) if value else None for value in values]
+        result: list[T | None] = []
+        for value in values:
+            if value is None:
+                result.append(default)
+            else:
+                validated = self._validate_model(value=value)
+                result.append(validated if validated is not None else default)
+        return result
 
     async def put(self, key: str, value: T, *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Serialize and store a model.
