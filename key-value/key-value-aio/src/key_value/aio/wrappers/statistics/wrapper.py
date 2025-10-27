@@ -175,7 +175,7 @@ class StatisticsWrapper(BaseWrapper):
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         collection = collection or DEFAULT_COLLECTION_NAME
 

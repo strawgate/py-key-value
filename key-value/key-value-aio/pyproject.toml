@@ -56,6 +56,7 @@ addopts = [
     "--inline-snapshot=disable",
     "-n=auto",
     "--dist=loadfile",
+    "--maxfail=5"
 ]
 markers = [
     "skip_on_ci: Skip running the test when running on CI",

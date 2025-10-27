@@ -59,7 +59,7 @@ class TimeoutWrapper(BaseWrapper):
         values: Sequence[Mapping[str, Any]],
         *,
         collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        ttl: SupportsFloat | None = None,
     ) -> None:
         return await asyncio.wait_for(
             self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=ttl), timeout=self.timeout

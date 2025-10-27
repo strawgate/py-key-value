@@ -4,6 +4,7 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, SupportsFloat
 
+from key_value.shared.type_checking.bear_spray import bear_enforce
 from typing_extensions import override
 
 from key_value.sync.code_gen.protocols.key_value import KeyValue
@@ -14,41 +15,44 @@ class BaseWrapper(KeyValue):
 
     key_value: KeyValue
 
+    @bear_enforce
     @override
     def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
         return self.key_value.get(collection=collection, key=key)
 
+    @bear_enforce
     @override
-    def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         return self.key_value.get_many(collection=collection, keys=keys)
 
+    @bear_enforce
     @override
     def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
         return self.key_value.ttl(collection=collection, key=key)
 
+    @bear_enforce
     @override
-    def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         return self.key_value.ttl_many(collection=collection, keys=keys)
 
+    @bear_enforce
     @override
     def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         return self.key_value.put(collection=collection, key=key, value=value, ttl=ttl)
 
+    @bear_enforce
     @override
     def put_many(
-        self,
-        keys: list[str],
-        values: Sequence[Mapping[str, Any]],
-        *,
-        collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        self, keys: Sequence[str], values: Sequence[Mapping[str, Any]], *, collection: str | None = None, ttl: SupportsFloat | None = None
     ) -> None:
         return self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
 
+    @bear_enforce
     @override
     def delete(self, key: str, *, collection: str | None = None) -> bool:
         return self.key_value.delete(collection=collection, key=key)
 
+    @bear_enforce
     @override
-    def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         return self.key_value.delete_many(keys=keys, collection=collection)

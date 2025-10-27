@@ -33,7 +33,7 @@ def get_docker_client() -> DockerClient:
     return DockerClient.from_env()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def docker_client() -> DockerClient:
     return get_docker_client()
 

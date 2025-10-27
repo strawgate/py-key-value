@@ -37,8 +37,8 @@ class PrefixKeysWrapper(BaseWrapper):
         return self.key_value.get(key=new_key, collection=collection)
 
     @override
-    def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
-        new_keys: list[str] = [self._prefix_key(key=key) for key in keys]
+    def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+        new_keys: Sequence[str] = [self._prefix_key(key=key) for key in keys]
         return self.key_value.get_many(keys=new_keys, collection=collection)
 
     @override
@@ -47,8 +47,8 @@ class PrefixKeysWrapper(BaseWrapper):
         return self.key_value.ttl(key=new_key, collection=collection)
 
     @override
-    def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
-        new_keys: list[str] = [self._prefix_key(key=key) for key in keys]
+    def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+        new_keys: Sequence[str] = [self._prefix_key(key=key) for key in keys]
         return self.key_value.ttl_many(keys=new_keys, collection=collection)
 
     @override
@@ -58,14 +58,9 @@ class PrefixKeysWrapper(BaseWrapper):
 
     @override
     def put_many(
-        self,
-        keys: list[str],
-        values: Sequence[Mapping[str, Any]],
-        *,
-        collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        self, keys: Sequence[str], values: Sequence[Mapping[str, Any]], *, collection: str | None = None, ttl: SupportsFloat | None = None
     ) -> None:
-        new_keys: list[str] = [self._prefix_key(key=key) for key in keys]
+        new_keys: Sequence[str] = [self._prefix_key(key=key) for key in keys]
         return self.key_value.put_many(keys=new_keys, values=values, collection=collection, ttl=ttl)
 
     @override
@@ -74,6 +69,6 @@ class PrefixKeysWrapper(BaseWrapper):
         return self.key_value.delete(key=new_key, collection=collection)
 
     @override
-    def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
-        new_keys: list[str] = [self._prefix_key(key=key) for key in keys]
+    def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
+        new_keys: Sequence[str] = [self._prefix_key(key=key) for key in keys]
         return self.key_value.delete_many(keys=new_keys, collection=collection)

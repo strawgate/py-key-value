@@ -8,14 +8,16 @@ Base abstract class for managed key-value store implementations.
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from threading import Lock
-from types import TracebackType
+from types import MappingProxyType, TracebackType
 from typing import Any, SupportsFloat
 
 from key_value.shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.shared.errors import StoreSetupError
+from key_value.shared.type_checking.bear_spray import bear_enforce
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.time_to_live import now, prepare_ttl, prepare_ttls
+from key_value.shared.utils.time_to_live import prepare_entry_timestamps
 from typing_extensions import Self, override
 
 from key_value.sync.code_gen.protocols.key_value import (
@@ -26,6 +28,19 @@ from key_value.sync.code_gen.protocols.key_value import (
     EnumerateKeysProtocol,
     KeyValueProtocol,
 )
+
+SEED_DATA_TYPE = Mapping[str, Mapping[str, Mapping[str, Any]]]
+FROZEN_SEED_DATA_TYPE = MappingProxyType[str, MappingProxyType[str, MappingProxyType[str, Any]]]
+DEFAULT_SEED_DATA: FROZEN_SEED_DATA_TYPE = MappingProxyType({})
+
+
+def _seed_to_frozen_seed_data(seed: SEED_DATA_TYPE) -> FROZEN_SEED_DATA_TYPE:
+    return MappingProxyType(
+        {
+            collection: MappingProxyType({key: MappingProxyType(value) for (key, value) in items.items()})
+            for (collection, items) in seed.items()
+        }
+    )
 
 
 class BaseStore(KeyValueProtocol, ABC):
@@ -46,20 +61,27 @@ class BaseStore(KeyValueProtocol, ABC):
     _setup_collection_locks: defaultdict[str, Lock]
     _setup_collection_complete: defaultdict[str, bool]
 
+    _seed: FROZEN_SEED_DATA_TYPE
+
     default_collection: str
 
-    def __init__(self, *, default_collection: str | None = None) -> None:
+    def __init__(self, *, default_collection: str | None = None, seed: SEED_DATA_TYPE | None = None) -> None:
         """Initialize the managed key-value store.
 
         Args:
             default_collection: The default collection to use if no collection is provided.
                 Defaults to "default_collection".
+            seed: Optional seed data to pre-populate the store. Format: {collection: {key: {field: value, ...}}}.
+                Seeding occurs once during store initialization (when the store is first entered or when the
+                first operation is performed on the store).
         """
 
         self._setup_complete = False
         self._setup_lock = Lock()
         self._setup_collection_locks = defaultdict(Lock)
         self._setup_collection_complete = defaultdict(bool)
+
+        self._seed = _seed_to_frozen_seed_data(seed=seed or {})
 
         self.default_collection = default_collection or DEFAULT_COLLECTION_NAME
 
@@ -74,8 +96,15 @@ class BaseStore(KeyValueProtocol, ABC):
     def _setup(self) -> None:
         """Initialize the store (called once before first use)."""
 
-    def _setup_collection(self, *, collection: str) -> None:  # pyright: ignore[reportUnusedParameter]
-        "Initialize the collection (called once before first use of the collection)."
+    def _setup_collection(self, *, collection: str) -> None:
+        """Initialize the collection (called once before first use of the collection)."""
+
+    def _seed_store(self) -> None:
+        """Seed the store with the data from the seed."""
+        for collection, items in self._seed.items():
+            self.setup_collection(collection=collection)
+            for key, value in items.items():
+                self.put(key=key, value=dict(value), collection=collection)
 
     def setup(self) -> None:
         if not self._setup_complete:
@@ -87,7 +116,10 @@ class BaseStore(KeyValueProtocol, ABC):
                         raise StoreSetupError(
                             message=f"Failed to setup key value store: {e}", extra_info={"store": self.__class__.__name__}
                         ) from e
+
                     self._setup_complete = True
+
+                    self._seed_store()
 
     def setup_collection(self, *, collection: str) -> None:
         self.setup()
@@ -105,11 +137,12 @@ class BaseStore(KeyValueProtocol, ABC):
     def _get_managed_entry(self, *, collection: str, key: str) -> ManagedEntry | None:
         """Retrieve a cache entry by key from the specified collection."""
 
-    def _get_managed_entries(self, *, collection: str, keys: list[str]) -> list[ManagedEntry | None]:
+    def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
         """Retrieve multiple managed entries by key from the specified collection."""
 
         return [self._get_managed_entry(collection=collection, key=key) for key in keys]
 
+    @bear_enforce
     @override
     def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
         """Retrieve a value by key from the specified collection.
@@ -134,14 +167,16 @@ class BaseStore(KeyValueProtocol, ABC):
 
         return dict(managed_entry.value)
 
+    @bear_enforce
     @override
-    def get_many(self, keys: list[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
+    def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
         collection = collection or self.default_collection
         self.setup_collection(collection=collection)
 
         entries = self._get_managed_entries(keys=keys, collection=collection)
         return [dict(entry.value) if entry and (not entry.is_expired) else None for entry in entries]
 
+    @bear_enforce
     @override
     def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
         collection = collection or self.default_collection
@@ -154,8 +189,9 @@ class BaseStore(KeyValueProtocol, ABC):
 
         return (dict(managed_entry.value), managed_entry.ttl)
 
+    @bear_enforce
     @override
-    def ttl_many(self, keys: list[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+    def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         """Retrieve multiple values and TTLs by key from the specified collection.
 
         Returns a list of tuples of the form (value, ttl_seconds). Missing or expired
@@ -172,69 +208,71 @@ class BaseStore(KeyValueProtocol, ABC):
         """Store a managed entry by key in the specified collection."""
         ...
 
-    def _put_managed_entries(self, *, collection: str, keys: list[str], managed_entries: Sequence[ManagedEntry]) -> None:
-        """Store multiple managed entries by key in the specified collection."""
+    def _put_managed_entries(
+        self,
+        *,
+        collection: str,
+        keys: Sequence[str],
+        managed_entries: Sequence[ManagedEntry],
+        ttl: float | None,
+        created_at: datetime,
+        expires_at: datetime | None,
+    ) -> None:
+        """Store multiple managed entries by key in the specified collection.
 
+        Args:
+            collection: The collection to store entries in
+            keys: The keys for the entries
+            managed_entries: The managed entries to store
+            ttl: The TTL in seconds (None for no expiration)
+            created_at: The creation timestamp for all entries
+            expires_at: The expiration timestamp for all entries (None if no TTL)
+        """
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             self._put_managed_entry(collection=collection, key=key, managed_entry=managed_entry)
 
+    @bear_enforce
     @override
     def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Store a key-value pair in the specified collection with optional TTL."""
         collection = collection or self.default_collection
         self.setup_collection(collection=collection)
 
-        managed_entry: ManagedEntry = ManagedEntry(value=value, ttl=prepare_ttl(t=ttl), created_at=now())
+        (created_at, ttl_seconds, expires_at) = prepare_entry_timestamps(ttl=ttl)
+
+        managed_entry: ManagedEntry = ManagedEntry(value=value, ttl=ttl_seconds, created_at=created_at, expires_at=expires_at)
 
         self._put_managed_entry(collection=collection, key=key, managed_entry=managed_entry)
 
-    def _prepare_put_many(
-        self, *, keys: list[str], values: Sequence[Mapping[str, Any]], ttl: Sequence[SupportsFloat | None] | SupportsFloat | None
-    ) -> tuple[list[str], Sequence[Mapping[str, Any]], list[float | None]]:
-        """Prepare multiple managed entries for a put_many operation.
-
-        Inheriting classes can use this method if they need to modify a put_many operation."""
-
-        if len(keys) != len(values):
-            msg = "put_many called but a different number of keys and values were provided"
-            raise ValueError(msg) from None
-
-        if ttl and isinstance(ttl, Sequence) and (len(ttl) != len(keys)):
-            msg = "put_many called but a different number of keys and ttl values were provided"
-            raise ValueError(msg) from None
-
-        ttl_for_entries: list[float | None] = prepare_ttls(t=ttl, count=len(keys))
-
-        return (keys, values, ttl_for_entries)
-
     @override
     def put_many(
-        self,
-        keys: list[str],
-        values: Sequence[Mapping[str, Any]],
-        *,
-        collection: str | None = None,
-        ttl: Sequence[SupportsFloat | None] | None = None,
+        self, keys: Sequence[str], values: Sequence[Mapping[str, Any]], *, collection: str | None = None, ttl: SupportsFloat | None = None
     ) -> None:
         """Store multiple key-value pairs in the specified collection."""
 
         collection = collection or self.default_collection
         self.setup_collection(collection=collection)
 
-        (keys, values, ttl_for_entries) = self._prepare_put_many(keys=keys, values=values, ttl=ttl)
+        if len(keys) != len(values):
+            msg = "put_many called but a different number of keys and values were provided"
+            raise ValueError(msg) from None
+
+        (created_at, ttl_seconds, expires_at) = prepare_entry_timestamps(ttl=ttl)
 
         managed_entries: list[ManagedEntry] = [
-            ManagedEntry(value=value, ttl=ttl_for_entries[i], created_at=now()) for (i, value) in enumerate(values)
+            ManagedEntry(value=value, ttl=ttl_seconds, created_at=created_at, expires_at=expires_at) for value in values
         ]
 
-        self._put_managed_entries(collection=collection, keys=keys, managed_entries=managed_entries)
+        self._put_managed_entries(
+            collection=collection, keys=keys, managed_entries=managed_entries, ttl=ttl_seconds, created_at=created_at, expires_at=expires_at
+        )
 
     @abstractmethod
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         """Delete a managed entry by key from the specified collection."""
         ...
 
-    def _delete_managed_entries(self, *, keys: list[str], collection: str) -> int:
+    def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
         """Delete multiple managed entries by key from the specified collection."""
 
         deleted_count: int = 0
@@ -245,6 +283,7 @@ class BaseStore(KeyValueProtocol, ABC):
 
         return deleted_count
 
+    @bear_enforce
     @override
     def delete(self, key: str, *, collection: str | None = None) -> bool:
         collection = collection or self.default_collection
@@ -252,8 +291,9 @@ class BaseStore(KeyValueProtocol, ABC):
 
         return self._delete_managed_entry(key=key, collection=collection)
 
+    @bear_enforce
     @override
-    def delete_many(self, keys: list[str], *, collection: str | None = None) -> int:
+    def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
         """Delete multiple managed entries by key from the specified collection."""
         collection = collection or self.default_collection
         self.setup_collection(collection=collection)

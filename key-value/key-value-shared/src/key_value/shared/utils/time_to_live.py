@@ -1,11 +1,9 @@
 import time
-from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from numbers import Real
 from typing import Any, SupportsFloat, overload
 
 from key_value.shared.errors import InvalidTTLError
-from key_value.shared.errors.key_value import IncorrectTTLCountError
 
 
 def epoch_to_datetime(epoch: float) -> datetime:
@@ -76,32 +74,13 @@ def prepare_ttl(t: SupportsFloat | None) -> float | None:
     return ttl
 
 
-def prepare_ttls(t: Sequence[SupportsFloat | None] | SupportsFloat | None, count: int) -> list[float | None]:
-    """Prepare a list of TTLs for use in a put_many operation.
+def prepare_entry_timestamps(ttl: SupportsFloat | None) -> tuple[datetime, float | None, datetime | None]:
+    created_at: datetime = now()
 
-    If a single TTL (or None) is provided, it will be repeated `count` times.
+    ttl_seconds: float | None = prepare_ttl(t=ttl)
 
-    If multiple TTLs are provided, they will be validated, including that the number of TTLs is equal to `count`."""
+    expires_at: datetime | None = None
+    if ttl_seconds is not None:
+        expires_at = created_at + timedelta(seconds=ttl_seconds)
 
-    validated_ttls: list[float | None] = []
-
-    if t is None:
-        # No TTL provided, return a list of Nones
-        validated_ttls = [None] * count
-    elif isinstance(t, Sequence):
-        if isinstance(t, str):
-            # Special case for strings, as they are sequences and so the resulting error message is confusing
-            # 'the length [of the string] is not equal to the count'
-            raise InvalidTTLError(ttl=t, extra_info={"type": type(t).__name__})
-
-        # Multiple TTLs provided, validate that the number of TTLs is equal to `count`
-        if len(t) != count:
-            raise IncorrectTTLCountError(ttl=t, count=count)
-
-        # And then validate each TTL
-        validated_ttls = [prepare_ttl(t=ttl) for ttl in t]
-    else:
-        # Single TTL provided, first validate it and then repeat it `count` times
-        validated_ttls = [prepare_ttl(t=t)] * count
-
-    return validated_ttls
+    return created_at, ttl_seconds, expires_at

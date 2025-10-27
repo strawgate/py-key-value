@@ -101,11 +101,12 @@ needs while keeping your framework code clean and backend-agnostic.
 - **No Live Objects**: Even when using the in-memory store, "live" objects are
   never returned from the store. You get a dictionary or a Pydantic model,
   hopefully a copy of what you stored, but never the same instance in memory.
-- **Dislike of Bear Bros**: Beartype is used for runtime type checking, it will
-  report warnings if you get too cheeky with what you're passing around. If you
-  are not a fan of beartype, you can disable it by setting the
-  `PY_KEY_VALUE_DISABLE_BEARTYPE` environment variable to `true` or you can
-  disable the warnings via the warn module.
+- **Dislike of Bear Bros**: Beartype is used for runtime type checking. Core
+  protocol methods in store and wrapper implementations (put/get/delete/ttl
+  and their batch variants) enforce types and will raise TypeError for
+  violations. Other code produces warnings. You can disable all beartype
+  checks by setting `PY_KEY_VALUE_DISABLE_BEARTYPE=true` or suppress warnings
+  via the warnings module.
 
 ## Installation
 
@@ -164,7 +165,7 @@ get(key: str, collection: str | None = None) -> dict[str, Any] | None:
 get_many(keys: list[str], collection: str | None = None) -> list[dict[str, Any] | None]:
 
 put(key: str, value: dict[str, Any], collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
-put_many(keys: list[str], values: Sequence[dict[str, Any]], collection: str | None = None, ttl: Sequence[SupportsFloat | None] | None = None) -> None:
+put_many(keys: list[str], values: Sequence[dict[str, Any]], collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
 
 delete(key: str, collection: str | None = None) -> bool:
 delete_many(keys: list[str], collection: str | None = None) -> int:
@@ -296,6 +297,7 @@ The following wrappers are available:
 
 | Wrapper | Description | Example |
 |---------|---------------|-----|
+| CollectionRoutingWrapper | Route operations to different stores based on a collection name. | `CollectionRoutingWrapper(collection_map={"sessions": redis_store, "users": dynamo_store}, default_store=memory_store)` |
 | CompressionWrapper | Compress values before storing and decompress on retrieval. | `CompressionWrapper(key_value=memory_store, min_size_to_compress=0)` |
 | FernetEncryptionWrapper | Encrypt values before storing and decrypt on retrieval. | `FernetEncryptionWrapper(key_value=memory_store, source_material="your-source-material", salt="your-salt")` |
 | FallbackWrapper | Fallback to a secondary store when the primary store fails. | `FallbackWrapper(primary_key_value=memory_store, fallback_key_value=memory_store)` |
@@ -306,6 +308,7 @@ The following wrappers are available:
 | PrefixKeysWrapper | Prefix all keys with a given prefix. | `PrefixKeysWrapper(key_value=memory_store, prefix="users")` |
 | ReadOnlyWrapper | Prevent all write operations on the underlying store. | `ReadOnlyWrapper(key_value=memory_store, raise_on_write=True)` |
 | RetryWrapper | Retry failed operations with exponential backoff. | `RetryWrapper(key_value=memory_store, max_retries=3, initial_delay=0.1, max_delay=10.0, exponential_base=2.0)` |
+| RoutingWrapper | Route operations to different stores based on a routing function. | `RoutingWrapper(routing_function=lambda collection: redis_store if collection == "sessions" else dynamo_store, default_store=memory_store)` |
 | SingleCollectionWrapper | Wrap a store to only use a single collection. | `SingleCollectionWrapper(key_value=memory_store, single_collection="users")` |
 | TTLClampWrapper | Clamp the TTL to a given range. | `TTLClampWrapper(key_value=memory_store, min_ttl=60, max_ttl=3600)` |
 | StatisticsWrapper | Track operation statistics for the store. | `StatisticsWrapper(key_value=memory_store)` |

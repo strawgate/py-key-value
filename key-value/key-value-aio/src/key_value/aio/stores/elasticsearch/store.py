@@ -1,6 +1,9 @@
-from typing import TYPE_CHECKING, Any, overload
+from collections.abc import Sequence
+from datetime import datetime
+from typing import Any, overload
 
-from key_value.shared.utils.compound import compound_key
+from elastic_transport import ObjectApiResponse  # noqa: TC002
+from key_value.shared.errors import DeserializationError
 from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json
 from key_value.shared.utils.sanitize import (
     ALPHANUMERIC_CHARACTERS,
@@ -19,6 +22,7 @@ from key_value.aio.stores.base import (
     BaseEnumerateKeysStore,
     BaseStore,
 )
+from key_value.aio.stores.elasticsearch.utils import new_bulk_action
 
 try:
     from elasticsearch import AsyncElasticsearch
@@ -33,10 +37,6 @@ except ImportError as e:
     msg = "ElasticsearchStore requires py-key-value-aio[elasticsearch]"
     raise ImportError(msg) from e
 
-if TYPE_CHECKING:
-    from datetime import datetime
-
-    from elastic_transport import ObjectApiResponse
 
 DEFAULT_INDEX_PREFIX = "kv_store"
 
@@ -71,6 +71,36 @@ ALLOWED_KEY_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
 MAX_INDEX_LENGTH = 240
 ALLOWED_INDEX_CHARACTERS: str = LOWERCASE_ALPHABET + NUMBERS + "_" + "-" + "."
+
+
+def managed_entry_to_document(collection: str, key: str, managed_entry: ManagedEntry) -> dict[str, Any]:
+    document: dict[str, Any] = {
+        "collection": collection,
+        "key": key,
+        "value": managed_entry.to_json(include_metadata=False),
+    }
+
+    if managed_entry.created_at:
+        document["created_at"] = managed_entry.created_at.isoformat()
+    if managed_entry.expires_at:
+        document["expires_at"] = managed_entry.expires_at.isoformat()
+
+    return document
+
+
+def source_to_managed_entry(source: dict[str, Any]) -> ManagedEntry:
+    if not (value_str := source.get("value")) or not isinstance(value_str, str):
+        msg = "Value is not a string"
+        raise DeserializationError(msg)
+
+    created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
+    expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
+
+    return ManagedEntry(
+        value=load_from_json(value_str),
+        created_at=created_at,
+        expires_at=expires_at,
+    )
 
 
 class ElasticsearchStore(
@@ -158,13 +188,17 @@ class ElasticsearchStore(
             allowed_characters=ALLOWED_KEY_CHARACTERS,
         )
 
+    def _get_destination(self, *, collection: str, key: str) -> tuple[str, str]:
+        index_name: str = self._sanitize_index_name(collection=collection)
+        document_id: str = self._sanitize_document_id(key=key)
+
+        return index_name, document_id
+
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        combo_key: str = compound_key(collection=collection, key=key)
+        index_name, document_id = self._get_destination(collection=collection, key=key)
 
-        elasticsearch_response = await self._client.options(ignore_status=404).get(
-            index=self._sanitize_index_name(collection=collection), id=self._sanitize_document_id(key=combo_key)
-        )
+        elasticsearch_response = await self._client.options(ignore_status=404).get(index=index_name, id=document_id)
 
         body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
 
@@ -183,6 +217,39 @@ class ElasticsearchStore(
             expires_at=expires_at,
         )
 
+    @override
+    async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
+        if not keys:
+            return []
+
+        # Use mget for efficient batch retrieval
+        index_name = self._sanitize_index_name(collection=collection)
+        document_ids = [self._sanitize_document_id(key=key) for key in keys]
+        docs = [{"_id": document_id} for document_id in document_ids]
+
+        elasticsearch_response = await self._client.options(ignore_status=404).mget(index=index_name, docs=docs)
+
+        body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
+        docs_result = body.get("docs", [])
+
+        entries_by_id: dict[str, ManagedEntry | None] = {}
+        for doc in docs_result:
+            if not (doc_id := doc.get("_id")):
+                continue
+
+            if "found" not in doc:
+                entries_by_id[doc_id] = None
+                continue
+
+            if not (source := doc.get("_source")):
+                entries_by_id[doc_id] = None
+                continue
+
+            entries_by_id[doc_id] = source_to_managed_entry(source=source)
+
+        # Return entries in the same order as input keys
+        return [entries_by_id.get(document_id) for document_id in document_ids]
+
     @property
     def _should_refresh_on_put(self) -> bool:
         return not self._is_serverless
@@ -195,32 +262,54 @@ class ElasticsearchStore(
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
-        combo_key: str = compound_key(collection=collection, key=key)
+        index_name: str = self._sanitize_index_name(collection=collection)
+        document_id: str = self._sanitize_document_id(key=key)
 
-        document: dict[str, Any] = {
-            "collection": collection,
-            "key": key,
-            "value": managed_entry.to_json(include_metadata=False),
-        }
-
-        if managed_entry.created_at:
-            document["created_at"] = managed_entry.created_at.isoformat()
-        if managed_entry.expires_at:
-            document["expires_at"] = managed_entry.expires_at.isoformat()
+        document: dict[str, Any] = managed_entry_to_document(collection=collection, key=key, managed_entry=managed_entry)
 
         _ = await self._client.index(
-            index=self._sanitize_index_name(collection=collection),
-            id=self._sanitize_document_id(key=combo_key),
+            index=index_name,
+            id=document_id,
             body=document,
             refresh=self._should_refresh_on_put,
         )
 
     @override
+    async def _put_managed_entries(
+        self,
+        *,
+        collection: str,
+        keys: Sequence[str],
+        managed_entries: Sequence[ManagedEntry],
+        ttl: float | None,
+        created_at: datetime,
+        expires_at: datetime | None,
+    ) -> None:
+        if not keys:
+            return
+
+        operations: list[dict[str, Any]] = []
+
+        index_name: str = self._sanitize_index_name(collection=collection)
+
+        for key, managed_entry in zip(keys, managed_entries, strict=True):
+            document_id: str = self._sanitize_document_id(key=key)
+
+            index_action: dict[str, Any] = new_bulk_action(action="index", index=index_name, document_id=document_id)
+
+            document: dict[str, Any] = managed_entry_to_document(collection=collection, key=key, managed_entry=managed_entry)
+
+            operations.extend([index_action, document])
+
+        _ = await self._client.bulk(operations=operations, refresh=self._should_refresh_on_put)  # pyright: ignore[reportUnknownMemberType]
+
+    @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        combo_key: str = compound_key(collection=collection, key=key)
+        index_name: str = self._sanitize_index_name(collection=collection)
+        document_id: str = self._sanitize_document_id(key=key)
 
         elasticsearch_response: ObjectApiResponse[Any] = await self._client.options(ignore_status=404).delete(
-            index=self._sanitize_index_name(collection=collection), id=self._sanitize_document_id(key=combo_key)
+            index=index_name, id=document_id
         )
 
         body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
@@ -229,6 +318,34 @@ class ElasticsearchStore(
             return False
 
         return result == "deleted"
+
+    @override
+    async def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
+        if not keys:
+            return 0
+
+        operations: list[dict[str, Any]] = []
+
+        for key in keys:
+            index_name, document_id = self._get_destination(collection=collection, key=key)
+
+            delete_action: dict[str, Any] = new_bulk_action(action="delete", index=index_name, document_id=document_id)
+
+            operations.append(delete_action)
+
+        elasticsearch_response = await self._client.bulk(operations=operations)  # pyright: ignore[reportUnknownMemberType]
+
+        body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
+
+        # Count successful deletions
+        deleted_count = 0
+        items = body.get("items", [])
+        for item in items:
+            delete_result = item.get("delete", {})
+            if delete_result.get("result") == "deleted":
+                deleted_count += 1
+
+        return deleted_count
 
     @override
     async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:

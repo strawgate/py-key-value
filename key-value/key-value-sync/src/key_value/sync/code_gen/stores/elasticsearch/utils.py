@@ -4,6 +4,7 @@
 from typing import Any, TypeVar, cast
 
 from elastic_transport import ObjectApiResponse
+from key_value.shared.utils.managed_entry import ManagedEntry
 
 
 def get_body_from_response(response: ObjectApiResponse[Any]) -> dict[str, Any]:
@@ -108,3 +109,18 @@ def get_first_value_from_field_in_hit(hit: dict[str, Any], field: str, value_typ
         msg: str = f"Field {field} in hit {hit} is not a single value"
         raise TypeError(msg)
     return values[0]
+
+
+def managed_entry_to_document(collection: str, key: str, managed_entry: ManagedEntry) -> dict[str, Any]:
+    document: dict[str, Any] = {"collection": collection, "key": key, "value": managed_entry.to_json(include_metadata=False)}
+
+    if managed_entry.created_at:
+        document["created_at"] = managed_entry.created_at.isoformat()
+    if managed_entry.expires_at:
+        document["expires_at"] = managed_entry.expires_at.isoformat()
+
+    return document
+
+
+def new_bulk_action(action: str, index: str, document_id: str) -> dict[str, Any]:
+    return {action: {"_index": index, "_id": document_id}}

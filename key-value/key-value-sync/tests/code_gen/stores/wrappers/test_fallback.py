@@ -15,11 +15,13 @@ from tests.code_gen.stores.base import BaseStoreTests
 class FailingStore(MemoryStore):
     """A store that always fails."""
 
-    def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:  # noqa: ARG002
+    @override
+    def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
         msg = "Primary store unavailable"
         raise ConnectionError(msg)
 
-    def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None):  # noqa: ARG002
+    @override
+    def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None):
         msg = "Primary store unavailable"
         raise ConnectionError(msg)
 

@@ -1,7 +1,6 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pytest
-from key_value.shared_test.cases import LARGE_TEST_DATA_ARGNAMES, LARGE_TEST_DATA_ARGVALUES, LARGE_TEST_DATA_IDS
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -12,26 +11,27 @@ if TYPE_CHECKING:
     from key_value.aio.stores.windows_registry.store import WindowsRegistryStore
 
 
+TEST_REGISTRY_PATH = "software\\py-key-value-test"
+
+
 @pytest.mark.skipif(condition=not detect_on_windows(), reason="WindowsRegistryStore is only available on Windows")
 class TestWindowsRegistryStore(BaseStoreTests):
+    def cleanup(self):
+        from winreg import HKEY_CURRENT_USER
+
+        from key_value.aio.stores.windows_registry.utils import delete_sub_keys
+
+        delete_sub_keys(hive=HKEY_CURRENT_USER, sub_key=TEST_REGISTRY_PATH)
+
     @override
     @pytest.fixture
     async def store(self) -> "WindowsRegistryStore":
-        # Use a test-specific root to avoid conflicts
         from key_value.aio.stores.windows_registry.store import WindowsRegistryStore
 
-        store = WindowsRegistryStore(registry_path="software\\py-key-value-test", hive="HKEY_CURRENT_USER")
-        await store.delete_many(collection="test", keys=["test"])
-        await store.delete_many(collection="test_collection", keys=["test_key"])
+        self.cleanup()
 
-        return store
+        return WindowsRegistryStore(registry_path=TEST_REGISTRY_PATH, hive="HKEY_CURRENT_USER")
 
     @override
     @pytest.mark.skip(reason="We do not test boundedness of registry stores")
     async def test_not_unbounded(self, store: BaseStore): ...
-
-    @override
-    @pytest.mark.parametrize(argnames=LARGE_TEST_DATA_ARGNAMES, argvalues=LARGE_TEST_DATA_ARGVALUES, ids=LARGE_TEST_DATA_IDS)
-    async def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str):
-        await store.put(collection="test", key="test", value=data)
-        assert await store.get(collection="test", key="test") == data

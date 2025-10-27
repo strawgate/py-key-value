@@ -67,6 +67,12 @@ line-length = 140
     "DTZ005", # Ignore datetime.UTC
     "PLR2004", # Ignore magic values
     "E501", # Ignore line length
+    "ARG001", # Unused argument, Pyright captures this for us
+    "ARG002", # Unused argument, Pyright captures this for us
+]
+"**/code_gen/**/*.py" = [
+    "ARG001", # Unused argument, Pyright captures this for us
+    "ARG002", # Unused argument, Pyright captures this for us
 ]
 "**/test_*.py" = [
     "S101", # Ignore asserts
@@ -98,6 +104,7 @@ pythonVersion = "3.10"
 typeCheckingMode = "strict"
 reportExplicitAny = false
 reportMissingTypeStubs = false
+#reportUnnecessaryTypeIgnoreComment = "error"
 exclude = [
     "**/playground/**",
     "**/node_modules/**",

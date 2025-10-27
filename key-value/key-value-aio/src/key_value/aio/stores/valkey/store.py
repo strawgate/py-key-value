@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import overload
 
 from key_value.shared.utils.compound import compound_key
@@ -7,7 +8,6 @@ from typing_extensions import override
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
 
 try:
-    # Use redis-py asyncio client to communicate with a Valkey server (protocol compatible)
     from glide.glide_client import BaseClient, GlideClient
     from glide_shared.commands.core_options import ExpirySet, ExpiryType
     from glide_shared.config import GlideClientConfiguration, NodeAddress, ServerCredentials
@@ -81,6 +81,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
             # This should never happen, makes the type checker happy though
             msg = "Client is not connected"
             raise ValueError(msg)
+
         return self._connected_client
 
     @override
@@ -88,10 +89,32 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         combo_key: str = compound_key(collection=collection, key=key)
 
         response: bytes | None = await self._client.get(key=combo_key)
+
         if not isinstance(response, bytes):
             return None
+
         decoded_response: str = response.decode("utf-8")
+
         return ManagedEntry.from_json(json_str=decoded_response)
+
+    @override
+    async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
+        if not keys:
+            return []
+
+        combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
+
+        responses: list[bytes | None] = await self._client.mget(keys=combo_keys)  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+
+        entries: list[ManagedEntry | None] = []
+        for response in responses:
+            if isinstance(response, bytes):
+                decoded_response: str = response.decode("utf-8")
+                entries.append(ManagedEntry.from_json(json_str=decoded_response))
+            else:
+                entries.append(None)
+
+        return entries
 
     @override
     async def _put_managed_entry(
@@ -115,5 +138,18 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         return await self._client.delete(keys=[combo_key]) != 0
 
     @override
+    async def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
+        if not keys:
+            return 0
+
+        combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
+
+        deleted_count: int = await self._client.delete(keys=combo_keys)  # pyright: ignore[reportArgumentType]
+
+        return deleted_count
+
+    @override
     async def _close(self) -> None:
+        if self._connected_client is None:
+            return
         await self._client.close()

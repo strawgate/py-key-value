@@ -4,7 +4,7 @@
 from typing import Any
 
 import pytest
-from key_value.shared_test.cases import LARGE_TEST_DATA_ARGNAMES, LARGE_TEST_DATA_ARGVALUES, LARGE_TEST_DATA_IDS
+from key_value.shared_test.cases import LARGE_DATA_CASES, PositiveCases
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
@@ -20,7 +20,7 @@ class TestKeychainStore(BaseStoreTests):
     def store(self) -> KeyringStore:
         # Use a test-specific service name to avoid conflicts
         store = KeyringStore(service_name="py-key-value-test")
-        store.delete_many(collection="test", keys=["test"])
+        store.delete_many(collection="test", keys=["test", "test_2"])
         store.delete_many(collection="test_collection", keys=["test_key"])
 
         return store
@@ -31,7 +31,6 @@ class TestKeychainStore(BaseStoreTests):
 
     @override
     @pytest.mark.skipif(condition=detect_on_windows(), reason="Keyrings do not support large values on Windows")
-    @pytest.mark.parametrize(argnames=LARGE_TEST_DATA_ARGNAMES, argvalues=LARGE_TEST_DATA_ARGVALUES, ids=LARGE_TEST_DATA_IDS)
-    def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str):
-        store.put(collection="test", key="test", value=data)
-        assert store.get(collection="test", key="test") == data
+    @PositiveCases.parametrize(cases=[LARGE_DATA_CASES])
+    def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):
+        super().test_get_large_put_get(store, data, json, round_trip=round_trip)
