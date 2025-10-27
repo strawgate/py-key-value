@@ -167,6 +167,14 @@ class MemoryCollection:
         return self._cache.pop(key, None) is not None
 
     def keys(self, *, limit: int | None = None) -> list[str]:
+        """Retrieve all keys in the collection.
+
+        Args:
+            limit: The maximum number of keys to return. Defaults to 10,000.
+
+        Returns:
+            A list of keys in the collection, limited to the specified maximum.
+        """
         limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
         return list(self._cache.keys())[:limit]
 

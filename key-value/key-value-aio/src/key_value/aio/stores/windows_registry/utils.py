@@ -1,26 +1,7 @@
 import contextlib
 import winreg
-from collections.abc import Generator
-from contextlib import contextmanager
 
 HiveType = int
-
-
-@contextmanager
-def handle_winreg_error() -> Generator[None, None, None]:
-    """Context manager that suppresses Windows Registry errors.
-
-    This context manager catches FileNotFoundError and OSError exceptions
-    that can occur during Windows Registry operations, allowing graceful
-    handling of missing keys or access errors.
-
-    Yields:
-        None
-    """
-    try:
-        yield
-    except (FileNotFoundError, OSError):
-        return None
 
 
 def get_reg_sz_value(hive: HiveType, sub_key: str, value_name: str) -> str | None:
@@ -128,16 +109,16 @@ def delete_sub_keys(hive: HiveType, sub_key: str) -> None:
         hive: The registry hive (e.g., winreg.HKEY_CURRENT_USER).
         sub_key: The registry subkey path whose subkeys should be deleted.
     """
-    with (
-        handle_winreg_error(),
-        winreg.OpenKey(key=hive, sub_key=sub_key, access=winreg.KEY_WRITE | winreg.KEY_ENUMERATE_SUB_KEYS) as reg_key,
-    ):
-        index = 0
-        while True:
-            if not (next_child_key := winreg.EnumKey(reg_key, index)):
-                break
+    try:
+        with winreg.OpenKey(key=hive, sub_key=sub_key, access=winreg.KEY_WRITE | winreg.KEY_ENUMERATE_SUB_KEYS) as reg_key:
+            index = 0
+            while True:
+                if not (next_child_key := winreg.EnumKey(reg_key, index)):
+                    break
 
-            with contextlib.suppress(Exception):
-                winreg.DeleteKey(reg_key, next_child_key)
+                with contextlib.suppress(Exception):
+                    winreg.DeleteKey(reg_key, next_child_key)
 
-            index += 1
+                index += 1
+    except (FileNotFoundError, OSError):
+        return
