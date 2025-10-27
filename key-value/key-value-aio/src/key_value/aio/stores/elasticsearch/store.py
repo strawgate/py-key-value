@@ -55,10 +55,8 @@ DEFAULT_MAPPING = {
             "type": "keyword",
         },
         "value": {
-            "type": "keyword",
-            "index": False,
-            "doc_values": False,
-            "ignore_above": 256,
+            "type": "object",
+            "enabled": False,
         },
     },
 }
