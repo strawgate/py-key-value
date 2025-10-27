@@ -7,13 +7,14 @@ py-key-value project. For human developers, see [DEVELOPING.md](DEVELOPING.md).
 
 ### Required Pre-commit Checks
 
-All three checks must pass before committing:
+All four checks must pass before committing:
 
 1. `make lint` - Runs Ruff formatting and linting (Python + Markdown)
 2. `make typecheck` - Runs Basedpyright type checking
 3. `make codegen` - Regenerates sync library from async
+4. `make lint` - Runs Ruff formatting and linting after the other checks have
 
-Or run all three together:
+Or run all four together:
 
 ```bash
 make precommit
