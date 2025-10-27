@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Any, overload
+from typing import Any, cast, overload
 
 from elastic_transport import ObjectApiResponse  # noqa: TC002
 from key_value.shared.errors import DeserializationError
@@ -60,6 +60,9 @@ DEFAULT_MAPPING = {
             "doc_values": False,
             "ignore_above": 256,
         },
+        "value_flattened": {
+            "type": "flattened",
+        },
     },
 }
 
@@ -73,12 +76,17 @@ MAX_INDEX_LENGTH = 240
 ALLOWED_INDEX_CHARACTERS: str = LOWERCASE_ALPHABET + NUMBERS + "_" + "-" + "."
 
 
-def managed_entry_to_document(collection: str, key: str, managed_entry: ManagedEntry) -> dict[str, Any]:
+def managed_entry_to_document(collection: str, key: str, managed_entry: ManagedEntry, *, native_storage: bool = False) -> dict[str, Any]:
     document: dict[str, Any] = {
         "collection": collection,
         "key": key,
-        "value": managed_entry.to_json(include_metadata=False),
     }
+
+    # Store in appropriate field based on mode
+    if native_storage:
+        document["value_flattened"] = dict(managed_entry.value)
+    else:
+        document["value"] = managed_entry.to_json(include_metadata=False)
 
     if managed_entry.created_at:
         document["created_at"] = managed_entry.created_at.isoformat()
@@ -89,15 +97,26 @@ def managed_entry_to_document(collection: str, key: str, managed_entry: ManagedE
 
 
 def source_to_managed_entry(source: dict[str, Any]) -> ManagedEntry:
-    if not (value_str := source.get("value")) or not isinstance(value_str, str):
-        msg = "Value is not a string"
+    # Try flattened field first, fall back to string field
+    value_flattened = source.get("value_flattened")
+    value_str = source.get("value")
+
+    value: dict[str, Any]
+    if value_flattened and isinstance(value_flattened, dict):
+        # Native storage mode - cast to the correct type
+        value = cast(dict[str, Any], value_flattened)
+    elif value_str and isinstance(value_str, str):
+        # Legacy JSON string mode
+        value = load_from_json(value_str)
+    else:
+        msg = "Value field not found or invalid type"
         raise DeserializationError(msg)
 
     created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
     expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
 
     return ManagedEntry(
-        value=load_from_json(value_str),
+        value=value,
         created_at=created_at,
         expires_at=expires_at,
     )
@@ -114,11 +133,28 @@ class ElasticsearchStore(
 
     _index_prefix: str
 
-    @overload
-    def __init__(self, *, elasticsearch_client: AsyncElasticsearch, index_prefix: str, default_collection: str | None = None) -> None: ...
+    _native_storage: bool
 
     @overload
-    def __init__(self, *, url: str, api_key: str | None = None, index_prefix: str, default_collection: str | None = None) -> None: ...
+    def __init__(
+        self,
+        *,
+        elasticsearch_client: AsyncElasticsearch,
+        index_prefix: str,
+        native_storage: bool = False,
+        default_collection: str | None = None,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        *,
+        url: str,
+        api_key: str | None = None,
+        index_prefix: str,
+        native_storage: bool = False,
+        default_collection: str | None = None,
+    ) -> None: ...
 
     def __init__(
         self,
@@ -127,6 +163,7 @@ class ElasticsearchStore(
         url: str | None = None,
         api_key: str | None = None,
         index_prefix: str,
+        native_storage: bool = False,
         default_collection: str | None = None,
     ) -> None:
         """Initialize the elasticsearch store.
@@ -136,6 +173,8 @@ class ElasticsearchStore(
             url: The url of the elasticsearch cluster.
             api_key: The api key to use.
             index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
+            native_storage: Whether to use native storage mode (flattened field type) for values.
+                Defaults to False for backward compatibility.
             default_collection: The default collection to use if no collection is provided.
         """
         if elasticsearch_client is None and url is None:
@@ -153,6 +192,7 @@ class ElasticsearchStore(
             raise ValueError(msg)
 
         self._index_prefix = index_prefix
+        self._native_storage = native_storage
         self._is_serverless = False
 
         super().__init__(default_collection=default_collection)
@@ -205,17 +245,10 @@ class ElasticsearchStore(
         if not (source := get_source_from_body(body=body)):
             return None
 
-        if not (value_str := source.get("value")) or not isinstance(value_str, str):
+        try:
+            return source_to_managed_entry(source=source)
+        except DeserializationError:
             return None
-
-        created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
-        expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
-
-        return ManagedEntry(
-            value=load_from_json(value_str),
-            created_at=created_at,
-            expires_at=expires_at,
-        )
 
     @override
     async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
@@ -265,7 +298,9 @@ class ElasticsearchStore(
         index_name: str = self._sanitize_index_name(collection=collection)
         document_id: str = self._sanitize_document_id(key=key)
 
-        document: dict[str, Any] = managed_entry_to_document(collection=collection, key=key, managed_entry=managed_entry)
+        document: dict[str, Any] = managed_entry_to_document(
+            collection=collection, key=key, managed_entry=managed_entry, native_storage=self._native_storage
+        )
 
         _ = await self._client.index(
             index=index_name,
@@ -297,7 +332,9 @@ class ElasticsearchStore(
 
             index_action: dict[str, Any] = new_bulk_action(action="index", index=index_name, document_id=document_id)
 
-            document: dict[str, Any] = managed_entry_to_document(collection=collection, key=key, managed_entry=managed_entry)
+            document: dict[str, Any] = managed_entry_to_document(
+                collection=collection, key=key, managed_entry=managed_entry, native_storage=self._native_storage
+            )
 
             operations.extend([index_action, document])
 
