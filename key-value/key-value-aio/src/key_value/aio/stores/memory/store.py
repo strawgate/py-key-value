@@ -1,10 +1,9 @@
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, SupportsFloat
+from typing import Any
 
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.time_to_live import epoch_to_datetime
 from typing_extensions import Self, override
 
 from key_value.aio.stores.base import (
@@ -27,22 +26,19 @@ class MemoryCacheEntry:
     """A cache entry for the memory store.
 
     This dataclass represents an entry in the MemoryStore cache, storing the JSON-serialized
-    value along with expiration metadata and the original TTL value at insertion time.
+    value along with its expiration timestamp.
     """
 
     json_str: str
 
     expires_at: datetime | None
 
-    ttl_at_insert: SupportsFloat | None = field(default=None)
-
     @classmethod
-    def from_managed_entry(cls, managed_entry: ManagedEntry, ttl: SupportsFloat | None = None) -> Self:
+    def from_managed_entry(cls, managed_entry: ManagedEntry) -> Self:
         """Create a cache entry from a ManagedEntry.
 
         Args:
             managed_entry: The ManagedEntry to convert.
-            ttl: The TTL value at insertion time.
 
         Returns:
             A new MemoryCacheEntry.
@@ -50,7 +46,6 @@ class MemoryCacheEntry:
         return cls(
             json_str=managed_entry.to_json(),
             expires_at=managed_entry.expires_at,
-            ttl_at_insert=ttl,
         )
 
     def to_managed_entry(self) -> ManagedEntry:
@@ -62,28 +57,23 @@ class MemoryCacheEntry:
         return ManagedEntry.from_json(json_str=self.json_str)
 
 
-def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, now: float) -> float:
-    """Calculate time-to-use for cache entries based on their TTL.
+def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, now: float) -> float:  # noqa: ARG001
+    """Calculate time-to-use for cache entries based on their expiration time.
 
     This function is used by TLRUCache to determine when entries should expire.
-    It calculates the expiration timestamp and updates the entry's expires_at field.
 
     Args:
         _key: The cache key (unused).
         value: The cache entry.
-        now: The current time as an epoch timestamp.
+        now: The current time as an epoch timestamp (unused).
 
     Returns:
         The expiration time as an epoch timestamp, or sys.maxsize if the entry has no TTL.
     """
-    if value.ttl_at_insert is None:
+    if value.expires_at is None:
         return float(sys.maxsize)
 
-    expiration_epoch: float = now + float(value.ttl_at_insert)
-
-    value.expires_at = epoch_to_datetime(epoch=expiration_epoch)
-
-    return float(expiration_epoch)
+    return value.expires_at.timestamp()
 
 
 def _memory_cache_getsizeof(value: MemoryCacheEntry) -> int:  # noqa: ARG001
@@ -153,9 +143,7 @@ class MemoryCollection:
             key: The key to store under.
             value: The ManagedEntry to store.
         """
-        # Recalculate TTL to get remaining time until expiration
-        value.recalculate_ttl()
-        self._cache[key] = MemoryCacheEntry.from_managed_entry(managed_entry=value, ttl=value.ttl)
+        self._cache[key] = MemoryCacheEntry.from_managed_entry(managed_entry=value)
 
     def delete(self, key: str) -> bool:
         """Delete an entry from the collection.
