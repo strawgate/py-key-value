@@ -219,10 +219,27 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         collection_cache = MemoryCollection(max_entries=self.max_entries_per_collection)
         self._cache[collection] = collection_cache
 
+    def _get_collection_or_raise(self, collection: str) -> MemoryCollection:
+        """Get a collection or raise KeyError if not setup.
+
+        Args:
+            collection: The collection name.
+
+        Returns:
+            The MemoryCollection instance.
+
+        Raises:
+            KeyError: If the collection has not been setup via setup_collection().
+        """
+        collection_cache: MemoryCollection | None = self._cache.get(collection)
+        if collection_cache is None:
+            msg = f"Collection '{collection}' has not been setup. Call setup_collection() first."
+            raise KeyError(msg)
+        return collection_cache
+
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        collection_cache: MemoryCollection = self._cache[collection]
-
+        collection_cache = self._get_collection_or_raise(collection)
         return collection_cache.get(key=key)
 
     @override
@@ -233,20 +250,17 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
-        collection_cache: MemoryCollection = self._cache[collection]
-
+        collection_cache = self._get_collection_or_raise(collection)
         collection_cache.put(key=key, value=managed_entry)
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        collection_cache: MemoryCollection = self._cache[collection]
-
+        collection_cache = self._get_collection_or_raise(collection)
         return collection_cache.delete(key=key)
 
     @override
     async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
-        collection_cache: MemoryCollection = self._cache[collection]
-
+        collection_cache = self._get_collection_or_raise(collection)
         return collection_cache.keys(limit=limit)
 
     @override
