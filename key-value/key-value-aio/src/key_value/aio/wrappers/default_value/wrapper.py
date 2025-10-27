@@ -40,6 +40,8 @@ class DefaultValueWrapper(BaseWrapper):
         self._default_value_json = dump_to_json(obj=dict(default_value))
         self._default_ttl = None if default_ttl is None else float(default_ttl)
 
+        super().__init__()
+
     def _new_default_value(self) -> dict[str, Any]:
         return load_from_json(json_str=self._default_value_json)
 
