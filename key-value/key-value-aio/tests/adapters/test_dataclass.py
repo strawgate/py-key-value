@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Any
 
 import pytest
 from inline_snapshot import snapshot
@@ -225,3 +226,28 @@ class TestDataclassAdapter:
         assert cached_user == SAMPLE_USER
 
         assert await adapter.delete(key=TEST_KEY)
+
+    async def test_ttl_with_empty_list(self, product_list_adapter: DataclassAdapter[list[Product]]):
+        """Test that TTL with empty list returns correctly (not None)."""
+        await product_list_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=[], ttl=10)
+        value, ttl = await product_list_adapter.ttl(collection=TEST_COLLECTION, key=TEST_KEY)
+        assert value == []
+        assert ttl is not None
+        assert ttl > 0
+
+    async def test_list_payload_missing_items_returns_none(self, product_list_adapter: DataclassAdapter[list[Product]], store: MemoryStore):
+        """Test that list payload without 'items' wrapper returns None when raise_on_validation_error is False."""
+        # Manually insert malformed payload without the 'items' wrapper
+        # The payload is a dict but without the expected 'items' key for list models
+        malformed_payload: dict[str, Any] = {"wrong": []}
+        await store.put(collection=TEST_COLLECTION, key=TEST_KEY, value=malformed_payload)
+        assert await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
+
+    async def test_list_payload_missing_items_raises(self, product_list_adapter: DataclassAdapter[list[Product]], store: MemoryStore):
+        """Test that list payload without 'items' wrapper raises DeserializationError when configured."""
+        product_list_adapter._raise_on_validation_error = True  # pyright: ignore[reportPrivateUsage]
+        # Manually insert malformed payload without the 'items' wrapper
+        malformed_payload: dict[str, Any] = {"wrong": []}
+        await store.put(collection=TEST_COLLECTION, key=TEST_KEY, value=malformed_payload)
+        with pytest.raises(DeserializationError, match="missing 'items'"):
+            await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)

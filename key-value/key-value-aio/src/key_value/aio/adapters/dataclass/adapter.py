@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from dataclasses import is_dataclass
 from typing import Any, TypeVar, get_args, get_origin
 
@@ -20,8 +19,8 @@ class DataclassAdapter(BasePydanticAdapter[T]):
 
     _inner_type: type[Any]
 
-    # Beartype doesn't like our `type[T]` includes a bound on Sequence[...] as the subscript is not checkable at runtime
-    # For just the next 20 or so lines we are no longer bear bros but have no fear, we will be back soon!
+    # Beartype cannot handle the parameterized type annotation (type[T]) used here for this generic dataclass adapter.
+    # Using @bear_spray to bypass beartype's runtime checks for this specific method.
     @bear_spray
     def __init__(
         self,
@@ -44,13 +43,13 @@ class DataclassAdapter(BasePydanticAdapter[T]):
         self._key_value = key_value
 
         origin = get_origin(dataclass_type)
-        self._is_list_model = origin is not None and isinstance(origin, type) and issubclass(origin, Sequence)
+        self._is_list_model = origin is list
 
         # Extract the inner type for list models
         if self._is_list_model:
             args = get_args(dataclass_type)
             if not args:
-                msg = "List type must have a type argument"
+                msg = f"List type {dataclass_type} must have a type argument"
                 raise TypeError(msg)
             self._inner_type = args[0]
         else:

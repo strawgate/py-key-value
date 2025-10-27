@@ -53,7 +53,12 @@ class BasePydanticAdapter(Generic[T], ABC):
         """
         try:
             if self._is_list_model:
-                return self._type_adapter.validate_python(value.get("items", []))
+                if "items" not in value:
+                    if self._raise_on_validation_error:
+                        msg = f"Invalid {self._get_model_type_name()} payload: missing 'items' wrapper"
+                        raise DeserializationError(msg)
+                    return None
+                return self._type_adapter.validate_python(value["items"])
 
             return self._type_adapter.validate_python(value)
         except ValidationError as e:
@@ -115,7 +120,8 @@ class BasePydanticAdapter(Generic[T], ABC):
         """
         collection = collection or self._default_collection
 
-        if value := await self._key_value.get(key=key, collection=collection):
+        value = await self._key_value.get(key=key, collection=collection)
+        if value is not None:
             validated = self._validate_model(value=value)
             if validated is not None:
                 return validated
@@ -218,7 +224,8 @@ class BasePydanticAdapter(Generic[T], ABC):
         if entry is None:
             return (None, None)
 
-        if validated_model := self._validate_model(value=entry):
+        validated_model = self._validate_model(value=entry)
+        if validated_model is not None:
             return (validated_model, ttl_info)
 
         return (None, None)
@@ -229,4 +236,4 @@ class BasePydanticAdapter(Generic[T], ABC):
 
         entries: list[tuple[dict[str, Any] | None, float | None]] = await self._key_value.ttl_many(keys=keys, collection=collection)
 
-        return [(self._validate_model(value=entry) if entry else None, ttl_info) for entry, ttl_info in entries]
+        return [(self._validate_model(value=entry) if entry is not None else None, ttl_info) for entry, ttl_info in entries]
