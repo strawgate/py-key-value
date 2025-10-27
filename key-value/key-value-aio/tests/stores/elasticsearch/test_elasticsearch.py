@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from dirty_equals import IsFloat
+from dirty_equals import IsFloat, IsStr
 from elasticsearch import AsyncElasticsearch
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
@@ -94,8 +94,7 @@ def test_managed_entry_document_conversion_native_storage():
     assert round_trip_managed_entry.expires_at == expires_at
 
 
-@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
-class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
+class BaseTestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=ELASTICSEARCH_VERSIONS_TO_TEST)
     async def setup_elasticsearch(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
         version = request.param
@@ -124,13 +123,6 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         for index in indices:
             _ = await elasticsearch_client.options(ignore_status=404).indices.delete(index=index)
 
-    @override
-    @pytest.fixture
-    async def store(self) -> AsyncGenerator[ElasticsearchStore, None]:
-        await self._cleanup()
-        async with ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test", native_storage=True) as store:
-            yield store
-
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
@@ -150,6 +142,17 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         assert "kv-store-e2e-test-test_collection" in indices
         assert "kv-store-e2e-test-test_collection_2" in indices
 
+
+@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
+class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
+    """Test Elasticsearch store in native mode"""
+
+    @override
+    @pytest.fixture
+    async def store(self) -> ElasticsearchStore:
+        await self._cleanup()
+        return ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test", native_storage=True)
+
     async def test_value_stored_as_flattened_object(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
         """Verify values are stored as flattened objects, not JSON strings"""
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
@@ -164,8 +167,8 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
             {
                 "collection": "test",
                 "key": "test_key",
-                "value": {"string": '{"name": "Alice", "age": 30}'},
-                "created_at": "2025-10-27T15:33:31.795253+00:00",
+                "value": {"flattened": {"name": "Alice", "age": 30}},
+                "created_at": IsStr(min_length=20, max_length=40),
             }
         )
 
@@ -176,9 +179,9 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
             {
                 "collection": "test",
                 "key": "test_key",
-                "value": {"string": '{"name": "Bob", "age": 25}'},
-                "created_at": "2025-10-27T15:33:32.040020+00:00",
-                "expires_at": "2025-10-27T15:33:42.040020+00:00",
+                "value": {"flattened": {"name": "Bob", "age": 25}},
+                "created_at": IsStr(min_length=20, max_length=40),
+                "expires_at": IsStr(min_length=20, max_length=40),
             }
         )
 
@@ -204,13 +207,14 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         assert result == snapshot(None)
 
 
-class TestElasticsearchStoreNonNativeMode(TestElasticsearchStore):
+class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
+    """Test Elasticsearch store in non-native mode"""
+
     @override
     @pytest.fixture
-    async def store(self) -> AsyncGenerator[ElasticsearchStore, None]:
+    async def store(self) -> ElasticsearchStore:
         await self._cleanup()
-        async with ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test", native_storage=False) as store:
-            yield store
+        return ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test", native_storage=False)
 
     async def test_value_stored_as_json_string(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
         """Verify values are stored as flattened objects, not JSON strings"""
@@ -226,8 +230,8 @@ class TestElasticsearchStoreNonNativeMode(TestElasticsearchStore):
             {
                 "collection": "test",
                 "key": "test_key",
-                "value": {"string": '{"name": "Alice", "age": 30}'},
-                "created_at": "2025-10-27T15:33:32.631007+00:00",
+                "value": {"string": '{"age": 30, "name": "Alice"}'},
+                "created_at": IsStr(min_length=20, max_length=40),
             }
         )
 
@@ -238,9 +242,9 @@ class TestElasticsearchStoreNonNativeMode(TestElasticsearchStore):
             {
                 "collection": "test",
                 "key": "test_key",
-                "value": {"string": '{"name": "Bob", "age": 25}'},
-                "created_at": "2025-10-27T15:33:32.650061+00:00",
-                "expires_at": "2025-10-27T15:33:42.650061+00:00",
+                "value": {"string": '{"age": 25, "name": "Bob"}'},
+                "created_at": IsStr(min_length=20, max_length=40),
+                "expires_at": IsStr(min_length=20, max_length=40),
             }
         )
 
