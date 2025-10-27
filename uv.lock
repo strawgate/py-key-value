@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform != 'win32'",
@@ -317,11 +317,11 @@ wheels = [
 
 [[package]]
 name = "beartype"
-version = "0.22.3"
+version = "0.22.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/86/51/97f0d11d613d3b9650bd75588ff5206a408afcdc337ab7108dafb4c8d1ec/beartype-0.22.3.tar.gz", hash = "sha256:391c457bd6463d6fb0ec5d7e28ad44c336ae02dbaaae0fc55c053b071554855b", size = 1571548, upload-time = "2025-10-23T06:20:03.783Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e8/77/af43bdf737723b28130f2cb595ec0f23e0e757d211fe068fd0ccdb77d786/beartype-0.22.4.tar.gz", hash = "sha256:68284c7803efd190b1b4639a0ab1a17677af9571b8a2ef5a169d10cb8955b01f", size = 1578210, upload-time = "2025-10-26T03:30:50.352Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/95/03/1faffcbda0c872a299f0c54a5be91a738e2f6cee6ff8143c481fa51f1f0a/beartype-0.22.3-py3-none-any.whl", hash = "sha256:2f36eb8ea8d5eb693d2307639756c43db73c3d1153dbba62261d8c08dbe2946d", size = 1312115, upload-time = "2025-10-23T06:20:01.136Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/eb/f25ad1a7726b2fe21005c3580b35fa7bfe09646faf7c8f41867747987a35/beartype-0.22.4-py3-none-any.whl", hash = "sha256:7967a1cee01fee42e47da69c58c92da10ba5bcfb8072686e48487be5201e3d10", size = 1318387, upload-time = "2025-10-26T03:30:48.135Z" },
 ]
 
 [[package]]
@@ -1436,18 +1436,18 @@ requires-dist = [
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
     { name = "beartype", specifier = ">=0.20.0" },
-    { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
+    { name = "cachetools", marker = "extra == 'memory'", specifier = ">=5.0.0" },
     { name = "cryptography", marker = "extra == 'wrappers-encryption'", specifier = ">=45.0.0" },
     { name = "dbus-python", marker = "extra == 'keyring-linux'", specifier = ">=1.4.0" },
-    { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
-    { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
+    { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.0.0" },
+    { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=8.0.0" },
     { name = "hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "keyring", marker = "extra == 'keyring'", specifier = ">=25.6.0" },
     { name = "keyring", marker = "extra == 'keyring-linux'", specifier = ">=25.6.0" },
     { name = "pathvalidate", marker = "extra == 'disk'", specifier = ">=3.3.1" },
     { name = "py-key-value-shared", editable = "key-value/key-value-shared" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
-    { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.15.0" },
+    { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.0.0" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=4.3.0" },
     { name = "rocksdict", marker = "python_full_version >= '3.12' and extra == 'rocksdb'", specifier = ">=0.3.24" },
     { name = "rocksdict", marker = "python_full_version < '3.12' and extra == 'rocksdb'", specifier = ">=0.3.2" },
@@ -1593,18 +1593,18 @@ requires-dist = [
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
     { name = "beartype", specifier = ">=0.20.0" },
-    { name = "cachetools", marker = "extra == 'memory'", specifier = ">=6.0.0" },
+    { name = "cachetools", marker = "extra == 'memory'", specifier = ">=5.0.0" },
     { name = "cryptography", marker = "extra == 'wrappers-encryption'", specifier = ">=45.0.0" },
     { name = "dbus-python", marker = "extra == 'keyring-linux'", specifier = ">=1.4.0" },
-    { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.6.0" },
-    { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=9.0.0" },
+    { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.0.0" },
+    { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=8.0.0" },
     { name = "hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "keyring", marker = "extra == 'keyring'", specifier = ">=25.6.0" },
     { name = "keyring", marker = "extra == 'keyring-linux'", specifier = ">=25.6.0" },
     { name = "pathvalidate", marker = "extra == 'disk'", specifier = ">=3.3.1" },
     { name = "py-key-value-shared", editable = "key-value/key-value-shared" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
-    { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.15.0" },
+    { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.0.0" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=4.3.0" },
     { name = "rocksdict", marker = "python_full_version >= '3.12' and extra == 'rocksdb'", specifier = ">=0.3.24" },
     { name = "rocksdict", marker = "python_full_version < '3.12' and extra == 'rocksdb'", specifier = ">=0.3.2" },
@@ -1937,11 +1937,11 @@ wheels = [
 
 [[package]]
 name = "python-dotenv"
-version = "1.1.1"
+version = "1.2.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f6/b0/4bc07ccd3572a2f9df7e6782f52b0c6c90dcbb803ac4a167702d7d0dfe1e/python_dotenv-1.1.1.tar.gz", hash = "sha256:a8a6399716257f45be6a007360200409fce5cda2661e3dec71d23dc15f6189ab", size = 41978, upload-time = "2025-06-24T04:21:07.341Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f0/26/19cadc79a718c5edbec86fd4919a6b6d3f681039a2f6d66d14be94e75fb9/python_dotenv-1.2.1.tar.gz", hash = "sha256:42667e897e16ab0d66954af0e60a9caa94f0fd4ecf3aaf6d2d260eec1aa36ad6", size = 44221, upload-time = "2025-10-26T15:12:10.434Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5f/ed/539768cf28c661b5b068d66d96a2f155c4971a5d55684a514c1a0e0dec2f/python_dotenv-1.1.1-py3-none-any.whl", hash = "sha256:31f23644fe2602f88ff55e1f5c79ba497e01224ee7737937930c448e4d0e24dc", size = 20556, upload-time = "2025-06-24T04:21:06.073Z" },
+    { url = "https://files.pythonhosted.org/packages/14/1b/a298b06749107c305e1fe0f814c6c74aea7b2f1e10989cb30f544a1b3253/python_dotenv-1.2.1-py3-none-any.whl", hash = "sha256:b81ee9561e9ca4004139c6cbba3a238c32b03e4894671e181b671e8cb8425d61", size = 21230, upload-time = "2025-10-26T15:12:09.109Z" },
 ]
 
 [[package]]
