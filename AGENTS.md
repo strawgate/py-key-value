@@ -173,8 +173,8 @@ Wrappers add functionality to stores and are located in:
 - Async: `key-value/key-value-aio/src/key_value/aio/wrappers/`
 - Sync: `key-value/key-value-sync/src/key_value/sync/code_gen/wrappers/`
 
-Wrappers include: Compression, Encryption, Logging, Statistics, Retry,
-Timeout, Cache, Prefix, TTL clamping, and more.
+Wrappers include: Compression, DefaultValue, Encryption, Logging, Statistics,
+Retry, Timeout, Cache, Prefix, TTL clamping, and more.
 
 ## Adapters
 
