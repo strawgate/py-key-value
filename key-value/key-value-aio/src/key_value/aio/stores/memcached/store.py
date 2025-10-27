@@ -49,6 +49,17 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         super().__init__(default_collection=default_collection)
 
     def sanitize_key(self, key: str) -> str:
+        """Sanitize a key to fit Memcached's key length constraints.
+
+        Memcached has a maximum key length limit. Keys exceeding this limit are
+        hashed using SHA-256 and truncated to ensure they fit within the constraint.
+
+        Args:
+            key: The key to sanitize.
+
+        Returns:
+            The original key if within the length limit, or a SHA-256 hash prefix if too long.
+        """
         if len(key) > MAX_KEY_LENGTH:
             sha256_hash: str = hashlib.sha256(key.encode()).hexdigest()
             return sha256_hash[:64]

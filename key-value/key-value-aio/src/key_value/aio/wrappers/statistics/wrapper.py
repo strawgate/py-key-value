@@ -40,32 +40,52 @@ class BaseHitMissStatistics(BaseStatistics):
 
 @dataclass
 class GetStatistics(BaseHitMissStatistics):
-    """A class for statistics about a KV Store collection."""
+    """Statistics for get operations.
+
+    Tracks the number of successful retrievals (hits) vs. cache misses for get operations.
+    """
 
 
 @dataclass
 class PutStatistics(BaseStatistics):
-    """A class for statistics about a KV Store collection."""
+    """Statistics for put operations.
+
+    Tracks the total number of put (write) operations performed.
+    """
 
 
 @dataclass
 class DeleteStatistics(BaseHitMissStatistics):
-    """A class for statistics about a KV Store collection."""
+    """Statistics for delete operations.
+
+    Tracks the number of successful deletions (hits) vs. attempted deletions of non-existent keys (misses).
+    """
 
 
 @dataclass
 class ExistsStatistics(BaseHitMissStatistics):
-    """A class for statistics about a KV Store collection."""
+    """Statistics for exists operations.
+
+    Tracks the number of keys that exist (hits) vs. keys that don't exist (misses) when checking for existence.
+    """
 
 
 @dataclass
 class TTLStatistics(BaseHitMissStatistics):
-    """A class for statistics about a KV Store collection."""
+    """Statistics for TTL operations.
+
+    Tracks the number of successful TTL retrievals (hits) vs. TTL queries for non-existent keys (misses).
+    """
 
 
 @dataclass
 class KVStoreCollectionStatistics(BaseStatistics):
-    """A class for statistics about a KV Store collection."""
+    """Aggregated statistics for all operations on a single collection.
+
+    This dataclass groups together statistics for all operation types (get, put, delete,
+    ttl, exists) performed on a single collection, providing a comprehensive view of
+    collection-level activity.
+    """
 
     get: GetStatistics = field(default_factory=GetStatistics)
     """The statistics for the get operation."""
@@ -85,11 +105,23 @@ class KVStoreCollectionStatistics(BaseStatistics):
 
 @dataclass
 class KVStoreStatistics:
-    """Statistics container for a KV Store."""
+    """Statistics container for an entire KV Store across all collections.
+
+    This class maintains a dictionary of per-collection statistics, allowing tracking
+    and analysis of operations across all collections in the store.
+    """
 
     collections: dict[str, KVStoreCollectionStatistics] = field(default_factory=dict)
 
     def get_collection(self, collection: str) -> KVStoreCollectionStatistics:
+        """Get or create statistics for a specific collection.
+
+        Args:
+            collection: The collection name.
+
+        Returns:
+            The statistics object for the specified collection, creating it if it doesn't exist.
+        """
         if collection not in self.collections:
             self.collections[collection] = KVStoreCollectionStatistics()
         return self.collections[collection]

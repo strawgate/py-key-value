@@ -74,6 +74,19 @@ ALLOWED_INDEX_CHARACTERS: str = LOWERCASE_ALPHABET + NUMBERS + "_" + "-" + "."
 
 
 def managed_entry_to_document(collection: str, key: str, managed_entry: ManagedEntry) -> dict[str, Any]:
+    """Convert a ManagedEntry to an Elasticsearch document.
+
+    This function creates an Elasticsearch document containing the collection, key,
+    JSON-serialized value, and optional timestamp metadata.
+
+    Args:
+        collection: The collection name.
+        key: The entry key.
+        managed_entry: The ManagedEntry to convert.
+
+    Returns:
+        An Elasticsearch document dictionary.
+    """
     document: dict[str, Any] = {
         "collection": collection,
         "key": key,
@@ -89,6 +102,20 @@ def managed_entry_to_document(collection: str, key: str, managed_entry: ManagedE
 
 
 def source_to_managed_entry(source: dict[str, Any]) -> ManagedEntry:
+    """Convert an Elasticsearch document source to a ManagedEntry.
+
+    This function deserializes an Elasticsearch document back to a ManagedEntry,
+    parsing the JSON-encoded value and timestamp metadata.
+
+    Args:
+        source: The Elasticsearch document _source dictionary.
+
+    Returns:
+        A ManagedEntry reconstructed from the document.
+
+    Raises:
+        DeserializationError: If the value field is missing or not a valid string.
+    """
     if not (value_str := source.get("value")) or not isinstance(value_str, str):
         msg = "Value is not a string"
         raise DeserializationError(msg)
