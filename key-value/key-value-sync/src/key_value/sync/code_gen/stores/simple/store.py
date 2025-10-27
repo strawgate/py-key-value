@@ -17,6 +17,12 @@ DEFAULT_SIMPLE_STORE_MAX_ENTRIES = 10000
 
 @dataclass
 class SimpleStoreEntry:
+    """A simple storage entry for the SimpleStore.
+
+    This dataclass represents an entry in the SimpleStore, storing the JSON-serialized
+    value along with optional creation and expiration timestamps.
+    """
+
     json_str: str
 
     created_at: datetime | None
@@ -24,12 +30,22 @@ class SimpleStoreEntry:
 
     @property
     def current_ttl(self) -> float | None:
+        """Calculate the current TTL in seconds until expiration.
+
+        Returns:
+            The number of seconds until expiration, or None if the entry has no expiration.
+        """
         if self.expires_at is None:
             return None
 
         return seconds_to(datetime=self.expires_at)
 
     def to_managed_entry(self) -> ManagedEntry:
+        """Convert this storage entry to a ManagedEntry.
+
+        Returns:
+            A ManagedEntry reconstructed from the stored JSON and metadata.
+        """
         managed_entry: ManagedEntry = ManagedEntry(
             value=load_from_json(json_str=self.json_str), expires_at=self.expires_at, created_at=self.created_at
         )

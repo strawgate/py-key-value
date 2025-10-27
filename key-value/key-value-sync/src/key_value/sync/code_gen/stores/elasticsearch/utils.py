@@ -8,6 +8,14 @@ from key_value.shared.utils.managed_entry import ManagedEntry
 
 
 def get_body_from_response(response: ObjectApiResponse[Any]) -> dict[str, Any]:
+    """Extract and validate the body from an Elasticsearch response.
+
+    Args:
+        response: The Elasticsearch API response object.
+
+    Returns:
+        The response body as a dictionary, or an empty dict if the body is missing or invalid.
+    """
     if not (body := response.body):  # pyright: ignore[reportAny]
         return {}
 
@@ -18,6 +26,14 @@ def get_body_from_response(response: ObjectApiResponse[Any]) -> dict[str, Any]:
 
 
 def get_source_from_body(body: dict[str, Any]) -> dict[str, Any]:
+    """Extract and validate the _source field from an Elasticsearch response body.
+
+    Args:
+        body: The response body dictionary from Elasticsearch.
+
+    Returns:
+        The _source field as a dictionary, or an empty dict if missing or invalid.
+    """
     if not (source := body.get("_source")):
         return {}
 
@@ -28,6 +44,14 @@ def get_source_from_body(body: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_aggregations_from_body(body: dict[str, Any]) -> dict[str, Any]:
+    """Extract and validate the aggregations field from an Elasticsearch response body.
+
+    Args:
+        body: The response body dictionary from Elasticsearch.
+
+    Returns:
+        The aggregations field as a dictionary, or an empty dict if missing or invalid.
+    """
     if not (aggregations := body.get("aggregations")):
         return {}
 
@@ -38,6 +62,17 @@ def get_aggregations_from_body(body: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_hits_from_response(response: ObjectApiResponse[Any]) -> list[dict[str, Any]]:
+    """Extract and validate the hits array from an Elasticsearch response.
+
+    This function navigates the nested structure of Elasticsearch responses to extract
+    the hits.hits array which contains the actual search results.
+
+    Args:
+        response: The Elasticsearch API response object.
+
+    Returns:
+        A list of hit dictionaries from the response, or an empty list if the hits are missing or invalid.
+    """
     if not (body := response.body):  # pyright: ignore[reportAny]
         return []
 
@@ -66,6 +101,21 @@ T = TypeVar("T")
 
 
 def get_fields_from_hit(hit: dict[str, Any]) -> dict[str, list[Any]]:
+    """Extract and validate the fields from an Elasticsearch hit.
+
+    Elasticsearch can return stored fields via the "fields" key in each hit.
+    This function validates that the fields object exists and conforms to the
+    expected structure (a dict mapping field names to lists of values).
+
+    Args:
+        hit: A single hit dictionary from an Elasticsearch response.
+
+    Returns:
+        The fields dictionary from the hit, or an empty dict if missing.
+
+    Raises:
+        TypeError: If the fields structure is invalid (not a dict or contains non-list values).
+    """
     if not (fields := hit.get("fields")):
         return {}
 
@@ -81,6 +131,18 @@ def get_fields_from_hit(hit: dict[str, Any]) -> dict[str, list[Any]]:
 
 
 def get_field_from_hit(hit: dict[str, Any], field: str) -> list[Any]:
+    """Extract a specific field value from an Elasticsearch hit.
+
+    Args:
+        hit: A single hit dictionary from an Elasticsearch response.
+        field: The name of the field to extract.
+
+    Returns:
+        The field value as a list, or an empty list if the fields object is missing.
+
+    Raises:
+        TypeError: If the specified field is not present in the hit.
+    """
     if not (fields := get_fields_from_hit(hit=hit)):
         return []
 
@@ -92,6 +154,19 @@ def get_field_from_hit(hit: dict[str, Any], field: str) -> list[Any]:
 
 
 def get_values_from_field_in_hit(hit: dict[str, Any], field: str, value_type: type[T]) -> list[T]:
+    """Extract and type-check field values from an Elasticsearch hit.
+
+    Args:
+        hit: A single hit dictionary from an Elasticsearch response.
+        field: The name of the field to extract.
+        value_type: The expected type of values in the field list.
+
+    Returns:
+        A list of values of the specified type.
+
+    Raises:
+        TypeError: If the field is missing or contains values of the wrong type.
+    """
     if not (value := get_field_from_hit(hit=hit, field=field)):
         msg = f"Field {field} is not in hit {hit}"
         raise TypeError(msg)
@@ -104,6 +179,19 @@ def get_values_from_field_in_hit(hit: dict[str, Any], field: str, value_type: ty
 
 
 def get_first_value_from_field_in_hit(hit: dict[str, Any], field: str, value_type: type[T]) -> T:
+    """Extract and validate a single-value field from an Elasticsearch hit.
+
+    Args:
+        hit: A single hit dictionary from an Elasticsearch response.
+        field: The name of the field to extract.
+        value_type: The expected type of the value.
+
+    Returns:
+        The single value from the field.
+
+    Raises:
+        TypeError: If the field doesn't contain exactly one value, or if the value type is incorrect.
+    """
     values: list[T] = get_values_from_field_in_hit(hit=hit, field=field, value_type=value_type)
     if len(values) != 1:
         msg: str = f"Field {field} in hit {hit} is not a single value"
@@ -112,6 +200,19 @@ def get_first_value_from_field_in_hit(hit: dict[str, Any], field: str, value_typ
 
 
 def managed_entry_to_document(collection: str, key: str, managed_entry: ManagedEntry) -> dict[str, Any]:
+    """Convert a ManagedEntry to an Elasticsearch document format.
+
+    This function serializes a ManagedEntry to a document suitable for storage in Elasticsearch,
+    including collection, key, and value fields, plus optional timestamp metadata.
+
+    Args:
+        collection: The collection name to include in the document.
+        key: The key to include in the document.
+        managed_entry: The ManagedEntry to serialize.
+
+    Returns:
+        An Elasticsearch document dictionary ready for indexing.
+    """
     document: dict[str, Any] = {"collection": collection, "key": key, "value": managed_entry.to_json(include_metadata=False)}
 
     if managed_entry.created_at:
@@ -123,4 +224,14 @@ def managed_entry_to_document(collection: str, key: str, managed_entry: ManagedE
 
 
 def new_bulk_action(action: str, index: str, document_id: str) -> dict[str, Any]:
+    """Create a bulk action descriptor for Elasticsearch bulk operations.
+
+    Args:
+        action: The bulk action type (e.g., "index", "delete", "update").
+        index: The Elasticsearch index name.
+        document_id: The document ID.
+
+    Returns:
+        A bulk action dictionary formatted for Elasticsearch's bulk API.
+    """
     return {action: {"_index": index, "_id": document_id}}

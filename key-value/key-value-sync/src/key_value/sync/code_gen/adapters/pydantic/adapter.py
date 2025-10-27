@@ -50,6 +50,21 @@ class PydanticAdapter(Generic[T]):
         self._raise_on_validation_error = raise_on_validation_error
 
     def _validate_model(self, value: dict[str, Any]) -> T | None:
+        """Validate and deserialize a dict into the configured Pydantic model.
+
+        This method handles both single models and list models. For list models, it expects the value
+        to contain an "items" key with the list data, following the convention used by `_serialize_model`.
+        If validation fails and `raise_on_validation_error` is False, returns None instead of raising.
+
+        Args:
+            value: The dict to validate and convert to a Pydantic model.
+
+        Returns:
+            The validated model instance, or None if validation fails and errors are suppressed.
+
+        Raises:
+            DeserializationError: If validation fails and `raise_on_validation_error` is True.
+        """
         try:
             if self._is_list_model:
                 return self._type_adapter.validate_python(value.get("items", []))
@@ -62,6 +77,22 @@ class PydanticAdapter(Generic[T]):
             return None
 
     def _serialize_model(self, value: T) -> dict[str, Any]:
+        """Serialize a Pydantic model to a dict for storage.
+
+        This method handles both single models and list models. For list models, it wraps the serialized
+        list in a dict with an "items" key (e.g., {"items": [...]}) to ensure consistent dict-based storage
+        format across all value types. This wrapping convention is expected by `_validate_model` during
+        deserialization.
+
+        Args:
+            value: The Pydantic model instance to serialize.
+
+        Returns:
+            A dict representation of the model suitable for storage.
+
+        Raises:
+            SerializationError: If the model cannot be serialized.
+        """
         try:
             if self._is_list_model:
                 return {"items": self._type_adapter.dump_python(value, mode="json")}
@@ -91,6 +122,10 @@ class PydanticAdapter(Generic[T]):
         Raises:
             DeserializationError if the stored data cannot be validated as the model and the PydanticAdapter is configured to
             raise on validation error.
+
+        Note:
+            When raise_on_validation_error=False and validation fails, returns the default value (which may be None).
+            When raise_on_validation_error=True and validation fails, raises DeserializationError.
         """
         collection = collection or self._default_collection
 
@@ -121,6 +156,11 @@ class PydanticAdapter(Generic[T]):
         Raises:
             DeserializationError if the stored data cannot be validated as the model and the PydanticAdapter is configured to
             raise on validation error.
+
+        Note:
+            When raise_on_validation_error=False and validation fails for any key, that position in the returned list
+            will contain the default value (which may be None). The method returns a complete list matching the order
+            and length of the input keys, with defaults substituted for missing or invalid entries.
         """
         collection = collection or self._default_collection
 
@@ -171,7 +211,16 @@ class PydanticAdapter(Generic[T]):
     def ttl(self, key: str, *, collection: str | None = None) -> tuple[T | None, float | None]:
         """Get a model and its TTL seconds if present.
 
-        Returns (model, ttl_seconds) or (None, None) if missing.
+        Args:
+            key: The key to retrieve.
+            collection: The collection to use. If not provided, uses the default collection.
+
+        Returns:
+            A tuple of (model, ttl_seconds). Returns (None, None) if the key is missing or validation fails.
+
+        Note:
+            When validation fails and raise_on_validation_error=False, returns (None, None) even if TTL data exists.
+            When validation fails and raise_on_validation_error=True, raises DeserializationError.
         """
         collection = collection or self._default_collection
 
