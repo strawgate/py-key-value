@@ -24,7 +24,7 @@ try:
     from pymongo.database import Database
     from pymongo.results import DeleteResult  # noqa: TC002
 except ImportError as e:
-    msg = "MongoDBStore requires py-key-value-aio[mongodb]"
+    msg = "MongoDBStore requires py-key-value-sync[mongodb]"
     raise ImportError(msg) from e
 
 DEFAULT_DB = "kv-store-adapter"
@@ -46,7 +46,7 @@ def document_to_managed_entry(document: dict[str, Any]) -> ManagedEntry:
     """Convert a MongoDB document back to a ManagedEntry.
 
     This function deserializes a MongoDB document (created by `managed_entry_to_document`) back to a
-    ManagedEntry object. It supports both native BSON storage (dict in value.dict field) and legacy
+    ManagedEntry object. It supports both native BSON storage (dict in value.object field) and legacy
     JSON string storage (string in value.string field) for migration support.
 
     Args:
@@ -134,7 +134,7 @@ def managed_entry_to_document(key: str, managed_entry: ManagedEntry, *, native_s
 
 
 class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
-    """MongoDB-based key-value store using Motor (sync MongoDB driver)."""
+    """MongoDB-based key-value store using PyMongo (sync MongoDB driver)."""
 
     _client: MongoClient[dict[str, Any]]
     _db: Database[dict[str, Any]]
@@ -245,7 +245,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         Returns:
             A sanitized collection name that meets MongoDB requirements.
         """
-        return sanitize_string(value=collection, max_length=MAX_COLLECTION_LENGTH, allowed_characters=ALPHANUMERIC_CHARACTERS)
+        return sanitize_string(value=collection, max_length=MAX_COLLECTION_LENGTH, allowed_characters=COLLECTION_ALLOWED_CHARACTERS)
 
     @override
     def _setup_collection(self, *, collection: str) -> None:

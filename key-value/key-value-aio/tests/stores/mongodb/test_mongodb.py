@@ -8,8 +8,8 @@ from dirty_equals import IsDatetime, IsFloat, IsInstance
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
 from key_value.shared.utils.managed_entry import ManagedEntry
+from bson import ObjectId
 from pymongo import AsyncMongoClient
-from pymongo.collection import ObjectId
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -210,7 +210,7 @@ class TestMongoDBStoreNonNativeMode(BaseMongoDBStoreTests):
         )
 
     async def test_migration_from_native_mode(self, store: MongoDBStore):
-        """Verify native mode can read native mode JSON string data."""
+        """Verify legacy mode can read native-mode object data."""
         # Manually insert a legacy document with JSON string value in the new format
         await store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]

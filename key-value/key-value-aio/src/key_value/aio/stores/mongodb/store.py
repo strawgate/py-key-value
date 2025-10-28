@@ -39,7 +39,7 @@ def document_to_managed_entry(document: dict[str, Any]) -> ManagedEntry:
     """Convert a MongoDB document back to a ManagedEntry.
 
     This function deserializes a MongoDB document (created by `managed_entry_to_document`) back to a
-    ManagedEntry object. It supports both native BSON storage (dict in value.dict field) and legacy
+    ManagedEntry object. It supports both native BSON storage (dict in value.object field) and legacy
     JSON string storage (string in value.string field) for migration support.
 
     Args:
@@ -238,7 +238,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         Returns:
             A sanitized collection name that meets MongoDB requirements.
         """
-        return sanitize_string(value=collection, max_length=MAX_COLLECTION_LENGTH, allowed_characters=ALPHANUMERIC_CHARACTERS)
+        return sanitize_string(value=collection, max_length=MAX_COLLECTION_LENGTH, allowed_characters=COLLECTION_ALLOWED_CHARACTERS)
 
     @override
     async def _setup_collection(self, *, collection: str) -> None:
