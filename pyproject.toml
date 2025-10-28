@@ -70,6 +70,10 @@ line-length = 140
     "ARG001", # Unused argument, Pyright captures this for us
     "ARG002", # Unused argument, Pyright captures this for us
 ]
+"**/code_gen/**/*.py" = [
+    "ARG001", # Unused argument, Pyright captures this for us
+    "ARG002", # Unused argument, Pyright captures this for us
+]
 
 [project.optional-dependencies]
 dev = [
@@ -101,6 +105,9 @@ typeCheckingMode = "strict"
 reportExplicitAny = false
 reportMissingTypeStubs = false
 #reportUnnecessaryTypeIgnoreComment = "error"
+include = [
+    "key-value"
+]
 exclude = [
     "**/playground/**",
     "**/node_modules/**",

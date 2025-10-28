@@ -1,9 +1,11 @@
-from datetime import datetime  # noqa: TC003
+from collections.abc import Sequence
+from datetime import datetime
 from typing import Any, overload
 
-from elastic_transport import ObjectApiResponse  # noqa: TC002
-from key_value.shared.utils.compound import compound_key
-from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json
+from elastic_transport import ObjectApiResponse
+from elastic_transport import SerializationError as ElasticsearchSerializationError
+from key_value.shared.errors import DeserializationError, SerializationError
+from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json, verify_dict
 from key_value.shared.utils.sanitize import (
     ALPHANUMERIC_CHARACTERS,
     LOWERCASE_ALPHABET,
@@ -21,6 +23,7 @@ from key_value.aio.stores.base import (
     BaseEnumerateKeysStore,
     BaseStore,
 )
+from key_value.aio.stores.elasticsearch.utils import LessCapableJsonSerializer, LessCapableNdjsonSerializer, new_bulk_action
 
 try:
     from elasticsearch import AsyncElasticsearch
@@ -53,10 +56,17 @@ DEFAULT_MAPPING = {
             "type": "keyword",
         },
         "value": {
-            "type": "keyword",
-            "index": False,
-            "doc_values": False,
-            "ignore_above": 256,
+            "properties": {
+                # You might think the `string` field should be a text/keyword field
+                # but this is the recommended mapping for large stringified json
+                "string": {
+                    "type": "object",
+                    "enabled": False,
+                },
+                "flattened": {
+                    "type": "flattened",
+                },
+            },
         },
     },
 }
@@ -71,6 +81,54 @@ MAX_INDEX_LENGTH = 240
 ALLOWED_INDEX_CHARACTERS: str = LOWERCASE_ALPHABET + NUMBERS + "_" + "-" + "."
 
 
+def managed_entry_to_document(collection: str, key: str, managed_entry: ManagedEntry, *, native_storage: bool = False) -> dict[str, Any]:
+    document: dict[str, Any] = {"collection": collection, "key": key, "value": {}}
+
+    # Store in appropriate field based on mode
+    if native_storage:
+        document["value"]["flattened"] = managed_entry.value_as_dict
+    else:
+        document["value"]["string"] = managed_entry.value_as_json
+
+    if managed_entry.created_at:
+        document["created_at"] = managed_entry.created_at.isoformat()
+    if managed_entry.expires_at:
+        document["expires_at"] = managed_entry.expires_at.isoformat()
+
+    return document
+
+
+def source_to_managed_entry(source: dict[str, Any]) -> ManagedEntry:
+    value: dict[str, Any] = {}
+
+    raw_value = source.get("value")
+
+    # Try flattened field first, fall back to string field
+    if not raw_value or not isinstance(raw_value, dict):
+        msg = "Value field not found or invalid type"
+        raise DeserializationError(msg)
+
+    if value_flattened := raw_value.get("flattened"):  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+        value = verify_dict(obj=value_flattened)
+    elif value_str := raw_value.get("string"):  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+        if not isinstance(value_str, str):
+            msg = "Value in `value` field is not a string"
+            raise DeserializationError(msg)
+        value = load_from_json(value_str)
+    else:
+        msg = "Value field not found or invalid type"
+        raise DeserializationError(msg)
+
+    created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
+    expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
+
+    return ManagedEntry(
+        value=value,
+        created_at=created_at,
+        expires_at=expires_at,
+    )
+
+
 class ElasticsearchStore(
     BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCullStore, BaseContextManagerStore, BaseStore
 ):
@@ -82,11 +140,28 @@ class ElasticsearchStore(
 
     _index_prefix: str
 
-    @overload
-    def __init__(self, *, elasticsearch_client: AsyncElasticsearch, index_prefix: str, default_collection: str | None = None) -> None: ...
+    _native_storage: bool
 
     @overload
-    def __init__(self, *, url: str, api_key: str | None = None, index_prefix: str, default_collection: str | None = None) -> None: ...
+    def __init__(
+        self,
+        *,
+        elasticsearch_client: AsyncElasticsearch,
+        index_prefix: str,
+        native_storage: bool = True,
+        default_collection: str | None = None,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        *,
+        url: str,
+        api_key: str | None = None,
+        index_prefix: str,
+        native_storage: bool = True,
+        default_collection: str | None = None,
+    ) -> None: ...
 
     def __init__(
         self,
@@ -95,6 +170,7 @@ class ElasticsearchStore(
         url: str | None = None,
         api_key: str | None = None,
         index_prefix: str,
+        native_storage: bool = True,
         default_collection: str | None = None,
     ) -> None:
         """Initialize the elasticsearch store.
@@ -104,6 +180,8 @@ class ElasticsearchStore(
             url: The url of the elasticsearch cluster.
             api_key: The api key to use.
             index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
+            native_storage: Whether to use native storage mode (flattened field type) or serialize
+                            all values to JSON strings. Defaults to True.
             default_collection: The default collection to use if no collection is provided.
         """
         if elasticsearch_client is None and url is None:
@@ -120,7 +198,12 @@ class ElasticsearchStore(
             msg = "Either elasticsearch_client or url must be provided"
             raise ValueError(msg)
 
+        LessCapableJsonSerializer.install_serializer(client=self._client)
+        LessCapableJsonSerializer.install_default_serializer(client=self._client)
+        LessCapableNdjsonSerializer.install_serializer(client=self._client)
+
         self._index_prefix = index_prefix
+        self._native_storage = native_storage
         self._is_serverless = False
 
         super().__init__(default_collection=default_collection)
@@ -156,30 +239,60 @@ class ElasticsearchStore(
             allowed_characters=ALLOWED_KEY_CHARACTERS,
         )
 
+    def _get_destination(self, *, collection: str, key: str) -> tuple[str, str]:
+        index_name: str = self._sanitize_index_name(collection=collection)
+        document_id: str = self._sanitize_document_id(key=key)
+
+        return index_name, document_id
+
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        combo_key: str = compound_key(collection=collection, key=key)
+        index_name, document_id = self._get_destination(collection=collection, key=key)
 
-        elasticsearch_response = await self._client.options(ignore_status=404).get(
-            index=self._sanitize_index_name(collection=collection), id=self._sanitize_document_id(key=combo_key)
-        )
+        elasticsearch_response = await self._client.options(ignore_status=404).get(index=index_name, id=document_id)
 
         body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
 
         if not (source := get_source_from_body(body=body)):
             return None
 
-        if not (value_str := source.get("value")) or not isinstance(value_str, str):
+        try:
+            return source_to_managed_entry(source=source)
+        except DeserializationError:
             return None
 
-        created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
-        expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
+    @override
+    async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
+        if not keys:
+            return []
 
-        return ManagedEntry(
-            value=load_from_json(value_str),
-            created_at=created_at,
-            expires_at=expires_at,
-        )
+        # Use mget for efficient batch retrieval
+        index_name = self._sanitize_index_name(collection=collection)
+        document_ids = [self._sanitize_document_id(key=key) for key in keys]
+        docs = [{"_id": document_id} for document_id in document_ids]
+
+        elasticsearch_response = await self._client.options(ignore_status=404).mget(index=index_name, docs=docs)
+
+        body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
+        docs_result = body.get("docs", [])
+
+        entries_by_id: dict[str, ManagedEntry | None] = {}
+        for doc in docs_result:
+            if not (doc_id := doc.get("_id")):
+                continue
+
+            if "found" not in doc:
+                entries_by_id[doc_id] = None
+                continue
+
+            if not (source := doc.get("_source")):
+                entries_by_id[doc_id] = None
+                continue
+
+            entries_by_id[doc_id] = source_to_managed_entry(source=source)
+
+        # Return entries in the same order as input keys
+        return [entries_by_id.get(document_id) for document_id in document_ids]
 
     @property
     def _should_refresh_on_put(self) -> bool:
@@ -193,32 +306,69 @@ class ElasticsearchStore(
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
-        combo_key: str = compound_key(collection=collection, key=key)
+        index_name: str = self._sanitize_index_name(collection=collection)
+        document_id: str = self._sanitize_document_id(key=key)
 
-        document: dict[str, Any] = {
-            "collection": collection,
-            "key": key,
-            "value": managed_entry.to_json(include_metadata=False),
-        }
-
-        if managed_entry.created_at:
-            document["created_at"] = managed_entry.created_at.isoformat()
-        if managed_entry.expires_at:
-            document["expires_at"] = managed_entry.expires_at.isoformat()
-
-        _ = await self._client.index(
-            index=self._sanitize_index_name(collection=collection),
-            id=self._sanitize_document_id(key=combo_key),
-            body=document,
-            refresh=self._should_refresh_on_put,
+        document: dict[str, Any] = managed_entry_to_document(
+            collection=collection, key=key, managed_entry=managed_entry, native_storage=self._native_storage
         )
+
+        try:
+            _ = await self._client.index(
+                index=index_name,
+                id=document_id,
+                body=document,
+                refresh=self._should_refresh_on_put,
+            )
+        except ElasticsearchSerializationError as e:
+            msg = f"Failed to serialize document: {e}"
+            raise SerializationError(message=msg) from e
+        except Exception:
+            raise
+
+    @override
+    async def _put_managed_entries(
+        self,
+        *,
+        collection: str,
+        keys: Sequence[str],
+        managed_entries: Sequence[ManagedEntry],
+        ttl: float | None,
+        created_at: datetime,
+        expires_at: datetime | None,
+    ) -> None:
+        if not keys:
+            return
+
+        operations: list[dict[str, Any]] = []
+
+        index_name: str = self._sanitize_index_name(collection=collection)
+
+        for key, managed_entry in zip(keys, managed_entries, strict=True):
+            document_id: str = self._sanitize_document_id(key=key)
+
+            index_action: dict[str, Any] = new_bulk_action(action="index", index=index_name, document_id=document_id)
+
+            document: dict[str, Any] = managed_entry_to_document(
+                collection=collection, key=key, managed_entry=managed_entry, native_storage=self._native_storage
+            )
+
+            operations.extend([index_action, document])
+        try:
+            _ = await self._client.bulk(operations=operations, refresh=self._should_refresh_on_put)  # pyright: ignore[reportUnknownMemberType]
+        except ElasticsearchSerializationError as e:
+            msg = f"Failed to serialize bulk operations: {e}"
+            raise SerializationError(message=msg) from e
+        except Exception:
+            raise
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        combo_key: str = compound_key(collection=collection, key=key)
+        index_name: str = self._sanitize_index_name(collection=collection)
+        document_id: str = self._sanitize_document_id(key=key)
 
         elasticsearch_response: ObjectApiResponse[Any] = await self._client.options(ignore_status=404).delete(
-            index=self._sanitize_index_name(collection=collection), id=self._sanitize_document_id(key=combo_key)
+            index=index_name, id=document_id
         )
 
         body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
@@ -227,6 +377,34 @@ class ElasticsearchStore(
             return False
 
         return result == "deleted"
+
+    @override
+    async def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
+        if not keys:
+            return 0
+
+        operations: list[dict[str, Any]] = []
+
+        for key in keys:
+            index_name, document_id = self._get_destination(collection=collection, key=key)
+
+            delete_action: dict[str, Any] = new_bulk_action(action="delete", index=index_name, document_id=document_id)
+
+            operations.append(delete_action)
+
+        elasticsearch_response = await self._client.bulk(operations=operations)  # pyright: ignore[reportUnknownMemberType]
+
+        body: dict[str, Any] = get_body_from_response(response=elasticsearch_response)
+
+        # Count successful deletions
+        deleted_count = 0
+        items = body.get("items", [])
+        for item in items:
+            delete_result = item.get("delete", {})
+            if delete_result.get("result") == "deleted":
+                deleted_count += 1
+
+        return deleted_count
 
     @override
     async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:

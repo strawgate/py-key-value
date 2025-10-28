@@ -7,13 +7,14 @@ py-key-value project. For human developers, see [DEVELOPING.md](DEVELOPING.md).
 
 ### Required Pre-commit Checks
 
-All three checks must pass before committing:
+All four checks must pass before committing:
 
 1. `make lint` - Runs Ruff formatting and linting (Python + Markdown)
 2. `make typecheck` - Runs Basedpyright type checking
 3. `make codegen` - Regenerates sync library from async
+4. `make lint` - Runs Ruff formatting and linting after the other checks have
 
-Or run all three together:
+Or run all four together:
 
 ```bash
 make precommit
@@ -173,8 +174,8 @@ Wrappers add functionality to stores and are located in:
 - Async: `key-value/key-value-aio/src/key_value/aio/wrappers/`
 - Sync: `key-value/key-value-sync/src/key_value/sync/code_gen/wrappers/`
 
-Wrappers include: Compression, Encryption, Logging, Statistics, Retry,
-Timeout, Cache, Prefix, TTL clamping, and more.
+Wrappers include: Compression, DefaultValue, Encryption, Logging, Statistics,
+Retry, Timeout, Cache, Prefix, TTL clamping, and more.
 
 ## Adapters
 
@@ -215,6 +216,11 @@ make sync
 GitHub Actions workflows are in `.github/workflows/`:
 
 - `test.yml` - Run tests across packages
+  - `codegen_check` job - Ensures `make codegen lint` has been run before
+    commits
+  - `static_analysis` job - Runs linting and type checking per package
+  - `test_quick` and `test_all` jobs - Run tests across Python versions and
+    platforms
 - `publish.yml` - Publish packages to PyPI
 - `claude-on-mention.yml` - Claude Code assistant (can make PRs)
 - `claude-on-open-label.yml` - Claude triage assistant (read-only analysis)
@@ -233,3 +239,8 @@ make bump-version-dry VERSION=1.2.3    # Dry run
 - For human developer documentation, see [DEVELOPING.md](DEVELOPING.md)
 - For library usage documentation, see [README.md](README.md)
 - For package-specific information, see READMEs in each package directory
+
+## Radical Honesty
+
+Agents should be honest! Properly document any problems encountered, share
+feedback, and be transparent about your AI-assisted work.

@@ -143,7 +143,7 @@ from key_value.aio.stores.memory import MemoryStore
 
 async def example(key_value: AsyncKeyValue) -> None:
     await key_value.put(key="123", value={"name": "Alice"}, collection="users", ttl=3600)
-    value = await store.get(key="123", collection="users")
+    value = await key_value.get(key="123", collection="users")
     await key_value.delete(key="123", collection="users")
 
 
@@ -253,6 +253,7 @@ the protocol, your application code might be simplified by using an adapter.
 
 | Adapter | Description | Example |
 |---------|:------------|:------------------|
+| DataclassAdapter | Type-safe storage/retrieval of dataclass models with transparent serialization/deserialization. | `DataclassAdapter(key_value=memory_store, dataclass_type=User)` |
 | PydanticAdapter | Type-safe storage/retrieval of Pydantic models with transparent serialization/deserialization. | `PydanticAdapter(key_value=memory_store, pydantic_model=User)` |
 | RaiseOnMissingAdapter | Optional raise-on-missing behavior for `get`, `get_many`, `ttl`, and `ttl_many`. | `RaiseOnMissingAdapter(key_value=memory_store)` |
 
@@ -307,6 +308,7 @@ The following wrappers are available:
 |---------|---------------|-----|
 | CollectionRoutingWrapper | Route operations to different stores based on a collection name. | `CollectionRoutingWrapper(collection_map={"sessions": redis_store, "users": dynamo_store}, default_store=memory_store)` |
 | CompressionWrapper | Compress values before storing and decompress on retrieval. | `CompressionWrapper(key_value=memory_store, min_size_to_compress=0)` |
+| DefaultValueWrapper | Return a default value when key is missing. | `DefaultValueWrapper(key_value=memory_store, default_value={})` |
 | FernetEncryptionWrapper | Encrypt values before storing and decrypt on retrieval. | `FernetEncryptionWrapper(key_value=memory_store, source_material="your-source-material", salt="your-salt")` |
 | FallbackWrapper | Fallback to a secondary store when the primary store fails. | `FallbackWrapper(primary_key_value=memory_store, fallback_key_value=memory_store)` |
 | LimitSizeWrapper | Limit the size of entries stored in the cache. | `LimitSizeWrapper(key_value=memory_store, max_size=1024, raise_on_too_large=True)` |
@@ -318,8 +320,9 @@ The following wrappers are available:
 | RetryWrapper | Retry failed operations with exponential backoff. | `RetryWrapper(key_value=memory_store, max_retries=3, initial_delay=0.1, max_delay=10.0, exponential_base=2.0)` |
 | RoutingWrapper | Route operations to different stores based on a routing function. | `RoutingWrapper(routing_function=lambda collection: redis_store if collection == "sessions" else dynamo_store, default_store=memory_store)` |
 | SingleCollectionWrapper | Wrap a store to only use a single collection. | `SingleCollectionWrapper(key_value=memory_store, single_collection="users")` |
-| TTLClampWrapper | Clamp the TTL to a given range. | `TTLClampWrapper(key_value=memory_store, min_ttl=60, max_ttl=3600)` |
 | StatisticsWrapper | Track operation statistics for the store. | `StatisticsWrapper(key_value=memory_store)` |
+| TimeoutWrapper | Add timeout protection to store operations. | `TimeoutWrapper(key_value=redis_store, timeout=5.0)` |
+| TTLClampWrapper | Clamp the TTL to a given range. | `TTLClampWrapper(key_value=memory_store, min_ttl=60, max_ttl=3600)` |
 
 Wrappers can be stacked on top of each other to create more complex functionality.
 
@@ -416,4 +419,4 @@ Contributions welcome but may not be accepted. File an issue before submitting
 a pull request. If you do not get agreement on your proposal before making a
 pull request you may have a bad time.
 
-MIT licensed.
+Apache 2.0 licensed.

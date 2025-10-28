@@ -72,3 +72,15 @@ def prepare_ttl(t: SupportsFloat | None) -> float | None:
         raise InvalidTTLError(ttl=t)
 
     return ttl
+
+
+def prepare_entry_timestamps(ttl: SupportsFloat | None) -> tuple[datetime, float | None, datetime | None]:
+    created_at: datetime = now()
+
+    ttl_seconds: float | None = prepare_ttl(t=ttl)
+
+    expires_at: datetime | None = None
+    if ttl_seconds is not None:
+        expires_at = created_at + timedelta(seconds=ttl_seconds)
+
+    return created_at, ttl_seconds, expires_at

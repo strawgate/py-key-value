@@ -8,6 +8,7 @@ Base abstract class for managed key-value store implementations.
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from threading import Lock
 from types import MappingProxyType, TracebackType
 from typing import Any, SupportsFloat
@@ -16,7 +17,7 @@ from key_value.shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.shared.errors import StoreSetupError
 from key_value.shared.type_checking.bear_spray import bear_enforce
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.time_to_live import now, prepare_ttl
+from key_value.shared.utils.time_to_live import prepare_entry_timestamps
 from typing_extensions import Self, override
 
 from key_value.sync.code_gen.protocols.key_value import (
@@ -34,6 +35,18 @@ DEFAULT_SEED_DATA: FROZEN_SEED_DATA_TYPE = MappingProxyType({})
 
 
 def _seed_to_frozen_seed_data(seed: SEED_DATA_TYPE) -> FROZEN_SEED_DATA_TYPE:
+    """Convert mutable seed data to an immutable frozen structure.
+
+    This function converts the nested mapping structure of seed data into immutable MappingProxyType
+    objects at all levels. Using immutable structures prevents accidental modification of seed data
+    after store initialization and ensures thread-safety.
+
+    Args:
+        seed: The mutable seed data mapping: {collection: {key: {field: value}}}.
+
+    Returns:
+        An immutable frozen version of the seed data using MappingProxyType.
+    """
     return MappingProxyType(
         {
             collection: MappingProxyType({key: MappingProxyType(value) for (key, value) in items.items()})
@@ -106,6 +119,15 @@ class BaseStore(KeyValueProtocol, ABC):
                 self.put(key=key, value=dict(value), collection=collection)
 
     def setup(self) -> None:
+        """Initialize the store if not already initialized.
+
+        This method is called automatically before any store operations and uses a lock to ensure
+        thread-safe lazy initialization. It can also be called manually to ensure the store is ready
+        before performing operations. The setup process includes calling the `_setup()` hook and
+        seeding the store with initial data if provided.
+
+        This method is idempotent - calling it multiple times has no additional effect after the first call.
+        """
         if not self._setup_complete:
             with self._setup_lock:
                 if not self._setup_complete:
@@ -121,6 +143,19 @@ class BaseStore(KeyValueProtocol, ABC):
                     self._seed_store()
 
     def setup_collection(self, *, collection: str) -> None:
+        """Initialize a specific collection if not already initialized.
+
+        This method is called automatically before any collection-specific operations and uses a per-collection
+        lock to ensure thread-safe lazy initialization. It can also be called manually to ensure a collection
+        is ready before performing operations on it. The setup process includes calling the `_setup_collection()`
+        hook for store-specific collection initialization.
+
+        This method is idempotent - calling it multiple times for the same collection has no additional effect
+        after the first call.
+
+        Args:
+            collection: The name of the collection to initialize.
+        """
         self.setup()
 
         if not self._setup_collection_complete[collection]:
@@ -207,9 +242,26 @@ class BaseStore(KeyValueProtocol, ABC):
         """Store a managed entry by key in the specified collection."""
         ...
 
-    def _put_managed_entries(self, *, collection: str, keys: Sequence[str], managed_entries: Sequence[ManagedEntry]) -> None:
-        """Store multiple managed entries by key in the specified collection."""
+    def _put_managed_entries(
+        self,
+        *,
+        collection: str,
+        keys: Sequence[str],
+        managed_entries: Sequence[ManagedEntry],
+        ttl: float | None,
+        created_at: datetime,
+        expires_at: datetime | None,
+    ) -> None:
+        """Store multiple managed entries by key in the specified collection.
 
+        Args:
+            collection: The collection to store entries in
+            keys: The keys for the entries
+            managed_entries: The managed entries to store
+            ttl: The TTL in seconds (None for no expiration)
+            created_at: The creation timestamp for all entries
+            expires_at: The expiration timestamp for all entries (None if no TTL)
+        """
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             self._put_managed_entry(collection=collection, key=key, managed_entry=managed_entry)
 
@@ -220,26 +272,12 @@ class BaseStore(KeyValueProtocol, ABC):
         collection = collection or self.default_collection
         self.setup_collection(collection=collection)
 
-        managed_entry: ManagedEntry = ManagedEntry(value=value, ttl=prepare_ttl(t=ttl), created_at=now())
+        (created_at, ttl_seconds, expires_at) = prepare_entry_timestamps(ttl=ttl)
+
+        managed_entry: ManagedEntry = ManagedEntry(value=value, ttl=ttl_seconds, created_at=created_at, expires_at=expires_at)
 
         self._put_managed_entry(collection=collection, key=key, managed_entry=managed_entry)
 
-    def _prepare_put_many(
-        self, *, keys: Sequence[str], values: Sequence[Mapping[str, Any]], ttl: SupportsFloat | None
-    ) -> tuple[Sequence[str], Sequence[Mapping[str, Any]], float | None]:
-        """Prepare multiple managed entries for a put_many operation.
-
-        Inheriting classes can use this method if they need to modify a put_many operation."""
-
-        if len(keys) != len(values):
-            msg = "put_many called but a different number of keys and values were provided"
-            raise ValueError(msg) from None
-
-        ttl_for_entries: float | None = prepare_ttl(t=ttl)
-
-        return (keys, values, ttl_for_entries)
-
-    @bear_enforce
     @override
     def put_many(
         self, keys: Sequence[str], values: Sequence[Mapping[str, Any]], *, collection: str | None = None, ttl: SupportsFloat | None = None
@@ -249,11 +287,19 @@ class BaseStore(KeyValueProtocol, ABC):
         collection = collection or self.default_collection
         self.setup_collection(collection=collection)
 
-        (keys, values, ttl_for_entries) = self._prepare_put_many(keys=keys, values=values, ttl=ttl)
+        if len(keys) != len(values):
+            msg = "put_many called but a different number of keys and values were provided"
+            raise ValueError(msg) from None
 
-        managed_entries: list[ManagedEntry] = [ManagedEntry(value=value, ttl=ttl_for_entries, created_at=now()) for value in values]
+        (created_at, ttl_seconds, expires_at) = prepare_entry_timestamps(ttl=ttl)
 
-        self._put_managed_entries(collection=collection, keys=keys, managed_entries=managed_entries)
+        managed_entries: list[ManagedEntry] = [
+            ManagedEntry(value=value, ttl=ttl_seconds, created_at=created_at, expires_at=expires_at) for value in values
+        ]
+
+        self._put_managed_entries(
+            collection=collection, keys=keys, managed_entries=managed_entries, ttl=ttl_seconds, created_at=created_at, expires_at=expires_at
+        )
 
     @abstractmethod
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:

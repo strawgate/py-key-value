@@ -10,7 +10,7 @@ async def async_gather(*aws: Awaitable[Any], return_exceptions: bool = False) ->
     return await asyncio.gather(*aws, return_exceptions=return_exceptions)
 
 
-def gather(*args: Any, **kwargs: Any) -> tuple[Any, ...]:  # noqa: ARG001
+def gather(*args: Any, **kwargs: Any) -> tuple[Any, ...]:
     """
     Equivalent to asyncio.gather(), converted to asyncio.gather() by async_to_sync.
     """
