@@ -5,7 +5,7 @@ from key_value.shared.type_checking.bear_spray import bear_spray
 from pydantic import BaseModel
 from pydantic.type_adapter import TypeAdapter
 
-from key_value.aio.adapters.base import BasePydanticAdapter
+from key_value.aio.adapters.pydantic.base import BasePydanticAdapter
 from key_value.aio.protocols.key_value import AsyncKeyValue
 
 T = TypeVar("T", bound=BaseModel | Sequence[BaseModel])

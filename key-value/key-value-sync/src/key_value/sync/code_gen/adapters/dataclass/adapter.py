@@ -7,7 +7,7 @@ from typing import Any, TypeVar, get_args, get_origin
 from key_value.shared.type_checking.bear_spray import bear_spray
 from pydantic.type_adapter import TypeAdapter
 
-from key_value.sync.code_gen.adapters.base import BasePydanticAdapter
+from key_value.sync.code_gen.adapters.pydantic.base import BasePydanticAdapter
 from key_value.sync.code_gen.protocols.key_value import KeyValue
 
 T = TypeVar("T")
