@@ -245,6 +245,7 @@ the protocol, your application code might be simplified by using an adapter.
 
 | Adapter | Description | Example |
 |---------|:------------|:------------------|
+| DataclassAdapter | Type-safe storage/retrieval of dataclass models with transparent serialization/deserialization. | `DataclassAdapter(key_value=memory_store, dataclass_type=User)` |
 | PydanticAdapter | Type-safe storage/retrieval of Pydantic models with transparent serialization/deserialization. | `PydanticAdapter(key_value=memory_store, pydantic_model=User)` |
 | RaiseOnMissingAdapter | Optional raise-on-missing behavior for `get`, `get_many`, `ttl`, and `ttl_many`. | `RaiseOnMissingAdapter(key_value=memory_store)` |
 

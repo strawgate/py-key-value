@@ -34,9 +34,10 @@ class DataclassAdapter(BasePydanticAdapter[T]):
 
         Args:
             key_value: The AsyncKeyValue to use.
-            dataclass_type: The dataclass type to use. Can be a single dataclass or Sequence[dataclass].
+            dataclass_type: The dataclass type to use. Can be a single dataclass or list[dataclass].
             default_collection: The default collection to use.
-            raise_on_validation_error: Whether to raise a ValidationError if the model is invalid.
+            raise_on_validation_error: Whether to raise a DeserializationError if validation fails during reads. Otherwise,
+                                       calls will return None if validation fails.
 
         Raises:
             TypeError: If dataclass_type is not a dataclass type.

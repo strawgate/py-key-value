@@ -28,9 +28,10 @@ class PydanticAdapter(BasePydanticAdapter[T]):
 
         Args:
             key_value: The KVStore to use.
-            pydantic_model: The Pydantic model to use.
+            pydantic_model: The Pydantic model to use. Can be a single Pydantic model or list[Pydantic model].
             default_collection: The default collection to use.
-            raise_on_validation_error: Whether to raise a ValidationError if the model is invalid.
+            raise_on_validation_error: Whether to raise a DeserializationError if validation fails during reads. Otherwise,
+                                       calls will return None if validation fails.
         """
 
         self._key_value = key_value
