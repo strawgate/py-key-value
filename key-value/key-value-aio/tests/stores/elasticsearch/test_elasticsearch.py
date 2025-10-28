@@ -207,6 +207,7 @@ class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
         assert result == snapshot({"legacy": "data"})
 
 
+@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
 class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
     """Test Elasticsearch store in non-native mode (i.e. it stores stringified JSON values)"""
 
