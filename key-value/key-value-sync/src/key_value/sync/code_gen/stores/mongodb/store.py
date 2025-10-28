@@ -181,7 +181,11 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
         new_collection: Collection[dict[str, Any]] = self._db.create_collection(name=collection)
 
+        # Index for efficient key lookups
         _ = new_collection.create_index(keys="key")
+
+        # TTL index for automatic expiration of entries when expires_at is reached
+        _ = new_collection.create_index(keys="expires_at", expireAfterSeconds=0)
 
         self._collections_by_name[collection] = new_collection
 
