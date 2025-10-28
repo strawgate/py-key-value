@@ -58,6 +58,13 @@ def model_type_from_log_record(record: LogRecord) -> str:
     return record.model_type  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
 
 
+def error_from_log_record(record: LogRecord) -> str:
+    if not hasattr(record, "error"):
+        msg = "Log record does not have an error attribute"
+        raise ValueError(msg)
+    return record.error  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
+
+
 def errors_from_log_record(record: LogRecord) -> list[str]:
     if not hasattr(record, "errors"):
         msg = "Log record does not have an errors attribute"
@@ -188,7 +195,7 @@ class TestPydanticAdapter:
 
         errors = errors_from_log_record(record)
         assert len(errors) == 1
-        assert "is_admin" in errors[0]
+        assert "is_admin" in str(errors[0])
 
     def test_list_validation_error_logging(
         self, product_list_adapter: PydanticAdapter[list[Product]], store: MemoryStore, caplog: pytest.LogCaptureFixture
@@ -211,6 +218,5 @@ class TestPydanticAdapter:
         assert record.levelname == "ERROR"
         assert "Missing 'items' wrapper" in record.message
         assert model_type_from_log_record(record) == "Pydantic model"
-        errors = errors_from_log_record(record)
-        assert len(errors) == 1
-        assert "missing 'items' wrapper" in errors[0]
+        errors = error_from_log_record(record)
+        assert "missing 'items' wrapper" in str(errors)
