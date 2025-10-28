@@ -174,7 +174,11 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
         new_collection: AsyncCollection[dict[str, Any]] = await self._db.create_collection(name=collection)
 
+        # Index for efficient key lookups
         _ = await new_collection.create_index(keys="key")
+
+        # TTL index for automatic expiration of entries when expires_at is reached
+        _ = await new_collection.create_index(keys="expires_at", expireAfterSeconds=0)
 
         self._collections_by_name[collection] = new_collection
 
