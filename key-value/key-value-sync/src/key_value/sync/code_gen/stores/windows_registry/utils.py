@@ -49,7 +49,8 @@ def has_key(hive: HiveType, sub_key: str) -> bool:
 
 def create_key(hive: HiveType, sub_key: str) -> None:
     try:
-        winreg.CreateKey(hive, sub_key)
+        key = winreg.CreateKey(hive, sub_key)
+        key.Close()
     except OSError as e:
         msg = f"Failed to create registry key '{sub_key}'"
         raise StoreSetupError(msg) from e
