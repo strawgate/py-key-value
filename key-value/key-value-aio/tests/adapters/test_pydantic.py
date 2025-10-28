@@ -215,5 +215,5 @@ class TestPydanticAdapter:
         assert record.levelname == "ERROR"
         assert "Missing 'items' wrapper" in record.message
         assert model_type_from_log_record(record) == "Pydantic model"
-        errors = error_from_log_record(record)
-        assert "missing 'items' wrapper" in str(errors)
+        error = error_from_log_record(record)
+        assert "missing 'items' wrapper" in str(error)
