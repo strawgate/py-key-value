@@ -7,11 +7,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
+from bson import ObjectId
 from dirty_equals import IsDatetime, IsFloat, IsInstance
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import wait_for_true
 from key_value.shared.utils.managed_entry import ManagedEntry
-from bson import ObjectId
 from pymongo import MongoClient
 from typing_extensions import override
 
@@ -134,9 +134,8 @@ class TestMongoDBStoreNativeMode(BaseMongoDBStoreTests):
     @pytest.fixture
     def store(self, setup_mongodb: None) -> MongoDBStore:
         store = MongoDBStore(url=f"mongodb://{MONGODB_HOST}:{MONGODB_HOST_PORT}", db_name=f"{MONGODB_TEST_DB}-native", native_storage=True)
-        # Ensure a clean db by dropping our default test collection if it exists
-        with contextlib.suppress(Exception):
-            _ = store._client.drop_database(name_or_database=f"{MONGODB_TEST_DB}-native")  # pyright: ignore[reportPrivateUsage]
+
+        clean_mongodb_database(store=store)
 
         return store
 
@@ -169,7 +168,6 @@ class TestMongoDBStoreNativeMode(BaseMongoDBStoreTests):
         # New format with JSON string
         collection.insert_one({"key": "legacy_key", "value": {"string": '{"legacy": "data"}'}})
 
-        # Should be able to read it in native mode
         result = store.get(collection="test", key="legacy_key")
         assert result == {"legacy": "data"}
 
@@ -207,7 +205,7 @@ class TestMongoDBStoreNonNativeMode(BaseMongoDBStoreTests):
         )
 
     def test_migration_from_native_mode(self, store: MongoDBStore):
-        """Verify legacy mode can read native-mode object data."""
+        """Verify non-native mode can read native mode data."""
         # Manually insert a legacy document with JSON string value in the new format
         store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
@@ -215,6 +213,5 @@ class TestMongoDBStoreNonNativeMode(BaseMongoDBStoreTests):
 
         collection.insert_one({"key": "legacy_key", "value": {"object": {"name": "Alice", "age": 30}}})
 
-        # Should be able to read it in native mode
         result = store.get(collection="test", key="legacy_key")
         assert result == {"name": "Alice", "age": 30}

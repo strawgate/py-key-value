@@ -127,7 +127,7 @@ def managed_entry_to_document(key: str, managed_entry: ManagedEntry, *, native_s
 
 
 class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
-    """MongoDB-based key-value store using Motor (async MongoDB driver)."""
+    """MongoDB-based key-value store using pymongo."""
 
     _client: AsyncMongoClient[dict[str, Any]]
     _db: AsyncDatabase[dict[str, Any]]

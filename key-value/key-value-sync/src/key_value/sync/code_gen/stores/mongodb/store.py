@@ -24,7 +24,7 @@ try:
     from pymongo.database import Database
     from pymongo.results import DeleteResult  # noqa: TC002
 except ImportError as e:
-    msg = "MongoDBStore requires py-key-value-sync[mongodb]"
+    msg = "MongoDBStore requires py-key-value-aio[mongodb]"
     raise ImportError(msg) from e
 
 DEFAULT_DB = "kv-store-adapter"
@@ -134,7 +134,7 @@ def managed_entry_to_document(key: str, managed_entry: ManagedEntry, *, native_s
 
 
 class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
-    """MongoDB-based key-value store using PyMongo (sync MongoDB driver)."""
+    """MongoDB-based key-value store using pymongo."""
 
     _client: MongoClient[dict[str, Any]]
     _db: Database[dict[str, Any]]
