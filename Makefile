@@ -119,4 +119,4 @@ else
 	@cd key-value/key-value-shared && uv build .
 endif
 
-precommit: lint typecheck codegen
+precommit: lint codegen lint typecheck 
