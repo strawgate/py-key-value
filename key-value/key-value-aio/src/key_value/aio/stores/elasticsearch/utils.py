@@ -1,7 +1,13 @@
-from typing import Any, TypeVar, cast
+from typing import Any, ClassVar, TypeVar, cast
 
-from elastic_transport import ObjectApiResponse
-from key_value.shared.utils.managed_entry import ManagedEntry
+from elastic_transport import (
+    JsonSerializer,
+    NdjsonSerializer,
+    ObjectApiResponse,
+    SerializationError,
+)
+
+from elasticsearch import AsyncElasticsearch
 
 
 def get_body_from_response(response: ObjectApiResponse[Any]) -> dict[str, Any]:
@@ -28,7 +34,10 @@ def get_aggregations_from_body(body: dict[str, Any]) -> dict[str, Any]:
     if not (aggregations := body.get("aggregations")):
         return {}
 
-    if not isinstance(aggregations, dict) or not all(isinstance(key, str) for key in aggregations):  # pyright: ignore[reportUnknownVariableType]
+    if not isinstance(aggregations, dict) or not all(
+        isinstance(key, str)
+        for key in aggregations  # pyright: ignore[reportUnknownVariableType]
+    ):
         return {}
 
     return cast("dict[str, Any]", aggregations)
@@ -108,20 +117,50 @@ def get_first_value_from_field_in_hit(hit: dict[str, Any], field: str, value_typ
     return values[0]
 
 
-def managed_entry_to_document(collection: str, key: str, managed_entry: ManagedEntry) -> dict[str, Any]:
-    document: dict[str, Any] = {
-        "collection": collection,
-        "key": key,
-        "value": managed_entry.to_json(include_metadata=False),
-    }
-
-    if managed_entry.created_at:
-        document["created_at"] = managed_entry.created_at.isoformat()
-    if managed_entry.expires_at:
-        document["expires_at"] = managed_entry.expires_at.isoformat()
-
-    return document
-
-
 def new_bulk_action(action: str, index: str, document_id: str) -> dict[str, Any]:
     return {action: {"_index": index, "_id": document_id}}
+
+
+class LessCapableJsonSerializer(JsonSerializer):
+    """A JSON Serializer that doesnt try to be smart with datetime, floats, etc."""
+
+    mimetype: ClassVar[str] = "application/json"
+    compatibility_mimetype: ClassVar[str] = "application/vnd.elasticsearch+json"
+
+    def default(self, data: Any) -> Any:
+        raise SerializationError(
+            message=f"Unable to serialize to JSON: {data!r} (type: {type(data).__name__})",
+        )
+
+    @classmethod
+    def install_default_serializer(cls, client: AsyncElasticsearch) -> None:
+        cls.install_serializer(client=client)
+        client.transport.serializers.default_serializer = cls()
+
+    @classmethod
+    def install_serializer(cls, client: AsyncElasticsearch) -> None:
+        client.transport.serializers.serializers.update(
+            {
+                cls.mimetype: cls(),
+                cls.compatibility_mimetype: cls(),
+            }
+        )
+
+
+class LessCapableNdjsonSerializer(NdjsonSerializer):
+    """A NDJSON Serializer that doesnt try to be smart with datetime, floats, etc."""
+
+    mimetype: ClassVar[str] = "application/x-ndjson"
+    compatibility_mimetype: ClassVar[str] = "application/vnd.elasticsearch+x-ndjson"
+
+    def default(self, data: Any) -> Any:
+        return LessCapableJsonSerializer.default(self=self, data=data)  # pyright: ignore[reportCallIssue, reportUnknownVariableType, reportArgumentType]
+
+    @classmethod
+    def install_serializer(cls, client: AsyncElasticsearch) -> None:
+        client.transport.serializers.serializers.update(
+            {
+                cls.mimetype: cls(),
+                cls.compatibility_mimetype: cls(),
+            }
+        )
