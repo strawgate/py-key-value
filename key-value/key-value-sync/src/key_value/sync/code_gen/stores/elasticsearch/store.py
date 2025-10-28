@@ -39,6 +39,8 @@ except ImportError as e:
 
 DEFAULT_INDEX_PREFIX = "kv_store"
 
+# You might think the `string` field should be a text/keyword field
+# but this is the recommended mapping for large stringified json
 DEFAULT_MAPPING = {
     "properties": {
         "created_at": {"type": "date"},

@@ -142,7 +142,7 @@ class LessCapableNdjsonSerializer(NdjsonSerializer):
     compatibility_mimetype: ClassVar[str] = "application/vnd.elasticsearch+x-ndjson"
 
     def default(self, data: Any) -> Any:
-        return LessCapableJsonSerializer.default(data=data)  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
+        return LessCapableJsonSerializer.default(self=self, data=data)  # pyright: ignore[reportCallIssue, reportUnknownVariableType, reportArgumentType]
 
     @classmethod
     def install_serializer(cls, client: Elasticsearch) -> None:

@@ -57,6 +57,8 @@ DEFAULT_MAPPING = {
         },
         "value": {
             "properties": {
+                # You might think the `string` field should be a text/keyword field
+                # but this is the recommended mapping for large stringified json
                 "string": {
                     "type": "object",
                     "enabled": False,
