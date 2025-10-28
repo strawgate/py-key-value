@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from logging import LogRecord
 
 import pytest
 from inline_snapshot import snapshot
@@ -45,6 +46,20 @@ SAMPLE_ORDER: Order = Order(created_at=datetime.now(), updated_at=datetime.now()
 TEST_COLLECTION: str = "test_collection"
 TEST_KEY: str = "test_key"
 TEST_KEY_2: str = "test_key_2"
+
+
+def model_type_from_log_record(record: LogRecord) -> str:
+    if not hasattr(record, "model_type"):
+        msg = "Log record does not have a model_type attribute"
+        raise ValueError(msg)
+    return record.model_type  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
+
+
+def errors_from_log_record(record: LogRecord) -> list[str]:
+    if not hasattr(record, "errors"):
+        msg = "Log record does not have an errors attribute"
+        raise ValueError(msg)
+    return record.errors  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
 
 
 class TestPydanticAdapter:
@@ -166,9 +181,11 @@ class TestPydanticAdapter:
         record = caplog.records[0]
         assert record.levelname == "ERROR"
         assert "Validation failed" in record.message
-        assert record.model_type == "Pydantic model"
-        assert record.error_count == 1
-        assert "is_admin" in str(record.errors)
+        assert model_type_from_log_record(record) == "Pydantic model"
+
+        errors = errors_from_log_record(record)
+        assert len(errors) == 1
+        assert "is_admin" in errors[0]
 
     async def test_list_validation_error_logging(
         self, product_list_adapter: PydanticAdapter[list[Product]], store: MemoryStore, caplog: pytest.LogCaptureFixture
@@ -190,5 +207,7 @@ class TestPydanticAdapter:
         record = caplog.records[0]
         assert record.levelname == "ERROR"
         assert "Missing 'items' wrapper" in record.message
-        assert record.model_type == "Pydantic model"
-        assert "missing 'items' wrapper" in record.error
+        assert model_type_from_log_record(record) == "Pydantic model"
+        errors = errors_from_log_record(record)
+        assert len(errors) == 1
+        assert "missing 'items' wrapper" in errors[0]

@@ -68,7 +68,6 @@ class BasePydanticAdapter(Generic[T], ABC):
                         extra={
                             "model_type": self._get_model_type_name(),
                             "error": "missing 'items' wrapper",
-                            "value_preview": str(value)[:200],
                         },
                         exc_info=False,
                     )
@@ -91,7 +90,6 @@ class BasePydanticAdapter(Generic[T], ABC):
                     "model_type": self._get_model_type_name(),
                     "error_count": len(error_details),
                     "errors": error_details,
-                    "value_preview": str(value)[:200],
                 },
                 exc_info=True,
             )
