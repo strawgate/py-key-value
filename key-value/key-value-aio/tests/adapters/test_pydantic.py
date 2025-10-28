@@ -145,3 +145,50 @@ class TestPydanticAdapter:
 
         assert await product_list_adapter.delete(collection=TEST_COLLECTION, key=TEST_KEY)
         assert await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
+
+    async def test_validation_error_logging(
+        self, user_adapter: PydanticAdapter[User], updated_user_adapter: PydanticAdapter[UpdatedUser], caplog: pytest.LogCaptureFixture
+    ):
+        """Test that validation errors are logged when raise_on_validation_error=False."""
+        import logging
+
+        # Store a User, then try to retrieve as UpdatedUser (missing is_admin field)
+        await user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER)
+
+        with caplog.at_level(logging.ERROR):
+            updated_user = await updated_user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+
+        # Should return None due to validation failure
+        assert updated_user is None
+
+        # Check that an error was logged
+        assert len(caplog.records) == 1
+        record = caplog.records[0]
+        assert record.levelname == "ERROR"
+        assert "Validation failed" in record.message
+        assert record.model_type == "Pydantic model"
+        assert record.error_count == 1
+        assert "is_admin" in str(record.errors)
+
+    async def test_list_validation_error_logging(
+        self, product_list_adapter: PydanticAdapter[list[Product]], store: MemoryStore, caplog: pytest.LogCaptureFixture
+    ):
+        """Test that missing 'items' wrapper is logged for list models."""
+        import logging
+
+        # Manually store invalid data (missing 'items' wrapper)
+        await store.put(collection=TEST_COLLECTION, key=TEST_KEY, value={"invalid": "data"})
+
+        with caplog.at_level(logging.ERROR):
+            result = await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+
+        # Should return None due to missing 'items' wrapper
+        assert result is None
+
+        # Check that an error was logged
+        assert len(caplog.records) == 1
+        record = caplog.records[0]
+        assert record.levelname == "ERROR"
+        assert "Missing 'items' wrapper" in record.message
+        assert record.model_type == "Pydantic model"
+        assert "missing 'items' wrapper" in record.error
