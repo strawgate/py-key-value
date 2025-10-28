@@ -121,7 +121,7 @@ class InstallSerializerMixin:
 
     @classmethod
     def install_serializer(cls, client: AsyncElasticsearch) -> None:
-        client._transport.serializers.serializers.update(
+        client.transport.serializers.serializers.update(
             {
                 cls.mimetype: cls(),
                 cls.compatibility_mimetype: cls(),
@@ -131,7 +131,7 @@ class InstallSerializerMixin:
     @classmethod
     def install_default_serializer(cls, client: AsyncElasticsearch) -> None:
         cls.install_serializer(client=client)
-        client._transport.serializers.default_serializer = cls()
+        client.transport.serializers.default_serializer = cls()
 
 
 class LessCapableJsonSerializer(InstallSerializerMixin, JsonSerializer):

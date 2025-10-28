@@ -5,11 +5,11 @@ import platform
 import subprocess
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from time import sleep
 
 import pytest
 from docker import DockerClient
 from docker.models.containers import Container
+from key_value.shared.code_gen.sleep import sleep
 
 logger = logging.getLogger(__name__)
 

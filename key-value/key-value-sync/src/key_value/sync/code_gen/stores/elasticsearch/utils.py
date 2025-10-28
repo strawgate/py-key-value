@@ -123,12 +123,12 @@ class InstallSerializerMixin:
 
     @classmethod
     def install_serializer(cls, client: Elasticsearch) -> None:
-        client._transport.serializers.serializers.update({cls.mimetype: cls(), cls.compatibility_mimetype: cls()})
+        client.transport.serializers.serializers.update({cls.mimetype: cls(), cls.compatibility_mimetype: cls()})
 
     @classmethod
     def install_default_serializer(cls, client: Elasticsearch) -> None:
         cls.install_serializer(client=client)
-        client._transport.serializers.default_serializer = cls()
+        client.transport.serializers.default_serializer = cls()
 
 
 class LessCapableJsonSerializer(InstallSerializerMixin, JsonSerializer):

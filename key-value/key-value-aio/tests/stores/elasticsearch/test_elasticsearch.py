@@ -145,7 +145,7 @@ class BaseTestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
 class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
-    """Test Elasticsearch store in native mode"""
+    """Test Elasticsearch store in native mode (i.e. it stores flattened objects)"""
 
     @override
     @pytest.fixture
@@ -208,7 +208,7 @@ class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
 
 
 class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
-    """Test Elasticsearch store in non-native mode"""
+    """Test Elasticsearch store in non-native mode (i.e. it stores stringified JSON values)"""
 
     @override
     @pytest.fixture
@@ -220,8 +220,6 @@ class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
         """Verify values are stored as flattened objects, not JSON strings"""
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
-        # Check raw Elasticsearch document using public sanitization methods
-        # Note: We need to access these internal methods for testing the storage format
         index_name = store._sanitize_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
         doc_id = store._sanitize_document_id(key="test_key")  # pyright: ignore[reportPrivateUsage]
 
@@ -250,7 +248,6 @@ class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
 
     async def test_migration_from_native_mode(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
         """Verify non-native mode can read native mode data"""
-        # Manually insert a legacy document with JSON string value
         index_name = store._sanitize_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
         doc_id = store._sanitize_document_id(key="legacy_key")  # pyright: ignore[reportPrivateUsage]
 
@@ -266,6 +263,5 @@ class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
 
         await es_client.indices.refresh(index=index_name)
 
-        # Should be able to read it in native mode
         result = await store.get(collection="test", key="legacy_key")
         assert result == snapshot({"name": "Alice", "age": 30})
