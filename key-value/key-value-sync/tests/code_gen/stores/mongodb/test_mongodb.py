@@ -55,7 +55,7 @@ def test_managed_entry_document_conversion_native_mode():
     assert document == snapshot(
         {
             "key": "test",
-            "value": {"dict": {"test": "test"}},
+            "value": {"object": {"test": "test"}},
             "created_at": datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc),
             "expires_at": datetime(2025, 1, 1, 0, 0, 10, tzinfo=timezone.utc),
         }
@@ -88,27 +88,6 @@ def test_managed_entry_document_conversion_legacy_mode():
     round_trip_managed_entry = document_to_managed_entry(document=document)
 
     assert round_trip_managed_entry.value == managed_entry.value
-    assert round_trip_managed_entry.created_at == created_at
-    assert round_trip_managed_entry.ttl == IsFloat(lt=0)
-    assert round_trip_managed_entry.expires_at == expires_at
-
-
-def test_managed_entry_document_conversion_old_format():
-    """Test backward compatibility with old format where value is directly a string."""
-    created_at = datetime(year=2025, month=1, day=1, hour=0, minute=0, second=0, tzinfo=timezone.utc)
-    expires_at = created_at + timedelta(seconds=10)
-
-    # Simulate old document format
-    old_document = {
-        "key": "test",
-        "value": '{"test": "test"}',
-        "created_at": "2025-01-01T00:00:00+00:00",
-        "expires_at": "2025-01-01T00:00:10+00:00",
-    }
-
-    round_trip_managed_entry = document_to_managed_entry(document=old_document)
-
-    assert round_trip_managed_entry.value == {"test": "test"}
     assert round_trip_managed_entry.created_at == created_at
     assert round_trip_managed_entry.ttl == IsFloat(lt=0)
     assert round_trip_managed_entry.expires_at == expires_at

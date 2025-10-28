@@ -2,8 +2,10 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, overload
 
-from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.errors import DeserializationError
+from key_value.shared.utils.managed_entry import ManagedEntry, verify_dict
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
+from key_value.shared.utils.time_to_live import timezone
 from typing_extensions import Self, override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseStore
@@ -46,24 +48,42 @@ def document_to_managed_entry(document: dict[str, Any]) -> ManagedEntry:
     Returns:
         A ManagedEntry object reconstructed from the document.
     """
-    # Check if we have the new two-field structure
-    value_field = document.get("value")
+    if not (value_field := document.get("value")):
+        msg = "Value field not found"
+        raise DeserializationError(msg)
 
-    if isinstance(value_field, dict):
-        # New format: check for dict or string subfields
-        if "dict" in value_field:
-            # Native storage mode - value is already a dict
-            return ManagedEntry.from_dict(
-                data={"value": value_field["dict"], **{k: v for k, v in document.items() if k != "value"}}, stringified_value=False
-            )
-        if "string" in value_field:
-            # Legacy storage mode - value is a JSON string
-            return ManagedEntry.from_dict(
-                data={"value": value_field["string"], **{k: v for k, v in document.items() if k != "value"}}, stringified_value=True
-            )
+    if not isinstance(value_field, dict):
+        msg = "Expected `value` field to be an object"
+        raise DeserializationError(msg)
 
-    # Old format: value field is directly a string
-    return ManagedEntry.from_dict(data=document, stringified_value=True)
+    value_holder: dict[str, Any] = verify_dict(obj=value_field)
+
+    data: dict[str, Any] = {}
+
+    # The Value field is an object with two possible fields: `object` and `string`
+    # - `object`: The value is a native BSON dict
+    # - `string`: The value is a JSON string
+    # Mongo stores datetimes without timezones as UTC so we mark them as UTC
+
+    if created_at_datetime := document.get("created_at"):
+        if not isinstance(created_at_datetime, datetime):
+            msg = "Expected `created_at` field to be a datetime"
+            raise DeserializationError(msg)
+        data["created_at"] = created_at_datetime.replace(tzinfo=timezone.utc)
+    if expires_at_datetime := document.get("expires_at"):
+        if not isinstance(expires_at_datetime, datetime):
+            msg = "Expected `expires_at` field to be a datetime"
+            raise DeserializationError(msg)
+        data["expires_at"] = expires_at_datetime.replace(tzinfo=timezone.utc)
+
+    if value_object := value_holder.get("object"):
+        return ManagedEntry.from_dict(data={"value": value_object, **data})
+
+    if value_string := value_holder.get("string"):
+        return ManagedEntry.from_dict(data={"value": value_string, **data}, stringified_value=True)
+
+    msg = "Expected `value` field to be an object with `object` or `string` subfield"
+    raise DeserializationError(msg)
 
 
 def managed_entry_to_document(key: str, managed_entry: ManagedEntry, *, native_storage: bool = True) -> dict[str, Any]:
@@ -76,7 +96,7 @@ def managed_entry_to_document(key: str, managed_entry: ManagedEntry, *, native_s
     Args:
         key: The key associated with this entry.
         managed_entry: The ManagedEntry to serialize.
-        native_storage: If True (default), store value as native BSON dict in value.dict field.
+        native_storage: If True (default), store value as native BSON dict in value.object field.
                        If False, store as JSON string in value.string field for backward compatibility.
 
     Returns:
@@ -86,7 +106,7 @@ def managed_entry_to_document(key: str, managed_entry: ManagedEntry, *, native_s
 
     # Store in appropriate field based on mode
     if native_storage:
-        document["value"]["dict"] = managed_entry.value_as_dict
+        document["value"]["object"] = managed_entry.value_as_dict
     else:
         document["value"]["string"] = managed_entry.value_as_json
 
@@ -240,7 +260,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         sanitized_collection = self._sanitize_collection_name(collection=collection)
 
         if doc := await self._collections_by_name[sanitized_collection].find_one(filter={"key": key}):
-            return ManagedEntry.from_dict(data=doc, stringified_value=True)
+            return document_to_managed_entry(document=doc)
 
         return None
 
