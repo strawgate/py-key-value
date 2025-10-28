@@ -37,7 +37,7 @@ def get_aggregations_from_body(body: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(aggregations, dict) or not all(
         isinstance(key, str)
         for key in aggregations  # pyright: ignore[reportUnknownVariableType]
-    ):  # pyright: ignore[reportUnknownVariableType]
+    ):
         return {}
 
     return cast("dict[str, Any]", aggregations)

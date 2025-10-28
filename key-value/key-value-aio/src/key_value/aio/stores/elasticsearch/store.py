@@ -354,8 +354,13 @@ class ElasticsearchStore(
             )
 
             operations.extend([index_action, document])
-
-        _ = await self._client.bulk(operations=operations, refresh=self._should_refresh_on_put)  # pyright: ignore[reportUnknownMemberType]
+        try:
+            _ = await self._client.bulk(operations=operations, refresh=self._should_refresh_on_put)  # pyright: ignore[reportUnknownMemberType]
+        except ElasticsearchSerializationError as e:
+            msg = f"Failed to serialize bulk operations: {e}"
+            raise SerializationError(message=msg) from e
+        except Exception:
+            raise
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
