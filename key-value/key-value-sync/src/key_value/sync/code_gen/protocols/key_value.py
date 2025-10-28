@@ -9,8 +9,9 @@ from typing import Any, Protocol, SupportsFloat, runtime_checkable
 class KeyValueProtocol(Protocol):
     """A subset of KV operations: get/put/delete and TTL variants, including bulk calls.
 
-    This protocol defines the minimal contract for key-value store implementations. All methods are
-    async and may raise exceptions on connection failures, validation errors, or other operational issues.
+    This protocol defines the minimal contract for key-value store implementations. All methods may
+    raise exceptions on connection failures, validation errors, or other operational issues.
+
     Implementations should handle backend-specific errors appropriately.
     """
 
