@@ -70,6 +70,7 @@ def document_to_managed_entry(document: dict[str, Any]) -> ManagedEntry:
             msg = "Expected `created_at` field to be a datetime"
             raise DeserializationError(msg)
         data["created_at"] = created_at_datetime.replace(tzinfo=timezone.utc)
+
     if expires_at_datetime := document.get("expires_at"):
         if not isinstance(expires_at_datetime, datetime):
             msg = "Expected `expires_at` field to be a datetime"
@@ -104,11 +105,17 @@ def managed_entry_to_document(key: str, managed_entry: ManagedEntry, *, native_s
     """
     document: dict[str, Any] = {"key": key, "value": {}}
 
+    # We convert to JSON even if we don't need to, this ensures that the value we were provided
+    # can be serialized to JSON which helps ensure compatibility across stores. For example,
+    # Mongo can natively handle datetime objects which other stores cannot, if we don't convert to JSON,
+    # then using py-key-value with Mongo will return different values than if we used another store.
+    json_str = managed_entry.value_as_json
+
     # Store in appropriate field based on mode
     if native_storage:
         document["value"]["object"] = managed_entry.value_as_dict
     else:
-        document["value"]["string"] = managed_entry.value_as_json
+        document["value"]["string"] = json_str
 
     # Add metadata fields
     if managed_entry.created_at:

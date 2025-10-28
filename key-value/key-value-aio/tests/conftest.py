@@ -168,6 +168,7 @@ def docker_container(
     finally:
         docker_stop(name, raise_on_error=False)
         docker_rm(name, raise_on_error=False)
+        docker_wait_container_gone(name=name, max_tries=10, wait_time=1.0)
 
     logger.info(f"Container {name} stopped and removed")
     return

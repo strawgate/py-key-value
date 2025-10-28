@@ -4,11 +4,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
-from dirty_equals import IsFloat
+from dirty_equals import IsDatetime, IsFloat, IsInstance
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
 from key_value.shared.utils.managed_entry import ManagedEntry
 from pymongo import AsyncMongoClient
+from pymongo.collection import ObjectId
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -92,9 +93,13 @@ def test_managed_entry_document_conversion_legacy_mode():
     assert round_trip_managed_entry.expires_at == expires_at
 
 
-@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
-class TestMongoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    """Test MongoDBStore with native_storage=False (legacy mode) for backward compatibility."""
+async def clean_mongodb_database(store: MongoDBStore) -> None:
+    with contextlib.suppress(Exception):
+        _ = await store._client.drop_database(name_or_database=MONGODB_TEST_DB)  # pyright: ignore[reportPrivateUsage]
+
+
+class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
+    """Base class for MongoDB store tests."""
 
     @pytest.fixture(autouse=True, scope="session", params=MONGODB_VERSIONS_TO_TEST)
     async def setup_mongodb(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
@@ -107,48 +112,22 @@ class TestMongoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
             yield
 
-    @override
-    @pytest.fixture
-    async def store(self, setup_mongodb: None) -> MongoDBStore:
-        # Use legacy mode (native_storage=False) to test backward compatibility
-        store = MongoDBStore(url=f"mongodb://{MONGODB_HOST}:{MONGODB_HOST_PORT}", db_name=MONGODB_TEST_DB, native_storage=False)
-        # Ensure a clean db by dropping our default test collection if it exists
-        with contextlib.suppress(Exception):
-            _ = await store._client.drop_database(name_or_database=MONGODB_TEST_DB)  # pyright: ignore[reportPrivateUsage]
-
-        return store
-
-    @pytest.fixture
-    async def mongodb_store(self, store: MongoDBStore) -> MongoDBStore:
-        return store
-
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
 
-    async def test_mongodb_collection_name_sanitization(self, mongodb_store: MongoDBStore):
+    async def test_mongodb_collection_name_sanitization(self, store: MongoDBStore):
         """Tests that a special characters in the collection name will not raise an error."""
-        await mongodb_store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
-        assert await mongodb_store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
+        await store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
+        assert await store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
 
-        collections = await mongodb_store.collections()
+        collections = await store.collections()
         assert collections == snapshot(["test_collection_-daf4a2ec"])
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
-class TestMongoDBStoreNativeMode(ContextManagerStoreTestMixin, BaseStoreTests):
+class TestMongoDBStoreNativeMode(BaseMongoDBStoreTests):
     """Test MongoDBStore with native_storage=True (default)."""
-
-    @pytest.fixture(autouse=True, scope="session", params=MONGODB_VERSIONS_TO_TEST)
-    async def setup_mongodb(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
-        version = request.param
-
-        with docker_container(f"mongodb-test-native-{version}", f"mongo:{version}", {str(MONGODB_HOST_PORT): MONGODB_HOST_PORT}):
-            if not await async_wait_for_true(bool_fn=ping_mongodb, tries=WAIT_FOR_MONGODB_TIMEOUT, wait_time=1):
-                msg = f"MongoDB {version} failed to start"
-                raise MongoDBFailedToStartError(msg)
-
-            yield
 
     @override
     @pytest.fixture
@@ -160,36 +139,31 @@ class TestMongoDBStoreNativeMode(ContextManagerStoreTestMixin, BaseStoreTests):
 
         return store
 
-    @pytest.fixture
-    async def mongodb_store(self, store: MongoDBStore) -> MongoDBStore:
-        return store
-
-    @pytest.mark.skip(reason="Distributed Caches are unbounded")
-    @override
-    async def test_not_unbounded(self, store: BaseStore): ...
-
-    async def test_value_stored_as_bson_dict(self, mongodb_store: MongoDBStore):
+    async def test_value_stored_as_bson_dict(self, store: MongoDBStore):
         """Verify values are stored as BSON dicts, not JSON strings."""
-        await mongodb_store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
         # Get the raw MongoDB document
-        await mongodb_store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = mongodb_store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        collection = mongodb_store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
+        await store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
         doc = await collection.find_one({"key": "test_key"})
 
-        # In native mode, value should be a dict with "dict" subfield
-        assert doc is not None
-        assert isinstance(doc["value"], dict)
-        assert "dict" in doc["value"]
-        assert doc["value"]["dict"] == {"name": "Alice", "age": 30}
+        assert doc == snapshot(
+            {
+                "_id": IsInstance(expected_type=ObjectId),
+                "key": "test_key",
+                "created_at": IsDatetime(),
+                "value": {"object": {"name": "Alice", "age": 30}},
+            }
+        )
 
-    async def test_migration_from_legacy_mode(self, mongodb_store: MongoDBStore):
+    async def test_migration_from_legacy_mode(self, store: MongoDBStore):
         """Verify native mode can read legacy JSON string data."""
         # Manually insert a legacy document with JSON string value in the new format
-        await mongodb_store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = mongodb_store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        collection = mongodb_store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
+        await store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
 
         await collection.insert_one(
             {
@@ -199,23 +173,56 @@ class TestMongoDBStoreNativeMode(ContextManagerStoreTestMixin, BaseStoreTests):
         )
 
         # Should be able to read it in native mode
-        result = await mongodb_store.get(collection="test", key="legacy_key")
+        result = await store.get(collection="test", key="legacy_key")
         assert result == {"legacy": "data"}
 
-    async def test_migration_from_old_format(self, mongodb_store: MongoDBStore):
-        """Verify native mode can read old format where value is directly a string."""
-        # Manually insert an old document with value directly as JSON string
-        await mongodb_store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = mongodb_store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        collection = mongodb_store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
+
+@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
+class TestMongoDBStoreNonNativeMode(BaseMongoDBStoreTests):
+    """Test MongoDBStore with native_storage=False (legacy mode) for backward compatibility."""
+
+    @override
+    @pytest.fixture
+    async def store(self, setup_mongodb: None) -> MongoDBStore:
+        store = MongoDBStore(url=f"mongodb://{MONGODB_HOST}:{MONGODB_HOST_PORT}", db_name=MONGODB_TEST_DB, native_storage=False)
+
+        await clean_mongodb_database(store=store)
+
+        return store
+
+    async def test_value_stored_as_json(self, store: MongoDBStore):
+        """Verify values are stored as JSON strings."""
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        # Get the raw MongoDB document
+        await store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
+        doc = await collection.find_one({"key": "test_key"})
+
+        assert doc == snapshot(
+            {
+                "_id": IsInstance(expected_type=ObjectId),
+                "key": "test_key",
+                "created_at": IsDatetime(),
+                "value": {"string": '{"age": 30, "name": "Alice"}'},
+            }
+        )
+
+    async def test_migration_from_native_mode(self, store: MongoDBStore):
+        """Verify native mode can read native mode JSON string data."""
+        # Manually insert a legacy document with JSON string value in the new format
+        await store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
 
         await collection.insert_one(
             {
-                "key": "old_key",
-                "value": '{"old": "format"}',  # Old format: value directly as JSON string
+                "key": "legacy_key",
+                "value": {"object": {"name": "Alice", "age": 30}},
             }
         )
 
         # Should be able to read it in native mode
-        result = await mongodb_store.get(collection="test", key="old_key")
-        assert result == {"old": "format"}
+        result = await store.get(collection="test", key="legacy_key")
+        assert result == {"name": "Alice", "age": 30}
