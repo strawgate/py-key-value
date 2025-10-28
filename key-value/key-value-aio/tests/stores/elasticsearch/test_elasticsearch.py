@@ -185,9 +185,8 @@ class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
             }
         )
 
-    async def test_migration_from_legacy_mode(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
-        """Verify native mode can read legacy JSON string data"""
-        # Manually insert a legacy document with JSON string value
+    async def test_migration_from_non_native_mode(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
+        """Verify native mode can read a document with stringified data"""
         index_name = store._sanitize_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
         doc_id = store._sanitize_document_id(key="legacy_key")  # pyright: ignore[reportPrivateUsage]
 
@@ -197,14 +196,15 @@ class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
             body={
                 "collection": "test",
                 "key": "legacy_key",
-                "value": '{"legacy": "data"}',  # JSON string
+                "value": {
+                    "string": '{"legacy": "data"}',
+                },
             },
         )
         await es_client.indices.refresh(index=index_name)
 
-        # Should be able to read stringified values too
         result = await store.get(collection="test", key="legacy_key")
-        assert result == snapshot(None)
+        assert result == snapshot({"legacy": "data"})
 
 
 class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):

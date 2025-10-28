@@ -1,6 +1,11 @@
 from typing import Any, ClassVar, TypeVar, cast
 
-from elastic_transport import JsonSerializer, NdjsonSerializer, ObjectApiResponse, SerializationError
+from elastic_transport import (
+    JsonSerializer,
+    NdjsonSerializer,
+    ObjectApiResponse,
+    SerializationError,
+)
 
 from elasticsearch import AsyncElasticsearch
 
@@ -29,7 +34,10 @@ def get_aggregations_from_body(body: dict[str, Any]) -> dict[str, Any]:
     if not (aggregations := body.get("aggregations")):
         return {}
 
-    if not isinstance(aggregations, dict) or not all(isinstance(key, str) for key in aggregations):  # pyright: ignore[reportUnknownVariableType]
+    if not isinstance(aggregations, dict) or not all(
+        isinstance(key, str)
+        for key in aggregations  # pyright: ignore[reportUnknownVariableType]
+    ):  # pyright: ignore[reportUnknownVariableType]
         return {}
 
     return cast("dict[str, Any]", aggregations)
@@ -113,28 +121,7 @@ def new_bulk_action(action: str, index: str, document_id: str) -> dict[str, Any]
     return {action: {"_index": index, "_id": document_id}}
 
 
-class InstallSerializerMixin:
-    """A mixin that installs the serializer into the transport."""
-
-    mimetype: ClassVar[str]
-    compatibility_mimetype: ClassVar[str]
-
-    @classmethod
-    def install_serializer(cls, client: AsyncElasticsearch) -> None:
-        client.transport.serializers.serializers.update(
-            {
-                cls.mimetype: cls(),
-                cls.compatibility_mimetype: cls(),
-            }
-        )
-
-    @classmethod
-    def install_default_serializer(cls, client: AsyncElasticsearch) -> None:
-        cls.install_serializer(client=client)
-        client.transport.serializers.default_serializer = cls()
-
-
-class LessCapableJsonSerializer(InstallSerializerMixin, JsonSerializer):
+class LessCapableJsonSerializer(JsonSerializer):
     """A JSON Serializer that doesnt try to be smart with datetime, floats, etc."""
 
     mimetype: ClassVar[str] = "application/json"
@@ -145,12 +132,35 @@ class LessCapableJsonSerializer(InstallSerializerMixin, JsonSerializer):
             message=f"Unable to serialize to JSON: {data!r} (type: {type(data).__name__})",
         )
 
+    @classmethod
+    def install_default_serializer(cls, client: AsyncElasticsearch) -> None:
+        cls.install_serializer(client=client)
+        client.transport.serializers.default_serializer = cls()
 
-class NdjsonSerializer(InstallSerializerMixin, NdjsonSerializer):
+    @classmethod
+    def install_serializer(cls, client: AsyncElasticsearch) -> None:
+        client.transport.serializers.serializers.update(
+            {
+                cls.mimetype: cls(),
+                cls.compatibility_mimetype: cls(),
+            }
+        )
+
+
+class LessCapableNdjsonSerializer(NdjsonSerializer):
     """A NDJSON Serializer that doesnt try to be smart with datetime, floats, etc."""
 
     mimetype: ClassVar[str] = "application/x-ndjson"
     compatibility_mimetype: ClassVar[str] = "application/vnd.elasticsearch+x-ndjson"
 
     def default(self, data: Any) -> Any:
-        return LessCapableJsonSerializer.default(self, data)
+        return LessCapableJsonSerializer.default(data=data)  # pyright: ignore[reportCallIssue, reportUnknownVariableType]
+
+    @classmethod
+    def install_serializer(cls, client: AsyncElasticsearch) -> None:
+        client.transport.serializers.serializers.update(
+            {
+                cls.mimetype: cls(),
+                cls.compatibility_mimetype: cls(),
+            }
+        )

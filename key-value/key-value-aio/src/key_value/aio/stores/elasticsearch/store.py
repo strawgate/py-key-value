@@ -23,7 +23,7 @@ from key_value.aio.stores.base import (
     BaseEnumerateKeysStore,
     BaseStore,
 )
-from key_value.aio.stores.elasticsearch.utils import LessCapableJsonSerializer, NdjsonSerializer, new_bulk_action
+from key_value.aio.stores.elasticsearch.utils import LessCapableJsonSerializer, LessCapableNdjsonSerializer, new_bulk_action
 
 try:
     from elasticsearch import AsyncElasticsearch
@@ -99,14 +99,16 @@ def managed_entry_to_document(collection: str, key: str, managed_entry: ManagedE
 def source_to_managed_entry(source: dict[str, Any]) -> ManagedEntry:
     value: dict[str, Any] = {}
 
+    raw_value = source.get("value")
+
     # Try flattened field first, fall back to string field
-    if not (value := source.get("value")) or not isinstance(value, dict):
+    if not raw_value or not isinstance(raw_value, dict):
         msg = "Value field not found or invalid type"
         raise DeserializationError(msg)
 
-    if value_flattened := value.get("flattened"):
+    if value_flattened := raw_value.get("flattened"):  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
         value = verify_dict(obj=value_flattened)
-    elif value_str := value.get("string"):
+    elif value_str := raw_value.get("string"):  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
         if not isinstance(value_str, str):
             msg = "Value in `value` field is not a string"
             raise DeserializationError(msg)
@@ -196,7 +198,7 @@ class ElasticsearchStore(
 
         LessCapableJsonSerializer.install_serializer(client=self._client)
         LessCapableJsonSerializer.install_default_serializer(client=self._client)
-        NdjsonSerializer.install_serializer(client=self._client)
+        LessCapableNdjsonSerializer.install_serializer(client=self._client)
 
         self._index_prefix = index_prefix
         self._native_storage = native_storage
