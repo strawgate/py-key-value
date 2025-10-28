@@ -91,7 +91,7 @@ class TestPydanticAdapter:
             [SAMPLE_USER_2, SAMPLE_USER]
         )
 
-    async def test_simple_adapter_with_list(self, product_list_adapter: PydanticAdapter[list[datetime]]):
+    async def test_simple_adapter_with_list(self, product_list_adapter: PydanticAdapter[list[Product]]):
         await product_list_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=[SAMPLE_PRODUCT, SAMPLE_PRODUCT])
         cached_products: list[Product] | None = await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
         assert cached_products == [SAMPLE_PRODUCT, SAMPLE_PRODUCT]

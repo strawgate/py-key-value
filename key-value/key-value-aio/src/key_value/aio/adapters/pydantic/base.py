@@ -63,7 +63,8 @@ class BasePydanticAdapter(Generic[T], ABC):
             return self._type_adapter.validate_python(value)
         except ValidationError as e:
             if self._raise_on_validation_error:
-                msg = f"Invalid {self._get_model_type_name()}: {value}"
+                details = e.errors(include_input=False)
+                msg = f"Invalid {self._get_model_type_name()}: {details}"
                 raise DeserializationError(msg) from e
             return None
 
