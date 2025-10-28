@@ -4,7 +4,13 @@ from typing import Any, Protocol, SupportsFloat, runtime_checkable
 
 @runtime_checkable
 class AsyncKeyValueProtocol(Protocol):
-    """A subset of KV operations: get/put/delete and TTL variants, including bulk calls."""
+    """A subset of KV operations: get/put/delete and TTL variants, including bulk calls.
+
+    This protocol defines the minimal contract for key-value store implementations. All methods may
+    raise exceptions on connection failures, validation errors, or other operational issues.
+
+    Implementations should handle backend-specific errors appropriately.
+    """
 
     async def get(
         self,
@@ -54,6 +60,9 @@ class AsyncKeyValueProtocol(Protocol):
         Args:
             key: The key to delete the value from.
             collection: The collection to delete the value from. If no collection is provided, it will use the default collection.
+
+        Returns:
+            True if the key was deleted, False if the key did not exist.
         """
         ...
 

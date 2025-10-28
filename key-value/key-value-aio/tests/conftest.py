@@ -8,6 +8,8 @@ from contextlib import contextmanager
 
 import pytest
 from docker import DockerClient
+from docker.models.containers import Container
+from key_value.shared.code_gen.sleep import sleep
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,19 @@ def docker_logs(name: str, print_logs: bool = False, raise_on_error: bool = Fals
     return logs
 
 
+def docker_get(name: str, raise_on_not_found: bool = False) -> Container | None:
+    from docker.errors import NotFound
+
+    client = get_docker_client()
+    try:
+        return client.containers.get(name)
+    except NotFound:
+        logger.info(f"Container {name} failed to get")
+        if raise_on_not_found:
+            raise
+        return None
+
+
 def docker_pull(image: str, raise_on_error: bool = False) -> bool:
     logger.info(f"Pulling image {image}")
     client = get_docker_client()
@@ -72,23 +87,41 @@ def docker_pull(image: str, raise_on_error: bool = False) -> bool:
 
 def docker_stop(name: str, raise_on_error: bool = False) -> bool:
     logger.info(f"Stopping container {name}")
-    client = get_docker_client()
+
+    if not (container := docker_get(name=name, raise_on_not_found=False)):
+        return False
+
     try:
-        client.containers.get(name).stop()
+        container.stop()
     except Exception:
         logger.info(f"Container {name} failed to stop")
         if raise_on_error:
             raise
         return False
+
     logger.info(f"Container {name} stopped")
     return True
 
 
+def docker_wait_container_gone(name: str, max_tries: int = 10, wait_time: float = 1.0) -> bool:
+    logger.info(f"Waiting for container {name} to be gone")
+    count = 0
+    while count < max_tries:
+        if not docker_get(name=name, raise_on_not_found=False):
+            return True
+        sleep(wait_time)
+        count += 1
+    return False
+
+
 def docker_rm(name: str, raise_on_error: bool = False) -> bool:
     logger.info(f"Removing container {name}")
-    client = get_docker_client()
+
+    if not (container := docker_get(name=name, raise_on_not_found=False)):
+        return False
+
     try:
-        client.containers.get(container_id=name).remove()
+        container.remove()
     except Exception:
         logger.info(f"Container {name} failed to remove")
         if raise_on_error:
@@ -121,6 +154,7 @@ def docker_container(
         docker_pull(image=image, raise_on_error=True)
         docker_stop(name=name, raise_on_error=False)
         docker_rm(name=name, raise_on_error=False)
+        docker_wait_container_gone(name=name, max_tries=10, wait_time=1.0)
         docker_run(name=name, image=image, ports=ports, environment=environment or {}, raise_on_error=True)
         logger.info(f"Container {name} created")
         yield

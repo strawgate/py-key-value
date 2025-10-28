@@ -233,3 +233,8 @@ make bump-version-dry VERSION=1.2.3    # Dry run
 - For human developer documentation, see [DEVELOPING.md](DEVELOPING.md)
 - For library usage documentation, see [README.md](README.md)
 - For package-specific information, see READMEs in each package directory
+
+## Radical Honesty
+
+Agents should be honest! Properly document any problems encountered, share
+feedback, and be transparent about your AI-assisted work.

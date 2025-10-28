@@ -34,15 +34,34 @@ COLLECTION_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
 
 
 def document_to_managed_entry(document: dict[str, Any]) -> ManagedEntry:
-    """
-    Convert a MongoDB document to a ManagedEntry.
+    """Convert a MongoDB document back to a ManagedEntry.
+
+    This function deserializes a MongoDB document (created by `managed_entry_to_document`) back to a
+    ManagedEntry object, parsing the stringified value field and preserving all metadata.
+
+    Args:
+        document: The MongoDB document to convert.
+
+    Returns:
+        A ManagedEntry object reconstructed from the document.
     """
     return ManagedEntry.from_dict(data=document, stringified_value=True)
 
 
 def managed_entry_to_document(key: str, managed_entry: ManagedEntry) -> dict[str, Any]:
-    """
-    Convert a ManagedEntry to a MongoDB document.
+    """Convert a ManagedEntry to a MongoDB document for storage.
+
+    This function serializes a ManagedEntry to a MongoDB document format, including the key and all
+    metadata (TTL, creation, and expiration timestamps). The value is stringified to ensure proper
+    storage in MongoDB. The serialization is designed to preserve all entry information for round-trip
+    conversion back to a ManagedEntry.
+
+    Args:
+        key: The key associated with this entry.
+        managed_entry: The ManagedEntry to serialize.
+
+    Returns:
+        A MongoDB document dict containing the key, value, and all metadata.
     """
     return {
         "key": key,
@@ -127,6 +146,18 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         await self._client.__aexit__(exc_type, exc_val, exc_tb)
 
     def _sanitize_collection_name(self, collection: str) -> str:
+        """Sanitize a collection name to meet MongoDB naming requirements.
+
+        MongoDB has specific requirements for collection names (length limits, allowed characters).
+        This method ensures collection names are compliant by truncating to the maximum allowed length
+        and replacing invalid characters with safe alternatives.
+
+        Args:
+            collection: The collection name to sanitize.
+
+        Returns:
+            A sanitized collection name that meets MongoDB requirements.
+        """
         return sanitize_string(value=collection, max_length=MAX_COLLECTION_LENGTH, allowed_characters=ALPHANUMERIC_CHARACTERS)
 
     @override
