@@ -40,6 +40,12 @@ async def ping_elasticsearch() -> bool:
         return await es_client.ping()
 
 
+async def cleanup_elasticsearch_indices(elasticsearch_client: AsyncElasticsearch):
+    indices = await elasticsearch_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
+    for index in indices:
+        _ = await elasticsearch_client.options(ignore_status=404).indices.delete(index=index)
+
+
 class ElasticsearchFailedToStartError(Exception):
     pass
 
@@ -117,11 +123,11 @@ class BaseTestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         async with AsyncElasticsearch(hosts=[ES_URL]) as es_client:
             yield es_client
 
-    async def _cleanup(self):
-        elasticsearch_client = get_elasticsearch_client()
-        indices = await elasticsearch_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
-        for index in indices:
-            _ = await elasticsearch_client.options(ignore_status=404).indices.delete(index=index)
+    @pytest.fixture(autouse=True)
+    async def cleanup_elasticsearch_indices(self, es_client: AsyncElasticsearch):
+        await cleanup_elasticsearch_indices(elasticsearch_client=es_client)
+        yield
+        await cleanup_elasticsearch_indices(elasticsearch_client=es_client)
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
@@ -150,7 +156,6 @@ class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
     @override
     @pytest.fixture
     async def store(self) -> ElasticsearchStore:
-        await self._cleanup()
         return ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test", native_storage=True)
 
     async def test_value_stored_as_flattened_object(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
@@ -214,11 +219,10 @@ class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
     @override
     @pytest.fixture
     async def store(self) -> ElasticsearchStore:
-        await self._cleanup()
         return ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test", native_storage=False)
 
     async def test_value_stored_as_json_string(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
-        """Verify values are stored as flattened objects, not JSON strings"""
+        """Verify values are stored as JSON strings"""
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
         index_name = store._sanitize_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]

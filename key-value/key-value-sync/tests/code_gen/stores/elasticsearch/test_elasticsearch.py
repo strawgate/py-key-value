@@ -41,6 +41,12 @@ def ping_elasticsearch() -> bool:
         return es_client.ping()
 
 
+def cleanup_elasticsearch_indices(elasticsearch_client: Elasticsearch):
+    indices = elasticsearch_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
+    for index in indices:
+        _ = elasticsearch_client.options(ignore_status=404).indices.delete(index=index)
+
+
 class ElasticsearchFailedToStartError(Exception):
     pass
 
@@ -118,11 +124,11 @@ class BaseTestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         with Elasticsearch(hosts=[ES_URL]) as es_client:
             yield es_client
 
-    def _cleanup(self):
-        elasticsearch_client = get_elasticsearch_client()
-        indices = elasticsearch_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
-        for index in indices:
-            _ = elasticsearch_client.options(ignore_status=404).indices.delete(index=index)
+    @pytest.fixture(autouse=True)
+    def cleanup_elasticsearch_indices(self, es_client: Elasticsearch):
+        cleanup_elasticsearch_indices(elasticsearch_client=es_client)
+        yield
+        cleanup_elasticsearch_indices(elasticsearch_client=es_client)
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
@@ -151,7 +157,6 @@ class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
     @override
     @pytest.fixture
     def store(self) -> ElasticsearchStore:
-        self._cleanup()
         return ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test", native_storage=True)
 
     def test_value_stored_as_flattened_object(self, store: ElasticsearchStore, es_client: Elasticsearch):
@@ -207,11 +212,10 @@ class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
     @override
     @pytest.fixture
     def store(self) -> ElasticsearchStore:
-        self._cleanup()
         return ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test", native_storage=False)
 
     def test_value_stored_as_json_string(self, store: ElasticsearchStore, es_client: Elasticsearch):
-        """Verify values are stored as flattened objects, not JSON strings"""
+        """Verify values are stored as JSON strings"""
         store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
         index_name = store._sanitize_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
