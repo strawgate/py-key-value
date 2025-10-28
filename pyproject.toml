@@ -99,6 +99,9 @@ typeCheckingMode = "strict"
 reportExplicitAny = false
 reportMissingTypeStubs = false
 #reportUnnecessaryTypeIgnoreComment = "error"
+include = [
+    "key-value"
+]
 exclude = [
     "**/playground/**",
     "**/node_modules/**",
