@@ -64,7 +64,14 @@ jobs:
       - name: "Check for uncommitted changes"
         run: |
           if ! git diff --exit-code; then
-            echo "Error: Uncommitted changes detected after running 'make codegen lint'."
+            echo "Error: Modified files detected after running 'make codegen lint'."
+            echo "Please run 'make codegen lint' locally and commit the changes."
+            exit 1
+          fi
+          if [ -n "$(git ls-files --others --exclude-standard)" ]; then
+            echo "Error: Untracked files detected after running 'make codegen lint'."
+            echo "Untracked files:"
+            git ls-files --others --exclude-standard
             echo "Please run 'make codegen lint' locally and commit the changes."
             exit 1
           fi
