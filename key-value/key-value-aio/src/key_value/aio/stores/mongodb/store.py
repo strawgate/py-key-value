@@ -37,7 +37,8 @@ def document_to_managed_entry(document: dict[str, Any]) -> ManagedEntry:
     """Convert a MongoDB document back to a ManagedEntry.
 
     This function deserializes a MongoDB document (created by `managed_entry_to_document`) back to a
-    ManagedEntry object, parsing the stringified value field and preserving all metadata.
+    ManagedEntry object. It supports both native BSON storage (dict in value.dict field) and legacy
+    JSON string storage (string in value.string field) for migration support.
 
     Args:
         document: The MongoDB document to convert.
@@ -45,28 +46,57 @@ def document_to_managed_entry(document: dict[str, Any]) -> ManagedEntry:
     Returns:
         A ManagedEntry object reconstructed from the document.
     """
+    # Check if we have the new two-field structure
+    value_field = document.get("value")
+
+    if isinstance(value_field, dict):
+        # New format: check for dict or string subfields
+        if "dict" in value_field:
+            # Native storage mode - value is already a dict
+            return ManagedEntry.from_dict(
+                data={"value": value_field["dict"], **{k: v for k, v in document.items() if k != "value"}}, stringified_value=False
+            )
+        if "string" in value_field:
+            # Legacy storage mode - value is a JSON string
+            return ManagedEntry.from_dict(
+                data={"value": value_field["string"], **{k: v for k, v in document.items() if k != "value"}}, stringified_value=True
+            )
+
+    # Old format: value field is directly a string
     return ManagedEntry.from_dict(data=document, stringified_value=True)
 
 
-def managed_entry_to_document(key: str, managed_entry: ManagedEntry) -> dict[str, Any]:
+def managed_entry_to_document(key: str, managed_entry: ManagedEntry, *, native_storage: bool = True) -> dict[str, Any]:
     """Convert a ManagedEntry to a MongoDB document for storage.
 
     This function serializes a ManagedEntry to a MongoDB document format, including the key and all
-    metadata (TTL, creation, and expiration timestamps). The value is stringified to ensure proper
-    storage in MongoDB. The serialization is designed to preserve all entry information for round-trip
-    conversion back to a ManagedEntry.
+    metadata (TTL, creation, and expiration timestamps). The value storage format depends on the
+    native_storage parameter.
 
     Args:
         key: The key associated with this entry.
         managed_entry: The ManagedEntry to serialize.
+        native_storage: If True (default), store value as native BSON dict in value.dict field.
+                       If False, store as JSON string in value.string field for backward compatibility.
 
     Returns:
         A MongoDB document dict containing the key, value, and all metadata.
     """
-    return {
-        "key": key,
-        **managed_entry.to_dict(include_metadata=True, include_expiration=True, include_creation=True, stringify_value=True),
-    }
+    document: dict[str, Any] = {"key": key, "value": {}}
+
+    # Store in appropriate field based on mode
+    if native_storage:
+        document["value"]["dict"] = managed_entry.value_as_dict
+    else:
+        document["value"]["string"] = managed_entry.value_as_json
+
+    # Add metadata fields
+    if managed_entry.created_at:
+        document["created_at"] = managed_entry.created_at
+    if managed_entry.expires_at:
+        document["expires_at"] = managed_entry.expires_at
+
+    return document
 
 
 class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
@@ -75,6 +105,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
     _client: AsyncMongoClient[dict[str, Any]]
     _db: AsyncDatabase[dict[str, Any]]
     _collections_by_name: dict[str, AsyncCollection[dict[str, Any]]]
+    _native_storage: bool
 
     @overload
     def __init__(
@@ -83,6 +114,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         client: AsyncMongoClient[dict[str, Any]],
         db_name: str | None = None,
         coll_name: str | None = None,
+        native_storage: bool = True,
         default_collection: str | None = None,
     ) -> None:
         """Initialize the MongoDB store.
@@ -91,12 +123,19 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
             client: The MongoDB client to use.
             db_name: The name of the MongoDB database.
             coll_name: The name of the MongoDB collection.
+            native_storage: Whether to use native BSON storage (True, default) or JSON string storage (False).
             default_collection: The default collection to use if no collection is provided.
         """
 
     @overload
     def __init__(
-        self, *, url: str, db_name: str | None = None, coll_name: str | None = None, default_collection: str | None = None
+        self,
+        *,
+        url: str,
+        db_name: str | None = None,
+        coll_name: str | None = None,
+        native_storage: bool = True,
+        default_collection: str | None = None,
     ) -> None:
         """Initialize the MongoDB store.
 
@@ -104,6 +143,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
             url: The url of the MongoDB cluster.
             db_name: The name of the MongoDB database.
             coll_name: The name of the MongoDB collection.
+            native_storage: Whether to use native BSON storage (True, default) or JSON string storage (False).
             default_collection: The default collection to use if no collection is provided.
         """
 
@@ -114,9 +154,21 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         url: str | None = None,
         db_name: str | None = None,
         coll_name: str | None = None,
+        native_storage: bool = True,
         default_collection: str | None = None,
     ) -> None:
-        """Initialize the MongoDB store."""
+        """Initialize the MongoDB store.
+
+        Args:
+            client: The MongoDB client to use (mutually exclusive with url).
+            url: The url of the MongoDB cluster (mutually exclusive with client).
+            db_name: The name of the MongoDB database.
+            coll_name: The name of the MongoDB collection.
+            native_storage: Whether to use native BSON storage (True, default) or JSON string storage (False).
+                           Native storage stores values as BSON dicts for better query support.
+                           Legacy mode stores values as JSON strings for backward compatibility.
+            default_collection: The default collection to use if no collection is provided.
+        """
 
         if client:
             self._client = client
@@ -131,6 +183,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
         self._db = self._client[db_name]
         self._collections_by_name = {}
+        self._native_storage = native_storage
 
         super().__init__(default_collection=default_collection)
 
@@ -217,7 +270,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
-        mongo_doc: dict[str, Any] = managed_entry_to_document(key=key, managed_entry=managed_entry)
+        mongo_doc: dict[str, Any] = managed_entry_to_document(key=key, managed_entry=managed_entry, native_storage=self._native_storage)
 
         sanitized_collection = self._sanitize_collection_name(collection=collection)
 
@@ -248,7 +301,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
         operations: list[UpdateOne] = []
         for key, managed_entry in zip(keys, managed_entries, strict=True):
-            mongo_doc: dict[str, Any] = managed_entry_to_document(key=key, managed_entry=managed_entry)
+            mongo_doc: dict[str, Any] = managed_entry_to_document(key=key, managed_entry=managed_entry, native_storage=self._native_storage)
 
             operations.append(
                 UpdateOne(
