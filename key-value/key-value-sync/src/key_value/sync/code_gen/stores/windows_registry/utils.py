@@ -3,18 +3,10 @@
 # DO NOT CHANGE! Change the original file instead.
 import contextlib
 import winreg
-from collections.abc import Generator
-from contextlib import contextmanager
+
+from key_value.shared.errors.store import StoreSetupError
 
 HiveType = int
-
-
-@contextmanager
-def handle_winreg_error() -> Generator[None, None, None]:
-    try:
-        yield
-    except (FileNotFoundError, OSError):
-        return None
 
 
 def get_reg_sz_value(hive: HiveType, sub_key: str, value_name: str) -> str | None:
@@ -27,8 +19,15 @@ def get_reg_sz_value(hive: HiveType, sub_key: str, value_name: str) -> str | Non
 
 
 def set_reg_sz_value(hive: HiveType, sub_key: str, value_name: str, value: str) -> None:
-    with winreg.OpenKey(key=hive, sub_key=sub_key, access=winreg.KEY_WRITE) as reg_key:
-        winreg.SetValueEx(reg_key, value_name, 0, winreg.REG_SZ, value)
+    try:
+        with winreg.OpenKey(key=hive, sub_key=sub_key, access=winreg.KEY_WRITE) as reg_key:
+            winreg.SetValueEx(reg_key, value_name, 0, winreg.REG_SZ, value)
+    except FileNotFoundError as e:
+        msg = f"Registry key '{sub_key}' does not exist"
+        raise StoreSetupError(msg) from e
+    except OSError as e:
+        msg = f"Failed to set registry value '{value_name}' at '{sub_key}'"
+        raise StoreSetupError(msg) from e
 
 
 def delete_reg_sz_value(hive: HiveType, sub_key: str, value_name: str) -> bool:
@@ -49,29 +48,35 @@ def has_key(hive: HiveType, sub_key: str) -> bool:
 
 
 def create_key(hive: HiveType, sub_key: str) -> None:
-    winreg.CreateKey(hive, sub_key)
+    try:
+        winreg.CreateKey(hive, sub_key)
+    except OSError as e:
+        msg = f"Failed to create registry key '{sub_key}'"
+        raise StoreSetupError(msg) from e
 
 
 def delete_key(hive: HiveType, sub_key: str) -> bool:
     try:
-        with winreg.OpenKey(key=hive, sub_key=sub_key, access=winreg.KEY_WRITE) as reg_key:
-            winreg.DeleteKey(reg_key, sub_key)
-            return True
+        winreg.DeleteKey(hive, sub_key)
     except (FileNotFoundError, OSError):
         return False
+    else:
+        return True
 
 
 def delete_sub_keys(hive: HiveType, sub_key: str) -> None:
-    with (
-        handle_winreg_error(),
-        winreg.OpenKey(key=hive, sub_key=sub_key, access=winreg.KEY_WRITE | winreg.KEY_ENUMERATE_SUB_KEYS) as reg_key,
-    ):
-        index = 0
-        while True:
-            if not (next_child_key := winreg.EnumKey(reg_key, index)):
-                break
+    try:
+        with winreg.OpenKey(key=hive, sub_key=sub_key, access=winreg.KEY_WRITE | winreg.KEY_ENUMERATE_SUB_KEYS) as reg_key:
+            while True:
+                try:
+                    # Always enumerate at index 0 since keys shift after deletion
+                    next_child_key = winreg.EnumKey(reg_key, 0)
+                except OSError:
+                    # No more subkeys
+                    break
 
-            with contextlib.suppress(Exception):
-                winreg.DeleteKey(reg_key, next_child_key)
-
-            index += 1
+                # Key already deleted or can't be deleted, skip it
+                with contextlib.suppress(FileNotFoundError, OSError):
+                    winreg.DeleteKey(reg_key, next_child_key)
+    except (FileNotFoundError, OSError):
+        return
