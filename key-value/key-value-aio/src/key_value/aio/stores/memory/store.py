@@ -57,7 +57,7 @@ class MemoryCacheEntry:
         return ManagedEntry.from_json(json_str=self.json_str)
 
 
-def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, now: float) -> float:  # noqa: ARG001
+def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, _now: float) -> float:
     """Calculate time-to-use for cache entries based on their expiration time.
 
     This function is used by TLRUCache to determine when entries should expire.
@@ -65,7 +65,7 @@ def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, now: float) -> float: 
     Args:
         _key: The cache key (unused).
         value: The cache entry.
-        now: The current time as an epoch timestamp (unused).
+        _now: The current time as an epoch timestamp (unused).
 
     Returns:
         The expiration time as an epoch timestamp, or sys.maxsize if the entry has no TTL.
