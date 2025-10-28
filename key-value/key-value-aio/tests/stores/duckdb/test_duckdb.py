@@ -39,13 +39,13 @@ class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
 
 
 class TestDuckDBStoreTextMode(ContextManagerStoreTestMixin, BaseStoreTests):
-    """Test DuckDB store with TEXT column mode instead of JSON."""
+    """Test DuckDB store with TEXT column mode (stringified JSON) instead of native JSON."""
 
     @override
     @pytest.fixture
     async def store(self) -> AsyncGenerator[DuckDBStore, None]:
-        """Test with in-memory DuckDB database using TEXT column."""
-        duckdb_store = DuckDBStore(use_json_column=False)
+        """Test with in-memory DuckDB database using TEXT column for stringified JSON."""
+        duckdb_store = DuckDBStore(native_storage=False)
         yield duckdb_store
         await duckdb_store.close()
 
@@ -65,7 +65,7 @@ class TestDuckDBStoreSpecific:
 
     async def test_native_sql_queryability(self):
         """Test that users can query the database directly with SQL."""
-        store = DuckDBStore(use_json_column=True)
+        store = DuckDBStore(native_storage=True)
 
         # Store some test data with known metadata
         await store.put(collection="products", key="item1", value={"name": "Widget", "price": 10.99}, ttl=3600)
@@ -73,9 +73,9 @@ class TestDuckDBStoreSpecific:
         await store.put(collection="orders", key="order1", value={"total": 100.00, "items": 3})
 
         # Query directly via SQL to verify native storage
-        # Check that value is stored as JSON (can extract fields)
+        # Check that value_dict is stored as JSON (can extract fields)
         result = store._connection.execute("""
-            SELECT key, value->'name' as name, value->'price' as price
+            SELECT key, value_dict->'name' as name, value_dict->'price' as price
             FROM kv_entries
             WHERE collection = 'products'
             ORDER BY key
@@ -110,26 +110,28 @@ class TestDuckDBStoreSpecific:
         await store.close()
 
     async def test_text_mode_storage(self):
-        """Test that TEXT mode stores value as string instead of native JSON."""
-        store = DuckDBStore(use_json_column=False)
+        """Test that TEXT mode stores value as stringified JSON instead of native JSON."""
+        store = DuckDBStore(native_storage=False)
 
         await store.put(collection="test", key="key1", value={"data": "value"})
 
-        # Query to check column type - in TEXT mode, value should be a string
+        # Query to check column type - in TEXT mode, value_json should be populated
         result = store._connection.execute("""
-            SELECT value, typeof(value) as value_type
+            SELECT value_json, value_dict, typeof(value_json) as json_type, typeof(value_dict) as dict_type
             FROM kv_entries
             WHERE collection = 'test' AND key = 'key1'
         """).fetchone()
 
         assert result is not None
-        value_str, value_type = result
+        value_json, value_dict, json_type, _dict_type = result
 
-        # In TEXT mode, value should be stored as VARCHAR/TEXT
-        assert value_type in ("VARCHAR", "TEXT")
+        # In TEXT mode (native_storage=False), value_json should be populated, value_dict should be NULL
+        assert value_json is not None
+        assert value_dict is None
+        assert json_type in ("VARCHAR", "TEXT")
         # Value should be a JSON string
-        assert isinstance(value_str, str)
-        assert "data" in value_str
+        assert isinstance(value_json, str)
+        assert "data" in value_json
 
         await store.close()
 
@@ -219,6 +221,68 @@ class TestDuckDBStoreSpecific:
         assert result == {"test": "value"}
 
         await store.close()
+
+    async def test_custom_table_name(self):
+        """Test that store can use custom table name."""
+        custom_table = "my_custom_kv_table"
+        store = DuckDBStore(table_name=custom_table)
+
+        # Store some data
+        await store.put(collection="test", key="key1", value={"data": "value"})
+
+        # Verify the custom table exists and contains the data
+        result = store._connection.execute(f"""
+            SELECT key, collection
+            FROM {custom_table}
+            WHERE key = 'key1'
+        """).fetchone()  # noqa: S608
+
+        assert result is not None
+        assert result[0] == "key1"
+        assert result[1] == "test"
+
+        # Verify default table doesn't exist
+        tables = store._connection.execute("""
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_name = 'kv_entries'
+        """).fetchall()
+
+        assert len(tables) == 0
+
+        await store.close()
+
+    async def test_native_vs_stringified_storage(self):
+        """Test that native and stringified storage modes work correctly."""
+        # Native storage (default)
+        store_native = DuckDBStore(native_storage=True)
+        await store_native.put(collection="test", key="key1", value={"name": "native"})
+
+        result = store_native._connection.execute("""
+            SELECT value_dict, value_json
+            FROM kv_entries
+            WHERE key = 'key1'
+        """).fetchone()
+
+        assert result[0] is not None  # value_dict should be populated
+        assert result[1] is None  # value_json should be NULL
+
+        await store_native.close()
+
+        # Stringified storage
+        store_string = DuckDBStore(native_storage=False)
+        await store_string.put(collection="test", key="key2", value={"name": "stringified"})
+
+        result = store_string._connection.execute("""
+            SELECT value_dict, value_json
+            FROM kv_entries
+            WHERE key = 'key2'
+        """).fetchone()
+
+        assert result[0] is None  # value_dict should be NULL
+        assert result[1] is not None  # value_json should be populated
+
+        await store_string.close()
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
     async def test_not_unbounded(self, store: BaseStore): ...
