@@ -38,6 +38,21 @@ class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
     async def test_not_unbounded(self, store: BaseStore): ...
 
 
+class TestDuckDBStoreTextMode(ContextManagerStoreTestMixin, BaseStoreTests):
+    """Test DuckDB store with TEXT column mode instead of JSON."""
+
+    @override
+    @pytest.fixture
+    async def store(self) -> AsyncGenerator[DuckDBStore, None]:
+        """Test with in-memory DuckDB database using TEXT column."""
+        duckdb_store = DuckDBStore(use_json_column=False)
+        yield duckdb_store
+        await duckdb_store.close()
+
+    @pytest.mark.skip(reason="Local disk stores are unbounded")
+    async def test_not_unbounded(self, store: BaseStore): ...
+
+
 class TestDuckDBStoreSpecific:
     """Test DuckDB-specific functionality."""
 
@@ -47,6 +62,76 @@ class TestDuckDBStoreSpecific:
         duckdb_store = DuckDBStore()
         yield duckdb_store
         await duckdb_store.close()
+
+    async def test_native_sql_queryability(self):
+        """Test that users can query the database directly with SQL."""
+        store = DuckDBStore(use_json_column=True)
+
+        # Store some test data with known metadata
+        await store.put(collection="products", key="item1", value={"name": "Widget", "price": 10.99}, ttl=3600)
+        await store.put(collection="products", key="item2", value={"name": "Gadget", "price": 25.50}, ttl=7200)
+        await store.put(collection="orders", key="order1", value={"total": 100.00, "items": 3})
+
+        # Query directly via SQL to verify native storage
+        # Check that value is stored as JSON (can extract fields)
+        result = store._connection.execute("""
+            SELECT key, value->'name' as name, value->'price' as price
+            FROM kv_entries
+            WHERE collection = 'products'
+            ORDER BY key
+        """).fetchall()
+
+        assert len(result) == 2
+        assert result[0][0] == "item1"
+        assert result[0][1] == '"Widget"'  # JSON strings are quoted
+        assert result[1][0] == "item2"
+
+        # Query by expiration timestamp
+        result = store._connection.execute("""
+            SELECT COUNT(*)
+            FROM kv_entries
+            WHERE expires_at > now() OR expires_at IS NULL
+        """).fetchone()
+
+        assert result[0] == 3  # All 3 entries should not be expired
+
+        # Query metadata columns directly
+        result = store._connection.execute("""
+            SELECT key, ttl, created_at IS NOT NULL as has_created
+            FROM kv_entries
+            WHERE collection = 'products' AND ttl > 3600
+        """).fetchall()
+
+        assert len(result) == 1  # Only item2 has ttl > 3600
+        assert result[0][0] == "item2"
+        assert result[0][1] == 7200
+        assert result[0][2] is True  # has_created
+
+        await store.close()
+
+    async def test_text_mode_storage(self):
+        """Test that TEXT mode stores value as string instead of native JSON."""
+        store = DuckDBStore(use_json_column=False)
+
+        await store.put(collection="test", key="key1", value={"data": "value"})
+
+        # Query to check column type - in TEXT mode, value should be a string
+        result = store._connection.execute("""
+            SELECT value, typeof(value) as value_type
+            FROM kv_entries
+            WHERE collection = 'test' AND key = 'key1'
+        """).fetchone()
+
+        assert result is not None
+        value_str, value_type = result
+
+        # In TEXT mode, value should be stored as VARCHAR/TEXT
+        assert value_type in ("VARCHAR", "TEXT")
+        # Value should be a JSON string
+        assert isinstance(value_str, str)
+        assert "data" in value_str
+
+        await store.close()
 
     async def test_database_path_initialization(self):
         """Test that store can be initialized with different database path options."""
