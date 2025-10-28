@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, overload
@@ -38,6 +39,7 @@ except ImportError as e:
     msg = "ElasticsearchStore requires py-key-value-aio[elasticsearch]"
     raise ImportError(msg) from e
 
+logger = logging.getLogger(__name__)
 
 DEFAULT_INDEX_PREFIX = "kv_store"
 
@@ -289,7 +291,18 @@ class ElasticsearchStore(
                 entries_by_id[doc_id] = None
                 continue
 
-            entries_by_id[doc_id] = source_to_managed_entry(source=source)
+            try:
+                entries_by_id[doc_id] = source_to_managed_entry(source=source)
+            except DeserializationError:
+                logger.error(
+                    "Failed to deserialize Elasticsearch document in batch operation",
+                    extra={
+                        "collection": collection,
+                        "document_id": doc_id,
+                    },
+                    exc_info=True,
+                )
+                entries_by_id[doc_id] = None
 
         # Return entries in the same order as input keys
         return [entries_by_id.get(document_id) for document_id in document_ids]

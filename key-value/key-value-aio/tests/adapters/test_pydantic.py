@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 import pytest
@@ -145,3 +146,48 @@ class TestPydanticAdapter:
 
         assert await product_list_adapter.delete(collection=TEST_COLLECTION, key=TEST_KEY)
         assert await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
+
+    async def test_validation_error_logging(
+        self, user_adapter: PydanticAdapter[User], updated_user_adapter: PydanticAdapter[UpdatedUser], caplog: pytest.LogCaptureFixture
+    ):
+        """Test that validation errors are logged when raise_on_validation_error=False."""
+        await user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER)
+
+        # Clear any previous log records
+        caplog.clear()
+
+        # Configure caplog to capture ERROR level logs
+        with caplog.at_level(logging.ERROR):
+            # Try to get the user with an adapter expecting different fields
+            updated_user = await updated_user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+            assert updated_user is None
+
+            # Verify that an error was logged
+            assert len(caplog.records) == 1
+            record = caplog.records[0]
+            assert record.levelname == "ERROR"
+            assert "Validation failed" in record.message
+            assert record.model_type == "Pydantic model"  # pyright: ignore[reportAttributeAccessIssue]
+            assert record.error_count == 1  # pyright: ignore[reportAttributeAccessIssue]
+
+    async def test_list_validation_error_logging(
+        self, product_list_adapter: PydanticAdapter[list[Product]], store: MemoryStore, caplog: pytest.LogCaptureFixture
+    ):
+        """Test that validation errors are logged for list models with missing 'items' wrapper."""
+        # Manually put invalid data (missing 'items' wrapper)
+        await store.put(collection=TEST_COLLECTION, key=TEST_KEY, value={"invalid": "data"})
+
+        # Clear any previous log records
+        caplog.clear()
+
+        # Configure caplog to capture ERROR level logs
+        with caplog.at_level(logging.ERROR):
+            result = await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+            assert result is None
+
+            # Verify that an error was logged
+            assert len(caplog.records) == 1
+            record = caplog.records[0]
+            assert record.levelname == "ERROR"
+            assert "missing 'items' wrapper" in record.message
+            assert record.model_type == "Pydantic model"  # pyright: ignore[reportAttributeAccessIssue]
