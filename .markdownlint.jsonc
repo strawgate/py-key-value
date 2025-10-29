@@ -5,5 +5,8 @@
     "line_length": 80,
     "code_blocks": false, // Don't restrict line length in code blocks
     "tables": false // Don't restrict line length in tables
+  },
+  "MD024": {
+    "siblings_only": true // Allow duplicate headings in different sections
   }
 }

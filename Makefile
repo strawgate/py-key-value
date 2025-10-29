@@ -1,5 +1,5 @@
 .PHONY: bump-version bump-version-dry codegen lint typecheck sync precommit test build help
-.PHONY: install test-aio test-sync test-shared
+.PHONY: install test-aio test-sync test-shared docs-serve docs-build docs-deploy
 
 # Default target - show help
 .DEFAULT_GOAL := help
@@ -19,6 +19,9 @@ help:
 	@echo "  make build             - Build all packages"
 	@echo "  make codegen           - Generate sync package from async"
 	@echo "  make precommit         - Run pre-commit checks (lint + typecheck + codegen)"
+	@echo "  make docs-serve        - Start documentation server"
+	@echo "  make docs-build        - Build documentation"
+	@echo "  make docs-deploy       - Deploy documentation to GitHub Pages"
 	@echo ""
 	@echo "Per-project targets (use PROJECT=<path>):"
 	@echo "  make sync PROJECT=key-value/key-value-aio"
@@ -119,4 +122,17 @@ else
 	@cd key-value/key-value-shared && uv build .
 endif
 
-precommit: lint codegen lint typecheck 
+precommit: lint codegen lint typecheck
+
+# Documentation targets
+docs-serve:
+	@echo "Starting documentation server..."
+	@uv run --extra docs mkdocs serve
+
+docs-build:
+	@echo "Building documentation..."
+	@uv run --extra docs mkdocs build
+
+docs-deploy:
+	@echo "Deploying documentation to GitHub Pages..."
+	@uv run --extra docs mkdocs gh-deploy --force
