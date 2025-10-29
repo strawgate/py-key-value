@@ -1743,6 +1743,10 @@ redis = [
 rocksdb = [
     { name = "rocksdict" },
 ]
+s3 = [
+    { name = "aioboto3" },
+    { name = "types-aiobotocore-s3" },
+]
 valkey = [
     { name = "valkey-glide" },
 ]
@@ -1757,13 +1761,14 @@ wrappers-encryption = [
 [package.dev-dependencies]
 dev = [
     { name = "py-key-value", extra = ["dev"] },
-    { name = "py-key-value-aio", extra = ["disk", "dynamodb", "elasticsearch", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "rocksdb", "vault", "wrappers-encryption"] },
+    { name = "py-key-value-aio", extra = ["disk", "dynamodb", "elasticsearch", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "rocksdb", "s3", "vault", "wrappers-encryption"] },
     { name = "py-key-value-aio", extra = ["valkey"], marker = "sys_platform != 'win32'" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aioboto3", marker = "extra == 'dynamodb'", specifier = ">=13.3.0" },
+    { name = "aioboto3", marker = "extra == 's3'", specifier = ">=13.3.0" },
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
     { name = "beartype", specifier = ">=0.20.0" },
@@ -1783,16 +1788,17 @@ requires-dist = [
     { name = "rocksdict", marker = "python_full_version >= '3.12' and extra == 'rocksdb'", specifier = ">=0.3.24" },
     { name = "rocksdict", marker = "python_full_version < '3.12' and extra == 'rocksdb'", specifier = ">=0.3.2" },
     { name = "types-aiobotocore-dynamodb", marker = "extra == 'dynamodb'", specifier = ">=2.16.0" },
+    { name = "types-aiobotocore-s3", marker = "extra == 's3'", specifier = ">=2.16.0" },
     { name = "types-hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "valkey-glide", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "dynamodb", "keyring", "keyring-linux", "pydantic", "rocksdb", "wrappers-encryption"]
+provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "dynamodb", "s3", "keyring", "keyring-linux", "pydantic", "rocksdb", "wrappers-encryption"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "py-key-value", extras = ["dev"], editable = "." },
     { name = "py-key-value-aio", extras = ["keyring"] },
-    { name = "py-key-value-aio", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb", "vault", "dynamodb", "rocksdb"] },
+    { name = "py-key-value-aio", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb", "vault", "dynamodb", "s3", "rocksdb"] },
     { name = "py-key-value-aio", extras = ["pydantic"] },
     { name = "py-key-value-aio", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extras = ["wrappers-encryption"] },
@@ -2615,6 +2621,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/b0/d4/de8e1aa81d0d993db09328c4d7ff1b4500b3017e3094734454455412356b/types_aiobotocore_dynamodb-2.25.0.tar.gz", hash = "sha256:e194e2e404c4c3c3da5c0518e3a86b9b276ef083b690bb37d8b493216b27d836", size = 48094, upload-time = "2025-10-11T01:27:40.666Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ca/4f/05d80aa8b5a95b82ddb89547c3a037b9460702286c66ca6e0fbb8fa2ce86/types_aiobotocore_dynamodb-2.25.0-py3-none-any.whl", hash = "sha256:de791dfcef90eb3431c09b63419301f9ff824d82970623e149a427d5fd325430", size = 57971, upload-time = "2025-10-11T01:27:39.639Z" },
+]
+
+[[package]]
+name = "types-aiobotocore-s3"
+version = "2.25.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions", marker = "python_full_version < '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/17/c7/d69fd0aa19b61ae67357b4d4aa546be7a6e0b38cde5d0c0704208e00791a/types_aiobotocore_s3-2.25.0.tar.gz", hash = "sha256:3885d2d975b02490c4a59ab0d9c607dec2b7d650189f19a2b6a5e0f81a07e56d", size = 76334, upload-time = "2025-10-11T01:32:43.509Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/43/42/0606f39a94b828f53db6741a5803626766379fc653c43fa98d1a3da28fb8/types_aiobotocore_s3-2.25.0-py3-none-any.whl", hash = "sha256:637b8b3eabd71a8083e835adb696e08b8bab75fb2e3f1ef3020334659abdf698", size = 83849, upload-time = "2025-10-11T01:32:42.437Z" },
 ]
 
 [[package]]
