@@ -5,6 +5,7 @@ import pytest
 from dirty_equals import IsFloat
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
+from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
 from redis.asyncio.client import Redis
 from typing_extensions import override
@@ -105,3 +106,22 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
+
+    async def test_value_stored_as_json_string(self, store: RedisStore):
+        """Verify values are stored as JSON strings in Redis."""
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        # Get raw Redis value using the compound key format
+        combo_key = compound_key(collection="test", key="test_key")
+        raw_value = await store._client.get(combo_key)  # pyright: ignore[reportPrivateUsage]
+
+        assert raw_value == snapshot('{"created_at": "2025-10-29T04:17:32.000000+00:00", "value": {"name": "Alice", "age": 30}}')
+
+        # Test with TTL to verify expires_at is included
+        await store.put(collection="test", key="test_key_ttl", value={"name": "Bob", "age": 25}, ttl=3600)
+        combo_key_ttl = compound_key(collection="test", key="test_key_ttl")
+        raw_value_ttl = await store._client.get(combo_key_ttl)  # pyright: ignore[reportPrivateUsage]
+
+        assert raw_value_ttl == snapshot(
+            '{"created_at": "2025-10-29T04:17:32.000000+00:00", "expires_at": "2025-10-29T05:17:32.000000+00:00", "value": {"name": "Bob", "age": 25}}'
+        )

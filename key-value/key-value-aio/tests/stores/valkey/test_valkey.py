@@ -1,8 +1,12 @@
 import contextlib
 from collections.abc import AsyncGenerator
+from datetime import datetime, timedelta, timezone
 
 import pytest
+from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
+from key_value.shared.utils.compound import compound_key
+from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -25,6 +29,21 @@ VALKEY_VERSIONS_TO_TEST = [
     "8.0.0",  # Released Sep 2024
     "9.0.0",  # Released Oct 2025
 ]
+
+
+def test_managed_entry_serialization():
+    """Test ManagedEntry serialization to JSON for Valkey storage."""
+    created_at = datetime(year=2025, month=1, day=1, hour=0, minute=0, second=0, tzinfo=timezone.utc)
+    expires_at = created_at + timedelta(seconds=10)
+
+    managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
+    json_str = managed_entry.to_json()
+
+    assert json_str == snapshot('{"value": {"test": "test"}}')
+
+    round_trip_managed_entry = ManagedEntry.from_json(json_str=json_str)
+
+    assert round_trip_managed_entry.value == managed_entry.value
 
 
 class ValkeyFailedToStartError(Exception):
@@ -84,3 +103,33 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
+
+    async def test_value_stored_as_json_string(self, store):
+        """Verify values are stored as JSON strings in Valkey."""
+        from typing import TYPE_CHECKING
+
+        if TYPE_CHECKING:
+            from key_value.aio.stores.valkey import ValkeyStore
+
+        store: ValkeyStore  # type: ignore[name-defined]
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        # Get raw Valkey value using the compound key format
+        combo_key = compound_key(collection="test", key="test_key")
+        raw_value = await store._client.get(key=combo_key)  # pyright: ignore[reportPrivateUsage]
+
+        # Decode bytes to string
+        assert isinstance(raw_value, bytes)
+        decoded_value = raw_value.decode("utf-8")
+
+        assert decoded_value == snapshot('{"value": {"name": "Alice", "age": 30}}')
+
+        # Test with TTL to verify it still stores correctly
+        await store.put(collection="test", key="test_key_ttl", value={"name": "Bob", "age": 25}, ttl=3600)
+        combo_key_ttl = compound_key(collection="test", key="test_key_ttl")
+        raw_value_ttl = await store._client.get(key=combo_key_ttl)  # pyright: ignore[reportPrivateUsage]
+
+        assert isinstance(raw_value_ttl, bytes)
+        decoded_value_ttl = raw_value_ttl.decode("utf-8")
+
+        assert decoded_value_ttl == snapshot('{"value": {"name": "Bob", "age": 25}}')

@@ -2,6 +2,8 @@ import contextlib
 from collections.abc import AsyncGenerator
 
 import pytest
+from dirty_equals import IsStr
+from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
 
@@ -101,3 +103,43 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
+
+    async def test_value_stored_as_dynamodb_item(self, store: DynamoDBStore):
+        """Verify values are stored with correct DynamoDB structure."""
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        # Get raw DynamoDB item
+        response = await store._connected_client.get_item(  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType]
+            TableName=store._table_name,  # pyright: ignore[reportPrivateUsage]
+            Key={
+                "collection": {"S": "test"},
+                "key": {"S": "test_key"},
+            },
+        )
+
+        assert response["Item"] == snapshot(  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+            {
+                "collection": {"S": "test"},
+                "key": {"S": "test_key"},
+                "value": {"S": '{"value": {"name": "Alice", "age": 30}}'},
+            }
+        )
+
+        # Test with TTL to verify ttl attribute is set correctly
+        await store.put(collection="test", key="test_key_ttl", value={"name": "Bob", "age": 25}, ttl=3600)
+        response_ttl = await store._connected_client.get_item(  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType]
+            TableName=store._table_name,  # pyright: ignore[reportPrivateUsage]
+            Key={
+                "collection": {"S": "test"},
+                "key": {"S": "test_key_ttl"},
+            },
+        )
+
+        assert response_ttl["Item"] == snapshot(  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+            {
+                "collection": {"S": "test"},
+                "key": {"S": "test_key_ttl"},
+                "value": {"S": '{"value": {"name": "Bob", "age": 25}}'},
+                "ttl": {"N": IsStr(regex=r"^\d+$")},
+            }
+        )

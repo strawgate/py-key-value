@@ -1,7 +1,11 @@
 from collections.abc import AsyncGenerator
+from datetime import datetime, timedelta, timezone
 
 import pytest
+from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
+from key_value.shared.utils.compound import compound_key
+from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -23,6 +27,21 @@ VAULT_VERSIONS_TO_TEST = [
     "1.12.0",  # Released Oct 2022
     "1.21.0",  # Released Oct 2025
 ]
+
+
+def test_managed_entry_serialization():
+    """Test ManagedEntry serialization to JSON for Vault storage."""
+    created_at = datetime(year=2025, month=1, day=1, hour=0, minute=0, second=0, tzinfo=timezone.utc)
+    expires_at = created_at + timedelta(seconds=10)
+
+    managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
+    json_str = managed_entry.to_json()
+
+    assert json_str == snapshot('{"value": {"test": "test"}}')
+
+    round_trip_managed_entry = ManagedEntry.from_json(json_str=json_str)
+
+    assert round_trip_managed_entry.value == managed_entry.value
 
 
 class VaultFailedToStartError(Exception):
@@ -91,3 +110,23 @@ class TestVaultStore(BaseStoreTests):
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
+
+    async def test_value_stored_as_vault_secret(self, store):
+        """Verify values are stored as Vault secrets with JSON in 'value' field."""
+        from typing import TYPE_CHECKING
+
+        if TYPE_CHECKING:
+            from key_value.aio.stores.vault import VaultStore
+
+        store: VaultStore  # type: ignore[name-defined]
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        # Get raw Vault secret using the compound key format
+        combo_key = compound_key(collection="test", key="test_key")
+        client = self.get_vault_client()
+        response = client.secrets.kv.v2.read_secret(path=combo_key, mount_point=VAULT_MOUNT_POINT)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+
+        # Vault KV v2 returns data in response['data']['data']
+        secret_data = response["data"]["data"]  # pyright: ignore[reportUnknownVariableType]
+
+        assert secret_data == snapshot({"value": '{"value": {"name": "Alice", "age": 30}}'})  # pyright: ignore[reportUnknownArgumentType]
