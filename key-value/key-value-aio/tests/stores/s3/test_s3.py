@@ -33,7 +33,7 @@ async def ping_s3() -> bool:
 
         session = aioboto3.Session(
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
         )
         async with session.client(service_name="s3", endpoint_url=S3_ENDPOINT) as client:  # type: ignore
@@ -74,7 +74,7 @@ class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
             bucket_name=S3_TEST_BUCKET,
             endpoint_url=S3_ENDPOINT,
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
         )
 
@@ -83,21 +83,19 @@ class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
 
         session = aioboto3.Session(
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
         )
-        async with (
-            session.client(service_name="s3", endpoint_url=S3_ENDPOINT) as client,  # type: ignore
-            contextlib.suppress(Exception),
-        ):
-            # Delete all objects in the bucket
-            response = await client.list_objects_v2(Bucket=S3_TEST_BUCKET)  # type: ignore
-            if "Contents" in response:
-                for obj in response["Contents"]:
-                    await client.delete_object(Bucket=S3_TEST_BUCKET, Key=obj["Key"])  # type: ignore
+        async with session.client(service_name="s3", endpoint_url=S3_ENDPOINT) as client:  # type: ignore
+            with contextlib.suppress(Exception):
+                # Delete all objects in the bucket
+                response = await client.list_objects_v2(Bucket=S3_TEST_BUCKET)  # type: ignore
+                if "Contents" in response:
+                    for obj in response["Contents"]:  # type: ignore
+                        await client.delete_object(Bucket=S3_TEST_BUCKET, Key=obj["Key"])  # type: ignore
 
-            # Delete the bucket
-            await client.delete_bucket(Bucket=S3_TEST_BUCKET)  # type: ignore
+                # Delete the bucket
+                await client.delete_bucket(Bucket=S3_TEST_BUCKET)  # type: ignore
 
         return store
 

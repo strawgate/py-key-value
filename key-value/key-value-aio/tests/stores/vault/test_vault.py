@@ -13,7 +13,7 @@ from tests.stores.base import (
 # Vault test configuration
 VAULT_HOST = "localhost"
 VAULT_PORT = 8200
-VAULT_TOKEN = "dev-root-token"  # noqa: S105
+VAULT_TOKEN = "dev-root-token"
 VAULT_MOUNT_POINT = "secret"
 VAULT_CONTAINER_PORT = 8200
 
