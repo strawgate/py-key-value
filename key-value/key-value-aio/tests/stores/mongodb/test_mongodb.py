@@ -95,7 +95,7 @@ def test_managed_entry_document_conversion_legacy_mode():
 
 async def clean_mongodb_database(store: MongoDBStore) -> None:
     with contextlib.suppress(Exception):
-        _ = await store._client.drop_database(name_or_database=MONGODB_TEST_DB)  # pyright: ignore[reportPrivateUsage]
+        _ = await store._client.drop_database(name_or_database=store._db.name)  # pyright: ignore[reportPrivateUsage]
 
 
 class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
