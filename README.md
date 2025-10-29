@@ -8,16 +8,16 @@ This monorepo contains two libraries:
 
 ## Documentation
 
-- [Full Documentation](https://strawgate.github.io/py-key-value/)
-- [Getting Started Guide](https://strawgate.github.io/py-key-value/getting-started/)
-- [Wrappers Guide](https://strawgate.github.io/py-key-value/wrappers/)
-- [Adapters Guide](https://strawgate.github.io/py-key-value/adapters/)
-- [API Reference](https://strawgate.github.io/py-key-value/api/protocols/)
+- [Full Documentation](https://strawgate.com/py-key-value/)
+- [Getting Started Guide](https://strawgate.com/py-key-value/getting-started/)
+- [Wrappers Guide](https://strawgate.com/py-key-value/wrappers/)
+- [Adapters Guide](https://strawgate.com/py-key-value/adapters/)
+- [API Reference](https://strawgate.com/py-key-value/api/protocols/)
 
 ## Why use this library?
 
-- **Multiple backends**: DynamoDB, Elasticsearch, Memcached, MongoDB,
-  PostgreSQL, Redis, RocksDB, Valkey, and In-memory, Disk, etc
+- **Multiple backends**: DynamoDB, Elasticsearch, Memcached, MongoDB, PostgreSQL,
+  Redis, RocksDB, Valkey, and In-memory, Disk, etc
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
 - **Adapters**: Pydantic model support, raise-on-missing behavior, etc
@@ -131,7 +131,7 @@ pip install py-key-value-aio[memory]
 pip install py-key-value-aio[disk]
 pip install py-key-value-aio[dynamodb]
 pip install py-key-value-aio[elasticsearch]
-# or: redis, mongodb, postgresql, memcached, valkey, vault, registry, rocksdb, see below for all options
+# or: redis, mongodb, postgresql, memcached, valkey, vault, rocksdb, see below for all options
 ```
 
 ```python

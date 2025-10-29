@@ -1,7 +1,7 @@
 """PostgreSQL-based key-value store using asyncpg.
 
 Note: SQL queries in this module use f-strings for table names, which triggers S608 warnings.
-This is safe because table names are validated in __init__ to be alphanumeric (plus underscores).
+This is safe because table names are validated in __init__ to be alphanumeric plus underscores.
 """
 
 from collections.abc import AsyncIterator, Sequence
@@ -33,6 +33,7 @@ PAGE_LIMIT = 10000
 # PostgreSQL table name length limit is 63 characters
 # Use 200 for consistency with MongoDB
 MAX_COLLECTION_LENGTH = 200
+POSTGRES_MAX_IDENTIFIER_LEN = 63
 
 
 class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
@@ -64,6 +65,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
     """
 
     _pool: asyncpg.Pool | None  # type: ignore[type-arg]
+    _owns_pool: bool
     _url: str | None
     _host: str
     _port: int
@@ -143,6 +145,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
     ) -> None:
         """Initialize the PostgreSQL store."""
         self._pool = pool
+        self._owns_pool = pool is None  # Only own the pool if we create it
         self._url = url
         self._host = host
         self._port = port
@@ -150,10 +153,17 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         self._user = user
         self._password = password
 
-        # Validate and sanitize table name to prevent SQL injection
+        # Validate and sanitize table name to prevent SQL injection and invalid identifiers
         table_name = table_name or DEFAULT_TABLE
         if not table_name.replace("_", "").isalnum():
             msg = f"Table name must be alphanumeric (with underscores): {table_name}"
+            raise ValueError(msg)
+        if table_name[0].isdigit():
+            msg = f"Table name must not start with a digit: {table_name}"
+            raise ValueError(msg)
+        # PostgreSQL identifier limit is 63 bytes
+        if len(table_name) > POSTGRES_MAX_IDENTIFIER_LEN:
+            msg = f"Table name too long (>{POSTGRES_MAX_IDENTIFIER_LEN}): {table_name}"
             raise ValueError(msg)
         self._table_name = table_name
 
@@ -200,6 +210,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
                     user=self._user,
                     password=self._password,
                 )
+            self._owns_pool = True
 
         await super().__aenter__()
         return self
@@ -207,7 +218,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
     @override
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
         await super().__aexit__(exc_type, exc_val, exc_tb)
-        if self._pool is not None:
+        if self._pool is not None and self._owns_pool:
             await self._pool.close()
 
     def _sanitize_collection_name(self, collection: str) -> str:
@@ -218,8 +229,19 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
 
         Returns:
             A sanitized collection name.
+
+        Raises:
+            ValueError: If the sanitized collection name is empty.
         """
-        return sanitize_string(value=collection, max_length=MAX_COLLECTION_LENGTH, allowed_characters=ALPHANUMERIC_CHARACTERS)
+        sanitized = sanitize_string(
+            value=collection,
+            max_length=MAX_COLLECTION_LENGTH,
+            allowed_characters=ALPHANUMERIC_CHARACTERS + "_",
+        )
+        if not sanitized:
+            msg = "Collection name cannot be empty after sanitization"
+            raise ValueError(msg)
+        return sanitized
 
     @override
     async def _setup_collection(self, *, collection: str) -> None:
@@ -244,8 +266,13 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         """
 
         # Create index on expires_at for efficient TTL queries
+        # Ensure index name <= 63 chars (PostgreSQL identifier limit)
+        index_name = f"idx_{self._table_name}_expires_at"
+        if len(index_name) > POSTGRES_MAX_IDENTIFIER_LEN:
+            import hashlib
+            index_name = "idx_" + hashlib.sha256(self._table_name.encode()).hexdigest()[:16] + "_exp"
         create_index_sql = f"""  # noqa: S608
-        CREATE INDEX IF NOT EXISTS idx_{self._table_name}_expires_at
+        CREATE INDEX IF NOT EXISTS {index_name}
         ON {self._table_name}(expires_at)
         WHERE expires_at IS NOT NULL
         """
@@ -374,7 +401,6 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
                 DO UPDATE SET
                     value = EXCLUDED.value,
                     ttl = EXCLUDED.ttl,
-                    created_at = EXCLUDED.created_at,
                     expires_at = EXCLUDED.expires_at
                 """,  # noqa: S608
                 sanitized_collection,
@@ -411,9 +437,9 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
 
         sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        # Prepare data for batch insert
+        # Prepare data for batch insert using method-level ttl/created_at/expires_at
         values = [
-            (sanitized_collection, key, entry.value, entry.ttl, entry.created_at, entry.expires_at)
+            (sanitized_collection, key, entry.value, ttl, created_at, expires_at)
             for key, entry in zip(keys, managed_entries, strict=True)
         ]
 
@@ -427,7 +453,6 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
                 DO UPDATE SET
                     value = EXCLUDED.value,
                     ttl = EXCLUDED.ttl,
-                    created_at = EXCLUDED.created_at,
                     expires_at = EXCLUDED.expires_at
                 """,  # noqa: S608
                 values,
@@ -490,7 +515,9 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         Returns:
             A list of collection names.
         """
-        limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
+        if limit is None or limit <= 0:
+            limit = DEFAULT_PAGE_SIZE
+        limit = min(limit, PAGE_LIMIT)
 
         async with self._acquire_connection() as conn:
             rows = await conn.fetch(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
