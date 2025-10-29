@@ -216,6 +216,11 @@ make sync
 GitHub Actions workflows are in `.github/workflows/`:
 
 - `test.yml` - Run tests across packages
+  - `codegen_check` job - Ensures `make codegen lint` has been run before
+    commits
+  - `static_analysis` job - Runs linting and type checking per package
+  - `test_quick` and `test_all` jobs - Run tests across Python versions and
+    platforms
 - `publish.yml` - Publish packages to PyPI
 - `claude-on-mention.yml` - Claude Code assistant (can make PRs)
 - `claude-on-open-label.yml` - Claude triage assistant (read-only analysis)

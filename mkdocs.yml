@@ -1,0 +1,76 @@
+site_name: py-key-value Documentation
+site_description: A pluggable interface for Key-Value Stores
+site_url: https://strawgate.github.io/py-key-value/
+repo_url: https://github.com/strawgate/py-key-value
+repo_name: strawgate/py-key-value
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    # Palette toggle for light mode
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [key-value/key-value-aio/src]
+          options:
+            show_source: true
+            docstring_style: google
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            signature_crossrefs: true
+            separate_signature: true
+            line_length: 80
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Wrappers: wrappers.md
+  - Adapters: adapters.md
+  - API Reference:
+      - Protocols: api/protocols.md
+      - Stores: api/stores.md
+      - Wrappers: api/wrappers.md
+      - Adapters: api/adapters.md

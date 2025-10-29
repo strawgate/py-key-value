@@ -38,3 +38,31 @@ def test_get_many_missing(adapter: RaiseOnMissingAdapter):
     adapter.put(collection="test", key="test", value={"test": "test"})
     with pytest.raises(MissingKeyError):
         _ = adapter.get_many(collection="test", keys=["test", "test_2"], raise_on_missing=True)
+
+
+def test_ttl(adapter: RaiseOnMissingAdapter):
+    adapter.put(collection="test", key="test", value={"test": "test"}, ttl=60)
+    (value, ttl) = adapter.ttl(collection="test", key="test")
+    assert value == {"test": "test"}
+    assert ttl is not None
+
+
+def test_ttl_missing(adapter: RaiseOnMissingAdapter):
+    with pytest.raises(MissingKeyError):
+        _ = adapter.ttl(collection="test", key="test", raise_on_missing=True)
+
+
+def test_ttl_many(adapter: RaiseOnMissingAdapter):
+    adapter.put(collection="test", key="test", value={"test": "test"}, ttl=60)
+    adapter.put(collection="test", key="test_2", value={"test": "test_2"}, ttl=120)
+    results = adapter.ttl_many(collection="test", keys=["test", "test_2"])
+    assert results[0][0] == {"test": "test"}
+    assert results[0][1] is not None
+    assert results[1][0] == {"test": "test_2"}
+    assert results[1][1] is not None
+
+
+def test_ttl_many_missing(adapter: RaiseOnMissingAdapter):
+    adapter.put(collection="test", key="test", value={"test": "test"}, ttl=60)
+    with pytest.raises(MissingKeyError):
+        _ = adapter.ttl_many(collection="test", keys=["test", "test_2"], raise_on_missing=True)

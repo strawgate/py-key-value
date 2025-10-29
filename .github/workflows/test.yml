@@ -30,6 +30,52 @@ jobs:
           config: '.markdownlint.jsonc'
           globs: '**/*.md'
 
+  codegen_check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@v6
+
+      - name: "Set up Python 3.10"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: "Install Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: "Install dependencies"
+        run: make sync
+
+      - name: "Run codegen"
+        run: make codegen
+
+      - name: "Run lint"
+        run: make lint
+
+      - name: "Check for uncommitted changes"
+        run: |
+          if ! git diff --exit-code; then
+            echo "Error: Modified files detected after running 'make codegen lint'."
+            echo "Please run 'make codegen lint' locally and commit the changes."
+            exit 1
+          fi
+          if [ -n "$(git ls-files --others --exclude-standard)" ]; then
+            echo "Error: Untracked files detected after running 'make codegen lint'."
+            echo "Untracked files:"
+            git ls-files --others --exclude-standard
+            echo "Please run 'make codegen lint' locally and commit the changes."
+            exit 1
+          fi
+
   static_analysis:
     runs-on: ubuntu-latest
 
@@ -66,6 +112,7 @@ jobs:
   test_quick:
     needs:
       - markdown_lint
+      - codegen_check
       - static_analysis
     timeout-minutes: 10
     strategy:

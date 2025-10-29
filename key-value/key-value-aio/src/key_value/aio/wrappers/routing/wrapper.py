@@ -48,6 +48,8 @@ class RoutingWrapper(BaseWrapper):
         self._routing_function = routing_function
         self._default_store = default_store
 
+        super().__init__()
+
     def _get_store(self, collection: str | None) -> AsyncKeyValue:
         """Get the appropriate store for the given collection.
 

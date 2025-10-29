@@ -24,15 +24,32 @@ PAGE_LIMIT = 10000
 
 
 def managed_entry_to_json(managed_entry: ManagedEntry) -> str:
-    """
-    Convert a ManagedEntry to a JSON string.
+    """Convert a ManagedEntry to a JSON string for Redis storage.
+
+    This function serializes a ManagedEntry to JSON format including all metadata (TTL, creation,
+    and expiration timestamps). The serialization is designed to preserve all entry information
+    for round-trip conversion back to a ManagedEntry.
+
+    Args:
+        managed_entry: The ManagedEntry to serialize.
+
+    Returns:
+        A JSON string representation of the ManagedEntry with full metadata.
     """
     return managed_entry.to_json(include_metadata=True, include_expiration=True, include_creation=True)
 
 
 def json_to_managed_entry(json_str: str) -> ManagedEntry:
-    """
-    Convert a JSON string to a ManagedEntry.
+    """Convert a JSON string from Redis storage back to a ManagedEntry.
+
+    This function deserializes a JSON string (created by `managed_entry_to_json`) back to a
+    ManagedEntry object, preserving all metadata including TTL, creation, and expiration timestamps.
+
+    Args:
+        json_str: The JSON string to deserialize.
+
+    Returns:
+        A ManagedEntry object reconstructed from the JSON string.
     """
     return ManagedEntry.from_json(json_str=json_str, includes_metadata=True)
 

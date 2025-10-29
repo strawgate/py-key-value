@@ -98,6 +98,9 @@ def main() -> int:
         lint(path=path)
         logger.info("Finished linting: %s", path)
 
+    lint(path=SYNC_PROJECT_DIR)
+    lint(path=SYNC_PROJECT_TESTS_DIR)
+
     return 0
 
 

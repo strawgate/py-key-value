@@ -36,7 +36,7 @@ def test_managed_entry_document_conversion():
     document = managed_entry_to_json(managed_entry=managed_entry)
 
     assert document == snapshot(
-        '{"value": {"test": "test"}, "created_at": "2025-01-01T00:00:00+00:00", "expires_at": "2025-01-01T00:00:10+00:00"}'
+        '{"created_at": "2025-01-01T00:00:00+00:00", "expires_at": "2025-01-01T00:00:10+00:00", "value": {"test": "test"}}'
     )
 
     round_trip_managed_entry = json_to_managed_entry(json_str=document)

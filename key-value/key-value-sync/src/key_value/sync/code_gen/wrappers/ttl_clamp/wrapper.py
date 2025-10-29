@@ -12,7 +12,12 @@ from key_value.sync.code_gen.wrappers.base import BaseWrapper
 
 
 class TTLClampWrapper(BaseWrapper):
-    """Wrapper that enforces a maximum TTL for puts into the store."""
+    """Wrapper that enforces a maximum TTL for puts into the store.
+
+    This wrapper only modifies write operations (put, put_many). All read operations
+    (get, get_many, ttl, ttl_many, delete, delete_many) pass through unchanged to
+    the underlying store.
+    """
 
     def __init__(
         self, key_value: KeyValue, min_ttl: SupportsFloat, max_ttl: SupportsFloat, missing_ttl: SupportsFloat | None = None

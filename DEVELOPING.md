@@ -100,6 +100,11 @@ make precommit
 
 This runs linting, type checking, and code generation.
 
+**Important**: CI will fail if `make codegen lint` has not been run before
+committing. The `codegen_check` job in the test workflow verifies that
+running these commands produces no file changes, ensuring all generated
+code and formatting is up to date.
+
 ## Using Makefile in CI
 
 The Makefile targets support per-project operations, making them

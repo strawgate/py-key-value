@@ -1,10 +1,9 @@
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, SupportsFloat
+from typing import Any
 
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.time_to_live import epoch_to_datetime
 from typing_extensions import Self, override
 
 from key_value.aio.stores.base import (
@@ -30,30 +29,23 @@ class MemoryCacheEntry:
 
     expires_at: datetime | None
 
-    ttl_at_insert: SupportsFloat | None = field(default=None)
-
     @classmethod
-    def from_managed_entry(cls, managed_entry: ManagedEntry, ttl: SupportsFloat | None = None) -> Self:
+    def from_managed_entry(cls, managed_entry: ManagedEntry) -> Self:
         return cls(
             json_str=managed_entry.to_json(),
             expires_at=managed_entry.expires_at,
-            ttl_at_insert=ttl,
         )
 
     def to_managed_entry(self) -> ManagedEntry:
         return ManagedEntry.from_json(json_str=self.json_str)
 
 
-def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, now: float) -> float:
-    """Calculate time-to-use for cache entries based on their TTL."""
-    if value.ttl_at_insert is None:
+def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, _now: float) -> float:
+    """Calculate time-to-use for cache entries based on their expiration time."""
+    if value.expires_at is None:
         return float(sys.maxsize)
 
-    expiration_epoch: float = now + float(value.ttl_at_insert)
-
-    value.expires_at = epoch_to_datetime(epoch=expiration_epoch)
-
-    return float(expiration_epoch)
+    return value.expires_at.timestamp()
 
 
 def _memory_cache_getsizeof(value: MemoryCacheEntry) -> int:  # noqa: ARG001
@@ -93,7 +85,7 @@ class MemoryCollection:
         return managed_entry
 
     def put(self, key: str, value: ManagedEntry) -> None:
-        self._cache[key] = MemoryCacheEntry.from_managed_entry(managed_entry=value, ttl=value.ttl)
+        self._cache[key] = MemoryCacheEntry.from_managed_entry(managed_entry=value)
 
     def delete(self, key: str) -> bool:
         return self._cache.pop(key, None) is not None
@@ -153,10 +145,27 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         collection_cache = MemoryCollection(max_entries=self.max_entries_per_collection)
         self._cache[collection] = collection_cache
 
+    def _get_collection_or_raise(self, collection: str) -> MemoryCollection:
+        """Get a collection or raise KeyError if not setup.
+
+        Args:
+            collection: The collection name.
+
+        Returns:
+            The MemoryCollection instance.
+
+        Raises:
+            KeyError: If the collection has not been setup via setup_collection().
+        """
+        collection_cache: MemoryCollection | None = self._cache.get(collection)
+        if collection_cache is None:
+            msg = f"Collection '{collection}' has not been setup. Call setup_collection() first."
+            raise KeyError(msg)
+        return collection_cache
+
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        collection_cache: MemoryCollection = self._cache[collection]
-
+        collection_cache = self._get_collection_or_raise(collection)
         return collection_cache.get(key=key)
 
     @override
@@ -167,20 +176,17 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
-        collection_cache: MemoryCollection = self._cache[collection]
-
+        collection_cache = self._get_collection_or_raise(collection)
         collection_cache.put(key=key, value=managed_entry)
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        collection_cache: MemoryCollection = self._cache[collection]
-
+        collection_cache = self._get_collection_or_raise(collection)
         return collection_cache.delete(key=key)
 
     @override
     async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
-        collection_cache: MemoryCollection = self._cache[collection]
-
+        collection_cache = self._get_collection_or_raise(collection)
         return collection_cache.keys(limit=limit)
 
     @override

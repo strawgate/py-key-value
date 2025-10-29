@@ -71,7 +71,7 @@ class BaseEncryptionWrapper(BaseWrapper):
             json_str: str = json.dumps(value, separators=(",", ":"))
 
             json_bytes: bytes = json_str.encode(encoding="utf-8")
-        except (json.JSONDecodeError, TypeError) as e:
+        except TypeError as e:
             msg: str = f"Failed to serialize object to JSON: {e}"
             raise SerializationError(msg) from e
 

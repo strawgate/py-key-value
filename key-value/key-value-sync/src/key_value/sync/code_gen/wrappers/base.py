@@ -11,7 +11,24 @@ from key_value.sync.code_gen.protocols.key_value import KeyValue
 
 
 class BaseWrapper(KeyValue):
-    """A base wrapper for KVStore implementations that passes through to the underlying store."""
+    """A base wrapper for KVStore implementations that passes through to the underlying store.
+
+    This class implements the passthrough pattern where all operations are delegated to the wrapped
+    key-value store without modification. It serves as a foundation for creating custom wrappers that
+    need to intercept, modify, or enhance specific operations while passing through others unchanged.
+
+    To create a custom wrapper, subclass this class and override only the methods you need to customize.
+    All other operations will automatically pass through to the underlying store.
+
+    Example:
+        class LoggingWrapper(BaseWrapper):
+            async def get(self, key: str, *, collection: str | None = None):
+                logger.info(f"Getting key: {key}")
+                return await super().get(key, collection=collection)
+
+    Attributes:
+        key_value: The underlying KeyValue store that operations are delegated to.
+    """
 
     key_value: KeyValue
 
