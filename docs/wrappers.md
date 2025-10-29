@@ -8,9 +8,7 @@ protocol, so they can be used anywhere a store can be used.
 
 | Wrapper | Description |
 |---------|-------------|
-| [CollectionRoutingWrapper](#collectionroutingwrapper) | Route operations to different stores based on collection name |
 | [CompressionWrapper](#compressionwrapper) | Compress values before storing and decompress on retrieval |
-| [DefaultValueWrapper](#defaultvaluewrapper) | Return a default value when key is missing |
 | [FernetEncryptionWrapper](#fernetencryptionwrapper) | Encrypt values before storing and decrypt on retrieval |
 | [FallbackWrapper](#fallbackwrapper) | Fallback to a secondary store when the primary store fails |
 | [LimitSizeWrapper](#limitsizewrapper) | Limit the size of entries stored in the cache |
@@ -20,11 +18,10 @@ protocol, so they can be used anywhere a store can be used.
 | [PrefixKeysWrapper](#prefixkeyswrapper) | Prefix all keys with a given prefix |
 | [ReadOnlyWrapper](#readonlywrapper) | Prevent all write operations on the underlying store |
 | [RetryWrapper](#retrywrapper) | Retry failed operations with exponential backoff |
-| [RoutingWrapper](#routingwrapper) | Route operations to different stores based on a routing function |
 | [SingleCollectionWrapper](#singlecollectionwrapper) | Wrap a store to only use a single collection |
+| [TTLClampWrapper](#ttlclampwrapper) | Clamp the TTL to a given range |
 | [StatisticsWrapper](#statisticswrapper) | Track operation statistics for the store |
 | [TimeoutWrapper](#timeoutwrapper) | Add timeout protection to store operations |
-| [TTLClampWrapper](#ttlclampwrapper) | Clamp the TTL to a given range |
 
 ## What Are Wrappers?
 
@@ -54,7 +51,7 @@ Wrappers execute in the order they are stacked:
 - **Writes** (put, delete): Outer wrapper → Inner wrapper → Store
 - **Reads** (get, ttl): Store → Inner wrapper → Outer wrapper
 
-## Available Wrappers
+## Wrapper Details
 
 ### CompressionWrapper
 

@@ -8,11 +8,11 @@ This monorepo contains two libraries:
 
 ## Documentation
 
-- [Full Documentation](https://strawgate.github.io/py-key-value/)
-- [Getting Started Guide](https://strawgate.github.io/py-key-value/getting-started/)
-- [Wrappers Guide](https://strawgate.github.io/py-key-value/wrappers/)
-- [Adapters Guide](https://strawgate.github.io/py-key-value/adapters/)
-- [API Reference](https://strawgate.github.io/py-key-value/api/protocols/)
+- [Full Documentation](https://strawgate.com/py-key-value/)
+- [Getting Started Guide](https://strawgate.com/py-key-value/getting-started/)
+- [Wrappers Guide](https://strawgate.com/py-key-value/wrappers/)
+- [Adapters Guide](https://strawgate.com/py-key-value/adapters/)
+- [API Reference](https://strawgate.com/py-key-value/api/protocols/)
 
 ## Why use this library?
 
@@ -196,7 +196,7 @@ Each store has a **stability rating** indicating likelihood of
 backwards-incompatible changes. Stable stores (Redis, Valkey, Disk, Keyring)
 are recommended for long-term storage.
 
-**[📚 View all stores, installation guides, and examples →](https://strawgate.github.io/py-key-value/stores/)**
+**[📚 View all stores, installation guides, and examples →](https://strawgate.com/py-key-value/stores/)**
 
 ### Adapters
 
@@ -209,7 +209,7 @@ use cases:
 - **RaiseOnMissingAdapter**: Raise exceptions instead of returning None for
   missing keys
 
-**[📚 View all adapters with examples →](https://strawgate.github.io/py-key-value/adapters/)**
+**[📚 View all adapters with examples →](https://strawgate.com/py-key-value/adapters/)**
 
 **Quick example** - PydanticAdapter for type-safe storage:
 
@@ -263,7 +263,7 @@ wrappers include:
 - **Constraints**: LimitSize, TTLClamp, DefaultValue
 - **Observability**: Logging, Statistics
 
-**[📚 View all wrappers with examples →](https://strawgate.github.io/py-key-value/wrappers/)**
+**[📚 View all wrappers with examples →](https://strawgate.com/py-key-value/wrappers/)**
 
 Wrappers can be stacked for complex functionality:
 
@@ -353,8 +353,8 @@ library.
 
 ## Project links
 
-- Async README: `key-value/key-value-aio/README.md`
-- Sync README: `key-value/key-value-sync/README.md`
+- [Full Documentation](https://strawgate.com/py-key-value/)
+- [API Reference](https://strawgate.com/py-key-value/api/protocols/)
 
 Contributions welcome but may not be accepted. File an issue before submitting
 a pull request. If you do not get agreement on your proposal before making a
