@@ -84,16 +84,7 @@ integrity.
 ::: key_value.aio.adapters.pydantic.PydanticAdapter
     options:
       show_source: false
-      members:
-        - **init**
-        - get
-        - get_many
-        - put
-        - put_many
-        - delete
-        - delete_many
-        - ttl
-        - ttl_many
+      members: true
 
 #### Use Cases
 
@@ -309,10 +300,7 @@ error instead of returning `None` when a key is not found.
 ::: key_value.aio.adapters.raise_on_missing.RaiseOnMissingAdapter
     options:
       show_source: false
-      members:
-        - **init**
-        - get
-        - get_many
+      members: true
 
 #### Use Cases
 
