@@ -285,7 +285,6 @@ class BaseStore(KeyValueProtocol, ABC):
         created_at: datetime,
         expires_at: datetime | None,
     ) -> None:
-
         """Store multiple managed entries by key in the specified collection.
 
         Args:
