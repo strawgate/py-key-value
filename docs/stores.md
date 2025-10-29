@@ -40,6 +40,7 @@ Local stores are stored in memory or on disk, local to the application.
 | Windows Registry | Unstable | ☑️ | ✅ | Windows Registry-based storage |
 
 **Legend:**
+
 - ✅ = Fully async implementation available
 - ☑️ = Available but uses synchronous underlying implementation
 - ✖️ = Not available
@@ -55,17 +56,20 @@ store = MemoryStore()
 ```
 
 **Installation:**
+
 ```bash
 pip install py-key-value-aio[memory]
 ```
 
 **Use Cases:**
+
 - Development and testing
 - Fast caching
 - Session storage
 - Temporary data
 
 **Characteristics:**
+
 - No persistence (data lost on restart)
 - Extremely fast
 - No external dependencies
@@ -84,17 +88,20 @@ store = DiskStore(directory="./cache")
 ```
 
 **Installation:**
+
 ```bash
 pip install py-key-value-aio[disk]
 ```
 
 **Use Cases:**
+
 - Local caching with persistence
 - Development environments
 - Single-node applications
 - Small datasets
 
 **Characteristics:**
+
 - Persists across restarts
 - Simple file format (JSON)
 - Suitable for small to medium datasets
@@ -113,16 +120,19 @@ store = MultiDiskStore(directory="./cache")
 ```
 
 **Installation:**
+
 ```bash
 pip install py-key-value-aio[disk]
 ```
 
 **Use Cases:**
+
 - Organizing data by collection
 - Better performance with many collections
 - Easier to manage individual collections
 
 **Characteristics:**
+
 - One file per collection
 - Better suited for many collections
 - Easier collection management
@@ -141,16 +151,19 @@ store = RocksDBStore(path="./rocksdb")
 ```
 
 **Installation:**
+
 ```bash
 pip install py-key-value-aio[rocksdb]
 ```
 
 **Use Cases:**
+
 - High-throughput applications
 - Large datasets
 - Performance-critical applications
 
 **Characteristics:**
+
 - Very fast reads and writes
 - Efficient storage
 - Requires native dependencies
@@ -172,16 +185,19 @@ store = WindowsRegistryStore(
 ```
 
 **Installation:**
+
 ```bash
 pip install py-key-value-aio[registry]
 ```
 
 **Use Cases:**
+
 - Windows-specific applications
 - System configuration storage
 - Integration with Windows settings
 
 **Characteristics:**
+
 - Windows-only
 - Persists in registry
 - Subject to registry limitations
@@ -200,6 +216,7 @@ store = NullStore()
 ```
 
 **Use Cases:**
+
 - Testing without side effects
 - Disabling storage temporarily
 - Performance baseline testing
@@ -217,6 +234,7 @@ store = SimpleStore()
 ```
 
 **Use Cases:**
+
 - Basic testing
 - Minimal implementation reference
 
@@ -244,17 +262,20 @@ store = KeyringStore(service_name="py-key-value")
 ```
 
 **Installation:**
+
 ```bash
 pip install py-key-value-aio[keyring]
 ```
 
 **Use Cases:**
+
 - Storing API keys and tokens
 - User credentials
 - Sensitive configuration
 - Encrypted local storage
 
 **Characteristics:**
+
 - OS-level encryption
 - Secure by default
 - Cross-platform
@@ -279,17 +300,20 @@ store = VaultStore(
 ```
 
 **Installation:**
+
 ```bash
 pip install py-key-value-aio[vault]
 ```
 
 **Use Cases:**
+
 - Enterprise secret management
 - Multi-environment deployments
 - Centralized secret rotation
 - Audit logging
 
 **Characteristics:**
+
 - Enterprise-grade security
 - Centralized management
 - Audit logging
@@ -321,17 +345,20 @@ store = RedisStore(url="redis://localhost:6379/0")
 ```
 
 **Installation:**
+
 ```bash
 pip install py-key-value-aio[redis]
 ```
 
 **Use Cases:**
+
 - Distributed caching
 - Session storage
 - Real-time applications
 - High-throughput systems
 
 **Characteristics:**
+
 - Very fast (in-memory)
 - Production-ready
 - Rich feature set
@@ -351,16 +378,19 @@ store = ValkeyStore(host="localhost", port=6379)
 ```
 
 **Installation:**
+
 ```bash
 pip install py-key-value-aio[valkey]
 ```
 
 **Use Cases:**
+
 - Same as Redis
 - Open-source preference
 - Redis API compatibility
 
 **Characteristics:**
+
 - Redis-compatible
 - Open-source governance
 - Production-ready
@@ -382,17 +412,20 @@ store = DynamoDBStore(
 ```
 
 **Installation:**
+
 ```bash
 pip install py-key-value-aio[dynamodb]
 ```
 
 **Use Cases:**
+
 - AWS-native applications
 - Serverless architectures
 - Global distribution
 - Managed infrastructure
 
 **Characteristics:**
+
 - Fully managed
 - Auto-scaling
 - Global tables
@@ -416,16 +449,19 @@ store = ElasticsearchStore(
 ```
 
 **Installation:**
+
 ```bash
 pip install py-key-value-aio[elasticsearch]
 ```
 
 **Use Cases:**
+
 - Applications already using Elasticsearch
 - Need for search capabilities
 - Analytics and logging
 
 **Characteristics:**
+
 - Search capabilities
 - Distributed by default
 - Rich querying
@@ -444,16 +480,19 @@ store = MongoDBStore(url="mongodb://localhost:27017/test")
 ```
 
 **Installation:**
+
 ```bash
 pip install py-key-value-aio[mongodb]
 ```
 
 **Use Cases:**
+
 - Applications already using MongoDB
 - Document-oriented data
 - Flexible schemas
 
 **Characteristics:**
+
 - Document storage
 - Rich querying
 - Horizontal scaling
@@ -472,16 +511,19 @@ store = MemcachedStore(host="127.0.0.1", port=11211)
 ```
 
 **Installation:**
+
 ```bash
 pip install py-key-value-aio[memcached]
 ```
 
 **Use Cases:**
+
 - Distributed caching
 - Session storage
 - High-throughput caching
 
 **Characteristics:**
+
 - Very fast
 - Simple protocol
 - Distributed by design
