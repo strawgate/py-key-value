@@ -67,6 +67,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Stores: stores.md
   - Wrappers: wrappers.md
   - Adapters: adapters.md
   - API Reference:

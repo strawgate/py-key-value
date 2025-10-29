@@ -4,6 +4,28 @@ Wrappers are a powerful feature of py-key-value that allow you to add
 functionality to any key-value store. Wrappers implement the `AsyncKeyValue`
 protocol, so they can be used anywhere a store can be used.
 
+## Available Wrappers
+
+| Wrapper | Description |
+|---------|-------------|
+| [CollectionRoutingWrapper](#collectionroutingwrapper) | Route operations to different stores based on collection name |
+| [CompressionWrapper](#compressionwrapper) | Compress values before storing and decompress on retrieval |
+| [DefaultValueWrapper](#defaultvaluewrapper) | Return a default value when key is missing |
+| [FernetEncryptionWrapper](#fernetencryptionwrapper) | Encrypt values before storing and decrypt on retrieval |
+| [FallbackWrapper](#fallbackwrapper) | Fallback to a secondary store when the primary store fails |
+| [LimitSizeWrapper](#limitsizewrapper) | Limit the size of entries stored in the cache |
+| [LoggingWrapper](#loggingwrapper) | Log the operations performed on the store |
+| [PassthroughCacheWrapper](#passthroughcachewrapper) | Wrap two stores to provide a read-through cache |
+| [PrefixCollectionsWrapper](#prefixcollectionswrapper) | Prefix all collections with a given prefix |
+| [PrefixKeysWrapper](#prefixkeyswrapper) | Prefix all keys with a given prefix |
+| [ReadOnlyWrapper](#readonlywrapper) | Prevent all write operations on the underlying store |
+| [RetryWrapper](#retrywrapper) | Retry failed operations with exponential backoff |
+| [RoutingWrapper](#routingwrapper) | Route operations to different stores based on a routing function |
+| [SingleCollectionWrapper](#singlecollectionwrapper) | Wrap a store to only use a single collection |
+| [StatisticsWrapper](#statisticswrapper) | Track operation statistics for the store |
+| [TimeoutWrapper](#timeoutwrapper) | Add timeout protection to store operations |
+| [TTLClampWrapper](#ttlclampwrapper) | Clamp the TTL to a given range |
+
 ## What Are Wrappers?
 
 Wrappers follow the decorator pattern - they wrap around a key-value store and
