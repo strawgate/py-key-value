@@ -1,8 +1,10 @@
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, overload
 from urllib.parse import urlparse
 
+from key_value.shared.errors import DeserializationError
 from key_value.shared.type_checking.bear_spray import bear_spray
 from key_value.shared.utils.compound import compound_key, get_keys_from_compound_keys
 from key_value.shared.utils.managed_entry import ManagedEntry
@@ -18,6 +20,64 @@ except ImportError as e:
 
 DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
+
+
+class SerializationAdapter(ABC):
+    """Base class for store-specific serialization adapters.
+
+    Adapters encapsulate the logic for converting between ManagedEntry objects
+    and store-specific storage formats.
+    """
+
+    @abstractmethod
+    def to_storage(self, key: str, entry: ManagedEntry, collection: str | None = None) -> dict[str, Any] | str:
+        """Convert a ManagedEntry to the store's storage format.
+
+        Args:
+            key: The key associated with this entry.
+            entry: The ManagedEntry to serialize.
+            collection: Optional collection name.
+
+        Returns:
+            The serialized representation (dict or str depending on store).
+        """
+        ...
+
+    @abstractmethod
+    def from_storage(self, data: dict[str, Any] | str) -> ManagedEntry:
+        """Convert stored data back to a ManagedEntry.
+
+        Args:
+            data: The stored representation to deserialize.
+
+        Returns:
+            A ManagedEntry reconstructed from storage.
+
+        Raises:
+            DeserializationError: If the data cannot be deserialized.
+        """
+        ...
+
+
+class RedisAdapter(SerializationAdapter):
+    """Redis-specific serialization adapter.
+
+    Stores entries as JSON strings in Redis.
+    """
+
+    @override
+    def to_storage(self, key: str, entry: ManagedEntry, collection: str | None = None) -> str:
+        """Convert a ManagedEntry to a JSON string for Redis storage."""
+        return entry.to_json(include_metadata=True, include_expiration=True, include_creation=True)
+
+    @override
+    def from_storage(self, data: dict[str, Any] | str) -> ManagedEntry:
+        """Convert a JSON string from Redis storage back to a ManagedEntry."""
+        if not isinstance(data, str):
+            msg = "Expected Redis data to be a string"
+            raise DeserializationError(msg)
+
+        return ManagedEntry.from_json(json_str=data, includes_metadata=True)
 
 
 def managed_entry_to_json(managed_entry: ManagedEntry) -> str:
@@ -55,6 +115,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
     """Redis-based key-value store."""
 
     _client: Redis
+    _adapter: SerializationAdapter
 
     @overload
     def __init__(self, *, client: Redis, default_collection: str | None = None) -> None: ...
@@ -111,6 +172,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             )
 
         self._stable_api = True
+        self._adapter = RedisAdapter()
 
         super().__init__(default_collection=default_collection)
 
@@ -123,9 +185,10 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         if not isinstance(redis_response, str):
             return None
 
-        managed_entry: ManagedEntry = json_to_managed_entry(json_str=redis_response)
-
-        return managed_entry
+        try:
+            return self._adapter.from_storage(data=redis_response)
+        except DeserializationError:
+            return None
 
     @override
     async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
@@ -139,7 +202,10 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         entries: list[ManagedEntry | None] = []
         for redis_response in redis_responses:
             if isinstance(redis_response, str):
-                entries.append(json_to_managed_entry(json_str=redis_response))
+                try:
+                    entries.append(self._adapter.from_storage(data=redis_response))
+                except DeserializationError:
+                    entries.append(None)
             else:
                 entries.append(None)
 
@@ -155,7 +221,11 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
     ) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        json_value: str = managed_entry_to_json(managed_entry=managed_entry)
+        json_value = self._adapter.to_storage(key=key, entry=managed_entry, collection=collection)
+
+        if not isinstance(json_value, str):
+            msg = "Redis adapter must return str"
+            raise TypeError(msg)
 
         if managed_entry.ttl is not None:
             # Redis does not support <= 0 TTLs
@@ -181,10 +251,13 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
         if ttl is None:
             # If there is no TTL, we can just do a simple mset
-            mapping: dict[str, str] = {
-                compound_key(collection=collection, key=key): managed_entry_to_json(managed_entry=managed_entry)
-                for key, managed_entry in zip(keys, managed_entries, strict=True)
-            }
+            mapping: dict[str, str] = {}
+            for key, managed_entry in zip(keys, managed_entries, strict=True):
+                json_value = self._adapter.to_storage(key=key, entry=managed_entry, collection=collection)
+                if not isinstance(json_value, str):
+                    msg = "Redis adapter must return str"
+                    raise TypeError(msg)
+                mapping[compound_key(collection=collection, key=key)] = json_value
 
             await self._client.mset(mapping=mapping)
 
@@ -198,7 +271,11 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             combo_key: str = compound_key(collection=collection, key=key)
-            json_value: str = managed_entry_to_json(managed_entry=managed_entry)
+            json_value = self._adapter.to_storage(key=key, entry=managed_entry, collection=collection)
+
+            if not isinstance(json_value, str):
+                msg = "Redis adapter must return str"
+                raise TypeError(msg)
 
             pipeline.setex(name=combo_key, time=ttl_seconds, value=json_value)
 

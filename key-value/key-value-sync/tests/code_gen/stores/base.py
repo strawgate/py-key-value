@@ -20,253 +20,292 @@ from tests.code_gen.conftest import running_in_event_loop
 
 
 class BaseStoreTests(ABC):
+
     def eventually_consistent(self) -> None:  # noqa: B027
-        "Subclasses can override this to wait for eventually consistent operations."
+        'Subclasses can override this to wait for eventually consistent operations.'
+    
 
     @pytest.fixture
     @abstractmethod
-    def store(self) -> BaseStore | Generator[BaseStore, None, None]: ...
+    def store(self) -> BaseStore | Generator[BaseStore, None, None]:
+        ...
+    
 
     @pytest.mark.timeout(60)
     def test_store(self, store: BaseStore):
         """Tests that the store is a valid KeyValueProtocol."""
         assert isinstance(store, KeyValueProtocol) is True
+    
 
     def test_empty_get(self, store: BaseStore):
         """Tests that the get method returns None from an empty store."""
-        assert store.get(collection="test", key="test") is None
+        assert store.get(collection='test', key='test') is None
+    
 
     def test_empty_put(self, store: BaseStore):
         """Tests that the put method does not raise an exception when called on a new store."""
-        store.put(collection="test", key="test", value={"test": "test"})
+        store.put(collection='test', key='test', value={'test': 'test'})
+    
 
     def test_empty_ttl(self, store: BaseStore):
         """Tests that the ttl method returns None from an empty store."""
-        ttl = store.ttl(collection="test", key="test")
+        ttl = store.ttl(collection='test', key='test')
         assert ttl == (None, None)
+    
 
     def test_put_serialization_errors(self, store: BaseStore):
         """Tests that the put method raises SerializationError for non-JSON-serializable Pydantic types."""
         with pytest.raises(SerializationError):
-            store.put(collection="test", key="test", value={"test": AnyHttpUrl("https://test.com")})
+            store.put(collection='test', key='test', value={'test': AnyHttpUrl('https://test.com')})
+    
 
     def test_get_put_get(self, store: BaseStore):
-        assert store.get(collection="test", key="test") is None
-        store.put(collection="test", key="test", value={"test": "test"})
-        assert store.get(collection="test", key="test") == {"test": "test"}
+        assert store.get(collection='test', key='test') is None
+        store.put(collection='test', key='test', value={'test': 'test'})
+        assert store.get(collection='test', key='test') == {'test': 'test'}
+    
 
     @PositiveCases.parametrize(cases=SIMPLE_CASES)
     def test_models_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):
-        store.put(collection="test", key="test", value=data)
-        retrieved_data = store.get(collection="test", key="test")
+        store.put(collection='test', key='test', value=data)
+        retrieved_data = store.get(collection='test', key='test')
         assert retrieved_data is not None
         assert retrieved_data == round_trip
+    
 
     @NegativeCases.parametrize(cases=NEGATIVE_SIMPLE_CASES)
     def test_negative_models_put_get(self, store: BaseStore, data: dict[str, Any], error: type[Exception]):
         with pytest.raises(error):
-            store.put(collection="test", key="test", value=data)
+            store.put(collection='test', key='test', value=data)
+    
 
     @PositiveCases.parametrize(cases=[LARGE_DATA_CASES])
     def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):
-        store.put(collection="test", key="test", value=data)
-        assert store.get(collection="test", key="test") == round_trip
+        store.put(collection='test', key='test', value=data)
+        assert store.get(collection='test', key='test') == round_trip
+    
 
     def test_put_many_get(self, store: BaseStore):
-        store.put_many(collection="test", keys=["test", "test_2"], values=[{"test": "test"}, {"test": "test_2"}])
-        assert store.get(collection="test", key="test") == {"test": "test"}
-        assert store.get(collection="test", key="test_2") == {"test": "test_2"}
+        store.put_many(collection='test', keys=['test', 'test_2'], values=[{'test': 'test'}, {'test': 'test_2'}])
+        assert store.get(collection='test', key='test') == {'test': 'test'}
+        assert store.get(collection='test', key='test_2') == {'test': 'test_2'}
+    
 
     def test_put_many_get_many(self, store: BaseStore):
-        store.put_many(collection="test", keys=["test", "test_2"], values=[{"test": "test"}, {"test": "test_2"}])
-        assert store.get_many(collection="test", keys=["test", "test_2"]) == [{"test": "test"}, {"test": "test_2"}]
+        store.put_many(collection='test', keys=['test', 'test_2'], values=[{'test': 'test'}, {'test': 'test_2'}])
+        assert store.get_many(collection='test', keys=['test', 'test_2']) == [{'test': 'test'}, {'test': 'test_2'}]
+    
 
     def test_put_put_get_many(self, store: BaseStore):
-        store.put(collection="test", key="test", value={"test": "test"})
-        store.put(collection="test", key="test_2", value={"test": "test_2"})
-        assert store.get_many(collection="test", keys=["test", "test_2"]) == [{"test": "test"}, {"test": "test_2"}]
+        store.put(collection='test', key='test', value={'test': 'test'})
+        store.put(collection='test', key='test_2', value={'test': 'test_2'})
+        assert store.get_many(collection='test', keys=['test', 'test_2']) == [{'test': 'test'}, {'test': 'test_2'}]
+    
 
     def test_put_put_get_many_missing_one(self, store: BaseStore):
-        store.put(collection="test", key="test", value={"test": "test"})
-        store.put(collection="test", key="test_2", value={"test": "test_2"})
-        assert store.get_many(collection="test", keys=["test", "test_2", "test_3"]) == [{"test": "test"}, {"test": "test_2"}, None]
+        store.put(collection='test', key='test', value={'test': 'test'})
+        store.put(collection='test', key='test_2', value={'test': 'test_2'})
+        assert store.get_many(collection='test', keys=['test', 'test_2', 'test_3']) == [{'test': 'test'}, {'test': 'test_2'}, None]
+    
 
     def test_put_get_delete_get(self, store: BaseStore):
-        store.put(collection="test", key="test", value={"test": "test"})
-        assert store.get(collection="test", key="test") == {"test": "test"}
-        assert store.delete(collection="test", key="test")
-        assert store.get(collection="test", key="test") is None
+        store.put(collection='test', key='test', value={'test': 'test'})
+        assert store.get(collection='test', key='test') == {'test': 'test'}
+        assert store.delete(collection='test', key='test')
+        assert store.get(collection='test', key='test') is None
+    
 
     def test_put_many_get_get_delete_many_get_many(self, store: BaseStore):
-        store.put_many(collection="test", keys=["test", "test_2"], values=[{"test": "test"}, {"test": "test_2"}])
-        assert store.get_many(collection="test", keys=["test", "test_2"]) == [{"test": "test"}, {"test": "test_2"}]
-        assert store.delete_many(collection="test", keys=["test", "test_2"]) == 2
-        assert store.get_many(collection="test", keys=["test", "test_2"]) == [None, None]
+        store.put_many(collection='test', keys=['test', 'test_2'], values=[{'test': 'test'}, {'test': 'test_2'}])
+        assert store.get_many(collection='test', keys=['test', 'test_2']) == [{'test': 'test'}, {'test': 'test_2'}]
+        assert store.delete_many(collection='test', keys=['test', 'test_2']) == 2
+        assert store.get_many(collection='test', keys=['test', 'test_2']) == [None, None]
+    
 
     def test_put_many_get_many_delete_many_get_many(self, store: BaseStore):
-        store.put_many(collection="test", keys=["test", "test_2"], values=[{"test": "test"}, {"test": "test_2"}])
-        assert store.get_many(collection="test", keys=["test", "test_2"]) == [{"test": "test"}, {"test": "test_2"}]
-        assert store.delete_many(collection="test", keys=["test", "test_2"]) == 2
-        assert store.get_many(collection="test", keys=["test", "test_2"]) == [None, None]
+        store.put_many(collection='test', keys=['test', 'test_2'], values=[{'test': 'test'}, {'test': 'test_2'}])
+        assert store.get_many(collection='test', keys=['test', 'test_2']) == [{'test': 'test'}, {'test': 'test_2'}]
+        assert store.delete_many(collection='test', keys=['test', 'test_2']) == 2
+        assert store.get_many(collection='test', keys=['test', 'test_2']) == [None, None]
+    
 
     def test_put_many_tuple_get_many(self, store: BaseStore):
-        store.put_many(collection="test", keys=["test", "test_2"], values=({"test": "test"}, {"test": "test_2"}))
-        assert store.get_many(collection="test", keys=["test", "test_2"]) == [{"test": "test"}, {"test": "test_2"}]
+        store.put_many(collection='test', keys=['test', 'test_2'], values=({'test': 'test'}, {'test': 'test_2'}))
+        assert store.get_many(collection='test', keys=['test', 'test_2']) == [{'test': 'test'}, {'test': 'test_2'}]
+    
 
     def test_delete(self, store: BaseStore):
-        assert store.delete(collection="test", key="test") is False
+        assert store.delete(collection='test', key='test') is False
+    
 
     def test_put_delete_delete(self, store: BaseStore):
-        store.put(collection="test", key="test", value={"test": "test"})
-        assert store.delete(collection="test", key="test")
-        assert store.delete(collection="test", key="test") is False
+        store.put(collection='test', key='test', value={'test': 'test'})
+        assert store.delete(collection='test', key='test')
+        assert store.delete(collection='test', key='test') is False
+    
 
     def test_delete_many(self, store: BaseStore):
-        assert store.delete_many(collection="test", keys=["test", "test_2"]) == 0
+        assert store.delete_many(collection='test', keys=['test', 'test_2']) == 0
+    
 
     def test_put_delete_many(self, store: BaseStore):
-        store.put(collection="test", key="test", value={"test": "test"})
-        assert store.delete_many(collection="test", keys=["test", "test_2"]) == 1
+        store.put(collection='test', key='test', value={'test': 'test'})
+        assert store.delete_many(collection='test', keys=['test', 'test_2']) == 1
+    
 
     def test_delete_many_delete_many(self, store: BaseStore):
-        store.put(collection="test", key="test", value={"test": "test"})
-        assert store.delete_many(collection="test", keys=["test", "test_2"]) == 1
-        assert store.delete_many(collection="test", keys=["test", "test_2"]) == 0
+        store.put(collection='test', key='test', value={'test': 'test'})
+        assert store.delete_many(collection='test', keys=['test', 'test_2']) == 1
+        assert store.delete_many(collection='test', keys=['test', 'test_2']) == 0
+    
 
     def test_get_put_get_delete_get(self, store: BaseStore):
         """Tests that the get, put, delete, and get methods work together to store and retrieve a value from an empty store."""
-
-        assert store.get(collection="test", key="test") is None
-
-        store.put(collection="test", key="test", value={"test": "test"})
-
-        assert store.get(collection="test", key="test") == {"test": "test"}
-
-        assert store.delete(collection="test", key="test")
-
-        assert store.get(collection="test", key="test") is None
+        
+        assert store.get(collection='test', key='test') is None
+        
+        store.put(collection='test', key='test', value={'test': 'test'})
+        
+        assert store.get(collection='test', key='test') == {'test': 'test'}
+        
+        assert store.delete(collection='test', key='test')
+        
+        assert store.get(collection='test', key='test') is None
+    
 
     def test_get_put_get_put_delete_get(self, store: BaseStore):
         """Tests that the get, put, get, put, delete, and get methods work together to store and retrieve a value from an empty store."""
-        store.put(collection="test", key="test", value={"test": "test"})
-        assert store.get(collection="test", key="test") == {"test": "test"}
-
-        store.put(collection="test", key="test", value={"test": "test_2"})
-
-        assert store.get(collection="test", key="test") == {"test": "test_2"}
-        assert store.delete(collection="test", key="test")
-        assert store.get(collection="test", key="test") is None
+        store.put(collection='test', key='test', value={'test': 'test'})
+        assert store.get(collection='test', key='test') == {'test': 'test'}
+        
+        store.put(collection='test', key='test', value={'test': 'test_2'})
+        
+        assert store.get(collection='test', key='test') == {'test': 'test_2'}
+        assert store.delete(collection='test', key='test')
+        assert store.get(collection='test', key='test') is None
+    
 
     def test_put_many_delete_delete_get_many(self, store: BaseStore):
-        store.put_many(collection="test", keys=["test", "test_2"], values=[{"test": "test"}, {"test": "test_2"}])
-        assert store.get_many(collection="test", keys=["test", "test_2"]) == [{"test": "test"}, {"test": "test_2"}]
-        assert store.delete(collection="test", key="test")
-        assert store.delete(collection="test", key="test_2")
-        assert store.get_many(collection="test", keys=["test", "test_2"]) == [None, None]
+        store.put_many(collection='test', keys=['test', 'test_2'], values=[{'test': 'test'}, {'test': 'test_2'}])
+        assert store.get_many(collection='test', keys=['test', 'test_2']) == [{'test': 'test'}, {'test': 'test_2'}]
+        assert store.delete(collection='test', key='test')
+        assert store.delete(collection='test', key='test_2')
+        assert store.get_many(collection='test', keys=['test', 'test_2']) == [None, None]
+    
 
     def test_put_ttl_get_ttl(self, store: BaseStore):
         """Tests that the put and get ttl methods work together to store and retrieve a ttl from an empty store."""
-        store.put(collection="test", key="test", value={"test": "test"}, ttl=100)
-        (value, ttl) = store.ttl(collection="test", key="test")
-
-        assert value == {"test": "test"}
+        store.put(collection='test', key='test', value={'test': 'test'}, ttl=100)
+        (value, ttl) = store.ttl(collection='test', key='test')
+        
+        assert value == {'test': 'test'}
         assert ttl is not None
         assert ttl == IsFloat(approx=100)
+    
 
     def test_negative_ttl(self, store: BaseStore):
         """Tests that a negative ttl will return None when getting the key."""
         with pytest.raises(InvalidTTLError):
-            store.put(collection="test", key="test", value={"test": "test"}, ttl=-100)
+            store.put(collection='test', key='test', value={'test': 'test'}, ttl=-100)
+    
 
     @pytest.mark.timeout(10)
     def test_put_expired_get_none(self, store: BaseStore):
         """Tests that a put call with a negative ttl will return None when getting the key."""
-        store.put(collection="test_collection", key="test_key", value={"test": "test"}, ttl=2)
-        assert store.get(collection="test_collection", key="test_key") is not None
+        store.put(collection='test_collection', key='test_key', value={'test': 'test'}, ttl=2)
+        assert store.get(collection='test_collection', key='test_key') is not None
         sleep(seconds=1)
-
+        
         for _ in range(8):
             sleep(seconds=0.25)
-            if store.get(collection="test_collection", key="test_key") is None:
+            if store.get(collection='test_collection', key='test_key') is None:
                 # pass the test
                 return
-
-        pytest.fail("put_expired_get_none test failed, entry did not expire")
+        
+        pytest.fail('put_expired_get_none test failed, entry did not expire')
+    
 
     def test_long_collection_name(self, store: BaseStore):
         """Tests that a long collection name will not raise an error."""
-        store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
-        assert store.get(collection="test_collection" * 100, key="test_key") == {"test": "test"}
+        store.put(collection='test_collection' * 100, key='test_key', value={'test': 'test'})
+        assert store.get(collection='test_collection' * 100, key='test_key') == {'test': 'test'}
+    
 
     def test_special_characters_in_collection_name(self, store: BaseStore):
         """Tests that a special characters in the collection name will not raise an error."""
-        store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
-        assert store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
+        store.put(collection='test_collection!@#$%^&*()', key='test_key', value={'test': 'test'})
+        assert store.get(collection='test_collection!@#$%^&*()', key='test_key') == {'test': 'test'}
+    
 
     def test_long_key_name(self, store: BaseStore):
         """Tests that a long key name will not raise an error."""
-        store.put(collection="test_collection", key="test_key" * 100, value={"test": "test"})
-        assert store.get(collection="test_collection", key="test_key" * 100) == {"test": "test"}
+        store.put(collection='test_collection', key='test_key' * 100, value={'test': 'test'})
+        assert store.get(collection='test_collection', key='test_key' * 100) == {'test': 'test'}
+    
 
     def test_special_characters_in_key_name(self, store: BaseStore):
         """Tests that a special characters in the key name will not raise an error."""
-        store.put(collection="test_collection", key="test_key!@#$%^&*()", value={"test": "test"})
-        assert store.get(collection="test_collection", key="test_key!@#$%^&*()") == {"test": "test"}
+        store.put(collection='test_collection', key='test_key!@#$%^&*()', value={'test': 'test'})
+        assert store.get(collection='test_collection', key='test_key!@#$%^&*()') == {'test': 'test'}
+    
 
     @pytest.mark.timeout(20)
     def test_not_unbounded(self, store: BaseStore):
         """Tests that the store is not unbounded."""
-
+        
         for i in range(1000):
-            value = hashlib.sha256(f"test_{i}".encode()).hexdigest()
-            store.put(collection="test_collection", key=f"test_key_{i}", value={"test": value})
+            value = hashlib.sha256(f'test_{i}'.encode()).hexdigest()
+            store.put(collection='test_collection', key=f'test_key_{i}', value={'test': value})
+        
+        assert store.get(collection='test_collection', key='test_key_0') is None
+        assert store.get(collection='test_collection', key='test_key_999') is not None
+    
 
-        assert store.get(collection="test_collection", key="test_key_0") is None
-        assert store.get(collection="test_collection", key="test_key_999") is not None
-
-    @pytest.mark.skipif(condition=not running_in_event_loop(), reason="Cannot run concurrent operations outside of event loop")
+    @pytest.mark.skipif(condition=not running_in_event_loop(), reason='Cannot run concurrent operations outside of event loop')
     def test_concurrent_operations(self, store: BaseStore):
         """Tests that the store can handle concurrent operations."""
+        
 
         def worker(store: BaseStore, worker_id: int):
             for i in range(10):
-                assert store.get(collection="test_collection", key=f"test_{worker_id}_{i}") is None
-
-                store.put(collection="test_collection", key=f"test_{worker_id}_{i}", value={"test": f"test_{i}"})
-                assert store.get(collection="test_collection", key=f"test_{worker_id}_{i}") == {"test": f"test_{i}"}
-
-                store.put(collection="test_collection", key=f"test_{worker_id}_{i}", value={"test": f"test_{i}_2"})
-                assert store.get(collection="test_collection", key=f"test_{worker_id}_{i}") == {"test": f"test_{i}_2"}
-
-                assert store.delete(collection="test_collection", key=f"test_{worker_id}_{i}")
-                assert store.get(collection="test_collection", key=f"test_{worker_id}_{i}") is None
-
+                assert store.get(collection='test_collection', key=f'test_{worker_id}_{i}') is None
+                
+                store.put(collection='test_collection', key=f'test_{worker_id}_{i}', value={'test': f'test_{i}'})
+                assert store.get(collection='test_collection', key=f'test_{worker_id}_{i}') == {'test': f'test_{i}'}
+                
+                store.put(collection='test_collection', key=f'test_{worker_id}_{i}', value={'test': f'test_{i}_2'})
+                assert store.get(collection='test_collection', key=f'test_{worker_id}_{i}') == {'test': f'test_{i}_2'}
+                
+                assert store.delete(collection='test_collection', key=f'test_{worker_id}_{i}')
+                assert store.get(collection='test_collection', key=f'test_{worker_id}_{i}') is None
+        
         _ = gather(*[worker(store, worker_id) for worker_id in range(5)])
+    
 
     @pytest.mark.timeout(15)
     def test_minimum_put_many_get_many_performance(self, store: BaseStore):
         """Tests that the store meets minimum performance requirements."""
-        keys = [f"test_{i}" for i in range(10)]
-        values = [{"test": f"test_{i}"} for i in range(10)]
-        store.put_many(collection="test_collection", keys=keys, values=values)
-        assert store.get_many(collection="test_collection", keys=keys) == values
+        keys = [f'test_{i}' for i in range(10)]
+        values = [{'test': f'test_{i}'} for i in range(10)]
+        store.put_many(collection='test_collection', keys=keys, values=values)
+        assert store.get_many(collection='test_collection', keys=keys) == values
+    
 
     @pytest.mark.timeout(15)
     def test_minimum_put_many_delete_many_performance(self, store: BaseStore):
         """Tests that the store meets minimum performance requirements."""
-        keys = [f"test_{i}" for i in range(10)]
-        values = [{"test": f"test_{i}"} for i in range(10)]
-        store.put_many(collection="test_collection", keys=keys, values=values)
-        assert store.delete_many(collection="test_collection", keys=keys) == 10
+        keys = [f'test_{i}' for i in range(10)]
+        values = [{'test': f'test_{i}'} for i in range(10)]
+        store.put_many(collection='test_collection', keys=keys, values=values)
+        assert store.delete_many(collection='test_collection', keys=keys) == 10
 
 
 class ContextManagerStoreTestMixin:
-    @pytest.fixture(params=[True, False], ids=["with_ctx_manager", "no_ctx_manager"], autouse=True)
-    def enter_exit_store(
-        self, request: pytest.FixtureRequest, store: BaseContextManagerStore
-    ) -> Generator[BaseContextManagerStore, None, None]:
-        context_manager = request.param  # pyright: ignore[reportAny]
 
+    @pytest.fixture(params=[True, False], ids=['with_ctx_manager', 'no_ctx_manager'], autouse=True)
+    def enter_exit_store(self, request: pytest.FixtureRequest, store: BaseContextManagerStore) -> Generator[BaseContextManagerStore, None, None]:
+        context_manager = request.param  # pyright: ignore[reportAny]
+        
         if context_manager:
             with store:
                 yield store

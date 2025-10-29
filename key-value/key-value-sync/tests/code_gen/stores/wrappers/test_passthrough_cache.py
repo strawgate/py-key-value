@@ -16,14 +16,18 @@ DISK_STORE_SIZE_LIMIT = 100 * 1024  # 100KB
 
 
 class TestPassthroughCacheWrapper(BaseStoreTests):
-    @pytest.fixture(scope="session")
+
+    @pytest.fixture(scope='session')
     def primary_store(self) -> Generator[DiskStore, None, None]:
-        with tempfile.TemporaryDirectory() as temp_dir, DiskStore(directory=temp_dir, max_size=DISK_STORE_SIZE_LIMIT) as disk_store:
-            yield disk_store
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with DiskStore(directory=temp_dir, max_size=DISK_STORE_SIZE_LIMIT) as disk_store:
+                yield disk_store
+    
 
     @pytest.fixture
     def cache_store(self, memory_store: MemoryStore) -> MemoryStore:
         return memory_store
+    
 
     @override
     @pytest.fixture

@@ -19,28 +19,26 @@ from tests.code_gen.conftest import docker_container, should_skip_docker_tests
 from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # Redis test configuration
-REDIS_HOST = "localhost"
+REDIS_HOST = 'localhost'
 REDIS_PORT = 6379
 REDIS_DB = 15  # Use a separate database for tests
 
 WAIT_FOR_REDIS_TIMEOUT = 30
 
-REDIS_VERSIONS_TO_TEST = ["4.0.0", "7.0.0"]
+REDIS_VERSIONS_TO_TEST = ['4.0.0', '7.0.0']
 
 
 def test_managed_entry_document_conversion():
     created_at = datetime(year=2025, month=1, day=1, hour=0, minute=0, second=0, tzinfo=timezone.utc)
     expires_at = created_at + timedelta(seconds=10)
-
-    managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
+    
+    managed_entry = ManagedEntry(value={'test': 'test'}, created_at=created_at, expires_at=expires_at)
     document = managed_entry_to_json(managed_entry=managed_entry)
-
-    assert document == snapshot(
-        '{"created_at": "2025-01-01T00:00:00+00:00", "expires_at": "2025-01-01T00:00:10+00:00", "value": {"test": "test"}}'
-    )
-
+    
+    assert document == snapshot('{"created_at": "2025-01-01T00:00:00+00:00", "expires_at": "2025-01-01T00:00:10+00:00", "value": {"test": "test"}}')
+    
     round_trip_managed_entry = json_to_managed_entry(json_str=document)
-
+    
     assert round_trip_managed_entry.value == managed_entry.value
     assert round_trip_managed_entry.created_at == created_at
     assert round_trip_managed_entry.ttl == IsFloat(lt=0)
@@ -59,18 +57,20 @@ class RedisFailedToStartError(Exception):
     pass
 
 
-@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
+@pytest.mark.skipif(should_skip_docker_tests(), reason='Docker is not running')
 class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session", params=REDIS_VERSIONS_TO_TEST)
+
+    @pytest.fixture(autouse=True, scope='session', params=REDIS_VERSIONS_TO_TEST)
     def setup_redis(self, request: pytest.FixtureRequest) -> Generator[None, None, None]:
         version = request.param
-
-        with docker_container("redis-test", f"redis:{version}", {"6379": REDIS_PORT}):
+        
+        with docker_container('redis-test', f'redis:{version}', {'6379': REDIS_PORT}):
             if not wait_for_true(bool_fn=ping_redis, tries=30, wait_time=1):
-                msg = "Redis failed to start"
+                msg = 'Redis failed to start'
                 raise RedisFailedToStartError(msg)
-
+            
             yield
+    
 
     @override
     @pytest.fixture
@@ -80,28 +80,32 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         redis_store = RedisStore(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
         _ = redis_store._client.flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
         return redis_store
+    
 
     def test_redis_url_connection(self):
         """Test Redis store creation with URL."""
-        redis_url = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+        redis_url = f'redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}'
         store = RedisStore(url=redis_url)
         _ = store._client.flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
-        store.put(collection="test", key="url_test", value={"test": "value"})
-        result = store.get(collection="test", key="url_test")
-        assert result == {"test": "value"}
+        store.put(collection='test', key='url_test', value={'test': 'value'})
+        result = store.get(collection='test', key='url_test')
+        assert result == {'test': 'value'}
+    
 
     def test_redis_client_connection(self):
         """Test Redis store creation with existing client."""
         from redis import Redis
-
+        
         client = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
         store = RedisStore(client=client)
-
+        
         _ = store._client.flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
-        store.put(collection="test", key="client_test", value={"test": "value"})
-        result = store.get(collection="test", key="client_test")
-        assert result == {"test": "value"}
+        store.put(collection='test', key='client_test', value={'test': 'value'})
+        result = store.get(collection='test', key='client_test')
+        assert result == {'test': 'value'}
+    
 
-    @pytest.mark.skip(reason="Distributed Caches are unbounded")
+    @pytest.mark.skip(reason='Distributed Caches are unbounded')
     @override
-    def test_not_unbounded(self, store: BaseStore): ...
+    def test_not_unbounded(self, store: BaseStore):
+        ...

@@ -10,7 +10,8 @@ from tests.code_gen.stores.base import BaseStoreTests
 
 
 class TestPrefixCollectionWrapper(BaseStoreTests):
+
     @override
     @pytest.fixture
     def store(self, memory_store: MemoryStore) -> PrefixCollectionsWrapper:
-        return PrefixCollectionsWrapper(key_value=memory_store, prefix="collection_prefix")
+        return PrefixCollectionsWrapper(key_value=memory_store, prefix='collection_prefix')

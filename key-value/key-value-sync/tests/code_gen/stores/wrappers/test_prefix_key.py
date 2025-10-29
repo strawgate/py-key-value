@@ -10,7 +10,8 @@ from tests.code_gen.stores.base import BaseStoreTests
 
 
 class TestPrefixKeyWrapper(BaseStoreTests):
+
     @override
     @pytest.fixture
     def store(self, memory_store: MemoryStore) -> PrefixKeysWrapper:
-        return PrefixKeysWrapper(key_value=memory_store, prefix="key_prefix")
+        return PrefixKeysWrapper(key_value=memory_store, prefix='key_prefix')

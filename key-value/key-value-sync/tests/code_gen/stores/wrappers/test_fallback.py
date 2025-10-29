@@ -14,69 +14,76 @@ from tests.code_gen.stores.base import BaseStoreTests
 
 class FailingStore(MemoryStore):
     """A store that always fails."""
+    
 
     @override
-    def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
-        msg = "Primary store unavailable"
+    def get(self, key: str, *, collection: str | None=None) -> dict[str, Any] | None:
+        msg = 'Primary store unavailable'
         raise ConnectionError(msg)
+    
 
     @override
-    def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None):
-        msg = "Primary store unavailable"
+    def put(self, key: str, value: Mapping[str, Any], *, collection: str | None=None, ttl: SupportsFloat | None=None):
+        msg = 'Primary store unavailable'
         raise ConnectionError(msg)
 
 
 class TestFallbackWrapper(BaseStoreTests):
+
     @override
     @pytest.fixture
     def store(self, memory_store: MemoryStore) -> FallbackWrapper:
         fallback_store = MemoryStore()
         return FallbackWrapper(primary_key_value=memory_store, fallback_key_value=fallback_store)
+    
 
     def test_fallback_on_primary_failure(self):
         primary_store = FailingStore()
         fallback_store = MemoryStore()
         wrapper = FallbackWrapper(primary_key_value=primary_store, fallback_key_value=fallback_store)
-
+        
         # Put data in fallback store directly
-        fallback_store.put(collection="test", key="test", value={"test": "fallback_value"})
-
+        fallback_store.put(collection='test', key='test', value={'test': 'fallback_value'})
+        
         # Should fall back to secondary store
-        result = wrapper.get(collection="test", key="test")
-        assert result == {"test": "fallback_value"}
+        result = wrapper.get(collection='test', key='test')
+        assert result == {'test': 'fallback_value'}
+    
 
     def test_primary_success_no_fallback(self):
         primary_store = MemoryStore()
         fallback_store = MemoryStore()
         wrapper = FallbackWrapper(primary_key_value=primary_store, fallback_key_value=fallback_store)
-
+        
         # Put data in primary store
-        primary_store.put(collection="test", key="test", value={"test": "primary_value"})
-
+        primary_store.put(collection='test', key='test', value={'test': 'primary_value'})
+        
         # Put different data in fallback store
-        fallback_store.put(collection="test", key="test", value={"test": "fallback_value"})
-
+        fallback_store.put(collection='test', key='test', value={'test': 'fallback_value'})
+        
         # Should use primary store
-        result = wrapper.get(collection="test", key="test")
-        assert result == {"test": "primary_value"}
+        result = wrapper.get(collection='test', key='test')
+        assert result == {'test': 'primary_value'}
+    
 
     def test_write_to_fallback_disabled(self):
         primary_store = FailingStore()
         fallback_store = MemoryStore()
         wrapper = FallbackWrapper(primary_key_value=primary_store, fallback_key_value=fallback_store, write_to_fallback=False)
-
+        
         # Writes should fail without falling back
         with pytest.raises(ConnectionError):
-            wrapper.put(collection="test", key="test", value={"test": "value"})
+            wrapper.put(collection='test', key='test', value={'test': 'value'})
+    
 
     def test_write_to_fallback_enabled(self):
         primary_store = FailingStore()
         fallback_store = MemoryStore()
         wrapper = FallbackWrapper(primary_key_value=primary_store, fallback_key_value=fallback_store, write_to_fallback=True)
-
+        
         # Writes should fall back to secondary
-        wrapper.put(collection="test", key="test", value={"test": "value"})
-
+        wrapper.put(collection='test', key='test', value={'test': 'value'})
+        
         # Verify it was written to fallback
-        result = fallback_store.get(collection="test", key="test")
-        assert result == {"test": "value"}
+        result = fallback_store.get(collection='test', key='test')
+        assert result == {'test': 'value'}

@@ -168,3 +168,19 @@ def verify_dict(obj: Any) -> dict[str, Any]:
         raise DeserializationError(msg)
 
     return cast(typ="dict[str, Any]", val=obj)
+
+
+def estimate_serialized_size(value: Mapping[str, Any]) -> int:
+    """Estimate the serialized size of a value without creating a ManagedEntry.
+
+    This function provides a more efficient way to estimate the size of a value
+    when serialized to JSON, without the overhead of creating a full ManagedEntry object.
+    This is useful for size-based checks in wrappers.
+
+    Args:
+        value: The value mapping to estimate the size for.
+
+    Returns:
+        The estimated size in bytes when serialized to JSON.
+    """
+    return len(dump_to_json(obj=dict(value)))

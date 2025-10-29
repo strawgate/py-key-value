@@ -10,7 +10,8 @@ from tests.code_gen.stores.base import BaseStoreTests
 
 
 class TestSingleCollectionWrapper(BaseStoreTests):
+
     @override
     @pytest.fixture
     def store(self, memory_store: MemoryStore) -> SingleCollectionWrapper:
-        return SingleCollectionWrapper(key_value=memory_store, single_collection="test")
+        return SingleCollectionWrapper(key_value=memory_store, single_collection='test')

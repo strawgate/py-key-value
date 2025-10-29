@@ -10,63 +10,68 @@ from key_value.sync.code_gen.wrappers.read_only import ReadOnlyWrapper
 
 
 class TestReadOnlyWrapper:
+
     @pytest.fixture
     def memory_store(self) -> MemoryStore:
         return MemoryStore()
+    
 
     @override
     @pytest.fixture
     def store(self, memory_store: MemoryStore) -> ReadOnlyWrapper:
         # Pre-populate the store with test data
-        memory_store.put(collection="test", key="test", value={"test": "test"})
+        memory_store.put(collection='test', key='test', value={'test': 'test'})
         return ReadOnlyWrapper(key_value=memory_store, raise_on_write=False)
+    
 
     def test_read_operations_allowed(self, memory_store: MemoryStore):
         # Pre-populate store
-        memory_store.put(collection="test", key="test", value={"test": "value"})
-
+        memory_store.put(collection='test', key='test', value={'test': 'value'})
+        
         read_only_store = ReadOnlyWrapper(key_value=memory_store, raise_on_write=True)
-
+        
         # Read operations should work
-        result = read_only_store.get(collection="test", key="test")
-        assert result == {"test": "value"}
-
-        results = read_only_store.get_many(collection="test", keys=["test"])
-        assert results == [{"test": "value"}]
-
-        (value, _) = read_only_store.ttl(collection="test", key="test")
-        assert value == {"test": "value"}
+        result = read_only_store.get(collection='test', key='test')
+        assert result == {'test': 'value'}
+        
+        results = read_only_store.get_many(collection='test', keys=['test'])
+        assert results == [{'test': 'value'}]
+        
+        (value, _) = read_only_store.ttl(collection='test', key='test')
+        assert value == {'test': 'value'}
+    
 
     def test_write_operations_raise_error(self, memory_store: MemoryStore):
         read_only_store = ReadOnlyWrapper(key_value=memory_store, raise_on_write=True)
-
+        
         # Write operations should raise ReadOnlyError
         with pytest.raises(ReadOnlyError):
-            read_only_store.put(collection="test", key="test", value={"test": "value"})
-
+            read_only_store.put(collection='test', key='test', value={'test': 'value'})
+        
         with pytest.raises(ReadOnlyError):
-            read_only_store.put_many(collection="test", keys=["test"], values=[{"test": "value"}])
-
+            read_only_store.put_many(collection='test', keys=['test'], values=[{'test': 'value'}])
+        
         with pytest.raises(ReadOnlyError):
-            read_only_store.delete(collection="test", key="test")
-
+            read_only_store.delete(collection='test', key='test')
+        
         with pytest.raises(ReadOnlyError):
-            read_only_store.delete_many(collection="test", keys=["test"])
+            read_only_store.delete_many(collection='test', keys=['test'])
+    
 
     def test_write_operations_silent_ignore(self, memory_store: MemoryStore):
         read_only_store = ReadOnlyWrapper(key_value=memory_store, raise_on_write=False)
-
+        
         # Write operations should be silently ignored
-        read_only_store.put(collection="test", key="new_key", value={"test": "value"})
-
+        read_only_store.put(collection='test', key='new_key', value={'test': 'value'})
+        
         # Verify nothing was written
-        result = memory_store.get(collection="test", key="new_key")
+        result = memory_store.get(collection='test', key='new_key')
         assert result is None
-
+        
         # Delete should return False
-        deleted = read_only_store.delete(collection="test", key="test")
+        deleted = read_only_store.delete(collection='test', key='test')
         assert deleted is False
-
+        
         # Delete many should return 0
-        deleted_count = read_only_store.delete_many(collection="test", keys=["test"])
+        deleted_count = read_only_store.delete_many(collection='test', keys=['test'])
         assert deleted_count == 0

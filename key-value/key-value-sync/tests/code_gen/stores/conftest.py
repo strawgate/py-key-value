@@ -21,5 +21,5 @@ def now_plus(seconds: int) -> datetime:
     return now() + timedelta(seconds=seconds)
 
 
-def is_around(value: float, delta: float = 1) -> bool:
+def is_around(value: float, delta: float=1) -> bool:
     return value - delta < value < value + delta

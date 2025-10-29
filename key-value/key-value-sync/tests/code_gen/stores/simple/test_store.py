@@ -9,6 +9,7 @@ from tests.code_gen.stores.base import BaseStoreTests
 
 
 class TestSimpleStore(BaseStoreTests):
+
     @override
     @pytest.fixture
     def store(self) -> SimpleStore:
