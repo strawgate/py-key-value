@@ -10,7 +10,6 @@ from tests.code_gen.stores.base import BaseStoreTests
 
 
 class TestStatisticsWrapper(BaseStoreTests):
-
     @override
     @pytest.fixture
     def store(self, memory_store: MemoryStore) -> StatisticsWrapper:

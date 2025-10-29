@@ -6,16 +6,15 @@ from key_value.sync.code_gen.stores.memory import MemoryStore
 
 
 def test_key_value_protocol():
-
     def test_protocol(key_value: KeyValue):
-        assert key_value.get(collection='test', key='test') is None
-        key_value.put(collection='test', key='test', value={'test': 'test'})
-        assert key_value.delete(collection='test', key='test')
-        key_value.put(collection='test', key='test_2', value={'test': 'test'})
-    
+        assert key_value.get(collection="test", key="test") is None
+        key_value.put(collection="test", key="test", value={"test": "test"})
+        assert key_value.delete(collection="test", key="test")
+        key_value.put(collection="test", key="test_2", value={"test": "test"})
+
     memory_store = MemoryStore()
-    
+
     test_protocol(key_value=memory_store)
-    
-    assert memory_store.get(collection='test', key='test') is None
-    assert memory_store.get(collection='test', key='test_2') == {'test': 'test'}
+
+    assert memory_store.get(collection="test", key="test") is None
+    assert memory_store.get(collection="test", key="test_2") == {"test": "test"}

@@ -13,33 +13,33 @@ from tests.code_gen.conftest import detect_on_windows, docker_container, should_
 from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # Valkey test configuration
-VALKEY_HOST = 'localhost'
+VALKEY_HOST = "localhost"
 VALKEY_PORT = 6380  # normally 6379, avoid clashing with Redis tests
 VALKEY_DB = 15
 VALKEY_CONTAINER_PORT = 6379
 
 WAIT_FOR_VALKEY_TIMEOUT = 30
-  # Released Apr 2024
+# Released Apr 2024
 # Released Sep 2024
 # Released Oct 2025
-VALKEY_VERSIONS_TO_TEST = ['7.2.5', '8.0.0', '9.0.0']
+VALKEY_VERSIONS_TO_TEST = ["7.2.5", "8.0.0", "9.0.0"]
 
 
 class ValkeyFailedToStartError(Exception):
     pass
 
 
-@pytest.mark.skipif(should_skip_docker_tests(), reason='Docker is not running')
-@pytest.mark.skipif(detect_on_windows(), reason='Valkey is not supported on Windows')
+@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
+@pytest.mark.skipif(detect_on_windows(), reason="Valkey is not supported on Windows")
 class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
-
     def get_valkey_client(self):
-        from glide_sync.glide_client import GlideClient
         from glide_sync.config import GlideClientConfiguration, NodeAddress
-        
-        client_config: GlideClientConfiguration = GlideClientConfiguration(addresses=[NodeAddress(host=VALKEY_HOST, port=VALKEY_PORT)], database_id=VALKEY_DB)
+        from glide_sync.glide_client import GlideClient
+
+        client_config: GlideClientConfiguration = GlideClientConfiguration(
+            addresses=[NodeAddress(host=VALKEY_HOST, port=VALKEY_PORT)], database_id=VALKEY_DB
+        )
         return GlideClient.create(config=client_config)
-    
 
     def ping_valkey(self) -> bool:
         client = None
@@ -54,35 +54,31 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
             if client is not None:
                 with contextlib.suppress(Exception):
                     client.close()
-    
 
-    @pytest.fixture(scope='session', params=VALKEY_VERSIONS_TO_TEST)
+    @pytest.fixture(scope="session", params=VALKEY_VERSIONS_TO_TEST)
     def setup_valkey(self, request: pytest.FixtureRequest) -> Generator[None, None, None]:
         version = request.param
-        
-        with docker_container(f'valkey-test-{version}', f'valkey/valkey:{version}', {str(VALKEY_CONTAINER_PORT): VALKEY_PORT}):
+
+        with docker_container(f"valkey-test-{version}", f"valkey/valkey:{version}", {str(VALKEY_CONTAINER_PORT): VALKEY_PORT}):
             if not wait_for_true(bool_fn=self.ping_valkey, tries=WAIT_FOR_VALKEY_TIMEOUT, wait_time=1):
-                msg = f'Valkey {version} failed to start'
+                msg = f"Valkey {version} failed to start"
                 raise ValkeyFailedToStartError(msg)
-            
+
             yield
-    
 
     @override
     @pytest.fixture
     def store(self, setup_valkey: None):
         from key_value.sync.code_gen.stores.valkey import ValkeyStore
-        
+
         store: ValkeyStore = ValkeyStore(host=VALKEY_HOST, port=VALKEY_PORT, db=VALKEY_DB)
-        
+
         # This is a syncronous client
         client = self.get_valkey_client()
         _ = client.flushdb()
-        
-        return store
-    
 
-    @pytest.mark.skip(reason='Distributed Caches are unbounded')
+        return store
+
+    @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
-    def test_not_unbounded(self, store: BaseStore):
-        ...
+    def test_not_unbounded(self, store: BaseStore): ...

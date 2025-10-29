@@ -6,14 +6,15 @@ from typing import Any, overload
 from elastic_transport import ObjectApiResponse
 from elastic_transport import SerializationError as ElasticsearchSerializationError
 from key_value.shared.errors import DeserializationError, SerializationError
-from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json, verify_dict
+from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitize import (
     ALPHANUMERIC_CHARACTERS,
     LOWERCASE_ALPHABET,
     NUMBERS,
     sanitize_string,
 )
-from key_value.shared.utils.time_to_live import now_as_epoch, try_parse_datetime_str
+from key_value.shared.utils.serialization import ElasticsearchAdapter, SerializationAdapter
+from key_value.shared.utils.time_to_live import now_as_epoch
 from typing_extensions import override
 
 from key_value.aio.stores.base import (
@@ -84,54 +85,6 @@ MAX_INDEX_LENGTH = 240
 ALLOWED_INDEX_CHARACTERS: str = LOWERCASE_ALPHABET + NUMBERS + "_" + "-" + "."
 
 
-def managed_entry_to_document(collection: str, key: str, managed_entry: ManagedEntry, *, native_storage: bool = False) -> dict[str, Any]:
-    document: dict[str, Any] = {"collection": collection, "key": key, "value": {}}
-
-    # Store in appropriate field based on mode
-    if native_storage:
-        document["value"]["flattened"] = managed_entry.value_as_dict
-    else:
-        document["value"]["string"] = managed_entry.value_as_json
-
-    if managed_entry.created_at:
-        document["created_at"] = managed_entry.created_at.isoformat()
-    if managed_entry.expires_at:
-        document["expires_at"] = managed_entry.expires_at.isoformat()
-
-    return document
-
-
-def source_to_managed_entry(source: dict[str, Any]) -> ManagedEntry:
-    value: dict[str, Any] = {}
-
-    raw_value = source.get("value")
-
-    # Try flattened field first, fall back to string field
-    if not raw_value or not isinstance(raw_value, dict):
-        msg = "Value field not found or invalid type"
-        raise DeserializationError(msg)
-
-    if value_flattened := raw_value.get("flattened"):  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
-        value = verify_dict(obj=value_flattened)
-    elif value_str := raw_value.get("string"):  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
-        if not isinstance(value_str, str):
-            msg = "Value in `value` field is not a string"
-            raise DeserializationError(msg)
-        value = load_from_json(value_str)
-    else:
-        msg = "Value field not found or invalid type"
-        raise DeserializationError(msg)
-
-    created_at: datetime | None = try_parse_datetime_str(value=source.get("created_at"))
-    expires_at: datetime | None = try_parse_datetime_str(value=source.get("expires_at"))
-
-    return ManagedEntry(
-        value=value,
-        created_at=created_at,
-        expires_at=expires_at,
-    )
-
-
 class ElasticsearchStore(
     BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCullStore, BaseContextManagerStore, BaseStore
 ):
@@ -144,6 +97,8 @@ class ElasticsearchStore(
     _index_prefix: str
 
     _native_storage: bool
+
+    _adapter: SerializationAdapter
 
     @overload
     def __init__(
@@ -208,6 +163,7 @@ class ElasticsearchStore(
         self._index_prefix = index_prefix
         self._native_storage = native_storage
         self._is_serverless = False
+        self._adapter = ElasticsearchAdapter(native_storage=native_storage)
 
         super().__init__(default_collection=default_collection)
 
@@ -260,7 +216,7 @@ class ElasticsearchStore(
             return None
 
         try:
-            return source_to_managed_entry(source=source)
+            return self._adapter.from_storage(data=source)
         except DeserializationError:
             return None
 
@@ -293,7 +249,7 @@ class ElasticsearchStore(
                 continue
 
             try:
-                entries_by_id[doc_id] = source_to_managed_entry(source=source)
+                entries_by_id[doc_id] = self._adapter.from_storage(data=source)
             except DeserializationError as e:
                 logger.error(
                     "Failed to deserialize Elasticsearch document in batch operation",
@@ -324,9 +280,10 @@ class ElasticsearchStore(
         index_name: str = self._sanitize_index_name(collection=collection)
         document_id: str = self._sanitize_document_id(key=key)
 
-        document: dict[str, Any] = managed_entry_to_document(
-            collection=collection, key=key, managed_entry=managed_entry, native_storage=self._native_storage
-        )
+        document: dict[str, Any] = self._adapter.to_storage(key=key, entry=managed_entry, collection=collection)
+        if not isinstance(document, dict):
+            msg = "Elasticsearch adapter must return dict"
+            raise TypeError(msg)
 
         try:
             _ = await self._client.index(
@@ -364,9 +321,10 @@ class ElasticsearchStore(
 
             index_action: dict[str, Any] = new_bulk_action(action="index", index=index_name, document_id=document_id)
 
-            document: dict[str, Any] = managed_entry_to_document(
-                collection=collection, key=key, managed_entry=managed_entry, native_storage=self._native_storage
-            )
+            document: dict[str, Any] = self._adapter.to_storage(key=key, entry=managed_entry, collection=collection)
+            if not isinstance(document, dict):
+                msg = "Elasticsearch adapter must return dict"
+                raise TypeError(msg)
 
             operations.extend([index_action, document])
         try:

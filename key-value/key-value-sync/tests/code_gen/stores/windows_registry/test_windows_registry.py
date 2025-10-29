@@ -13,31 +13,27 @@ from tests.code_gen.stores.base import BaseStoreTests
 if TYPE_CHECKING:
     from key_value.sync.code_gen.stores.windows_registry.store import WindowsRegistryStore
 
-TEST_REGISTRY_PATH = 'software\\py-key-value-test'
+TEST_REGISTRY_PATH = "software\\py-key-value-test"
 
 
-@pytest.mark.skipif(condition=not detect_on_windows(), reason='WindowsRegistryStore is only available on Windows')
+@pytest.mark.skipif(condition=not detect_on_windows(), reason="WindowsRegistryStore is only available on Windows")
 class TestWindowsRegistryStore(BaseStoreTests):
-
     def cleanup(self):
         from winreg import HKEY_CURRENT_USER
-        
+
         from key_value.sync.code_gen.stores.windows_registry.utils import delete_sub_keys
-        
+
         delete_sub_keys(hive=HKEY_CURRENT_USER, sub_key=TEST_REGISTRY_PATH)
-    
 
     @override
     @pytest.fixture
-    def store(self) -> 'WindowsRegistryStore':
+    def store(self) -> "WindowsRegistryStore":
         from key_value.sync.code_gen.stores.windows_registry.store import WindowsRegistryStore
-        
+
         self.cleanup()
-        
-        return WindowsRegistryStore(registry_path=TEST_REGISTRY_PATH, hive='HKEY_CURRENT_USER')
-    
+
+        return WindowsRegistryStore(registry_path=TEST_REGISTRY_PATH, hive="HKEY_CURRENT_USER")
 
     @override
-    @pytest.mark.skip(reason='We do not test boundedness of registry stores')
-    def test_not_unbounded(self, store: BaseStore):
-        ...
+    @pytest.mark.skip(reason="We do not test boundedness of registry stores")
+    def test_not_unbounded(self, store: BaseStore): ...

@@ -9,13 +9,11 @@ from tests.code_gen.stores.base import BaseStoreTests
 
 
 class TestMemoryStore(BaseStoreTests):
-
     @override
     @pytest.fixture
     def store(self) -> MemoryStore:
         return MemoryStore(max_entries_per_collection=500)
-    
 
     def test_seed(self):
-        store = MemoryStore(max_entries_per_collection=500, seed={'test_collection': {'test_key': {'obj_key': 'obj_value'}}})
-        assert store.get(key='test_key', collection='test_collection') == {'obj_key': 'obj_value'}
+        store = MemoryStore(max_entries_per_collection=500, seed={"test_collection": {"test_key": {"obj_key": "obj_value"}}})
+        assert store.get(key="test_key", collection="test_collection") == {"obj_key": "obj_value"}

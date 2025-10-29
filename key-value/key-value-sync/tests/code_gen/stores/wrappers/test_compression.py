@@ -10,118 +10,114 @@ from tests.code_gen.stores.base import BaseStoreTests
 
 
 class TestCompressionWrapper(BaseStoreTests):
-
     @override
     @pytest.fixture
     def store(self, memory_store: MemoryStore) -> CompressionWrapper:
         # Set min_size to 0 so all values get compressed for testing
         return CompressionWrapper(key_value=memory_store, min_size_to_compress=0)
-    
 
     def test_compression_small_value_not_compressed(self, memory_store: MemoryStore):
         # With default min_size (1024), small values shouldn't be compressed
         compression_store = CompressionWrapper(key_value=memory_store, min_size_to_compress=1024)
-        
-        small_value = {'test': 'value'}
-        compression_store.put(collection='test', key='test', value=small_value)
-        
+
+        small_value = {"test": "value"}
+        compression_store.put(collection="test", key="test", value=small_value)
+
         # Check the underlying store - should NOT be compressed
-        raw_value = memory_store.get(collection='test', key='test')
+        raw_value = memory_store.get(collection="test", key="test")
         assert raw_value is not None
         assert raw_value == small_value
-        assert '__compressed_data__' not in raw_value
-        
+        assert "__compressed_data__" not in raw_value
+
         # Retrieve through wrapper
-        result = compression_store.get(collection='test', key='test')
+        result = compression_store.get(collection="test", key="test")
         assert result == small_value
-    
 
     def test_compression_large_value_compressed(self, memory_store: MemoryStore):
         compression_store = CompressionWrapper(key_value=memory_store, min_size_to_compress=100)
-        
+
         # Create a large value
-        large_value = {'data': 'x' * 1000, 'more_data': 'y' * 1000}
-        compression_store.put(collection='test', key='test', value=large_value)
-        
+        large_value = {"data": "x" * 1000, "more_data": "y" * 1000}
+        compression_store.put(collection="test", key="test", value=large_value)
+
         # Check the underlying store - should be compressed
-        raw_value = memory_store.get(collection='test', key='test')
+        raw_value = memory_store.get(collection="test", key="test")
         assert raw_value is not None
-        assert '__compressed_data__' in raw_value
-        assert '__compression_version__' in raw_value
-        assert isinstance(raw_value['__compressed_data__'], str)
-        
+        assert "__compressed_data__" in raw_value
+        assert "__compression_version__" in raw_value
+        assert isinstance(raw_value["__compressed_data__"], str)
+
         # Retrieve through wrapper - should decompress automatically
-        result = compression_store.get(collection='test', key='test')
+        result = compression_store.get(collection="test", key="test")
         assert result == large_value
-    
 
     def test_compression_many_operations(self, memory_store: MemoryStore):
         compression_store = CompressionWrapper(key_value=memory_store, min_size_to_compress=0)
-        
-        keys = ['k1', 'k2', 'k3']
-        values = [{'data': 'value1'}, {'data': 'value2'}, {'data': 'value3'}]
-        
-        compression_store.put_many(collection='test', keys=keys, values=values)
-        
+
+        keys = ["k1", "k2", "k3"]
+        values = [{"data": "value1"}, {"data": "value2"}, {"data": "value3"}]
+
+        compression_store.put_many(collection="test", keys=keys, values=values)
+
         # Check underlying store - all should be compressed
         for key in keys:
-            raw_value = memory_store.get(collection='test', key=key)
+            raw_value = memory_store.get(collection="test", key=key)
             assert raw_value is not None
-            assert '__compressed_data__' in raw_value
-        
+            assert "__compressed_data__" in raw_value
+
         # Retrieve through wrapper
-        results = compression_store.get_many(collection='test', keys=keys)
+        results = compression_store.get_many(collection="test", keys=keys)
         assert results == values
-    
 
     def test_compression_already_compressed_not_recompressed(self, memory_store: MemoryStore):
         compression_store = CompressionWrapper(key_value=memory_store, min_size_to_compress=0)
-        
+
         # Manually create a compressed value
-        compressed_value = {'__compressed_data__': 'H4sIAAAAAAAAA6tWKkktLlGyUlAqS8wpTtVRKi1OLUpVslIqLU4tUqoFAJRxMHkfAAAA', '__compression_version__': 1, '__compression_algorithm__': 'gzip'}
-        
+        compressed_value = {
+            "__compressed_data__": "H4sIAAAAAAAAA6tWKkktLlGyUlAqS8wpTtVRKi1OLUpVslIqLU4tUqoFAJRxMHkfAAAA",
+            "__compression_version__": 1,
+            "__compression_algorithm__": "gzip",
+        }
+
         # Should not try to compress again
         result = compression_store._compress_value(value=compressed_value)  # pyright: ignore[reportPrivateUsage]
         assert result == compressed_value
-    
 
     def test_decompression_handles_uncompressed_data(self, memory_store: MemoryStore):
         compression_store = CompressionWrapper(key_value=memory_store, min_size_to_compress=0)
-        
+
         # Store uncompressed data directly in underlying store
-        uncompressed_value = {'test': 'value'}
-        memory_store.put(collection='test', key='test', value=uncompressed_value)
-        
+        uncompressed_value = {"test": "value"}
+        memory_store.put(collection="test", key="test", value=uncompressed_value)
+
         # Should return as-is when retrieved through compression wrapper
-        result = compression_store.get(collection='test', key='test')
+        result = compression_store.get(collection="test", key="test")
         assert result == uncompressed_value
-    
 
     def test_decompression_handles_corrupted_data(self, memory_store: MemoryStore):
         compression_store = CompressionWrapper(key_value=memory_store, min_size_to_compress=0)
-        
+
         # Store corrupted compressed data
-        corrupted_value = {'__compressed_data__': 'invalid-base64-data!!!', '__compression_version__': 1}
-        memory_store.put(collection='test', key='test', value=corrupted_value)
-        
+        corrupted_value = {"__compressed_data__": "invalid-base64-data!!!", "__compression_version__": 1}
+        memory_store.put(collection="test", key="test", value=corrupted_value)
+
         # Should return the corrupted value as-is rather than crashing
-        result = compression_store.get(collection='test', key='test')
+        result = compression_store.get(collection="test", key="test")
         assert result == corrupted_value
-    
 
     def test_compression_size_reduction(self, memory_store: MemoryStore):
         compression_store = CompressionWrapper(key_value=memory_store, min_size_to_compress=0)
-        
+
         # Create a highly compressible value (repeated data)
-        large_value = {'data': 'x' * 10000}
-        
-        compression_store.put(collection='test', key='test', value=large_value)
-        
+        large_value = {"data": "x" * 10000}
+
+        compression_store.put(collection="test", key="test", value=large_value)
+
         # Check the compressed size
-        raw_value = memory_store.get(collection='test', key='test')
+        raw_value = memory_store.get(collection="test", key="test")
         assert raw_value is not None
-        compressed_data = raw_value['__compressed_data__']
-        
+        compressed_data = raw_value["__compressed_data__"]
+
         # Compressed data should be significantly smaller than original
         # Original is ~10KB, compressed should be much smaller due to repetition
         assert len(compressed_data) < 1000  # Should be less than 1KB

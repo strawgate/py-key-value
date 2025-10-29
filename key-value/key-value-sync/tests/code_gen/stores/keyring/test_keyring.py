@@ -13,28 +13,24 @@ from tests.code_gen.conftest import detect_on_linux, detect_on_windows
 from tests.code_gen.stores.base import BaseStoreTests
 
 
-@pytest.mark.skipif(condition=detect_on_linux(), reason='KeyringStore is not available on Linux CI')
+@pytest.mark.skipif(condition=detect_on_linux(), reason="KeyringStore is not available on Linux CI")
 class TestKeychainStore(BaseStoreTests):
-
     @override
     @pytest.fixture
     def store(self) -> KeyringStore:
         # Use a test-specific service name to avoid conflicts
-        store = KeyringStore(service_name='py-key-value-test')
-        store.delete_many(collection='test', keys=['test', 'test_2'])
-        store.delete_many(collection='test_collection', keys=['test_key'])
-        
+        store = KeyringStore(service_name="py-key-value-test")
+        store.delete_many(collection="test", keys=["test", "test_2"])
+        store.delete_many(collection="test_collection", keys=["test_key"])
+
         return store
-    
 
     @override
-    @pytest.mark.skip(reason='We do not test boundedness of keyring stores')
-    def test_not_unbounded(self, store: BaseStore):
-        ...
-    
+    @pytest.mark.skip(reason="We do not test boundedness of keyring stores")
+    def test_not_unbounded(self, store: BaseStore): ...
 
     @override
-    @pytest.mark.skipif(condition=detect_on_windows(), reason='Keyrings do not support large values on Windows')
+    @pytest.mark.skipif(condition=detect_on_windows(), reason="Keyrings do not support large values on Windows")
     @PositiveCases.parametrize(cases=[LARGE_DATA_CASES])
     def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):
         super().test_get_large_put_get(store, data, json, round_trip=round_trip)

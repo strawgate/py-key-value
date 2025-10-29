@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, overload
@@ -8,6 +7,7 @@ from key_value.shared.errors import DeserializationError
 from key_value.shared.type_checking.bear_spray import bear_spray
 from key_value.shared.utils.compound import compound_key, get_keys_from_compound_keys
 from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.serialization import FullJsonAdapter, SerializationAdapter
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseEnumerateKeysStore, BaseStore
@@ -20,95 +20,6 @@ except ImportError as e:
 
 DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
-
-
-class SerializationAdapter(ABC):
-    """Base class for store-specific serialization adapters.
-
-    Adapters encapsulate the logic for converting between ManagedEntry objects
-    and store-specific storage formats.
-    """
-
-    @abstractmethod
-    def to_storage(self, key: str, entry: ManagedEntry, collection: str | None = None) -> dict[str, Any] | str:
-        """Convert a ManagedEntry to the store's storage format.
-
-        Args:
-            key: The key associated with this entry.
-            entry: The ManagedEntry to serialize.
-            collection: Optional collection name.
-
-        Returns:
-            The serialized representation (dict or str depending on store).
-        """
-        ...
-
-    @abstractmethod
-    def from_storage(self, data: dict[str, Any] | str) -> ManagedEntry:
-        """Convert stored data back to a ManagedEntry.
-
-        Args:
-            data: The stored representation to deserialize.
-
-        Returns:
-            A ManagedEntry reconstructed from storage.
-
-        Raises:
-            DeserializationError: If the data cannot be deserialized.
-        """
-        ...
-
-
-class RedisAdapter(SerializationAdapter):
-    """Redis-specific serialization adapter.
-
-    Stores entries as JSON strings in Redis.
-    """
-
-    @override
-    def to_storage(self, key: str, entry: ManagedEntry, collection: str | None = None) -> str:
-        """Convert a ManagedEntry to a JSON string for Redis storage."""
-        return entry.to_json(include_metadata=True, include_expiration=True, include_creation=True)
-
-    @override
-    def from_storage(self, data: dict[str, Any] | str) -> ManagedEntry:
-        """Convert a JSON string from Redis storage back to a ManagedEntry."""
-        if not isinstance(data, str):
-            msg = "Expected Redis data to be a string"
-            raise DeserializationError(msg)
-
-        return ManagedEntry.from_json(json_str=data, includes_metadata=True)
-
-
-def managed_entry_to_json(managed_entry: ManagedEntry) -> str:
-    """Convert a ManagedEntry to a JSON string for Redis storage.
-
-    This function serializes a ManagedEntry to JSON format including all metadata (TTL, creation,
-    and expiration timestamps). The serialization is designed to preserve all entry information
-    for round-trip conversion back to a ManagedEntry.
-
-    Args:
-        managed_entry: The ManagedEntry to serialize.
-
-    Returns:
-        A JSON string representation of the ManagedEntry with full metadata.
-    """
-    return managed_entry.to_json(include_metadata=True, include_expiration=True, include_creation=True)
-
-
-def json_to_managed_entry(json_str: str) -> ManagedEntry:
-    """Convert a JSON string from Redis storage back to a ManagedEntry.
-
-    This function deserializes a JSON string (created by `managed_entry_to_json`) back to a
-    ManagedEntry object, preserving all metadata including TTL, creation, and expiration timestamps.
-
-    Args:
-        json_str: The JSON string to deserialize.
-
-    Returns:
-        A ManagedEntry object reconstructed from the JSON string.
-    """
-    return ManagedEntry.from_json(json_str=json_str, includes_metadata=True)
 
 
 class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):
@@ -172,7 +83,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             )
 
         self._stable_api = True
-        self._adapter = RedisAdapter()
+        self._adapter = FullJsonAdapter()
 
         super().__init__(default_collection=default_collection)
 
