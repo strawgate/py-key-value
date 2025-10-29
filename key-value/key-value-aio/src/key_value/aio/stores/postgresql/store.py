@@ -4,7 +4,8 @@ Note: SQL queries in this module use f-strings for table names, which triggers S
 This is safe because table names are validated in __init__ to be alphanumeric (plus underscores).
 """
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, overload
 
@@ -62,7 +63,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         ... )
     """
 
-    _pool: asyncpg.Pool[asyncpg.Record] | None
+    _pool: asyncpg.Pool | None  # type: ignore[type-arg]
     _url: str | None
     _host: str
     _port: int
@@ -75,7 +76,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
     def __init__(
         self,
         *,
-        pool: asyncpg.Pool[asyncpg.Record],
+        pool: asyncpg.Pool,  # type: ignore[type-arg]
         table_name: str | None = None,
         default_collection: str | None = None,
     ) -> None:
@@ -130,7 +131,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
     def __init__(
         self,
         *,
-        pool: asyncpg.Pool[asyncpg.Record] | None = None,
+        pool: asyncpg.Pool | None = None,  # type: ignore[type-arg]
         url: str | None = None,
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
@@ -158,13 +159,41 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
 
         super().__init__(default_collection=default_collection)
 
+    def _ensure_pool_initialized(self) -> asyncpg.Pool:  # type: ignore[type-arg]
+        """Ensure the connection pool is initialized.
+
+        Returns:
+            The initialized connection pool.
+
+        Raises:
+            RuntimeError: If the pool is not initialized.
+        """
+        if self._pool is None:
+            msg = "Pool is not initialized. Use async with or call __aenter__() first."
+            raise RuntimeError(msg)
+        return self._pool
+
+    @asynccontextmanager
+    async def _acquire_connection(self) -> AsyncIterator[asyncpg.Connection]:  # type: ignore[type-arg]
+        """Acquire a connection from the pool.
+
+        Yields:
+            A connection from the pool.
+
+        Raises:
+            RuntimeError: If the pool is not initialized.
+        """
+        pool = self._ensure_pool_initialized()
+        async with pool.acquire() as conn:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            yield conn
+
     @override
     async def __aenter__(self) -> Self:
         if self._pool is None:
             if self._url:
-                self._pool = await asyncpg.create_pool(self._url)
+                self._pool = await asyncpg.create_pool(self._url)  # pyright: ignore[reportUnknownMemberType]
             else:
-                self._pool = await asyncpg.create_pool(
+                self._pool = await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType]
                     host=self._host,
                     port=self._port,
                     database=self._database,
@@ -201,10 +230,6 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         """
         _ = self._sanitize_collection_name(collection=collection)
 
-        if self._pool is None:
-            msg = "Pool is not initialized. Use async with or call __aenter__() first."
-            raise RuntimeError(msg)
-
         # Create the main table if it doesn't exist
         create_table_sql = f"""  # noqa: S608
         CREATE TABLE IF NOT EXISTS {self._table_name} (
@@ -225,9 +250,9 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         WHERE expires_at IS NOT NULL
         """
 
-        async with self._pool.acquire() as conn:
-            await conn.execute(create_table_sql)
-            await conn.execute(create_index_sql)
+        async with self._acquire_connection() as conn:
+            await conn.execute(create_table_sql)  # pyright: ignore[reportUnknownMemberType]
+            await conn.execute(create_index_sql)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -242,12 +267,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         """
         sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        if self._pool is None:
-            msg = "Pool is not initialized. Use async with or call __aenter__() first."
-            raise RuntimeError(msg)
-
-        async with self._pool.acquire() as conn:
-            row = await conn.fetchrow(
+        async with self._acquire_connection() as conn:
+            row = await conn.fetchrow(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                 f"SELECT value, ttl, created_at, expires_at FROM {self._table_name} WHERE collection = $1 AND key = $2",  # noqa: S608
                 sanitized_collection,
                 key,
@@ -258,15 +279,15 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
 
             # Parse the managed entry
             managed_entry = ManagedEntry(
-                value=row["value"],
-                ttl=row["ttl"],
-                created_at=row["created_at"],
-                expires_at=row["expires_at"],
+                value=row["value"],  # pyright: ignore[reportUnknownArgumentType]
+                ttl=row["ttl"],  # pyright: ignore[reportUnknownArgumentType]
+                created_at=row["created_at"],  # pyright: ignore[reportUnknownArgumentType]
+                expires_at=row["expires_at"],  # pyright: ignore[reportUnknownArgumentType]
             )
 
             # Check if expired and delete if so
             if managed_entry.is_expired:
-                await conn.execute(
+                await conn.execute(  # pyright: ignore[reportUnknownMemberType]
                     f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = $2",  # noqa: S608
                     sanitized_collection,
                     key,
@@ -291,13 +312,9 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
 
         sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        if self._pool is None:
-            msg = "Pool is not initialized. Use async with or call __aenter__() first."
-            raise RuntimeError(msg)
-
-        async with self._pool.acquire() as conn:
+        async with self._acquire_connection() as conn:
             # Use ANY to query for multiple keys
-            rows = await conn.fetch(
+            rows = await conn.fetch(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                 f"SELECT key, value, ttl, created_at, expires_at FROM {self._table_name} WHERE collection = $1 AND key = ANY($2::text[])",  # noqa: S608
                 sanitized_collection,
                 list(keys),
@@ -307,23 +324,23 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             entries_by_key: dict[str, ManagedEntry | None] = dict.fromkeys(keys)
             expired_keys: list[str] = []
 
-            for row in rows:
+            for row in rows:  # pyright: ignore[reportUnknownVariableType]
                 managed_entry = ManagedEntry(
-                    value=row["value"],
-                    ttl=row["ttl"],
-                    created_at=row["created_at"],
-                    expires_at=row["expires_at"],
+                    value=row["value"],  # pyright: ignore[reportUnknownArgumentType]
+                    ttl=row["ttl"],  # pyright: ignore[reportUnknownArgumentType]
+                    created_at=row["created_at"],  # pyright: ignore[reportUnknownArgumentType]
+                    expires_at=row["expires_at"],  # pyright: ignore[reportUnknownArgumentType]
                 )
 
                 if managed_entry.is_expired:
-                    expired_keys.append(row["key"])
+                    expired_keys.append(row["key"])  # pyright: ignore[reportUnknownArgumentType]
                     entries_by_key[row["key"]] = None
                 else:
                     entries_by_key[row["key"]] = managed_entry
 
             # Delete expired entries in batch
             if expired_keys:
-                await conn.execute(
+                await conn.execute(  # pyright: ignore[reportUnknownMemberType]
                     f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = ANY($2::text[])",  # noqa: S608
                     sanitized_collection,
                     expired_keys,
@@ -348,12 +365,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         """
         sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        if self._pool is None:
-            msg = "Pool is not initialized. Use async with or call __aenter__() first."
-            raise RuntimeError(msg)
-
-        async with self._pool.acquire() as conn:
-            await conn.execute(
+        async with self._acquire_connection() as conn:
+            await conn.execute(  # pyright: ignore[reportUnknownMemberType]
                 f"""
                 INSERT INTO {self._table_name} (collection, key, value, ttl, created_at, expires_at)
                 VALUES ($1, $2, $3, $4, $5, $6)
@@ -398,19 +411,15 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
 
         sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        if self._pool is None:
-            msg = "Pool is not initialized. Use async with or call __aenter__() first."
-            raise RuntimeError(msg)
-
         # Prepare data for batch insert
         values = [
             (sanitized_collection, key, entry.value, entry.ttl, entry.created_at, entry.expires_at)
             for key, entry in zip(keys, managed_entries, strict=True)
         ]
 
-        async with self._pool.acquire() as conn:
+        async with self._acquire_connection() as conn:
             # Use executemany for batch insert
-            await conn.executemany(
+            await conn.executemany(  # pyright: ignore[reportUnknownMemberType]
                 f"""
                 INSERT INTO {self._table_name} (collection, key, value, ttl, created_at, expires_at)
                 VALUES ($1, $2, $3, $4, $5, $6)
@@ -437,12 +446,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         """
         sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        if self._pool is None:
-            msg = "Pool is not initialized. Use async with or call __aenter__() first."
-            raise RuntimeError(msg)
-
-        async with self._pool.acquire() as conn:
-            result = await conn.execute(
+        async with self._acquire_connection() as conn:
+            result = await conn.execute(  # pyright: ignore[reportUnknownMemberType]
                 f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = $2",  # noqa: S608
                 sanitized_collection,
                 key,
@@ -466,12 +471,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
 
         sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        if self._pool is None:
-            msg = "Pool is not initialized. Use async with or call __aenter__() first."
-            raise RuntimeError(msg)
-
-        async with self._pool.acquire() as conn:
-            result = await conn.execute(
+        async with self._acquire_connection() as conn:
+            result = await conn.execute(  # pyright: ignore[reportUnknownMemberType]
                 f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = ANY($2::text[])",  # noqa: S608
                 sanitized_collection,
                 list(keys),
@@ -491,17 +492,13 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         """
         limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
 
-        if self._pool is None:
-            msg = "Pool is not initialized. Use async with or call __aenter__() first."
-            raise RuntimeError(msg)
-
-        async with self._pool.acquire() as conn:
-            rows = await conn.fetch(
+        async with self._acquire_connection() as conn:
+            rows = await conn.fetch(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                 f"SELECT DISTINCT collection FROM {self._table_name} ORDER BY collection LIMIT $1",  # noqa: S608
                 limit,
             )
 
-            return [row["collection"] for row in rows]
+            return [row["collection"] for row in rows]  # pyright: ignore[reportUnknownVariableType]
 
     @override
     async def _delete_collection(self, *, collection: str) -> bool:
@@ -515,12 +512,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         """
         sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        if self._pool is None:
-            msg = "Pool is not initialized. Use async with or call __aenter__() first."
-            raise RuntimeError(msg)
-
-        async with self._pool.acquire() as conn:
-            result = await conn.execute(
+        async with self._acquire_connection() as conn:
+            result = await conn.execute(  # pyright: ignore[reportUnknownMemberType]
                 f"DELETE FROM {self._table_name} WHERE collection = $1",  # noqa: S608
                 sanitized_collection,
             )

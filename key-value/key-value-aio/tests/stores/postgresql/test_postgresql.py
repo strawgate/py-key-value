@@ -20,7 +20,7 @@ except ImportError:
 POSTGRESQL_HOST = "localhost"
 POSTGRESQL_HOST_PORT = 5432
 POSTGRESQL_USER = "postgres"
-POSTGRESQL_PASSWORD = "test"
+POSTGRESQL_PASSWORD = "test"  # noqa: S105
 POSTGRESQL_TEST_DB = "kv_store_test"
 
 WAIT_FOR_POSTGRESQL_TIMEOUT = 30
@@ -37,17 +37,18 @@ async def ping_postgresql() -> bool:
         return False
 
     try:
-        conn = await asyncpg.connect(
+        conn = await asyncpg.connect(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             host=POSTGRESQL_HOST,
             port=POSTGRESQL_HOST_PORT,
             user=POSTGRESQL_USER,
             password=POSTGRESQL_PASSWORD,
             database="postgres",
         )
-        await conn.close()
-        return True
+        await conn.close()  # pyright: ignore[reportUnknownMemberType]
     except Exception:
         return False
+    else:
+        return True
 
 
 class PostgreSQLFailedToStartError(Exception):
@@ -96,10 +97,10 @@ class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
         # Clean up the database before each test
         async with store:
             if store._pool is not None:  # pyright: ignore[reportPrivateUsage]
-                async with store._pool.acquire() as conn:  # pyright: ignore[reportPrivateUsage]
+                async with store._pool.acquire() as conn:  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportUnknownVariableType]
                     # Drop and recreate the kv_store table
                     with contextlib.suppress(Exception):
-                        await conn.execute("DROP TABLE IF EXISTS kv_store")
+                        await conn.execute("DROP TABLE IF EXISTS kv_store")  # pyright: ignore[reportUnknownMemberType]
 
         return store
 
