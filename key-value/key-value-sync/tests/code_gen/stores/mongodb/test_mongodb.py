@@ -160,12 +160,10 @@ class TestMongoDBStoreNativeMode(BaseMongoDBStoreTests):
 
     def test_migration_from_legacy_mode(self, store: MongoDBStore):
         """Verify native mode can read legacy JSON string data."""
-        # Manually insert a legacy document with JSON string value in the new format
         store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
         collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
 
-        # New format with JSON string
         collection.insert_one({"key": "legacy_key", "value": {"string": '{"legacy": "data"}'}})
 
         result = store.get(collection="test", key="legacy_key")
@@ -206,7 +204,6 @@ class TestMongoDBStoreNonNativeMode(BaseMongoDBStoreTests):
 
     def test_migration_from_native_mode(self, store: MongoDBStore):
         """Verify non-native mode can read native mode data."""
-        # Manually insert a legacy document with JSON string value in the new format
         store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
         collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
