@@ -42,8 +42,7 @@ compression.
 ::: key_value.aio.wrappers.compression.CompressionWrapper
     options:
       show_source: false
-      members:
-        - **init**
+      members: true
 
 #### Use Cases
 
@@ -87,8 +86,7 @@ encryption.
 ::: key_value.aio.wrappers.encryption.fernet.FernetEncryptionWrapper
     options:
       show_source: false
-      members:
-        - **init**
+      members: true
 
 #### Use Cases
 
@@ -137,8 +135,7 @@ Provides failover to a secondary store if the primary store fails.
 ::: key_value.aio.wrappers.fallback.FallbackWrapper
     options:
       show_source: false
-      members:
-        - **init**
+      members: true
 
 #### Use Cases
 
@@ -172,8 +169,7 @@ specified size.
 ::: key_value.aio.wrappers.limit_size.LimitSizeWrapper
     options:
       show_source: false
-      members:
-        - **init**
+      members: true
 
 #### Use Cases
 
@@ -209,8 +205,7 @@ Logs all key-value operations for debugging and auditing.
 ::: key_value.aio.wrappers.logging.LoggingWrapper
     options:
       show_source: false
-      members:
-        - **init**
+      members: true
 
 #### Use Cases
 
@@ -246,8 +241,7 @@ Provides read-through caching with a fast local cache and a slower remote store.
 ::: key_value.aio.wrappers.passthrough_cache.PassthroughCacheWrapper
     options:
       show_source: false
-      members:
-        - **init**
+      members: true
 
 #### Use Cases
 
@@ -283,8 +277,7 @@ Adds a prefix to all collection names.
 ::: key_value.aio.wrappers.prefix_collections.PrefixCollectionsWrapper
     options:
       show_source: false
-      members:
-        - **init**
+      members: true
 
 #### Use Cases
 
@@ -320,8 +313,7 @@ Adds a prefix to all keys.
 ::: key_value.aio.wrappers.prefix_keys.PrefixKeysWrapper
     options:
       show_source: false
-      members:
-        - **init**
+      members: true
 
 #### Use Cases
 
@@ -357,8 +349,7 @@ Prevents all write operations, making the store read-only.
 ::: key_value.aio.wrappers.read_only.ReadOnlyWrapper
     options:
       show_source: false
-      members:
-        - **init**
+      members: true
 
 #### Use Cases
 
@@ -389,8 +380,7 @@ Automatically retries failed operations with exponential backoff.
 ::: key_value.aio.wrappers.retry.RetryWrapper
     options:
       show_source: false
-      members:
-        - **init**
+      members: true
 
 #### Use Cases
 
@@ -426,8 +416,7 @@ parameter.
 ::: key_value.aio.wrappers.single_collection.SingleCollectionWrapper
     options:
       show_source: false
-      members:
-        - **init**
+      members: true
 
 #### Use Cases
 
@@ -460,8 +449,7 @@ bounds.
 ::: key_value.aio.wrappers.ttl_clamp.TTLClampWrapper
     options:
       show_source: false
-      members:
-        - **init**
+      members: true
 
 #### Use Cases
 
@@ -498,10 +486,7 @@ Tracks operation statistics including counts, hits, and misses.
 ::: key_value.aio.wrappers.statistics.StatisticsWrapper
     options:
       show_source: false
-      members:
-        - **init**
-        - get_statistics
-        - reset_statistics
+      members: true
 
 #### Use Cases
 
@@ -545,8 +530,7 @@ exceed the specified timeout.
 ::: key_value.aio.wrappers.timeout.TimeoutWrapper
     options:
       show_source: false
-      members:
-        - **init**
+      members: true
 
 #### Use Cases
 
