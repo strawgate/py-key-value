@@ -164,6 +164,20 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             waiter = self._connected_client.get_waiter("table_exists")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             await waiter.wait(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
 
+        # Enable TTL on the table
+        try:
+            await self._connected_client.update_time_to_live(  # pyright: ignore[reportUnknownMemberType]
+                TableName=self._table_name,
+                TimeToLiveSpecification={
+                    "Enabled": True,
+                    "AttributeName": "ttl",
+                },
+            )
+        except self._connected_client.exceptions.ClientError as e:  # pyright: ignore[reportUnknownMemberType]
+            # TTL may already be enabled, check error code
+            if e.response["Error"]["Code"] != "ValidationException":  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+                raise
+
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         """Retrieve a managed entry from DynamoDB."""
