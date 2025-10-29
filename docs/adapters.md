@@ -4,6 +4,14 @@ Adapters provide specialized interfaces for working with key-value stores. Unlik
 wrappers, adapters don't implement the `AsyncKeyValue` protocol - instead, they
 provide alternative APIs tailored for specific use cases.
 
+## Available Adapters
+
+| Adapter | Description |
+|---------|-------------|
+| [DataclassAdapter](#dataclassadapter) | Type-safe storage/retrieval of dataclass models with transparent serialization |
+| [PydanticAdapter](#pydanticadapter) | Type-safe storage/retrieval of Pydantic models with transparent serialization |
+| [RaiseOnMissingAdapter](#raiseonmissingadapter) | Optional raise-on-missing behavior for get operations |
+
 ## Adapters vs Wrappers
 
 **Wrappers:**
@@ -20,7 +28,52 @@ provide alternative APIs tailored for specific use cases.
 - Add type safety and specialized behavior
 - Transform how you interact with the store
 
-## Available Adapters
+## Adapter Details
+
+### DataclassAdapter
+
+The `DataclassAdapter` provides type-safe storage and retrieval of Python
+dataclass models. It automatically handles serialization and validation using
+Pydantic for validation.
+
+#### Use Cases
+
+- Type-safe data storage with dataclasses
+- Automatic validation on retrieval
+- Working with Python's native dataclass decorator
+- Ensuring data integrity
+
+#### Basic Example
+
+```python
+from dataclasses import dataclass
+from key_value.aio.stores.memory import MemoryStore
+from key_value.aio.adapters.dataclass import DataclassAdapter
+
+@dataclass
+class User:
+    name: str
+    email: str
+    age: int
+
+# Create adapter
+adapter = DataclassAdapter(
+    key_value=MemoryStore(),
+    dataclass_type=User
+)
+
+# Store a user (type-safe)
+user = User(name="Alice", email="alice@example.com", age=30)
+await adapter.put(key="user:123", value=user, collection="users")
+
+# Retrieve and get a validated model
+retrieved_user = await adapter.get(key="user:123", collection="users")
+if retrieved_user:
+    print(retrieved_user.name)  # Type-safe: "Alice"
+    print(retrieved_user.email)  # Type-safe: "alice@example.com"
+```
+
+---
 
 ### PydanticAdapter
 

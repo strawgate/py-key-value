@@ -8,11 +8,11 @@ This monorepo contains two libraries:
 
 ## Documentation
 
-- [Full Documentation](https://strawgate.github.io/py-key-value/)
-- [Getting Started Guide](https://strawgate.github.io/py-key-value/getting-started/)
-- [Wrappers Guide](https://strawgate.github.io/py-key-value/wrappers/)
-- [Adapters Guide](https://strawgate.github.io/py-key-value/adapters/)
-- [API Reference](https://strawgate.github.io/py-key-value/api/protocols/)
+- [Full Documentation](https://strawgate.com/py-key-value/)
+- [Getting Started Guide](https://strawgate.com/py-key-value/getting-started/)
+- [Wrappers Guide](https://strawgate.com/py-key-value/wrappers/)
+- [Adapters Guide](https://strawgate.com/py-key-value/adapters/)
+- [API Reference](https://strawgate.com/py-key-value/api/protocols/)
 
 ## Why use this library?
 
@@ -184,81 +184,34 @@ ttl_many(keys: list[str], collection: str | None = None) -> list[tuple[dict[str,
 
 ### Stores
 
-The library provides a variety of stores that implement the protocol.
+The library provides multiple store implementations organized into three
+categories:
 
-A ✅ means a store is available, a ☑️ under async means a store is available
-but the underlying implementation is synchronous. A ✖️ means a store is
-not available.
+- **Local stores**: In-memory and disk-based storage (Memory, Disk, RocksDB, etc.)
+- **Secret stores**: Secure OS-level storage for sensitive data (Keyring, Vault)
+- **Distributed stores**: Network-based storage for multi-node apps (Redis,
+  DynamoDB, MongoDB, etc.)
 
-Stability is a measure of the likelihood that the way data is stored will change
-in a backwards incompatible way.
+Each store has a **stability rating** indicating likelihood of
+backwards-incompatible changes. Stable stores (Redis, Valkey, Disk, Keyring)
+are recommended for long-term storage.
 
-- A stable store is one we do not intend to change in a backwards incompatible way.
-- A preview store is one that is unlikely to change in a backwards incompatible way.
-- An unstable store is one that is likely to change in a backwards incompatible way.
-
-If you are using py-key-value-aio for caching, stability may not be a concern for
-you. If you are using py-key-value-aio for long-term storage, stability is a
-concern and you should consider using a stable store.
-
-#### Local stores
-
-Local stores are stored in memory or on disk, local to the application.
-
-| Local Stores     | Stability | Async | Sync | Example |
-|------------------|:---------:|:-----:|:----:|:-------|
-| Memory           | N/A | ✅  |  ✅  | `MemoryStore()` |
-| Disk             | Stable | ☑️  |  ✅  | `DiskStore(directory="./cache")` |
-| Disk (Per-Collection) | Stable | ☑️  |  ✅  | `MultiDiskStore(directory="./cache")` |
-| Null (test)      | N/A | ✅  |  ✅  | `NullStore()` |
-| RocksDB          | Unstable | ☑️  |  ✅  | `RocksDBStore(path="./rocksdb")` |
-| Simple (test)    | N/A | ✅  |  ✅  | `SimpleStore()` |
-| Windows Registry | Unstable | ☑️  |   ✅   | `WindowsRegistryStore(hive="HKEY_CURRENT_USER", registry_path="Software\\py-key-value")` |
-
-#### Local - Secret stores
-
-Secret stores are stores that are used to store sensitive data, typically in
-an Operating System's secret store.
-
-| Secret Stores | Stability | Async | Sync | Example |
-|---------------|:---------:|:-----:|:----:|:-------|
-| Keyring       | Stable    | ✅  |   ✅   | `KeyringStore(service_name="py-key-value")` |
-| Vault         | Unstable  | ✅  |   ✅   | `VaultStore(url="http://localhost:8200", token="your-token")` |
-
-Note: The Windows Keyring has strict limits on the length of values which may
-cause issues with large values.
-
-#### Distributed stores
-
-Distributed stores are stores that are used to store data in a distributed
-system, for access across multiple application nodes.
-
-| Distributed Stores | Stability | Async | Sync | Example |
-|------------------|:---------:|:-----:|:----:|:-------|
-| DynamoDB         | Unstable | ✅  |  ✖️   | `DynamoDBStore(table_name="kv-store", region_name="us-east-1")` |
-| Elasticsearch    | Unstable | ✅  |  ✅  | `ElasticsearchStore(url="https://localhost:9200", api_key="your-api-key", index="kv-store")` |
-| Memcached        | Unstable | ✅  |  ✖️   | `MemcachedStore(host="127.0.0.1", port=11211")` |
-| MongoDB          | Unstable | ✅  |  ✅  | `MongoDBStore(url="mongodb://localhost:27017/test")` |
-| Redis            | Stable | ✅  |  ✅  | `RedisStore(url="redis://localhost:6379/0")` |
-| Valkey           | Stable | ✅  |  ✅  | `ValkeyStore(host="localhost", port=6379)` |
+**[📚 View all stores, installation guides, and examples →](https://strawgate.com/py-key-value/stores/)**
 
 ### Adapters
 
-Adapters "wrap" any protocol-compliant store but do not themselves implement
-the protocol.
+Adapters provide specialized interfaces for working with stores. Unlike wrappers,
+they don't implement the protocol but instead offer alternative APIs for specific
+use cases:
 
-They simplify your applications interactions with stores and provide additional
-functionality. While your application will accept an instance that implements
-the protocol, your application code might be simplified by using an adapter.
+- **DataclassAdapter**: Type-safe dataclass storage with automatic validation
+- **PydanticAdapter**: Type-safe Pydantic model storage with serialization
+- **RaiseOnMissingAdapter**: Raise exceptions instead of returning None for
+  missing keys
 
-| Adapter | Description | Example |
-|---------|:------------|:------------------|
-| DataclassAdapter | Type-safe storage/retrieval of dataclass models with transparent serialization/deserialization. | `DataclassAdapter(key_value=memory_store, dataclass_type=User)` |
-| PydanticAdapter | Type-safe storage/retrieval of Pydantic models with transparent serialization/deserialization. | `PydanticAdapter(key_value=memory_store, pydantic_model=User)` |
-| RaiseOnMissingAdapter | Optional raise-on-missing behavior for `get`, `get_many`, `ttl`, and `ttl_many`. | `RaiseOnMissingAdapter(key_value=memory_store)` |
+**[📚 View all adapters with examples →](https://strawgate.com/py-key-value/adapters/)**
 
-For example, the PydanticAdapter allows you to store and retrieve Pydantic
-models with transparent serialization/deserialization:
+**Quick example** - PydanticAdapter for type-safe storage:
 
 ```python
 import asyncio
@@ -298,33 +251,21 @@ asyncio.run(example())
 
 ### Wrappers
 
-The library provides a wrapper pattern for adding functionality to a store.
-Wrappers themselves implement the protocol meaning that you can wrap any store
-with any wrapper, and chain wrappers together as needed.
+Wrappers add functionality to stores while implementing the protocol themselves,
+allowing them to be stacked and used anywhere a store is expected. Available
+wrappers include:
 
-The following wrappers are available:
+- **Performance**: Compression, Caching (Passthrough), Statistics, Timeout
+- **Security**: Encryption (Fernet), ReadOnly
+- **Reliability**: Retry, Fallback
+- **Routing**: CollectionRouting, Routing, SingleCollection
+- **Organization**: PrefixKeys, PrefixCollections
+- **Constraints**: LimitSize, TTLClamp, DefaultValue
+- **Observability**: Logging, Statistics
 
-| Wrapper | Description | Example |
-|---------|---------------|-----|
-| CollectionRoutingWrapper | Route operations to different stores based on a collection name. | `CollectionRoutingWrapper(collection_map={"sessions": redis_store, "users": dynamo_store}, default_store=memory_store)` |
-| CompressionWrapper | Compress values before storing and decompress on retrieval. | `CompressionWrapper(key_value=memory_store, min_size_to_compress=0)` |
-| DefaultValueWrapper | Return a default value when key is missing. | `DefaultValueWrapper(key_value=memory_store, default_value={})` |
-| FernetEncryptionWrapper | Encrypt values before storing and decrypt on retrieval. | `FernetEncryptionWrapper(key_value=memory_store, source_material="your-source-material", salt="your-salt")` |
-| FallbackWrapper | Fallback to a secondary store when the primary store fails. | `FallbackWrapper(primary_key_value=memory_store, fallback_key_value=memory_store)` |
-| LimitSizeWrapper | Limit the size of entries stored in the cache. | `LimitSizeWrapper(key_value=memory_store, max_size=1024, raise_on_too_large=True)` |
-| LoggingWrapper | Log the operations performed on the store. | `LoggingWrapper(key_value=memory_store, log_level=logging.INFO, structured_logs=True)` |
-| PassthroughCacheWrapper | Wrap two stores to provide a read-through cache. | `PassthroughCacheWrapper(primary_key_value=memory_store, cache_key_value=memory_store)` |
-| PrefixCollectionsWrapper | Prefix all collections with a given prefix. | `PrefixCollectionsWrapper(key_value=memory_store, prefix="users")` |
-| PrefixKeysWrapper | Prefix all keys with a given prefix. | `PrefixKeysWrapper(key_value=memory_store, prefix="users")` |
-| ReadOnlyWrapper | Prevent all write operations on the underlying store. | `ReadOnlyWrapper(key_value=memory_store, raise_on_write=True)` |
-| RetryWrapper | Retry failed operations with exponential backoff. | `RetryWrapper(key_value=memory_store, max_retries=3, initial_delay=0.1, max_delay=10.0, exponential_base=2.0)` |
-| RoutingWrapper | Route operations to different stores based on a routing function. | `RoutingWrapper(routing_function=lambda collection: redis_store if collection == "sessions" else dynamo_store, default_store=memory_store)` |
-| SingleCollectionWrapper | Wrap a store to only use a single collection. | `SingleCollectionWrapper(key_value=memory_store, single_collection="users")` |
-| StatisticsWrapper | Track operation statistics for the store. | `StatisticsWrapper(key_value=memory_store)` |
-| TimeoutWrapper | Add timeout protection to store operations. | `TimeoutWrapper(key_value=redis_store, timeout=5.0)` |
-| TTLClampWrapper | Clamp the TTL to a given range. | `TTLClampWrapper(key_value=memory_store, min_ttl=60, max_ttl=3600)` |
+**[📚 View all wrappers with examples →](https://strawgate.com/py-key-value/wrappers/)**
 
-Wrappers can be stacked on top of each other to create more complex functionality.
+Wrappers can be stacked for complex functionality:
 
 ```python
 # Create a retriable redis store with timeout protection that is monitored,
@@ -412,8 +353,8 @@ library.
 
 ## Project links
 
-- Async README: `key-value/key-value-aio/README.md`
-- Sync README: `key-value/key-value-sync/README.md`
+- [Full Documentation](https://strawgate.com/py-key-value/)
+- [API Reference](https://strawgate.com/py-key-value/api/protocols/)
 
 Contributions welcome but may not be accepted. File an issue before submitting
 a pull request. If you do not get agreement on your proposal before making a
