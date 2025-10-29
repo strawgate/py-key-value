@@ -99,10 +99,6 @@ class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
 
         return store
 
-    @pytest.fixture
-    async def s3_store(self, store: S3Store) -> S3Store:
-        return store
-
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...

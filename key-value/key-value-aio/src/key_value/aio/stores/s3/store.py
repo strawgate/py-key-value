@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, overload
 
@@ -9,6 +8,9 @@ from key_value.aio.stores.base import (
     BaseContextManagerStore,
     BaseStore,
 )
+
+# HTTP status code for not found errors
+HTTP_NOT_FOUND = 404
 
 try:
     import aioboto3
@@ -59,7 +61,6 @@ class S3Store(BaseContextManagerStore, BaseStore):
         ...     await store.put(key="test", value={"data": "test"})
     """
 
-    _session: aioboto3.Session  # pyright: ignore[reportAny]
     _bucket_name: str
     _endpoint_url: str | None
     _raw_client: Any  # S3 client from aioboto3
@@ -182,15 +183,25 @@ class S3Store(BaseContextManagerStore, BaseStore):
         if not self._client and self._raw_client:
             self._client = await self._raw_client.__aenter__()
 
+        from botocore.exceptions import ClientError
+
         try:
             # Check if bucket exists
             await self._connected_client.head_bucket(Bucket=self._bucket_name)  # pyright: ignore[reportUnknownMemberType]
-        except Exception:
-            # Bucket doesn't exist, create it
-            import contextlib
+        except ClientError as e:
+            # Only proceed with bucket creation if it's a 404/NoSuchBucket error
+            error_code = e.response.get("Error", {}).get("Code", "")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            http_status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
-            with contextlib.suppress(self._connected_client.exceptions.BucketAlreadyOwnedByYou):  # pyright: ignore[reportUnknownMemberType]
-                await self._connected_client.create_bucket(Bucket=self._bucket_name)  # pyright: ignore[reportUnknownMemberType]
+            if error_code in ("404", "NoSuchBucket") or http_status == HTTP_NOT_FOUND:
+                # Bucket doesn't exist, create it
+                import contextlib
+
+                with contextlib.suppress(self._connected_client.exceptions.BucketAlreadyOwnedByYou):  # pyright: ignore[reportUnknownMemberType]
+                    await self._connected_client.create_bucket(Bucket=self._bucket_name)  # pyright: ignore[reportUnknownMemberType]
+            else:
+                # Re-raise authentication, permission, or other errors
+                raise
 
     def _get_s3_key(self, *, collection: str, key: str) -> str:
         """Generate the S3 object key for a given collection and key.
@@ -235,7 +246,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
             managed_entry = ManagedEntry.from_json(json_str=json_value)
 
             # Check for client-side expiration
-            if managed_entry.expires_at and managed_entry.expires_at <= datetime.now(tz=timezone.utc):
+            if managed_entry.is_expired:
                 # Entry expired, delete it and return None
                 await self._delete_managed_entry(key=key, collection=collection)
                 return None
@@ -296,6 +307,8 @@ class S3Store(BaseContextManagerStore, BaseStore):
         """
         s3_key = self._get_s3_key(collection=collection, key=key)
 
+        from botocore.exceptions import ClientError
+
         try:
             # Check if object exists before deletion
             await self._connected_client.head_object(  # pyright: ignore[reportUnknownMemberType]
@@ -303,12 +316,16 @@ class S3Store(BaseContextManagerStore, BaseStore):
                 Key=s3_key,
             )
 
-        except self._connected_client.exceptions.NoSuchKey:  # pyright: ignore[reportUnknownMemberType, reportUnknownAttributeType]
-            # Object doesn't exist
-            return False
-        except Exception:
-            # For 404 errors that don't raise NoSuchKey exception
-            return False
+        except ClientError as e:
+            # Check if it's a 404/not found error
+            error_code = e.response.get("Error", {}).get("Code", "")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            http_status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+            if error_code in ("404", "NoSuchKey") or http_status == HTTP_NOT_FOUND:
+                # Object doesn't exist
+                return False
+            # Re-raise other errors (auth, network, etc.)
+            raise
         else:
             # Object exists, delete it
             await self._connected_client.delete_object(  # pyright: ignore[reportUnknownMemberType]
