@@ -9,10 +9,10 @@ from typing import Any, overload
 from elastic_transport import ObjectApiResponse
 from elastic_transport import SerializationError as ElasticsearchSerializationError
 from key_value.shared.errors import DeserializationError, SerializationError
-from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json, verify_dict
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, LOWERCASE_ALPHABET, NUMBERS, sanitize_string
-from key_value.shared.utils.serialization import ElasticsearchAdapter, SerializationAdapter
-from key_value.shared.utils.time_to_live import now_as_epoch
+from key_value.shared.utils.serialization import SerializationAdapter
+from key_value.shared.utils.time_to_live import now_as_epoch, try_parse_datetime_str
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import (
@@ -63,6 +63,101 @@ ALLOWED_KEY_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
 MAX_INDEX_LENGTH = 240
 ALLOWED_INDEX_CHARACTERS: str = LOWERCASE_ALPHABET + NUMBERS + "_" + "-" + "."
+
+
+class ElasticsearchAdapter(SerializationAdapter):
+    """Adapter for Elasticsearch with support for native and string storage modes.
+
+    This adapter supports two storage modes:
+    - Native mode: Stores values as flattened dicts for efficient querying
+    - String mode: Stores values as JSON strings for backward compatibility
+
+    Elasticsearch-specific features:
+    - Stores collection name in the document for multi-tenancy
+    - Uses ISO format for datetime fields
+    - Supports migration between storage modes
+    """
+
+    def __init__(self, *, native_storage: bool = True) -> None:
+        """Initialize the Elasticsearch adapter.
+
+        Args:
+            native_storage: If True (default), store values as flattened dicts.
+                          If False, store values as JSON strings.
+        """
+        self.native_storage = native_storage
+
+    def to_storage(self, key: str, entry: ManagedEntry, collection: str | None = None) -> dict[str, Any]:
+        """Convert a ManagedEntry to an Elasticsearch document.
+
+        Args:
+            key: The key associated with this entry.
+            entry: The ManagedEntry to serialize.
+            collection: The collection name to store in the document.
+
+        Returns:
+            An Elasticsearch document dict with collection, key, value, and metadata.
+        """
+        document: dict[str, Any] = {"collection": collection or "", "key": key, "value": {}}
+
+        # Store in appropriate field based on mode
+        if self.native_storage:
+            document["value"]["flattened"] = entry.value_as_dict
+        else:
+            document["value"]["string"] = entry.value_as_json
+
+        if entry.created_at:
+            document["created_at"] = entry.created_at.isoformat()
+        if entry.expires_at:
+            document["expires_at"] = entry.expires_at.isoformat()
+
+        return document
+
+    def from_storage(self, data: dict[str, Any] | str) -> ManagedEntry:
+        """Convert an Elasticsearch document back to a ManagedEntry.
+
+        This method supports both native (flattened) and string storage modes,
+        trying the flattened field first and falling back to the string field.
+        This allows for seamless migration between storage modes.
+
+        Args:
+            data: The Elasticsearch document to deserialize.
+
+        Returns:
+            A ManagedEntry reconstructed from the document.
+
+        Raises:
+            DeserializationError: If data is not a dict or is malformed.
+        """
+        if not isinstance(data, dict):
+            msg = "Expected Elasticsearch document to be a dict"
+            raise DeserializationError(msg)
+
+        document = data
+        value: dict[str, Any] = {}
+
+        raw_value = document.get("value")
+
+        # Try flattened field first, fall back to string field
+        if not raw_value or not isinstance(raw_value, dict):
+            msg = "Value field not found or invalid type"
+            raise DeserializationError(msg)
+
+        if value_flattened := raw_value.get("flattened"):  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+            value = verify_dict(obj=value_flattened)
+        elif value_str := raw_value.get("string"):  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+            if not isinstance(value_str, str):
+                msg = "Value in `value` field is not a string"
+                raise DeserializationError(msg)
+            value = load_from_json(value_str)
+        else:
+            msg = "Value field not found or invalid type"
+            raise DeserializationError(msg)
+
+        created_at: datetime | None = try_parse_datetime_str(value=document.get("created_at"))
+        expires_at: datetime | None = try_parse_datetime_str(value=document.get("expires_at"))
+
+        return ManagedEntry(value=value, created_at=created_at, expires_at=expires_at)
 
 
 class ElasticsearchStore(

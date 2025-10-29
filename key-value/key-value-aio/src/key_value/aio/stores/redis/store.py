@@ -7,7 +7,7 @@ from key_value.shared.errors import DeserializationError
 from key_value.shared.type_checking.bear_spray import bear_spray
 from key_value.shared.utils.compound import compound_key, get_keys_from_compound_keys
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.serialization import FullJsonAdapter, SerializationAdapter
+from key_value.shared.utils.serialization import SerializationAdapter
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseEnumerateKeysStore, BaseStore
@@ -20,6 +20,45 @@ except ImportError as e:
 
 DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
+
+
+class FullJsonAdapter(SerializationAdapter):
+    """Adapter that serializes entries as complete JSON strings.
+
+    This adapter is suitable for Redis which works with string values.
+    It serializes the entire ManagedEntry (including all metadata) to a JSON string.
+    """
+
+    def to_storage(self, key: str, entry: ManagedEntry, collection: str | None = None) -> str:  # noqa: ARG002
+        """Convert a ManagedEntry to a JSON string.
+
+        Args:
+            key: The key (unused, for interface compatibility).
+            entry: The ManagedEntry to serialize.
+            collection: The collection (unused, for interface compatibility).
+
+        Returns:
+            A JSON string containing the entry and all metadata.
+        """
+        return entry.to_json(include_metadata=True, include_expiration=True, include_creation=True)
+
+    def from_storage(self, data: dict[str, Any] | str) -> ManagedEntry:
+        """Convert a JSON string back to a ManagedEntry.
+
+        Args:
+            data: The JSON string to deserialize.
+
+        Returns:
+            A ManagedEntry reconstructed from the JSON.
+
+        Raises:
+            DeserializationError: If data is not a string or cannot be parsed.
+        """
+        if not isinstance(data, str):
+            msg = "Expected data to be a JSON string"
+            raise DeserializationError(msg)
+
+        return ManagedEntry.from_json(json_str=data, includes_metadata=True)
 
 
 class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):

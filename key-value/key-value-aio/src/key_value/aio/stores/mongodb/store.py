@@ -3,9 +3,9 @@ from datetime import datetime
 from typing import Any, overload
 
 from key_value.shared.errors import DeserializationError
-from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.managed_entry import ManagedEntry, verify_dict
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
-from key_value.shared.utils.serialization import MongoDBAdapter, SerializationAdapter
+from key_value.shared.utils.serialization import SerializationAdapter
 from typing_extensions import Self, override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseStore
@@ -33,6 +33,119 @@ PAGE_LIMIT = 10000
 # So limit the collection name to 200 bytes
 MAX_COLLECTION_LENGTH = 200
 COLLECTION_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
+
+
+class MongoDBAdapter(SerializationAdapter):
+    """MongoDB-specific serialization adapter with native BSON datetime support.
+
+    This adapter is optimized for MongoDB, storing:
+    - Native BSON datetime types for TTL indexing (created_at, expires_at)
+    - Values in value.object (native BSON) or value.string (JSON) fields
+    - Support for migration between native and string storage modes
+
+    The native storage mode is recommended for new deployments as it allows
+    efficient querying of value fields, while string mode provides backward
+    compatibility with older data.
+    """
+
+    def __init__(self, *, native_storage: bool = True) -> None:
+        """Initialize the MongoDB adapter.
+
+        Args:
+            native_storage: If True (default), store value as native BSON dict in value.object field.
+                          If False, store as JSON string in value.string field for backward compatibility.
+        """
+        self.native_storage = native_storage
+
+    def to_storage(self, key: str, entry: ManagedEntry, collection: str | None = None) -> dict[str, Any]:  # noqa: ARG002
+        """Convert a ManagedEntry to a MongoDB document.
+
+        Args:
+            key: The key associated with this entry.
+            entry: The ManagedEntry to serialize.
+            collection: The collection (unused, for interface compatibility).
+
+        Returns:
+            A MongoDB document with key, value, and BSON datetime metadata.
+        """
+        document: dict[str, Any] = {"key": key, "value": {}}
+
+        # We convert to JSON even if we don't need to, this ensures that the value we were provided
+        # can be serialized to JSON which helps ensure compatibility across stores
+        json_str = entry.value_as_json
+
+        # Store in appropriate field based on mode
+        if self.native_storage:
+            document["value"]["object"] = entry.value_as_dict
+        else:
+            document["value"]["string"] = json_str
+
+        # Add metadata fields as BSON datetimes for TTL indexing
+        if entry.created_at:
+            document["created_at"] = entry.created_at
+        if entry.expires_at:
+            document["expires_at"] = entry.expires_at
+
+        return document
+
+    def from_storage(self, data: dict[str, Any] | str) -> ManagedEntry:
+        """Convert a MongoDB document back to a ManagedEntry.
+
+        This method supports both native (object) and legacy (string) storage modes,
+        and properly handles BSON datetime types for metadata.
+
+        Args:
+            data: The MongoDB document to deserialize.
+
+        Returns:
+            A ManagedEntry reconstructed from the document.
+
+        Raises:
+            DeserializationError: If data is not a dict or is malformed.
+        """
+        if not isinstance(data, dict):
+            msg = "Expected MongoDB document to be a dict"
+            raise DeserializationError(msg)
+
+        document = data
+
+        if not (value_field := document.get("value")):
+            msg = "Value field not found"
+            raise DeserializationError(msg)
+
+        if not isinstance(value_field, dict):
+            msg = "Expected `value` field to be an object"
+            raise DeserializationError(msg)
+
+        value_holder: dict[str, Any] = verify_dict(obj=value_field)
+
+        entry_data: dict[str, Any] = {}
+
+        # Mongo stores datetimes without timezones as UTC so we mark them as UTC
+        # Import timezone here to avoid circular import
+        from key_value.shared.utils.time_to_live import timezone
+
+        if created_at_datetime := document.get("created_at"):
+            if not isinstance(created_at_datetime, datetime):
+                msg = "Expected `created_at` field to be a datetime"
+                raise DeserializationError(msg)
+            entry_data["created_at"] = created_at_datetime.replace(tzinfo=timezone.utc)
+
+        if expires_at_datetime := document.get("expires_at"):
+            if not isinstance(expires_at_datetime, datetime):
+                msg = "Expected `expires_at` field to be a datetime"
+                raise DeserializationError(msg)
+            entry_data["expires_at"] = expires_at_datetime.replace(tzinfo=timezone.utc)
+
+        # Support both native (object) and legacy (string) storage
+        if value_object := value_holder.get("object"):
+            return ManagedEntry.from_dict(data={"value": value_object, **entry_data})
+
+        if value_string := value_holder.get("string"):
+            return ManagedEntry.from_dict(data={"value": value_string, **entry_data}, stringified_value=True)
+
+        msg = "Expected `value` field to be an object with `object` or `string` subfield"
+        raise DeserializationError(msg)
 
 
 class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
