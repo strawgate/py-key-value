@@ -7,7 +7,7 @@ from typing import Any, SupportsFloat, cast
 from typing_extensions import Self
 
 from key_value.shared.errors import DeserializationError, SerializationError
-from key_value.shared.utils.time_to_live import now, now_plus, prepare_ttl, try_parse_datetime_str
+from key_value.shared.utils.time_to_live import now, prepare_ttl, seconds_to, try_parse_datetime_str
 
 
 @dataclass(kw_only=True)
@@ -22,15 +22,7 @@ class ManagedEntry:
     value: Mapping[str, Any]
 
     created_at: datetime | None = field(default=None)
-    ttl: float | None = field(default=None)
     expires_at: datetime | None = field(default=None)
-
-    def __post_init__(self) -> None:
-        if self.ttl is not None and self.expires_at is None:
-            self.expires_at = now_plus(seconds=self.ttl)
-
-        elif self.expires_at is not None and self.ttl is None:
-            self.recalculate_ttl()
 
     @property
     def is_expired(self) -> bool:
@@ -39,17 +31,27 @@ class ManagedEntry:
         return self.expires_at <= now()
 
     @property
+    def ttl(self) -> float | None:
+        if self.expires_at is None:
+            return None
+        return seconds_to(datetime=self.expires_at)
+
+    @property
     def value_as_json(self) -> str:
         """Return the value as a JSON string."""
         return dump_to_json(obj=self.value_as_dict)
 
     @property
     def value_as_dict(self) -> dict[str, Any]:
-        return dict(self.value)
+        return verify_dict(obj=self.value)
 
-    def recalculate_ttl(self) -> None:
-        if self.expires_at is not None and self.ttl is None:
-            self.ttl = (self.expires_at - now()).total_seconds()
+    @property
+    def created_at_isoformat(self) -> str | None:
+        return self.created_at.isoformat() if self.created_at else None
+
+    @property
+    def expires_at_isoformat(self) -> str | None:
+        return self.expires_at.isoformat() if self.expires_at else None
 
     def to_dict(
         self, include_metadata: bool = True, include_expiration: bool = True, include_creation: bool = True, stringify_value: bool = False

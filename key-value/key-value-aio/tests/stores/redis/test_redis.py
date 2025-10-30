@@ -1,17 +1,16 @@
+import json
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta, timezone
+from typing import Any
 
 import pytest
-from dirty_equals import IsFloat
+from dirty_equals import IsDatetime
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
-from key_value.shared.utils.managed_entry import ManagedEntry
 from redis.asyncio.client import Redis
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.redis import RedisStore
-from key_value.aio.stores.redis.store import json_to_managed_entry, managed_entry_to_json
 from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -28,25 +27,6 @@ REDIS_VERSIONS_TO_TEST = [
 ]
 
 
-def test_managed_entry_document_conversion():
-    created_at = datetime(year=2025, month=1, day=1, hour=0, minute=0, second=0, tzinfo=timezone.utc)
-    expires_at = created_at + timedelta(seconds=10)
-
-    managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
-    document = managed_entry_to_json(managed_entry=managed_entry)
-
-    assert document == snapshot(
-        '{"created_at": "2025-01-01T00:00:00+00:00", "expires_at": "2025-01-01T00:00:10+00:00", "value": {"test": "test"}}'
-    )
-
-    round_trip_managed_entry = json_to_managed_entry(json_str=document)
-
-    assert round_trip_managed_entry.value == managed_entry.value
-    assert round_trip_managed_entry.created_at == created_at
-    assert round_trip_managed_entry.ttl == IsFloat(lt=0)
-    assert round_trip_managed_entry.expires_at == expires_at
-
-
 async def ping_redis() -> bool:
     client: Redis = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
     try:
@@ -57,6 +37,10 @@ async def ping_redis() -> bool:
 
 class RedisFailedToStartError(Exception):
     pass
+
+
+def get_client_from_store(store: RedisStore) -> Redis:
+    return store._client  # pyright: ignore[reportPrivateUsage]
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
@@ -78,14 +62,18 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         """Create a Redis store for testing."""
         # Create the store with test database
         redis_store = RedisStore(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
-        _ = await redis_store._client.flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
+        _ = await get_client_from_store(store=redis_store).flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
         return redis_store
+
+    @pytest.fixture
+    def redis_client(self, store: RedisStore) -> Redis:
+        return get_client_from_store(store=store)
 
     async def test_redis_url_connection(self):
         """Test Redis store creation with URL."""
         redis_url = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
         store = RedisStore(url=redis_url)
-        _ = await store._client.flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
+        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
         await store.put(collection="test", key="url_test", value={"test": "value"})
         result = await store.get(collection="test", key="url_test")
         assert result == {"test": "value"}
@@ -97,10 +85,61 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         client = Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
         store = RedisStore(client=client)
 
-        _ = await store._client.flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
+        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
         await store.put(collection="test", key="client_test", value={"test": "value"})
         result = await store.get(collection="test", key="client_test")
         assert result == {"test": "value"}
+
+    async def test_redis_document_format(self, store: RedisStore, redis_client: Redis):
+        """Test Redis store document format."""
+        await store.put(collection="test", key="document_format_test_1", value={"test_1": "value_1"})
+        await store.put(collection="test", key="document_format_test_2", value={"test_2": "value_2"}, ttl=10)
+
+        raw_documents = await redis_client.mget(keys=["test::document_format_test_1", "test::document_format_test_2"])
+        raw_documents_dicts: list[dict[str, Any]] = [json.loads(raw_document) for raw_document in raw_documents]
+        assert raw_documents_dicts == snapshot(
+            [
+                {
+                    "created_at": IsDatetime(iso_string=True),
+                    "value": {"test_1": "value_1"},
+                },
+                {
+                    "created_at": IsDatetime(iso_string=True),
+                    "expires_at": IsDatetime(iso_string=True),
+                    "value": {"test_2": "value_2"},
+                },
+            ]
+        )
+
+        await store.put_many(
+            collection="test",
+            keys=["document_format_test_3", "document_format_test_4"],
+            values=[{"test_3": "value_3"}, {"test_4": "value_4"}],
+            ttl=10,
+        )
+        raw_documents = await redis_client.mget(keys=["test::document_format_test_3", "test::document_format_test_4"])
+        raw_documents_dicts = [json.loads(raw_document) for raw_document in raw_documents]
+        assert raw_documents_dicts == snapshot(
+            [
+                {
+                    "created_at": IsDatetime(iso_string=True),
+                    "expires_at": IsDatetime(iso_string=True),
+                    "value": {"test_3": "value_3"},
+                },
+                {
+                    "created_at": IsDatetime(iso_string=True),
+                    "expires_at": IsDatetime(iso_string=True),
+                    "value": {"test_4": "value_4"},
+                },
+            ]
+        )
+
+        await store.put(collection="test", key="document_format_test", value={"test": "value"}, ttl=10)
+        raw_document = await redis_client.get(name="test::document_format_test")
+        raw_document_dict = json.loads(raw_document)
+        assert raw_document_dict == snapshot(
+            {"created_at": IsDatetime(iso_string=True), "expires_at": IsDatetime(iso_string=True), "value": {"test": "value"}}
+        )
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override

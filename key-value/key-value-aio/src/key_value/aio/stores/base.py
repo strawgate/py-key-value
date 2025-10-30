@@ -14,6 +14,7 @@ from key_value.shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.shared.errors import StoreSetupError
 from key_value.shared.type_checking.bear_spray import bear_enforce
 from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.serialization import BasicSerializationAdapter, SerializationAdapter
 from key_value.shared.utils.time_to_live import prepare_entry_timestamps
 from typing_extensions import Self, override
 
@@ -67,6 +68,8 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
     _setup_collection_locks: defaultdict[str, Lock]
     _setup_collection_complete: defaultdict[str, bool]
 
+    _serialization_adapter: SerializationAdapter
+
     _seed: FROZEN_SEED_DATA_TYPE
 
     default_collection: str
@@ -90,6 +93,8 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         self._seed = _seed_to_frozen_seed_data(seed=seed or {})
 
         self.default_collection = default_collection or DEFAULT_COLLECTION_NAME
+
+        self._serialization_adapter = BasicSerializationAdapter()
 
         if not hasattr(self, "_stable_api"):
             self._stable_api = False
@@ -286,9 +291,9 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         collection = collection or self.default_collection
         await self.setup_collection(collection=collection)
 
-        created_at, ttl_seconds, expires_at = prepare_entry_timestamps(ttl=ttl)
+        created_at, _, expires_at = prepare_entry_timestamps(ttl=ttl)
 
-        managed_entry: ManagedEntry = ManagedEntry(value=value, ttl=ttl_seconds, created_at=created_at, expires_at=expires_at)
+        managed_entry: ManagedEntry = ManagedEntry(value=value, created_at=created_at, expires_at=expires_at)
 
         await self._put_managed_entry(
             collection=collection,
@@ -316,9 +321,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
         created_at, ttl_seconds, expires_at = prepare_entry_timestamps(ttl=ttl)
 
-        managed_entries: list[ManagedEntry] = [
-            ManagedEntry(value=value, ttl=ttl_seconds, created_at=created_at, expires_at=expires_at) for value in values
-        ]
+        managed_entries: list[ManagedEntry] = [ManagedEntry(value=value, created_at=created_at, expires_at=expires_at) for value in values]
 
         await self._put_managed_entries(
             collection=collection,

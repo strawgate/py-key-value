@@ -11,7 +11,7 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.elasticsearch import ElasticsearchStore
-from key_value.aio.stores.elasticsearch.store import managed_entry_to_document, source_to_managed_entry
+from key_value.aio.stores.elasticsearch.store import ElasticsearchSerializationAdapter
 from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -55,19 +55,18 @@ def test_managed_entry_document_conversion():
     expires_at = created_at + timedelta(seconds=10)
 
     managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
-    document = managed_entry_to_document(collection="test_collection", key="test_key", managed_entry=managed_entry)
+    adapter = ElasticsearchSerializationAdapter(native_storage=False)
+    document = adapter.dump_dict(entry=managed_entry)
 
     assert document == snapshot(
         {
-            "collection": "test_collection",
-            "key": "test_key",
             "value": {"string": '{"test": "test"}'},
             "created_at": "2025-01-01T00:00:00+00:00",
             "expires_at": "2025-01-01T00:00:10+00:00",
         }
     )
 
-    round_trip_managed_entry = source_to_managed_entry(source=document)
+    round_trip_managed_entry = adapter.load_dict(data=document)
 
     assert round_trip_managed_entry.value == managed_entry.value
     assert round_trip_managed_entry.created_at == created_at
@@ -80,19 +79,18 @@ def test_managed_entry_document_conversion_native_storage():
     expires_at = created_at + timedelta(seconds=10)
 
     managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
-    document = managed_entry_to_document(collection="test_collection", key="test_key", managed_entry=managed_entry, native_storage=True)
+    adapter = ElasticsearchSerializationAdapter(native_storage=True)
+    document = adapter.dump_dict(entry=managed_entry)
 
     assert document == snapshot(
         {
-            "collection": "test_collection",
-            "key": "test_key",
             "value": {"flattened": {"test": "test"}},
             "created_at": "2025-01-01T00:00:00+00:00",
             "expires_at": "2025-01-01T00:00:10+00:00",
         }
     )
 
-    round_trip_managed_entry = source_to_managed_entry(source=document)
+    round_trip_managed_entry = adapter.load_dict(data=document)
 
     assert round_trip_managed_entry.value == managed_entry.value
     assert round_trip_managed_entry.created_at == created_at
@@ -170,8 +168,6 @@ class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
         response = await es_client.get(index=index_name, id=doc_id)
         assert response.body["_source"] == snapshot(
             {
-                "collection": "test",
-                "key": "test_key",
                 "value": {"flattened": {"name": "Alice", "age": 30}},
                 "created_at": IsStr(min_length=20, max_length=40),
             }
@@ -182,8 +178,6 @@ class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
         response = await es_client.get(index=index_name, id=doc_id)
         assert response.body["_source"] == snapshot(
             {
-                "collection": "test",
-                "key": "test_key",
                 "value": {"flattened": {"name": "Bob", "age": 25}},
                 "created_at": IsStr(min_length=20, max_length=40),
                 "expires_at": IsStr(min_length=20, max_length=40),
@@ -231,8 +225,6 @@ class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
         response = await es_client.get(index=index_name, id=doc_id)
         assert response.body["_source"] == snapshot(
             {
-                "collection": "test",
-                "key": "test_key",
                 "value": {"string": '{"age": 30, "name": "Alice"}'},
                 "created_at": IsStr(min_length=20, max_length=40),
             }
@@ -243,8 +235,6 @@ class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
         response = await es_client.get(index=index_name, id=doc_id)
         assert response.body["_source"] == snapshot(
             {
-                "collection": "test",
-                "key": "test_key",
                 "value": {"string": '{"age": 25, "name": "Bob"}'},
                 "created_at": IsStr(min_length=20, max_length=40),
                 "expires_at": IsStr(min_length=20, max_length=40),

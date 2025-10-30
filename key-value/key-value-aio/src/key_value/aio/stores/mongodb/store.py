@@ -1,9 +1,9 @@
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, overload
 
 from key_value.shared.errors import DeserializationError
-from key_value.shared.utils.managed_entry import ManagedEntry, verify_dict
+from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
 from key_value.shared.utils.serialization import SerializationAdapter
 from typing_extensions import Self, override
@@ -11,7 +11,7 @@ from typing_extensions import Self, override
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseStore
 
 try:
-    from pymongo import AsyncMongoClient
+    from pymongo import AsyncMongoClient, UpdateOne
     from pymongo.asynchronous.collection import AsyncCollection
     from pymongo.asynchronous.database import AsyncDatabase
     from pymongo.results import DeleteResult  # noqa: TC002
@@ -35,117 +35,56 @@ MAX_COLLECTION_LENGTH = 200
 COLLECTION_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
 
 
-class MongoDBAdapter(SerializationAdapter):
-    """MongoDB-specific serialization adapter with native BSON datetime support.
+class MongoDBSerializationAdapter(SerializationAdapter):
+    """Adapter for MongoDB with support for native and string storage modes."""
 
-    This adapter is optimized for MongoDB, storing:
-    - Native BSON datetime types for TTL indexing (created_at, expires_at)
-    - Values in value.object (native BSON) or value.string (JSON) fields
-    - Support for migration between native and string storage modes
-
-    The native storage mode is recommended for new deployments as it allows
-    efficient querying of value fields, while string mode provides backward
-    compatibility with older data.
-    """
+    _native_storage: bool
 
     def __init__(self, *, native_storage: bool = True) -> None:
-        """Initialize the MongoDB adapter.
+        """Initialize the MongoDB adapter."""
+        super().__init__()
 
-        Args:
-            native_storage: If True (default), store value as native BSON dict in value.object field.
-                          If False, store as JSON string in value.string field for backward compatibility.
-        """
-        self.native_storage = native_storage
+        self._native_storage = native_storage
+        self._date_format = "datetime"
+        self._value_format = "dict" if native_storage else "string"
 
-    def to_storage(self, key: str, entry: ManagedEntry, collection: str | None = None) -> dict[str, Any]:  # noqa: ARG002
-        """Convert a ManagedEntry to a MongoDB document.
+    @override
+    def prepare_dump(self, data: dict[str, Any]) -> dict[str, Any]:
+        value = data.pop("value")
 
-        Args:
-            key: The key associated with this entry.
-            entry: The ManagedEntry to serialize.
-            collection: The collection (unused, for interface compatibility).
+        data["value"] = {}
 
-        Returns:
-            A MongoDB document with key, value, and BSON datetime metadata.
-        """
-        document: dict[str, Any] = {"key": key, "value": {}}
-
-        # We convert to JSON even if we don't need to, this ensures that the value we were provided
-        # can be serialized to JSON which helps ensure compatibility across stores
-        json_str = entry.value_as_json
-
-        # Store in appropriate field based on mode
-        if self.native_storage:
-            document["value"]["object"] = entry.value_as_dict
+        if self._native_storage:
+            data["value"]["object"] = value
         else:
-            document["value"]["string"] = json_str
+            data["value"]["string"] = value
 
-        # Add metadata fields as BSON datetimes for TTL indexing
-        if entry.created_at:
-            document["created_at"] = entry.created_at
-        if entry.expires_at:
-            document["expires_at"] = entry.expires_at
+        return data
 
-        return document
+    @override
+    def prepare_load(self, data: dict[str, Any]) -> dict[str, Any]:
+        value = data.pop("value")
 
-    def from_storage(self, data: dict[str, Any] | str) -> ManagedEntry:
-        """Convert a MongoDB document back to a ManagedEntry.
+        if value_object := value.get("object"):
+            data["value"] = value_object
+        elif value_string := value.get("string"):
+            data["value"] = value_string
+        else:
+            msg = "Value field not found in MongoDB document"
+            raise DeserializationError(message=msg)
 
-        This method supports both native (object) and legacy (string) storage modes,
-        and properly handles BSON datetime types for metadata.
-
-        Args:
-            data: The MongoDB document to deserialize.
-
-        Returns:
-            A ManagedEntry reconstructed from the document.
-
-        Raises:
-            DeserializationError: If data is not a dict or is malformed.
-        """
-        if not isinstance(data, dict):
-            msg = "Expected MongoDB document to be a dict"
-            raise DeserializationError(msg)
-
-        document = data
-
-        if not (value_field := document.get("value")):
-            msg = "Value field not found"
-            raise DeserializationError(msg)
-
-        if not isinstance(value_field, dict):
-            msg = "Expected `value` field to be an object"
-            raise DeserializationError(msg)
-
-        value_holder: dict[str, Any] = verify_dict(obj=value_field)
-
-        entry_data: dict[str, Any] = {}
-
-        # Mongo stores datetimes without timezones as UTC so we mark them as UTC
-        # Import timezone here to avoid circular import
-        from key_value.shared.utils.time_to_live import timezone
-
-        if created_at_datetime := document.get("created_at"):
-            if not isinstance(created_at_datetime, datetime):
+        if date_created := data.get("created_at"):
+            if not isinstance(date_created, datetime):
                 msg = "Expected `created_at` field to be a datetime"
-                raise DeserializationError(msg)
-            entry_data["created_at"] = created_at_datetime.replace(tzinfo=timezone.utc)
-
-        if expires_at_datetime := document.get("expires_at"):
-            if not isinstance(expires_at_datetime, datetime):
+                raise DeserializationError(message=msg)
+            data["created_at"] = date_created.replace(tzinfo=timezone.utc)
+        if date_expires := data.get("expires_at"):
+            if not isinstance(date_expires, datetime):
                 msg = "Expected `expires_at` field to be a datetime"
-                raise DeserializationError(msg)
-            entry_data["expires_at"] = expires_at_datetime.replace(tzinfo=timezone.utc)
+                raise DeserializationError(message=msg)
+            data["expires_at"] = date_expires.replace(tzinfo=timezone.utc)
 
-        # Support both native (object) and legacy (string) storage
-        if value_object := value_holder.get("object"):
-            return ManagedEntry.from_dict(data={"value": value_object, **entry_data})
-
-        if value_string := value_holder.get("string"):
-            return ManagedEntry.from_dict(data={"value": value_string, **entry_data}, stringified_value=True)
-
-        msg = "Expected `value` field to be an object with `object` or `string` subfield"
-        raise DeserializationError(msg)
+        return data
 
 
 class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
@@ -232,7 +171,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
         self._db = self._client[db_name]
         self._collections_by_name = {}
-        self._adapter = MongoDBAdapter(native_storage=native_storage)
+        self._adapter = MongoDBSerializationAdapter(native_storage=native_storage)
 
         super().__init__(default_collection=default_collection)
 
@@ -290,7 +229,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
         if doc := await self._collections_by_name[sanitized_collection].find_one(filter={"key": key}):
             try:
-                return self._adapter.from_storage(data=doc)
+                return self._adapter.load_dict(data=doc)
             except DeserializationError:
                 return None
 
@@ -311,7 +250,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         async for doc in cursor:
             if key := doc.get("key"):
                 try:
-                    managed_entries_by_key[key] = self._adapter.from_storage(data=doc)
+                    managed_entries_by_key[key] = self._adapter.load_dict(data=doc)
                 except DeserializationError:
                     managed_entries_by_key[key] = None
 
@@ -325,17 +264,19 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
-        mongo_doc = self._adapter.to_storage(key=key, entry=managed_entry, collection=collection)
-
-        if not isinstance(mongo_doc, dict):
-            msg = "MongoDB adapter must return dict"
-            raise TypeError(msg)
+        mongo_doc = self._adapter.dump_dict(entry=managed_entry)
 
         sanitized_collection = self._sanitize_collection_name(collection=collection)
 
         _ = await self._collections_by_name[sanitized_collection].update_one(
             filter={"key": key},
-            update={"$set": mongo_doc},
+            update={
+                "$set": {
+                    "collection": collection,
+                    "key": key,
+                    **mongo_doc,
+                }
+            },
             upsert=True,
         )
 
@@ -355,21 +296,20 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
         sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        # Use bulk_write for efficient batch operations
-        from pymongo import UpdateOne
-
         operations: list[UpdateOne] = []
         for key, managed_entry in zip(keys, managed_entries, strict=True):
-            mongo_doc = self._adapter.to_storage(key=key, entry=managed_entry, collection=collection)
-
-            if not isinstance(mongo_doc, dict):
-                msg = "MongoDB adapter must return dict"
-                raise TypeError(msg)
+            mongo_doc = self._adapter.dump_dict(entry=managed_entry)
 
             operations.append(
                 UpdateOne(
                     filter={"key": key},
-                    update={"$set": mongo_doc},
+                    update={
+                        "$set": {
+                            "collection": collection,
+                            "key": key,
+                            **mongo_doc,
+                        }
+                    },
                     upsert=True,
                 )
             )
