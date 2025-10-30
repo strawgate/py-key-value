@@ -270,6 +270,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         index_name = f"idx_{self._table_name}_expires_at"
         if len(index_name) > POSTGRES_MAX_IDENTIFIER_LEN:
             import hashlib
+
             index_name = "idx_" + hashlib.sha256(self._table_name.encode()).hexdigest()[:16] + "_exp"
         create_index_sql = f"""  # noqa: S608
         CREATE INDEX IF NOT EXISTS {index_name}
@@ -439,8 +440,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
 
         # Prepare data for batch insert using method-level ttl/created_at/expires_at
         values = [
-            (sanitized_collection, key, entry.value, ttl, created_at, expires_at)
-            for key, entry in zip(keys, managed_entries, strict=True)
+            (sanitized_collection, key, entry.value, ttl, created_at, expires_at) for key, entry in zip(keys, managed_entries, strict=True)
         ]
 
         async with self._acquire_connection() as conn:
