@@ -2,6 +2,7 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.sanitize import hash_excess_length
 from typing_extensions import Self, override
 
 from key_value.aio.stores.base import (
@@ -11,6 +12,12 @@ from key_value.aio.stores.base import (
 
 # HTTP status code for not found errors
 HTTP_NOT_FOUND = 404
+
+# S3 key length limit is 1024 bytes
+# We allocate space for collection, separator, and key
+# Using 500 bytes for each allows for the separator and stays well under 1024
+MAX_COLLECTION_LENGTH = 500
+MAX_KEY_LENGTH = 500
 
 try:
     import aioboto3
@@ -206,6 +213,9 @@ class S3Store(BaseContextManagerStore, BaseStore):
     def _get_s3_key(self, *, collection: str, key: str) -> str:
         """Generate the S3 object key for a given collection and key.
 
+        S3 has a maximum key length of 1024 bytes. To ensure compliance, we hash
+        long collection or key names to stay within limits while maintaining uniqueness.
+
         Args:
             collection: The collection name.
             key: The key within the collection.
@@ -213,7 +223,11 @@ class S3Store(BaseContextManagerStore, BaseStore):
         Returns:
             The S3 object key in format: {collection}/{key}
         """
-        return f"{collection}/{key}"
+        # Hash collection and key if they exceed their max lengths
+        # This ensures the combined S3 key stays under 1024 bytes
+        safe_collection = hash_excess_length(collection, MAX_COLLECTION_LENGTH)
+        safe_key = hash_excess_length(key, MAX_KEY_LENGTH)
+        return f"{safe_collection}/{safe_key}"
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
