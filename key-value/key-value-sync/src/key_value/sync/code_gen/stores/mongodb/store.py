@@ -72,10 +72,10 @@ class MongoDBSerializationAdapter(SerializationAdapter):
     def prepare_load(self, data: dict[str, Any]) -> dict[str, Any]:
         value = data.pop("value")
 
-        if value_object := value.get("object"):
-            data["value"] = value_object
-        elif value_string := value.get("string"):
-            data["value"] = value_string
+        if "object" in value:
+            data["value"] = value["object"]
+        elif "string" in value:
+            data["value"] = value["string"]
         else:
             msg = "Value field not found in MongoDB document"
             raise DeserializationError(message=msg)

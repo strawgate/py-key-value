@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from datetime import timezone
 from pathlib import Path
 from typing import overload
 
@@ -120,7 +121,7 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
         managed_entry: ManagedEntry = self._serialization_adapter.load_json(json_str=managed_entry_str)
 
         if expire_epoch:
-            managed_entry.expires_at = datetime.fromtimestamp(expire_epoch)
+            managed_entry.expires_at = datetime.fromtimestamp(expire_epoch, tz=timezone.utc)
 
         return managed_entry
 

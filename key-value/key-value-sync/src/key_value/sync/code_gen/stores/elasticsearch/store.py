@@ -100,10 +100,10 @@ class ElasticsearchSerializationAdapter(SerializationAdapter):
     def prepare_load(self, data: dict[str, Any]) -> dict[str, Any]:
         value = data.pop("value")
 
-        if flattened := value.get("flattened"):
-            data["value"] = flattened
-        elif string := value.get("string"):
-            data["value"] = string
+        if "flattened" in value:
+            data["value"] = value["flattened"]
+        elif "string" in value:
+            data["value"] = value["string"]
         else:
             msg = "Value field not found in Elasticsearch document"
             raise DeserializationError(message=msg)

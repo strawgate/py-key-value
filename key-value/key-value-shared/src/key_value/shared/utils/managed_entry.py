@@ -2,7 +2,7 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, SupportsFloat, cast
+from typing import Any, SupportsFloat
 
 from typing_extensions import Self
 
@@ -58,7 +58,7 @@ class ManagedEntry:
         return cls(
             value=value,
             created_at=created_at,
-            expires_at=(now_plus(seconds=ttl) if created_at else None),
+            expires_at=(now_plus(seconds=float(ttl)) if ttl else None),
         )
 
     def to_dict(
@@ -169,7 +169,7 @@ def load_from_json(json_str: str) -> dict[str, Any]:
 
 
 def verify_dict(obj: Any) -> dict[str, Any]:
-    if not isinstance(obj, dict):
+    if not isinstance(obj, Mapping):
         msg = "Object is not a dictionary"
         raise DeserializationError(msg)
 
@@ -177,7 +177,7 @@ def verify_dict(obj: Any) -> dict[str, Any]:
         msg = "Object contains non-string keys"
         raise DeserializationError(msg)
 
-    return cast(typ="dict[str, Any]", val=obj)
+    return dict(obj)  # pyright: ignore[reportUnknownArgumentType]
 
 
 def estimate_serialized_size(value: Mapping[str, Any]) -> int:
