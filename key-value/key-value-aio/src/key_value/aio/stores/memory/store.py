@@ -117,8 +117,6 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
 
         self._stable_api = True
 
-        self._serialization_adapter = BasicSerializationAdapter()
-
         super().__init__(default_collection=default_collection, seed=seed)
 
     @override

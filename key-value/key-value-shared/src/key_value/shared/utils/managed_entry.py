@@ -85,12 +85,12 @@ def load_from_json(json_str: str) -> dict[str, Any]:
 @bear_enforce
 def verify_dict(obj: Any) -> dict[str, Any]:
     if not isinstance(obj, Mapping):
-        msg = "Object is not a dictionary"
-        raise DeserializationError(msg)
+        msg = "Object is not a Mapping"
+        raise TypeError(msg)
 
     if not all(isinstance(key, str) for key in obj):  # pyright: ignore[reportUnknownVariableType]
         msg = "Object contains non-string keys"
-        raise DeserializationError(msg)
+        raise TypeError(msg)
 
     return dict(obj)  # pyright: ignore[reportUnknownArgumentType]
 

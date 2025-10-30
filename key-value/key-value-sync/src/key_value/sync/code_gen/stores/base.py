@@ -80,10 +80,17 @@ class BaseStore(KeyValueProtocol, ABC):
 
     default_collection: str
 
-    def __init__(self, *, default_collection: str | None = None, seed: SEED_DATA_TYPE | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        serialization_adapter: SerializationAdapter | None = None,
+        default_collection: str | None = None,
+        seed: SEED_DATA_TYPE | None = None,
+    ) -> None:
         """Initialize the managed key-value store.
 
         Args:
+            serialization_adapter: The serialization adapter to use for the store.
             default_collection: The default collection to use if no collection is provided.
                 Defaults to "default_collection".
             seed: Optional seed data to pre-populate the store. Format: {collection: {key: {field: value, ...}}}.
@@ -100,7 +107,7 @@ class BaseStore(KeyValueProtocol, ABC):
 
         self.default_collection = default_collection or DEFAULT_COLLECTION_NAME
 
-        self._serialization_adapter = BasicSerializationAdapter()
+        self._serialization_adapter = serialization_adapter or BasicSerializationAdapter()
 
         if not hasattr(self, "_stable_api"):
             self._stable_api = False

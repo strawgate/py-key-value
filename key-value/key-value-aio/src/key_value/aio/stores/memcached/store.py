@@ -4,7 +4,6 @@ from typing import overload
 
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.serialization import BasicSerializationAdapter
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseStore
@@ -45,11 +44,9 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
             port: Memcached port. Defaults to 11211.
             default_collection: The default collection to use if no collection is provided.
         """
-        super().__init__(default_collection=default_collection)
-
         self._client = client or Client(host=host, port=port)
 
-        self._serialization_adapter = BasicSerializationAdapter(value_format="dict")
+        super().__init__(default_collection=default_collection)
 
     def sanitize_key(self, key: str) -> str:
         if len(key) > MAX_KEY_LENGTH:

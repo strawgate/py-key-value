@@ -34,6 +34,10 @@ class ValkeyFailedToStartError(Exception):
     pass
 
 
+def get_valkey_client_from_store(store: ValkeyStore) -> BaseClient:
+    return store._connected_client  # pyright: ignore[reportPrivateUsage, reportReturnType]
+
+
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
 @pytest.mark.skipif(detect_on_windows(), reason="Valkey is not supported on Windows")
 class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
@@ -92,9 +96,10 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     def test_not_unbounded(self, store: BaseStore): ...
 
-    def test_value_stored(self, store: ValkeyStore, valkey_client: BaseClient):
+    def test_value_stored(self, store: ValkeyStore):
         store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
+        valkey_client = get_valkey_client_from_store(store=store)
         value = valkey_client.get(key="test::test_key")
         assert value is not None
         value_as_dict = json.loads(value.decode("utf-8"))

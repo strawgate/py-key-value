@@ -5,7 +5,8 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Any, overload
 
-from key_value.shared.errors import DeserializationError
+from bson.errors import InvalidDocument
+from key_value.shared.errors import DeserializationError, SerializationError
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
 from key_value.shared.utils.serialization import SerializationAdapter
@@ -269,9 +270,15 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
         sanitized_collection = self._sanitize_collection_name(collection=collection)
 
-        _ = self._collections_by_name[sanitized_collection].update_one(
-            filter={"key": key}, update={"$set": {"collection": collection, "key": key, **mongo_doc}}, upsert=True
-        )
+        try:
+            # Ensure that the value is serializable to JSON
+            _ = managed_entry.value_as_json
+            _ = self._collections_by_name[sanitized_collection].update_one(
+                filter={"key": key}, update={"$set": {"key": key, **mongo_doc}}, upsert=True
+            )
+        except InvalidDocument as e:
+            msg = f"Failed to update MongoDB document: {e}"
+            raise SerializationError(message=msg) from e
 
     @override
     def _put_managed_entries(

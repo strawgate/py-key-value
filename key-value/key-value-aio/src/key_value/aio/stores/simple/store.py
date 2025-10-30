@@ -58,13 +58,13 @@ class SimpleStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDes
             default_collection: The default collection to use if no collection is provided.
         """
 
-        super().__init__(default_collection=default_collection)
-
         self.max_entries = max_entries or sys.maxsize
 
         self._data = defaultdict[str, SimpleStoreEntry]()
 
         self._serialization_adapter = ValueOnlySerializationAdapter()
+
+        super().__init__(default_collection=default_collection)
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:

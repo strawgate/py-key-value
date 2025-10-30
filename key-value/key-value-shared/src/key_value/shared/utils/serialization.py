@@ -11,7 +11,6 @@ from typing import Any, Literal, TypeVar
 
 from key_value.shared.errors import DeserializationError
 from key_value.shared.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json, verify_dict
-from key_value.shared.utils.time_to_live import try_parse_datetime_str
 
 T = TypeVar("T")
 
@@ -23,6 +22,14 @@ def key_must_be(dictionary: dict[str, Any], /, key: str, expected_type: type[T])
         msg = f"{key} must be a {expected_type.__name__}"
         raise TypeError(msg)
     return dictionary[key]
+
+
+def parse_datetime_str(value: str) -> datetime:
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        msg = f"Invalid datetime string: {value}"
+        raise DeserializationError(message=msg) from None
 
 
 class SerializationAdapter(ABC):
@@ -43,7 +50,7 @@ class SerializationAdapter(ABC):
         self._value_format = value_format
 
     def load_json(self, json_str: str) -> ManagedEntry:
-        """Convert a JSON string to a dictionary."""
+        """Convert a JSON string to a ManagedEntry."""
         loaded_data: dict[str, Any] = load_from_json(json_str=json_str)
 
         return self.load_dict(data=loaded_data)
@@ -63,9 +70,9 @@ class SerializationAdapter(ABC):
 
         if self._date_format == "isoformat":
             if created_at := key_must_be(data, key="created_at", expected_type=str):
-                managed_entry_proto["created_at"] = try_parse_datetime_str(value=created_at)
+                managed_entry_proto["created_at"] = parse_datetime_str(value=created_at)
             if expires_at := key_must_be(data, key="expires_at", expected_type=str):
-                managed_entry_proto["expires_at"] = try_parse_datetime_str(value=expires_at)
+                managed_entry_proto["expires_at"] = parse_datetime_str(value=expires_at)
 
         if self._date_format == "datetime":
             if created_at := key_must_be(data, key="created_at", expected_type=datetime):
@@ -104,9 +111,15 @@ class SerializationAdapter(ABC):
 
         data: dict[str, Any] = {
             "value": entry.value_as_dict if self._value_format == "dict" else entry.value_as_json,
-            "created_at": entry.created_at_isoformat,
-            "expires_at": entry.expires_at_isoformat,
         }
+
+        if self._date_format == "isoformat":
+            data["created_at"] = entry.created_at_isoformat
+            data["expires_at"] = entry.expires_at_isoformat
+
+        if self._date_format == "datetime":
+            data["created_at"] = entry.created_at
+            data["expires_at"] = entry.expires_at
 
         if exclude_none:
             data = {k: v for k, v in data.items() if v is not None}

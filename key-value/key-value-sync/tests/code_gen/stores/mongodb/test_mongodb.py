@@ -57,7 +57,6 @@ def test_managed_entry_document_conversion_native_mode():
 
     assert document == snapshot(
         {
-            "key": "test",
             "value": {"object": {"test": "test"}},
             "created_at": datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc),
             "expires_at": datetime(2025, 1, 1, 0, 0, 10, tzinfo=timezone.utc),
@@ -82,7 +81,6 @@ def test_managed_entry_document_conversion_legacy_mode():
 
     assert document == snapshot(
         {
-            "key": "test",
             "value": {"string": '{"test": "test"}'},
             "created_at": datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc),
             "expires_at": datetime(2025, 1, 1, 0, 0, 10, tzinfo=timezone.utc),
