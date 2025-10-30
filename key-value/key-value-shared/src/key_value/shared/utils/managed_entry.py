@@ -7,7 +7,7 @@ from typing import Any, SupportsFloat, cast
 from typing_extensions import Self
 
 from key_value.shared.errors import DeserializationError, SerializationError
-from key_value.shared.utils.time_to_live import now, prepare_ttl, seconds_to, try_parse_datetime_str
+from key_value.shared.utils.time_to_live import now, seconds_to, try_parse_datetime_str
 
 
 @dataclass(kw_only=True)
@@ -82,7 +82,11 @@ class ManagedEntry:
 
     @classmethod
     def from_dict(  # noqa: PLR0912
-        cls, data: dict[str, Any], includes_metadata: bool = True, ttl: SupportsFloat | None = None, stringified_value: bool = False
+        cls,
+        data: dict[str, Any],
+        includes_metadata: bool = True,
+        ttl: SupportsFloat | None = None,
+        stringified_value: bool = False,
     ) -> Self:
         if not includes_metadata:
             return cls(
@@ -127,12 +131,9 @@ class ManagedEntry:
                 raise DeserializationError(msg)
             value = verify_dict(obj=raw_value)
 
-        ttl_seconds: float | None = prepare_ttl(t=ttl)
-
         return cls(
             created_at=created_at,
             expires_at=expires_at,
-            ttl=ttl_seconds,
             value=value,
         )
 
