@@ -95,7 +95,7 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         await store.put(collection="test", key="document_format_test_1", value={"test_1": "value_1"})
         await store.put(collection="test", key="document_format_test_2", value={"test_2": "value_2"}, ttl=10)
 
-        raw_documents = await redis_client.mget(keys=["test::document_format_test_1", "test::document_format_test_2"])
+        raw_documents: Any = await redis_client.mget(keys=["test::document_format_test_1", "test::document_format_test_2"])
         raw_documents_dicts: list[dict[str, Any]] = [json.loads(raw_document) for raw_document in raw_documents]
         assert raw_documents_dicts == snapshot(
             [
@@ -135,7 +135,7 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         )
 
         await store.put(collection="test", key="document_format_test", value={"test": "value"}, ttl=10)
-        raw_document = await redis_client.get(name="test::document_format_test")
+        raw_document: Any = await redis_client.get(name="test::document_format_test")
         raw_document_dict = json.loads(raw_document)
         assert raw_document_dict == snapshot(
             {"created_at": IsDatetime(iso_string=True), "expires_at": IsDatetime(iso_string=True), "value": {"test": "value"}}
