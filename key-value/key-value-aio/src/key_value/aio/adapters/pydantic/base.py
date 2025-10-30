@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Any, Generic, SupportsFloat, TypeVar, overload
@@ -8,6 +9,8 @@ from pydantic.type_adapter import TypeAdapter
 from pydantic_core import PydanticSerializationError
 
 from key_value.aio.protocols.key_value import AsyncKeyValue
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -57,6 +60,17 @@ class BasePydanticAdapter(Generic[T], ABC):
                     if self._raise_on_validation_error:
                         msg = f"Invalid {self._get_model_type_name()} payload: missing 'items' wrapper"
                         raise DeserializationError(msg)
+
+                    # Log the missing 'items' wrapper when not raising
+                    logger.error(
+                        "Missing 'items' wrapper for list %s",
+                        self._get_model_type_name(),
+                        extra={
+                            "model_type": self._get_model_type_name(),
+                            "error": "missing 'items' wrapper",
+                        },
+                        exc_info=False,
+                    )
                     return None
                 return self._type_adapter.validate_python(value["items"])
 
@@ -66,6 +80,19 @@ class BasePydanticAdapter(Generic[T], ABC):
                 details = e.errors(include_input=False)
                 msg = f"Invalid {self._get_model_type_name()}: {details}"
                 raise DeserializationError(msg) from e
+
+            # Log the validation error when not raising
+            error_details = e.errors(include_input=False)
+            logger.error(
+                "Validation failed for %s",
+                self._get_model_type_name(),
+                extra={
+                    "model_type": self._get_model_type_name(),
+                    "error_count": len(error_details),
+                    "errors": error_details,
+                },
+                exc_info=True,
+            )
             return None
 
     def _serialize_model(self, value: T) -> dict[str, Any]:

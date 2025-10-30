@@ -7,7 +7,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import pytest
-from dirty_equals import IsFloat
+from bson import ObjectId
+from dirty_equals import IsDatetime, IsFloat, IsInstance
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import wait_for_true
 from key_value.shared.utils.managed_entry import ManagedEntry
@@ -45,15 +46,20 @@ class MongoDBFailedToStartError(Exception):
     pass
 
 
-def test_managed_entry_document_conversion():
+def test_managed_entry_document_conversion_native_mode():
     created_at = datetime(year=2025, month=1, day=1, hour=0, minute=0, second=0, tzinfo=timezone.utc)
     expires_at = created_at + timedelta(seconds=10)
 
     managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
-    document = managed_entry_to_document(key="test", managed_entry=managed_entry)
+    document = managed_entry_to_document(key="test", managed_entry=managed_entry, native_storage=True)
 
     assert document == snapshot(
-        {"key": "test", "value": '{"test": "test"}', "created_at": "2025-01-01T00:00:00+00:00", "expires_at": "2025-01-01T00:00:10+00:00"}
+        {
+            "key": "test",
+            "value": {"object": {"test": "test"}},
+            "created_at": datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc),
+            "expires_at": datetime(2025, 1, 1, 0, 0, 10, tzinfo=timezone.utc),
+        }
     )
 
     round_trip_managed_entry = document_to_managed_entry(document=document)
@@ -64,8 +70,38 @@ def test_managed_entry_document_conversion():
     assert round_trip_managed_entry.expires_at == expires_at
 
 
-@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
-class TestMongoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
+def test_managed_entry_document_conversion_legacy_mode():
+    created_at = datetime(year=2025, month=1, day=1, hour=0, minute=0, second=0, tzinfo=timezone.utc)
+    expires_at = created_at + timedelta(seconds=10)
+
+    managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
+    document = managed_entry_to_document(key="test", managed_entry=managed_entry, native_storage=False)
+
+    assert document == snapshot(
+        {
+            "key": "test",
+            "value": {"string": '{"test": "test"}'},
+            "created_at": datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc),
+            "expires_at": datetime(2025, 1, 1, 0, 0, 10, tzinfo=timezone.utc),
+        }
+    )
+
+    round_trip_managed_entry = document_to_managed_entry(document=document)
+
+    assert round_trip_managed_entry.value == managed_entry.value
+    assert round_trip_managed_entry.created_at == created_at
+    assert round_trip_managed_entry.ttl == IsFloat(lt=0)
+    assert round_trip_managed_entry.expires_at == expires_at
+
+
+def clean_mongodb_database(store: MongoDBStore) -> None:
+    with contextlib.suppress(Exception):
+        _ = store._client.drop_database(name_or_database=store._db.name)  # pyright: ignore[reportPrivateUsage]
+
+
+class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
+    """Base class for MongoDB store tests."""
+
     @pytest.fixture(autouse=True, scope="session", params=MONGODB_VERSIONS_TO_TEST)
     def setup_mongodb(self, request: pytest.FixtureRequest) -> Generator[None, None, None]:
         version = request.param
@@ -77,28 +113,102 @@ class TestMongoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
             yield
 
-    @override
-    @pytest.fixture
-    def store(self, setup_mongodb: None) -> MongoDBStore:
-        store = MongoDBStore(url=f"mongodb://{MONGODB_HOST}:{MONGODB_HOST_PORT}", db_name=MONGODB_TEST_DB)
-        # Ensure a clean db by dropping our default test collection if it exists
-        with contextlib.suppress(Exception):
-            _ = store._client.drop_database(name_or_database=MONGODB_TEST_DB)  # pyright: ignore[reportPrivateUsage]
-
-        return store
-
-    @pytest.fixture
-    def mongodb_store(self, store: MongoDBStore) -> MongoDBStore:
-        return store
-
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     def test_not_unbounded(self, store: BaseStore): ...
 
-    def test_mongodb_collection_name_sanitization(self, mongodb_store: MongoDBStore):
+    def test_mongodb_collection_name_sanitization(self, store: MongoDBStore):
         """Tests that a special characters in the collection name will not raise an error."""
-        mongodb_store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
-        assert mongodb_store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
+        store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
+        assert store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
 
-        collections = mongodb_store.collections()
+        collections = store.collections()
         assert collections == snapshot(["test_collection_-daf4a2ec"])
+
+
+@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
+class TestMongoDBStoreNativeMode(BaseMongoDBStoreTests):
+    """Test MongoDBStore with native_storage=True (default)."""
+
+    @override
+    @pytest.fixture
+    def store(self, setup_mongodb: None) -> MongoDBStore:
+        store = MongoDBStore(url=f"mongodb://{MONGODB_HOST}:{MONGODB_HOST_PORT}", db_name=f"{MONGODB_TEST_DB}-native", native_storage=True)
+
+        clean_mongodb_database(store=store)
+
+        return store
+
+    def test_value_stored_as_bson_dict(self, store: MongoDBStore):
+        """Verify values are stored as BSON dicts, not JSON strings."""
+        store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        # Get the raw MongoDB document
+        store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
+        doc = collection.find_one({"key": "test_key"})
+
+        assert doc == snapshot(
+            {
+                "_id": IsInstance(expected_type=ObjectId),
+                "key": "test_key",
+                "created_at": IsDatetime(),
+                "value": {"object": {"name": "Alice", "age": 30}},
+            }
+        )
+
+    def test_migration_from_legacy_mode(self, store: MongoDBStore):
+        """Verify native mode can read legacy JSON string data."""
+        store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
+
+        collection.insert_one({"key": "legacy_key", "value": {"string": '{"legacy": "data"}'}})
+
+        result = store.get(collection="test", key="legacy_key")
+        assert result == {"legacy": "data"}
+
+
+@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
+class TestMongoDBStoreNonNativeMode(BaseMongoDBStoreTests):
+    """Test MongoDBStore with native_storage=False (legacy mode) for backward compatibility."""
+
+    @override
+    @pytest.fixture
+    def store(self, setup_mongodb: None) -> MongoDBStore:
+        store = MongoDBStore(url=f"mongodb://{MONGODB_HOST}:{MONGODB_HOST_PORT}", db_name=MONGODB_TEST_DB, native_storage=False)
+
+        clean_mongodb_database(store=store)
+
+        return store
+
+    def test_value_stored_as_json(self, store: MongoDBStore):
+        """Verify values are stored as JSON strings."""
+        store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        # Get the raw MongoDB document
+        store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
+        doc = collection.find_one({"key": "test_key"})
+
+        assert doc == snapshot(
+            {
+                "_id": IsInstance(expected_type=ObjectId),
+                "key": "test_key",
+                "created_at": IsDatetime(),
+                "value": {"string": '{"age": 30, "name": "Alice"}'},
+            }
+        )
+
+    def test_migration_from_native_mode(self, store: MongoDBStore):
+        """Verify non-native mode can read native mode data."""
+        store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
+
+        collection.insert_one({"key": "legacy_key", "value": {"object": {"name": "Alice", "age": 30}}})
+
+        result = store.get(collection="test", key="legacy_key")
+        assert result == {"name": "Alice", "age": 30}

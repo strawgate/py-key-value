@@ -79,7 +79,7 @@ class ManagedEntry:
         )
 
     @classmethod
-    def from_dict(
+    def from_dict(  # noqa: PLR0912
         cls, data: dict[str, Any], includes_metadata: bool = True, ttl: SupportsFloat | None = None, stringified_value: bool = False
     ) -> Self:
         if not includes_metadata:
@@ -87,8 +87,26 @@ class ManagedEntry:
                 value=data,
             )
 
-        created_at: datetime | None = try_parse_datetime_str(value=data.get("created_at"))
-        expires_at: datetime | None = try_parse_datetime_str(value=data.get("expires_at"))
+        created_at: datetime | None = None
+        expires_at: datetime | None = None
+
+        if created_at_value := data.get("created_at"):
+            if isinstance(created_at_value, str):
+                created_at = try_parse_datetime_str(value=created_at_value)
+            elif isinstance(created_at_value, datetime):
+                created_at = created_at_value
+            else:
+                msg = "Expected `created_at` field to be a string or datetime"
+                raise DeserializationError(msg)
+
+        if expires_at_value := data.get("expires_at"):
+            if isinstance(expires_at_value, str):
+                expires_at = try_parse_datetime_str(value=expires_at_value)
+            elif isinstance(expires_at_value, datetime):
+                expires_at = expires_at_value
+            else:
+                msg = "Expected `expires_at` field to be a string or datetime"
+                raise DeserializationError(msg)
 
         if not (raw_value := data.get("value")):
             msg = "Value is None"

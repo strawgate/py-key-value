@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from logging import LogRecord
 
 import pytest
 from inline_snapshot import snapshot
@@ -45,6 +46,27 @@ SAMPLE_ORDER: Order = Order(created_at=datetime.now(), updated_at=datetime.now()
 TEST_COLLECTION: str = "test_collection"
 TEST_KEY: str = "test_key"
 TEST_KEY_2: str = "test_key_2"
+
+
+def model_type_from_log_record(record: LogRecord) -> str:
+    if not hasattr(record, "model_type"):
+        msg = "Log record does not have a model_type attribute"
+        raise ValueError(msg)
+    return record.model_type  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
+
+
+def error_from_log_record(record: LogRecord) -> str:
+    if not hasattr(record, "error"):
+        msg = "Log record does not have an error attribute"
+        raise ValueError(msg)
+    return record.error  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
+
+
+def errors_from_log_record(record: LogRecord) -> list[str]:
+    if not hasattr(record, "errors"):
+        msg = "Log record does not have an errors attribute"
+        raise ValueError(msg)
+    return record.errors  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
 
 
 class TestPydanticAdapter:
@@ -145,3 +167,53 @@ class TestPydanticAdapter:
 
         assert await product_list_adapter.delete(collection=TEST_COLLECTION, key=TEST_KEY)
         assert await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
+
+    async def test_validation_error_logging(
+        self, user_adapter: PydanticAdapter[User], updated_user_adapter: PydanticAdapter[UpdatedUser], caplog: pytest.LogCaptureFixture
+    ):
+        """Test that validation errors are logged when raise_on_validation_error=False."""
+        import logging
+
+        # Store a User, then try to retrieve as UpdatedUser (missing is_admin field)
+        await user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER)
+
+        with caplog.at_level(logging.ERROR):
+            updated_user = await updated_user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+
+        # Should return None due to validation failure
+        assert updated_user is None
+
+        # Check that an error was logged
+        assert len(caplog.records) == 1
+        record = caplog.records[0]
+        assert record.levelname == "ERROR"
+        assert "Validation failed" in record.message
+        assert model_type_from_log_record(record) == "Pydantic model"
+
+        errors = errors_from_log_record(record)
+        assert len(errors) == 1
+        assert "is_admin" in str(errors[0])
+
+    async def test_list_validation_error_logging(
+        self, product_list_adapter: PydanticAdapter[list[Product]], store: MemoryStore, caplog: pytest.LogCaptureFixture
+    ):
+        """Test that missing 'items' wrapper is logged for list models."""
+        import logging
+
+        # Manually store invalid data (missing 'items' wrapper)
+        await store.put(collection=TEST_COLLECTION, key=TEST_KEY, value={"invalid": "data"})
+
+        with caplog.at_level(logging.ERROR):
+            result = await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+
+        # Should return None due to missing 'items' wrapper
+        assert result is None
+
+        # Check that an error was logged
+        assert len(caplog.records) == 1
+        record = caplog.records[0]
+        assert record.levelname == "ERROR"
+        assert "Missing 'items' wrapper" in record.message
+        assert model_type_from_log_record(record) == "Pydantic model"
+        error = error_from_log_record(record)
+        assert "missing 'items' wrapper" in str(error)
