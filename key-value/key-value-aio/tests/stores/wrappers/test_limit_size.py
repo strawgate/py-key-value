@@ -1,5 +1,6 @@
 import pytest
 from key_value.shared.errors.wrappers.limit_size import EntryTooLargeError, EntryTooSmallError
+from key_value.shared.utils.managed_entry import estimate_serialized_size
 from typing_extensions import override
 
 from key_value.aio.stores.memory.store import MemoryStore
@@ -137,12 +138,8 @@ class TestLimitSizeWrapper(BaseStoreTests):
 
     async def test_exact_size_limit(self, memory_store: MemoryStore):
         # First, determine the exact size of a small value
-        from key_value.shared.utils.managed_entry import ManagedEntry
-
         test_value = {"test": "value"}
-        managed_entry = ManagedEntry(value=test_value)
-        json_str = managed_entry.to_json()
-        exact_size = len(json_str.encode("utf-8"))
+        exact_size = estimate_serialized_size(value=test_value)
 
         # Create a store with exact size limit
         limit_size_store: LimitSizeWrapper = LimitSizeWrapper(key_value=memory_store, max_size=exact_size, raise_on_too_large=True)

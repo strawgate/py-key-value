@@ -7,7 +7,8 @@ from typing import Any, SupportsFloat
 from typing_extensions import Self
 
 from key_value.shared.errors import DeserializationError, SerializationError
-from key_value.shared.utils.time_to_live import now, now_plus, seconds_to, try_parse_datetime_str
+from key_value.shared.type_checking.bear_spray import bear_enforce
+from key_value.shared.utils.time_to_live import now, now_plus, seconds_to
 
 
 @dataclass(kw_only=True)
@@ -61,96 +62,8 @@ class ManagedEntry:
             expires_at=(now_plus(seconds=float(ttl)) if ttl else None),
         )
 
-    def to_dict(
-        self, include_metadata: bool = True, include_expiration: bool = True, include_creation: bool = True, stringify_value: bool = False
-    ) -> dict[str, Any]:
-        if not include_metadata:
-            return dict(self.value)
 
-        data: dict[str, Any] = {"value": self.value_as_json if stringify_value else self.value}
-
-        if include_creation and self.created_at:
-            data["created_at"] = self.created_at.isoformat()
-        if include_expiration and self.expires_at:
-            data["expires_at"] = self.expires_at.isoformat()
-
-        return data
-
-    def to_json(
-        self, include_metadata: bool = True, include_expiration: bool = True, include_creation: bool = True, stringify_value: bool = False
-    ) -> str:
-        return dump_to_json(
-            obj=self.to_dict(
-                include_metadata=include_metadata,
-                include_expiration=include_expiration,
-                include_creation=include_creation,
-                stringify_value=stringify_value,
-            )
-        )
-
-    @classmethod
-    def from_dict(  # noqa: PLR0912
-        cls,
-        data: dict[str, Any],
-        includes_metadata: bool = True,
-        stringified_value: bool = False,
-    ) -> Self:
-        if not includes_metadata:
-            return cls(
-                value=data,
-            )
-
-        created_at: datetime | None = None
-        expires_at: datetime | None = None
-
-        if created_at_value := data.get("created_at"):
-            if isinstance(created_at_value, str):
-                created_at = try_parse_datetime_str(value=created_at_value)
-            elif isinstance(created_at_value, datetime):
-                created_at = created_at_value
-            else:
-                msg = "Expected `created_at` field to be a string or datetime"
-                raise DeserializationError(msg)
-
-        if expires_at_value := data.get("expires_at"):
-            if isinstance(expires_at_value, str):
-                expires_at = try_parse_datetime_str(value=expires_at_value)
-            elif isinstance(expires_at_value, datetime):
-                expires_at = expires_at_value
-            else:
-                msg = "Expected `expires_at` field to be a string or datetime"
-                raise DeserializationError(msg)
-
-        if not (raw_value := data.get("value")):
-            msg = "Value is None"
-            raise DeserializationError(msg)
-
-        value: dict[str, Any]
-
-        if stringified_value:
-            if not isinstance(raw_value, str):
-                msg = "Value is not a string"
-                raise DeserializationError(msg)
-            value = load_from_json(json_str=raw_value)
-        else:
-            if not isinstance(raw_value, dict):
-                msg = "Value is not a dictionary"
-                raise DeserializationError(msg)
-            value = verify_dict(obj=raw_value)
-
-        return cls(
-            created_at=created_at,
-            expires_at=expires_at,
-            value=value,
-        )
-
-    @classmethod
-    def from_json(cls, json_str: str, includes_metadata: bool = True) -> Self:
-        data: dict[str, Any] = load_from_json(json_str=json_str)
-
-        return cls.from_dict(data=data, includes_metadata=includes_metadata)
-
-
+@bear_enforce
 def dump_to_json(obj: dict[str, Any]) -> str:
     try:
         return json.dumps(obj, sort_keys=True)
@@ -159,6 +72,7 @@ def dump_to_json(obj: dict[str, Any]) -> str:
         raise SerializationError(msg) from e
 
 
+@bear_enforce
 def load_from_json(json_str: str) -> dict[str, Any]:
     try:
         return verify_dict(obj=json.loads(json_str))  # pyright: ignore[reportAny]
@@ -168,6 +82,7 @@ def load_from_json(json_str: str) -> dict[str, Any]:
         raise DeserializationError(msg) from e
 
 
+@bear_enforce
 def verify_dict(obj: Any) -> dict[str, Any]:
     if not isinstance(obj, Mapping):
         msg = "Object is not a dictionary"

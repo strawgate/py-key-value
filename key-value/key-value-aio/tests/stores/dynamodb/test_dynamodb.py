@@ -1,8 +1,14 @@
 import contextlib
+import json
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import pytest
+from dirty_equals import IsDatetime
+from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
+from types_aiobotocore_dynamodb.client import DynamoDBClient
+from types_aiobotocore_dynamodb.type_defs import GetItemOutputTypeDef
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -46,6 +52,10 @@ async def ping_dynamodb() -> bool:
 
 class DynamoDBFailedToStartError(Exception):
     pass
+
+
+def get_value_from_response(response: GetItemOutputTypeDef) -> dict[str, Any]:
+    return json.loads(response.get("Item", {}).get("value", {}).get("S", {}))  # pyright: ignore[reportArgumentType]
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
@@ -98,6 +108,29 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     async def dynamodb_store(self, store: DynamoDBStore) -> DynamoDBStore:
         return store
 
+    @pytest.fixture
+    async def dynamodb_client(self, store: DynamoDBStore) -> DynamoDBClient:
+        return store._connected_client  # pyright: ignore[reportPrivateUsage]
+
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
+
+    async def test_value_stored(self, store: DynamoDBStore, dynamodb_client: DynamoDBClient):
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        response = await dynamodb_client.get_item(
+            TableName=DYNAMODB_TEST_TABLE, Key={"collection": {"S": "test"}, "key": {"S": "test_key"}}
+        )
+        assert get_value_from_response(response=response) == snapshot(
+            {"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}}
+        )
+
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
+
+        response = await dynamodb_client.get_item(
+            TableName=DYNAMODB_TEST_TABLE, Key={"collection": {"S": "test"}, "key": {"S": "test_key"}}
+        )
+        assert get_value_from_response(response=response) == snapshot(
+            {"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}, "expires_at": IsDatetime(iso_string=True)}
+        )

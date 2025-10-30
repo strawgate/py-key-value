@@ -4,6 +4,7 @@ from typing import overload
 
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.serialization import BasicSerializationAdapter
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseStore
@@ -44,9 +45,11 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
             port: Memcached port. Defaults to 11211.
             default_collection: The default collection to use if no collection is provided.
         """
+        super().__init__(default_collection=default_collection)
+
         self._client = client or Client(host=host, port=port)
 
-        super().__init__(default_collection=default_collection)
+        self._serialization_adapter = BasicSerializationAdapter(value_format="dict")
 
     def sanitize_key(self, key: str) -> str:
         if len(key) > MAX_KEY_LENGTH:
@@ -65,7 +68,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
 
         json_str: str = raw_value.decode(encoding="utf-8")
 
-        return ManagedEntry.from_json(json_str=json_str)
+        return self._serialization_adapter.load_json(json_str=json_str)
 
     @override
     async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
@@ -82,7 +85,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         for raw_value in raw_values:
             if isinstance(raw_value, (bytes, bytearray)):
                 json_str: str = raw_value.decode(encoding="utf-8")
-                entries.append(ManagedEntry.from_json(json_str=json_str))
+                entries.append(self._serialization_adapter.load_json(json_str=json_str))
             else:
                 entries.append(None)
 
@@ -106,7 +109,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         else:
             exptime = max(int(managed_entry.ttl), 1)
 
-        json_value: str = managed_entry.to_json()
+        json_value: str = self._serialization_adapter.dump_json(entry=managed_entry)
 
         _ = await self._client.set(
             key=combo_key.encode(encoding="utf-8"),

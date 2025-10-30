@@ -199,7 +199,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         if not json_value:
             return None
 
-        return ManagedEntry.from_json(json_str=json_value)  # pyright: ignore[reportUnknownArgumentType]
+        return self._serialization_adapter.load_json(json_str=json_value)
 
     @override
     async def _put_managed_entry(
@@ -210,7 +210,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         managed_entry: ManagedEntry,
     ) -> None:
         """Store a managed entry in DynamoDB."""
-        json_value = managed_entry.to_json()
+        json_value = self._serialization_adapter.dump_json(entry=managed_entry)
 
         item: dict[str, Any] = {
             "collection": {"S": collection},

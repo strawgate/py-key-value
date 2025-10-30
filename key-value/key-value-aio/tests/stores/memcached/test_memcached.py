@@ -1,8 +1,11 @@
 import contextlib
+import json
 from collections.abc import AsyncGenerator
 
 import pytest
 from aiomcache import Client
+from dirty_equals import IsDatetime
+from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
 
@@ -64,3 +67,28 @@ class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
+
+    @pytest.fixture
+    async def memcached_client(self, store: MemcachedStore) -> Client:
+        return store._client  # pyright: ignore[reportPrivateUsage]
+
+    async def test_value_stored(self, store: MemcachedStore, memcached_client: Client):
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        value = await memcached_client.get(key=b"test::test_key")
+        assert value is not None
+        value_as_dict = json.loads(value.decode("utf-8"))
+        assert value_as_dict == snapshot({"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}})
+
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
+
+        value = await memcached_client.get(key=b"test::test_key")
+        assert value is not None
+        value_as_dict = json.loads(value.decode("utf-8"))
+        assert value_as_dict == snapshot(
+            {
+                "created_at": IsDatetime(iso_string=True),
+                "expires_at": IsDatetime(iso_string=True),
+                "value": {"age": 30, "name": "Alice"},
+            }
+        )

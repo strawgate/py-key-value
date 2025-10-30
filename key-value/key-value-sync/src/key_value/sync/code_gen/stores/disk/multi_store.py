@@ -6,8 +6,8 @@ from datetime import timezone
 from pathlib import Path
 from typing import overload
 
-from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry, datetime
+from key_value.shared.utils.serialization import BasicSerializationAdapter
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseContextManagerStore, BaseStore
@@ -103,6 +103,7 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
         self._cache = {}
 
         self._stable_api = True
+        self._serialization_adapter = BasicSerializationAdapter()
 
         super().__init__(default_collection=default_collection)
 
@@ -112,11 +113,9 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
 
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        combo_key: str = compound_key(collection=collection, key=key)
-
         expire_epoch: float
 
-        (managed_entry_str, expire_epoch) = self._cache[collection].get(key=combo_key, expire_time=True)  # pyright: ignore[reportAny]
+        (managed_entry_str, expire_epoch) = self._cache[collection].get(key=key, expire_time=True)  # pyright: ignore[reportAny]
 
         if not isinstance(managed_entry_str, str):
             return None
@@ -130,17 +129,11 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
 
     @override
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
-        combo_key: str = compound_key(collection=collection, key=key)
-
-        _ = self._cache[collection].set(
-            key=combo_key, value=self._serialization_adapter.dump_json(entry=managed_entry, exclude_none=False), expire=managed_entry.ttl
-        )
+        _ = self._cache[collection].set(key=key, value=self._serialization_adapter.dump_json(entry=managed_entry), expire=managed_entry.ttl)
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        combo_key: str = compound_key(collection=collection, key=key)
-
-        return self._cache[collection].delete(key=combo_key, retry=True)
+        return self._cache[collection].delete(key=key, retry=True)
 
     def _sync_close(self) -> None:
         for cache in self._cache.values():

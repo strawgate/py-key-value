@@ -2,13 +2,18 @@
 # from the original file 'test_valkey.py'
 # DO NOT CHANGE! Change the original file instead.
 import contextlib
+import json
 from collections.abc import Generator
 
 import pytest
+from dirty_equals import IsDatetime
+from glide_sync.glide_client import BaseClient
+from inline_snapshot import snapshot
 from key_value.shared.stores.wait import wait_for_true
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
+from key_value.sync.code_gen.stores.valkey import ValkeyStore
 from tests.code_gen.conftest import detect_on_windows, docker_container, should_skip_docker_tests
 from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -79,6 +84,27 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         return store
 
+    @pytest.fixture
+    def valkey_client(self, store: ValkeyStore):
+        return store._connected_client  # pyright: ignore[reportPrivateUsage]
+
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     def test_not_unbounded(self, store: BaseStore): ...
+
+    def test_value_stored(self, store: ValkeyStore, valkey_client: BaseClient):
+        store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        value = valkey_client.get(key="test::test_key")
+        assert value is not None
+        value_as_dict = json.loads(value.decode("utf-8"))
+        assert value_as_dict == snapshot({"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}})
+
+        store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
+
+        value = valkey_client.get(key="test::test_key")
+        assert value is not None
+        value_as_dict = json.loads(value.decode("utf-8"))
+        assert value_as_dict == snapshot(
+            {"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}, "expires_at": IsDatetime(iso_string=True)}
+        )

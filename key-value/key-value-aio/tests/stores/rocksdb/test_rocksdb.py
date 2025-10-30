@@ -1,8 +1,12 @@
+import json
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
+from dirty_equals import IsDatetime
+from inline_snapshot import snapshot
+from rocksdict import Rdict
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -59,3 +63,24 @@ class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.mark.skip(reason="Local disk stores are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
+
+    @pytest.fixture
+    async def rocksdb_client(self, store: RocksDBStore) -> Rdict:
+        return store._db  # pyright: ignore[reportPrivateUsage]
+
+    async def test_value_stored(self, store: RocksDBStore, rocksdb_client: Rdict):
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        value = rocksdb_client.get(key="test::test_key")
+        assert value is not None
+        value_as_dict = json.loads(value.decode("utf-8"))
+        assert value_as_dict == snapshot({"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}})
+
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
+
+        value = rocksdb_client.get(key="test::test_key")
+        assert value is not None
+        value_as_dict = json.loads(value.decode("utf-8"))
+        assert value_as_dict == snapshot(
+            {"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}, "expires_at": IsDatetime(iso_string=True)}
+        )

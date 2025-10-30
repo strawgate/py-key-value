@@ -131,3 +131,18 @@ class BasicSerializationAdapter(SerializationAdapter):
 
     def prepare_dump(self, data: dict[str, Any]) -> dict[str, Any]:
         return data
+
+
+class ValueOnlySerializationAdapter(SerializationAdapter):
+    """Serialization adapter that only serializes the value."""
+
+    def __init__(self, *, value_format: Literal["string", "dict"] | None = "dict") -> None:
+        super().__init__(date_format=None, value_format=value_format)
+
+    def prepare_load(self, data: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "value": data,
+        }
+
+    def prepare_dump(self, data: dict[str, Any]) -> dict[str, Any]:
+        return data.get("value")

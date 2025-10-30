@@ -7,7 +7,8 @@ from datetime import datetime
 from typing import Any
 
 from key_value.shared.utils.managed_entry import ManagedEntry
-from typing_extensions import Self, override
+from key_value.shared.utils.serialization import BasicSerializationAdapter
+from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import (
     SEED_DATA_TYPE,
@@ -32,13 +33,6 @@ class MemoryCacheEntry:
 
     expires_at: datetime | None
 
-    @classmethod
-    def from_managed_entry(cls, managed_entry: ManagedEntry) -> Self:
-        return cls(json_str=managed_entry.to_json(), expires_at=managed_entry.expires_at)
-
-    def to_managed_entry(self) -> ManagedEntry:
-        return ManagedEntry.from_json(json_str=self.json_str)
-
 
 def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, _now: float) -> float:
     """Calculate time-to-use for cache entries based on their expiration time."""
@@ -53,8 +47,6 @@ def _memory_cache_getsizeof(value: MemoryCacheEntry) -> int:
     return 1
 
 
-DEFAULT_MAX_ENTRIES_PER_COLLECTION = 10000
-
 DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
 
@@ -62,13 +54,17 @@ PAGE_LIMIT = 10000
 class MemoryCollection:
     _cache: TLRUCache[str, MemoryCacheEntry]
 
-    def __init__(self, max_entries: int = DEFAULT_MAX_ENTRIES_PER_COLLECTION):
+    def __init__(self, max_entries: int | None = None):
         """Initialize a fixed-size in-memory collection.
 
         Args:
-            max_entries: The maximum number of entries per collection. Defaults to 10,000 entries.
+            max_entries: The maximum number of entries per collection. Defaults to no limit.
         """
-        self._cache = TLRUCache[str, MemoryCacheEntry](maxsize=max_entries, ttu=_memory_cache_ttu, getsizeof=_memory_cache_getsizeof)
+        self._cache = TLRUCache[str, MemoryCacheEntry](
+            maxsize=max_entries or sys.maxsize, ttu=_memory_cache_ttu, getsizeof=_memory_cache_getsizeof
+        )
+
+        self._serialization_adapter = BasicSerializationAdapter()
 
     def get(self, key: str) -> ManagedEntry | None:
         managed_entry_str: MemoryCacheEntry | None = self._cache.get(key)
@@ -76,12 +72,13 @@ class MemoryCollection:
         if managed_entry_str is None:
             return None
 
-        managed_entry: ManagedEntry = managed_entry_str.to_managed_entry()
+        managed_entry: ManagedEntry = self._serialization_adapter.load_json(json_str=managed_entry_str.json_str)
 
         return managed_entry
 
     def put(self, key: str, value: ManagedEntry) -> None:
-        self._cache[key] = MemoryCacheEntry.from_managed_entry(managed_entry=value)
+        json_str: str = self._serialization_adapter.dump_json(entry=value)
+        self._cache[key] = MemoryCacheEntry(json_str=json_str, expires_at=value.expires_at)
 
     def delete(self, key: str) -> bool:
         return self._cache.pop(key, None) is not None
@@ -99,27 +96,25 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
     _cache: dict[str, MemoryCollection]
 
     def __init__(
-        self,
-        *,
-        max_entries_per_collection: int = DEFAULT_MAX_ENTRIES_PER_COLLECTION,
-        default_collection: str | None = None,
-        seed: SEED_DATA_TYPE | None = None,
+        self, *, max_entries_per_collection: int | None = None, default_collection: str | None = None, seed: SEED_DATA_TYPE | None = None
     ):
         """Initialize a fixed-size in-memory store.
 
         Args:
-            max_entries_per_collection: The maximum number of entries per collection. Defaults to 10000.
+            max_entries_per_collection: The maximum number of entries per collection. Defaults to no limit.
             default_collection: The default collection to use if no collection is provided.
             seed: Optional seed data to pre-populate the store. Format: {collection: {key: {field: value, ...}}}.
                 Each value must be a mapping (dict) that will be stored as the entry's value.
                 Seeding occurs lazily when each collection is first accessed.
         """
 
-        self.max_entries_per_collection = max_entries_per_collection
+        self.max_entries_per_collection = max_entries_per_collection or sys.maxsize
 
         self._cache = {}
 
         self._stable_api = True
+
+        self._serialization_adapter = BasicSerializationAdapter()
 
         super().__init__(default_collection=default_collection, seed=seed)
 

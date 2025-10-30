@@ -102,13 +102,13 @@ class VaultStore(BaseStore):
             return None
 
         json_str: str = secret_data["value"]  # pyright: ignore[reportUnknownVariableType]
-        return ManagedEntry.from_json(json_str=json_str)  # pyright: ignore[reportUnknownArgumentType]
+        return self._serialization_adapter.load_json(json_str=json_str)  # pyright: ignore[reportUnknownArgumentType]
 
     @override
     async def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        json_str: str = managed_entry.to_json()
+        json_str: str = self._serialization_adapter.dump_json(entry=managed_entry)
 
         # Store the JSON string in a 'value' field
         secret_data = {"value": json_str}
