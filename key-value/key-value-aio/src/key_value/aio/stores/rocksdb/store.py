@@ -109,7 +109,7 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
             return None
 
         managed_entry_str: str = value.decode("utf-8")
-        managed_entry: ManagedEntry = ManagedEntry.from_json(json_str=managed_entry_str)
+        managed_entry: ManagedEntry = self._serialization_adapter.load_json(json_str=managed_entry_str)
 
         return managed_entry
 

@@ -95,7 +95,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
 
         decoded_response: str = response.decode("utf-8")
 
-        return ManagedEntry.from_json(json_str=decoded_response)
+        return self._serialization_adapter.load_json(json_str=decoded_response)
 
     @override
     async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
