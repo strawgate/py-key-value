@@ -7,7 +7,7 @@ from typing import Any, SupportsFloat, cast
 from typing_extensions import Self
 
 from key_value.shared.errors import DeserializationError, SerializationError
-from key_value.shared.utils.time_to_live import now, seconds_to, try_parse_datetime_str
+from key_value.shared.utils.time_to_live import now, now_plus, seconds_to, try_parse_datetime_str
 
 
 @dataclass(kw_only=True)
@@ -53,6 +53,14 @@ class ManagedEntry:
     def expires_at_isoformat(self) -> str | None:
         return self.expires_at.isoformat() if self.expires_at else None
 
+    @classmethod
+    def from_ttl(cls, *, value: Mapping[str, Any], created_at: datetime | None = None, ttl: SupportsFloat) -> Self:
+        return cls(
+            value=value,
+            created_at=created_at,
+            expires_at=(now_plus(seconds=ttl) if created_at else None),
+        )
+
     def to_dict(
         self, include_metadata: bool = True, include_expiration: bool = True, include_creation: bool = True, stringify_value: bool = False
     ) -> dict[str, Any]:
@@ -85,7 +93,6 @@ class ManagedEntry:
         cls,
         data: dict[str, Any],
         includes_metadata: bool = True,
-        ttl: SupportsFloat | None = None,
         stringified_value: bool = False,
     ) -> Self:
         if not includes_metadata:
@@ -138,10 +145,10 @@ class ManagedEntry:
         )
 
     @classmethod
-    def from_json(cls, json_str: str, includes_metadata: bool = True, ttl: SupportsFloat | None = None) -> Self:
+    def from_json(cls, json_str: str, includes_metadata: bool = True) -> Self:
         data: dict[str, Any] = load_from_json(json_str=json_str)
 
-        return cls.from_dict(data=data, includes_metadata=includes_metadata, ttl=ttl)
+        return cls.from_dict(data=data, includes_metadata=includes_metadata)
 
 
 def dump_to_json(obj: dict[str, Any]) -> str:
