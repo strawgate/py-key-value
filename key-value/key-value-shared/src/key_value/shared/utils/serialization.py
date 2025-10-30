@@ -145,4 +145,7 @@ class ValueOnlySerializationAdapter(SerializationAdapter):
         }
 
     def prepare_dump(self, data: dict[str, Any]) -> dict[str, Any]:
-        return data.get("value")
+        if "value" not in data:
+            msg = "Value field not found"
+            raise DeserializationError(message=msg)
+        return verify_dict(obj=data["value"])
