@@ -45,6 +45,7 @@ class MemcachedFailedToStartError(Exception):
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=MEMCACHED_VERSIONS_TO_TEST)
     async def setup_memcached(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:

@@ -99,6 +99,7 @@ async def clean_mongodb_database(store: MongoDBStore) -> None:
         _ = await store._client.drop_database(name_or_database=store._db.name)  # pyright: ignore[reportPrivateUsage]
 
 
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
     """Base class for MongoDB store tests."""
 

@@ -17,6 +17,7 @@ from key_value.sync.code_gen.stores.rocksdb import RocksDBStore
 from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture

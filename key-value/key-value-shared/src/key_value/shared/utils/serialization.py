@@ -86,7 +86,7 @@ class SerializationAdapter(ABC):
 
         value = data["value"]
 
-        managed_entry_value: dict[str, Any] = data["value"]
+        managed_entry_value: dict[str, Any] = {}
 
         if isinstance(value, str):
             managed_entry_value = load_from_json(json_str=value)

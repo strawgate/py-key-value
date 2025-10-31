@@ -64,6 +64,7 @@ def get_dynamo_client_from_store(store: DynamoDBStore) -> DynamoDBClient:
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=DYNAMODB_VERSIONS_TO_TEST)
     async def setup_dynamodb(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
