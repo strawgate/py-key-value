@@ -4,7 +4,7 @@ import pytest
 from inline_snapshot import snapshot
 
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.serialization import BasicSerializationAdapter, ValueOnlySerializationAdapter
+from key_value.shared.utils.serialization import BasicSerializationAdapter
 
 FIXED_DATETIME_ONE = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 FIXED_DATETIME_ONE_ISOFORMAT = FIXED_DATETIME_ONE.isoformat()
@@ -78,45 +78,3 @@ class TestBasicSerializationAdapter:
 
         assert adapter.load_dict(data=adapter.dump_dict(entry=TEST_ENTRY_TWO)) == snapshot(TEST_ENTRY_TWO)
         assert adapter.load_json(json_str=adapter.dump_json(entry=TEST_ENTRY_TWO)) == snapshot(TEST_ENTRY_TWO)
-
-
-class TestValueOnlySerializationAdapter:
-    @pytest.fixture
-    def adapter(self) -> ValueOnlySerializationAdapter:
-        return ValueOnlySerializationAdapter()
-
-    def test_entry_one(self, adapter: ValueOnlySerializationAdapter):
-        assert adapter.dump_dict(entry=TEST_ENTRY_ONE) == snapshot(
-            {"key_one": "value_one", "key_two": "value_two", "key_three": {"nested_key": "nested_value"}}
-        )
-
-        assert adapter.dump_json(entry=TEST_ENTRY_ONE) == snapshot(
-            '{"key_one": "value_one", "key_three": {"nested_key": "nested_value"}, "key_two": "value_two"}'
-        )
-
-        assert adapter.load_json(json_str=adapter.dump_json(entry=TEST_ENTRY_ONE)) == snapshot(
-            ManagedEntry(value={"key_one": "value_one", "key_three": {"nested_key": "nested_value"}, "key_two": "value_two"})
-        )
-        assert adapter.load_dict(data=adapter.dump_dict(entry=TEST_ENTRY_ONE)) == snapshot(
-            ManagedEntry(value={"key_one": "value_one", "key_two": "value_two", "key_three": {"nested_key": "nested_value"}})
-        )
-
-    def test_entry_two(self, adapter: ValueOnlySerializationAdapter):
-        assert adapter.dump_dict(entry=TEST_ENTRY_TWO) == snapshot(
-            {"key_one": ["value_one", "value_two", "value_three"], "key_two": 123, "key_three": {"nested_key": "nested_value"}}
-        )
-
-        assert adapter.dump_json(entry=TEST_ENTRY_TWO) == snapshot(
-            '{"key_one": ["value_one", "value_two", "value_three"], "key_three": {"nested_key": "nested_value"}, "key_two": 123}'
-        )
-
-        assert adapter.load_json(json_str=adapter.dump_json(entry=TEST_ENTRY_TWO)) == snapshot(
-            ManagedEntry(
-                value={"key_one": ["value_one", "value_two", "value_three"], "key_three": {"nested_key": "nested_value"}, "key_two": 123}
-            )
-        )
-        assert adapter.load_dict(data=adapter.dump_dict(entry=TEST_ENTRY_TWO)) == snapshot(
-            ManagedEntry(
-                value={"key_one": ["value_one", "value_two", "value_three"], "key_two": 123, "key_three": {"nested_key": "nested_value"}}
-            )
-        )

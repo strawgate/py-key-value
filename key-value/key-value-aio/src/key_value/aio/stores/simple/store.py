@@ -5,7 +5,7 @@ from datetime import datetime
 
 from key_value.shared.utils.compound import compound_key, get_collections_from_compound_keys, get_keys_from_compound_keys
 from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json
-from key_value.shared.utils.serialization import ValueOnlySerializationAdapter
+from key_value.shared.utils.serialization import BasicSerializationAdapter
 from key_value.shared.utils.time_to_live import seconds_to
 from typing_extensions import override
 
@@ -62,7 +62,7 @@ class SimpleStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDes
 
         self._data = defaultdict[str, SimpleStoreEntry]()
 
-        self._serialization_adapter = ValueOnlySerializationAdapter()
+        self._serialization_adapter = BasicSerializationAdapter(date_format=None)
 
         super().__init__(default_collection=default_collection)
 
