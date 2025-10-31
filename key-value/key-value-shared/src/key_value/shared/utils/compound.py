@@ -1,5 +1,7 @@
 from collections.abc import Sequence
 
+from key_value.shared.type_checking.bear_spray import bear_enforce
+
 DEFAULT_COMPOUND_SEPARATOR = "::"
 DEFAULT_PREFIX_SEPARATOR = "__"
 
@@ -29,11 +31,13 @@ def uncompound_strings(strings: Sequence[str], separator: str | None = None) -> 
     return [uncompound_string(string=string, separator=separator) for string in strings]
 
 
+@bear_enforce
 def compound_key(collection: str, key: str, separator: str | None = None) -> str:
     separator = separator or DEFAULT_COMPOUND_SEPARATOR
     return compound_string(first=collection, second=key, separator=separator)
 
 
+@bear_enforce
 def uncompound_key(key: str, separator: str | None = None) -> tuple[str, str]:
     separator = separator or DEFAULT_COMPOUND_SEPARATOR
     return uncompound_string(string=key, separator=separator)

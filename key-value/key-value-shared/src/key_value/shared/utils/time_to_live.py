@@ -4,6 +4,7 @@ from numbers import Real
 from typing import Any, SupportsFloat, overload
 
 from key_value.shared.errors import InvalidTTLError
+from key_value.shared.type_checking.bear_spray import bear_enforce
 
 
 def epoch_to_datetime(epoch: float) -> datetime:
@@ -49,6 +50,7 @@ def prepare_ttl(t: SupportsFloat) -> float: ...
 def prepare_ttl(t: SupportsFloat | None) -> float | None: ...
 
 
+@bear_enforce
 def prepare_ttl(t: SupportsFloat | None) -> float | None:
     """Prepare a TTL for use in a put operation.
 
