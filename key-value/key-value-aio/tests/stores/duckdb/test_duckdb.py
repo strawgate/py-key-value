@@ -104,7 +104,7 @@ class TestDuckDBStoreSpecific:
 
         assert len(result) == 1  # Only item2 has ttl > 3600
         assert result[0][0] == "item2"
-        assert result[0][1] == 7200
+        assert abs(result[0][1] - 7200) < 1  # TTL should be approximately 7200 (floating point precision)
         assert result[0][2] is True  # has_created
 
         await store.close()
