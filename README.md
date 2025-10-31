@@ -17,7 +17,7 @@ This monorepo contains two libraries:
 ## Why use this library?
 
 - **Multiple backends**: DynamoDB, Elasticsearch, Memcached, MongoDB, Redis,
-  RocksDB, Valkey, and In-memory, Disk, etc
+  RocksDB, SQLite, Valkey, and In-memory, Disk, etc.
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
 - **Adapters**: Pydantic model support, raise-on-missing behavior, etc
@@ -129,6 +129,7 @@ pip install py-key-value-aio
 # With specific backend extras
 pip install py-key-value-aio[memory]
 pip install py-key-value-aio[disk]
+pip install py-key-value-aio[sqlite]
 pip install py-key-value-aio[dynamodb]
 pip install py-key-value-aio[elasticsearch]
 # or: redis, mongodb, memcached, valkey, vault, registry, rocksdb, see below for all options
@@ -187,7 +188,7 @@ ttl_many(keys: list[str], collection: str | None = None) -> list[tuple[dict[str,
 The library provides multiple store implementations organized into three
 categories:
 
-- **Local stores**: In-memory and disk-based storage (Memory, Disk, RocksDB, etc.)
+- **Local stores**: In-memory and disk-based storage (Memory, Disk, SQLite, RocksDB, etc.)
 - **Secret stores**: Secure OS-level storage for sensitive data (Keyring, Vault)
 - **Distributed stores**: Network-based storage for multi-node apps (Redis,
   DynamoDB, MongoDB, etc.)
