@@ -58,7 +58,7 @@ class SimpleStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDes
             default_collection: The default collection to use if no collection is provided.
         """
 
-        self.max_entries = max_entries or sys.maxsize
+        self.max_entries = max_entries if max_entries is not None else sys.maxsize
 
         self._data = defaultdict[str, SimpleStoreEntry]()
 
