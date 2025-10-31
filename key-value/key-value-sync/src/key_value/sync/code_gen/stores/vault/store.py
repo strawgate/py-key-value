@@ -83,7 +83,7 @@ class VaultStore(BaseStore):
         combo_key: str = compound_key(collection=collection, key=key)
 
         try:
-            response = self._kv_v2.read_secret(path=combo_key, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+            response = self._kv_v2.read_secret(path=combo_key, mount_point=self._mount_point, raise_on_deleted_version=True)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
         except InvalidPath:
             return None
         except Exception:
