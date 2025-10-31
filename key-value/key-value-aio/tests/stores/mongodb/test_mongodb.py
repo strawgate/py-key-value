@@ -14,7 +14,7 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.mongodb import MongoDBStore
-from key_value.aio.stores.mongodb.store import document_to_managed_entry, managed_entry_to_document
+from key_value.aio.stores.mongodb.store import MongoDBSerializationAdapter
 from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -50,18 +50,19 @@ def test_managed_entry_document_conversion_native_mode():
     expires_at = created_at + timedelta(seconds=10)
 
     managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
-    document = managed_entry_to_document(key="test", managed_entry=managed_entry, native_storage=True)
+
+    adapter = MongoDBSerializationAdapter(native_storage=True)
+    document = adapter.dump_dict(entry=managed_entry)
 
     assert document == snapshot(
         {
-            "key": "test",
             "value": {"object": {"test": "test"}},
             "created_at": datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc),
             "expires_at": datetime(2025, 1, 1, 0, 0, 10, tzinfo=timezone.utc),
         }
     )
 
-    round_trip_managed_entry = document_to_managed_entry(document=document)
+    round_trip_managed_entry = adapter.load_dict(data=document)
 
     assert round_trip_managed_entry.value == managed_entry.value
     assert round_trip_managed_entry.created_at == created_at
@@ -74,18 +75,18 @@ def test_managed_entry_document_conversion_legacy_mode():
     expires_at = created_at + timedelta(seconds=10)
 
     managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
-    document = managed_entry_to_document(key="test", managed_entry=managed_entry, native_storage=False)
+    adapter = MongoDBSerializationAdapter(native_storage=False)
+    document = adapter.dump_dict(entry=managed_entry)
 
     assert document == snapshot(
         {
-            "key": "test",
             "value": {"string": '{"test": "test"}'},
             "created_at": datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc),
             "expires_at": datetime(2025, 1, 1, 0, 0, 10, tzinfo=timezone.utc),
         }
     )
 
-    round_trip_managed_entry = document_to_managed_entry(document=document)
+    round_trip_managed_entry = adapter.load_dict(data=document)
 
     assert round_trip_managed_entry.value == managed_entry.value
     assert round_trip_managed_entry.created_at == created_at
@@ -98,6 +99,7 @@ async def clean_mongodb_database(store: MongoDBStore) -> None:
         _ = await store._client.drop_database(name_or_database=store._db.name)  # pyright: ignore[reportPrivateUsage]
 
 
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
     """Base class for MongoDB store tests."""
 

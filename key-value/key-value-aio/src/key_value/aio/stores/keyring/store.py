@@ -79,7 +79,7 @@ class KeyringStore(BaseStore):
         if json_str is None:
             return None
 
-        return ManagedEntry.from_json(json_str=json_str)
+        return self._serialization_adapter.load_json(json_str=json_str)
 
     @override
     async def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
@@ -88,7 +88,7 @@ class KeyringStore(BaseStore):
 
         combo_key: str = compound_key(collection=sanitized_collection, key=sanitized_key)
 
-        json_str: str = managed_entry.to_json()
+        json_str: str = self._serialization_adapter.dump_json(entry=managed_entry)
 
         keyring.set_password(service_name=self._service_name, username=combo_key, password=json_str)
 

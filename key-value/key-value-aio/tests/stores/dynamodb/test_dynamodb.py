@@ -1,8 +1,15 @@
 import contextlib
+import json
 from collections.abc import AsyncGenerator
+from datetime import datetime, timezone
+from typing import Any
 
 import pytest
+from dirty_equals import IsDatetime
+from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
+from types_aiobotocore_dynamodb.client import DynamoDBClient
+from types_aiobotocore_dynamodb.type_defs import GetItemOutputTypeDef
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -48,7 +55,16 @@ class DynamoDBFailedToStartError(Exception):
     pass
 
 
+def get_value_from_response(response: GetItemOutputTypeDef) -> dict[str, Any]:
+    return json.loads(response.get("Item", {}).get("value", {}).get("S", {}))  # pyright: ignore[reportArgumentType]
+
+
+def get_dynamo_client_from_store(store: DynamoDBStore) -> DynamoDBClient:
+    return store._connected_client  # pyright: ignore[reportPrivateUsage]
+
+
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=DYNAMODB_VERSIONS_TO_TEST)
     async def setup_dynamodb(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
@@ -101,3 +117,30 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
+
+    async def test_value_stored(self, store: DynamoDBStore):
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        response = await get_dynamo_client_from_store(store=store).get_item(
+            TableName=DYNAMODB_TEST_TABLE, Key={"collection": {"S": "test"}, "key": {"S": "test_key"}}
+        )
+        assert get_value_from_response(response=response) == snapshot(
+            {"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}}
+        )
+
+        assert "ttl" not in response.get("Item", {})
+
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
+
+        response = await get_dynamo_client_from_store(store=store).get_item(
+            TableName=DYNAMODB_TEST_TABLE, Key={"collection": {"S": "test"}, "key": {"S": "test_key"}}
+        )
+        assert get_value_from_response(response=response) == snapshot(
+            {"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}, "expires_at": IsDatetime(iso_string=True)}
+        )
+        # Verify DynamoDB TTL attribute is set for automatic expiration
+        assert "ttl" in response.get("Item", {}), "DynamoDB TTL attribute should be set when ttl parameter is provided"
+        ttl_value = int(response["Item"]["ttl"]["N"])  # pyright: ignore[reportTypedDictNotRequiredAccess]
+        now = datetime.now(timezone.utc)
+        assert ttl_value > now.timestamp(), "TTL timestamp should be a positive integer"
+        assert ttl_value < now.timestamp() + 10, "TTL timestamp should be less than the expected expiration time"

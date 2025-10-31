@@ -106,7 +106,7 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
             return None
 
         managed_entry_str: str = value.decode("utf-8")
-        managed_entry: ManagedEntry = ManagedEntry.from_json(json_str=managed_entry_str)
+        managed_entry: ManagedEntry = self._serialization_adapter.load_json(json_str=managed_entry_str)
 
         return managed_entry
 
@@ -115,7 +115,7 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         self._fail_on_closed_store()
 
         combo_key: str = compound_key(collection=collection, key=key)
-        json_value: str = managed_entry.to_json()
+        json_value: str = self._serialization_adapter.dump_json(entry=managed_entry)
 
         self._db[combo_key] = json_value.encode("utf-8")
 
@@ -138,7 +138,7 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         batch = WriteBatch()
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             combo_key: str = compound_key(collection=collection, key=key)
-            json_value: str = managed_entry.to_json()
+            json_value: str = self._serialization_adapter.dump_json(entry=managed_entry)
             batch.put(combo_key, json_value.encode("utf-8"))
 
         self._db.write(batch)

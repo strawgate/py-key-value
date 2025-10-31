@@ -17,6 +17,7 @@ TEST_REGISTRY_PATH = "software\\py-key-value-test"
 
 
 @pytest.mark.skipif(condition=not detect_on_windows(), reason="WindowsRegistryStore is only available on Windows")
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestWindowsRegistryStore(BaseStoreTests):
     def cleanup(self):
         from winreg import HKEY_CURRENT_USER

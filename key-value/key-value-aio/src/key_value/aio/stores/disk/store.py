@@ -1,4 +1,4 @@
-import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import overload
 
@@ -90,9 +90,10 @@ class DiskStore(BaseContextManagerStore, BaseStore):
         if not isinstance(managed_entry_str, str):
             return None
 
-        ttl = (expire_epoch - time.time()) if expire_epoch else None
+        managed_entry: ManagedEntry = self._serialization_adapter.load_json(json_str=managed_entry_str)
 
-        managed_entry: ManagedEntry = ManagedEntry.from_json(json_str=managed_entry_str, ttl=ttl)
+        if expire_epoch:
+            managed_entry.expires_at = datetime.fromtimestamp(expire_epoch, tz=timezone.utc)
 
         return managed_entry
 
@@ -106,7 +107,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
     ) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        _ = self._cache.set(key=combo_key, value=managed_entry.to_json(include_expiration=False), expire=managed_entry.ttl)
+        _ = self._cache.set(key=combo_key, value=self._serialization_adapter.dump_json(entry=managed_entry), expire=managed_entry.ttl)
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:

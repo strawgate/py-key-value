@@ -30,6 +30,7 @@ class VaultFailedToStartError(Exception):
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestVaultStore(BaseStoreTests):
     def get_vault_client(self):
         import hvac

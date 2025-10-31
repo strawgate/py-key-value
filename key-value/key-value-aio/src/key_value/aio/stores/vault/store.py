@@ -86,7 +86,7 @@ class VaultStore(BaseStore):
         combo_key: str = compound_key(collection=collection, key=key)
 
         try:
-            response = self._kv_v2.read_secret(path=combo_key, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+            response = self._kv_v2.read_secret(path=combo_key, mount_point=self._mount_point, raise_on_deleted_version=True)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
         except InvalidPath:
             return None
         except Exception:
@@ -102,13 +102,13 @@ class VaultStore(BaseStore):
             return None
 
         json_str: str = secret_data["value"]  # pyright: ignore[reportUnknownVariableType]
-        return ManagedEntry.from_json(json_str=json_str)  # pyright: ignore[reportUnknownArgumentType]
+        return self._serialization_adapter.load_json(json_str=json_str)  # pyright: ignore[reportUnknownArgumentType]
 
     @override
     async def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        json_str: str = managed_entry.to_json()
+        json_str: str = self._serialization_adapter.dump_json(entry=managed_entry)
 
         # Store the JSON string in a 'value' field
         secret_data = {"value": json_str}

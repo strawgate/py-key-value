@@ -88,14 +88,14 @@ class WindowsRegistryStore(BaseStore):
         if not (json_str := get_reg_sz_value(hive=self._hive, sub_key=registry_path, value_name=sanitized_key)):
             return None
 
-        return ManagedEntry.from_json(json_str=json_str)
+        return self._serialization_adapter.load_json(json_str=json_str)
 
     @override
     async def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
         sanitized_key = self._sanitize_key(key=key)
         registry_path = self._get_registry_path(collection=collection)
 
-        json_str: str = managed_entry.to_json()
+        json_str: str = self._serialization_adapter.dump_json(entry=managed_entry)
 
         set_reg_sz_value(hive=self._hive, sub_key=registry_path, value_name=sanitized_key, value=json_str)
 

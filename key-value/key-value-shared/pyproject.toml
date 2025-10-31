@@ -56,8 +56,3 @@ extend="../../pyproject.toml"
 
 [tool.pyright]
 extends = "../../pyproject.toml"
-
-executionEnvironments = [
-  { root = "tests", reportPrivateUsage = false, extraPaths = ["src"]},
-  { root = "src" }
-]
