@@ -200,11 +200,13 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         if not json_value:
             return None
 
-        managed_entry = self._serialization_adapter.load_json(json_str=json_value)
+        managed_entry: ManagedEntry = self._serialization_adapter.load_json(json_str=json_value)
 
-        ttl = item.get("ttl", {}).get("N")
-        if ttl:
-            managed_entry.expires_at = datetime.fromtimestamp(int(ttl), tz=timezone.utc)
+        expires_at_epoch = item.get("ttl", {}).get("N")
+
+        # Our managed entry may carry a TTL, but the TTL in DynamoDB takes precedence.
+        if expires_at_epoch:
+            managed_entry.expires_at = datetime.fromtimestamp(int(expires_at_epoch), tz=timezone.utc)
 
         return managed_entry
 
