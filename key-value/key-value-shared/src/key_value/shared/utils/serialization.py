@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Literal, TypeVar
 
-from key_value.shared.errors import DeserializationError
+from key_value.shared.errors import DeserializationError, SerializationError
 from key_value.shared.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json, verify_dict
 
 T = TypeVar("T")
@@ -130,6 +130,9 @@ class SerializationAdapter(ABC):
 
     def dump_json(self, entry: ManagedEntry, exclude_none: bool = True) -> str:
         """Convert a ManagedEntry to a JSON string."""
+        if self._date_format == "datetime":
+            msg = 'dump_json is incompatible with date_format="datetime"; use date_format="isoformat" or dump_dict().'
+            raise SerializationError(msg)
         return dump_to_json(obj=self.dump_dict(entry=entry, exclude_none=exclude_none))
 
 
