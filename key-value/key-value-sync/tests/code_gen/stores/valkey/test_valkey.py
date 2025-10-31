@@ -12,7 +12,6 @@ from key_value.shared.stores.wait import wait_for_true
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
-from key_value.sync.code_gen.stores.valkey import ValkeyStore
 from tests.code_gen.conftest import detect_on_windows, docker_container, should_skip_docker_tests
 from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -31,10 +30,6 @@ VALKEY_VERSIONS_TO_TEST = ["7.2.5", "8.0.0", "9.0.0"]
 
 class ValkeyFailedToStartError(Exception):
     pass
-
-
-def get_valkey_client_from_store(store: ValkeyStore):
-    return store._connected_client  # pyright: ignore[reportPrivateUsage, reportReturnType]
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
@@ -91,8 +86,12 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     def test_not_unbounded(self, store: BaseStore): ...
 
-    def test_value_stored(self, store: ValkeyStore):
+    def test_value_stored(self, store: BaseStore):
+        from key_value.sync.code_gen.stores.valkey import ValkeyStore
+
         store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        assert isinstance(store, ValkeyStore)
 
         valkey_client = store._connected_client  # pyright: ignore[reportPrivateUsage]
         assert valkey_client is not None

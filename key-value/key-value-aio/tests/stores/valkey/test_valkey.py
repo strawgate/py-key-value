@@ -9,7 +9,6 @@ from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
-from key_value.aio.stores.valkey import ValkeyStore
 from tests.conftest import detect_on_windows, docker_container, should_skip_docker_tests
 from tests.stores.base import (
     BaseStoreTests,
@@ -33,10 +32,6 @@ VALKEY_VERSIONS_TO_TEST = [
 
 class ValkeyFailedToStartError(Exception):
     pass
-
-
-def get_valkey_client_from_store(store: ValkeyStore):
-    return store._connected_client  # pyright: ignore[reportPrivateUsage, reportReturnType]
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
@@ -93,8 +88,12 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
 
-    async def test_value_stored(self, store: ValkeyStore):
+    async def test_value_stored(self, store: BaseStore):
+        from key_value.aio.stores.valkey import ValkeyStore
+
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        assert isinstance(store, ValkeyStore)
 
         valkey_client = store._connected_client  # pyright: ignore[reportPrivateUsage]
         assert valkey_client is not None
