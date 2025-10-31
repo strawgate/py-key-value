@@ -1,7 +1,6 @@
 import contextlib
 import json
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING
 
 import pytest
 from dirty_equals import IsDatetime
@@ -16,9 +15,6 @@ from tests.stores.base import (
     BaseStoreTests,
     ContextManagerStoreTestMixin,
 )
-
-if TYPE_CHECKING:
-    from glide.glide_client import BaseClient  # noqa: TC004
 
 # Valkey test configuration
 VALKEY_HOST = "localhost"
@@ -39,7 +35,7 @@ class ValkeyFailedToStartError(Exception):
     pass
 
 
-def get_valkey_client_from_store(store: ValkeyStore) -> BaseClient:
+def get_valkey_client_from_store(store: ValkeyStore):
     return store._connected_client  # pyright: ignore[reportPrivateUsage, reportReturnType]
 
 
@@ -100,7 +96,8 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
     async def test_value_stored(self, store: ValkeyStore):
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
-        valkey_client = get_valkey_client_from_store(store=store)
+        valkey_client = store._connected_client  # pyright: ignore[reportPrivateUsage]
+        assert valkey_client is not None
         value = await valkey_client.get(key="test::test_key")
         assert value is not None
         value_as_dict = json.loads(value.decode("utf-8"))
