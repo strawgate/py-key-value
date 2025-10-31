@@ -226,9 +226,9 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         }
 
         # Add TTL if present
-        if managed_entry.ttl is not None and managed_entry.created_at is not None:
+        if managed_entry.expires_at is not None:
             # DynamoDB TTL expects a Unix timestamp
-            ttl_timestamp = int(managed_entry.created_at.timestamp() + managed_entry.ttl)
+            ttl_timestamp = int(managed_entry.expires_at.timestamp())
             item["ttl"] = {"N": str(ttl_timestamp)}
 
         await self._connected_client.put_item(  # pyright: ignore[reportUnknownMemberType]
