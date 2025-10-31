@@ -108,7 +108,7 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
                 Seeding occurs lazily when each collection is first accessed.
         """
 
-        self.max_entries_per_collection = max_entries_per_collection or sys.maxsize
+        self.max_entries_per_collection = max_entries_per_collection if max_entries_per_collection is not None else sys.maxsize
 
         self._cache = {}
 

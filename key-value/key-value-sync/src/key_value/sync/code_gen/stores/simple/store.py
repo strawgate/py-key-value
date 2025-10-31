@@ -7,9 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from key_value.shared.utils.compound import compound_key, get_collections_from_compound_keys, get_keys_from_compound_keys
-from key_value.shared.utils.managed_entry import ManagedEntry, load_from_json
+from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.serialization import BasicSerializationAdapter
-from key_value.shared.utils.time_to_live import seconds_to
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseDestroyStore, BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseStore
@@ -23,20 +22,6 @@ class SimpleStoreEntry:
 
     created_at: datetime | None
     expires_at: datetime | None
-
-    @property
-    def current_ttl(self) -> float | None:
-        if self.expires_at is None:
-            return None
-
-        return seconds_to(datetime=self.expires_at)
-
-    def to_managed_entry(self) -> ManagedEntry:
-        managed_entry: ManagedEntry = ManagedEntry(
-            value=load_from_json(json_str=self.json_str), expires_at=self.expires_at, created_at=self.created_at
-        )
-
-        return managed_entry
 
 
 class SimpleStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDestroyStore, BaseStore):
