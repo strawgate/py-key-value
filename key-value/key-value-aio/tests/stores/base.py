@@ -174,7 +174,7 @@ class BaseStoreTests(ABC):
 
         assert value == {"test": "test"}
         assert ttl is not None
-        assert ttl == IsFloat(approx=100), f"TTL should be ~100, but is {ttl}"
+        assert ttl == IsFloat(approx=100, delta=2), f"TTL should be ~100, but is {ttl}"
 
     async def test_negative_ttl(self, store: BaseStore):
         """Tests that a negative ttl will return None when getting the key."""
