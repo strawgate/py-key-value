@@ -257,7 +257,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
             json_value = body_bytes.decode("utf-8")  # pyright: ignore[reportUnknownMemberType]
 
             # Deserialize to ManagedEntry
-            managed_entry = ManagedEntry.from_json(json_str=json_value)
+            managed_entry = self._serialization_adapter.load_json(json_str=json_value)
 
             # Check for client-side expiration
             if managed_entry.is_expired:
@@ -291,7 +291,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
             managed_entry: The ManagedEntry to store.
         """
         s3_key = self._get_s3_key(collection=collection, key=key)
-        json_value = managed_entry.to_json()
+        json_value = self._serialization_adapter.dump_json(entry=managed_entry)
 
         # Prepare metadata
         metadata: dict[str, str] = {}
