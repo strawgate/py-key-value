@@ -1,7 +1,10 @@
 import contextlib
+import json
 from collections.abc import AsyncGenerator
 
 import pytest
+from dirty_equals import IsDatetime
+from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
 
@@ -84,3 +87,26 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
+
+    async def test_value_stored(self, store: BaseStore):
+        from key_value.aio.stores.valkey import ValkeyStore
+
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        assert isinstance(store, ValkeyStore)
+
+        valkey_client = store._connected_client  # pyright: ignore[reportPrivateUsage]
+        assert valkey_client is not None
+        value = await valkey_client.get(key="test::test_key")
+        assert value is not None
+        value_as_dict = json.loads(value.decode("utf-8"))
+        assert value_as_dict == snapshot({"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}})
+
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
+
+        value = await valkey_client.get(key="test::test_key")
+        assert value is not None
+        value_as_dict = json.loads(value.decode("utf-8"))
+        assert value_as_dict == snapshot(
+            {"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}, "expires_at": IsDatetime(iso_string=True)}
+        )

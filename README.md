@@ -9,10 +9,10 @@ This monorepo contains two libraries:
 ## Documentation
 
 - [Full Documentation](https://strawgate.com/py-key-value/)
-- [Getting Started Guide](https://strawgate.com/py-key-value/getting-started/)
-- [Wrappers Guide](https://strawgate.com/py-key-value/wrappers/)
-- [Adapters Guide](https://strawgate.com/py-key-value/adapters/)
-- [API Reference](https://strawgate.com/py-key-value/api/protocols/)
+- [Getting Started Guide](https://strawgate.com/py-key-value/getting-started.html)
+- [Wrappers Guide](https://strawgate.com/py-key-value/wrappers.html)
+- [Adapters Guide](https://strawgate.com/py-key-value/adapters.html)
+- [API Reference](https://strawgate.com/py-key-value/api/protocols.html)
 
 ## Why use this library?
 
@@ -354,7 +354,7 @@ library.
 ## Project links
 
 - [Full Documentation](https://strawgate.com/py-key-value/)
-- [API Reference](https://strawgate.com/py-key-value/api/protocols/)
+- [API Reference](https://strawgate.com/py-key-value/api/protocols.html)
 
 Contributions welcome but may not be accepted. File an issue before submitting
 a pull request. If you do not get agreement on your proposal before making a
