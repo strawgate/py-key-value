@@ -58,6 +58,10 @@ def get_value_from_response(response: GetItemOutputTypeDef) -> dict[str, Any]:
     return json.loads(response.get("Item", {}).get("value", {}).get("S", {}))  # pyright: ignore[reportArgumentType]
 
 
+def get_dynamo_client_from_store(store: DynamoDBStore) -> DynamoDBClient:
+    return store._connected_client  # pyright: ignore[reportPrivateUsage]
+
+
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=DYNAMODB_VERSIONS_TO_TEST)
@@ -108,18 +112,14 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     async def dynamodb_store(self, store: DynamoDBStore) -> DynamoDBStore:
         return store
 
-    @pytest.fixture
-    async def dynamodb_client(self, store: DynamoDBStore) -> DynamoDBClient:
-        return store._connected_client  # pyright: ignore[reportPrivateUsage]
-
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
 
-    async def test_value_stored(self, store: DynamoDBStore, dynamodb_client: DynamoDBClient):
+    async def test_value_stored(self, store: DynamoDBStore):
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
-        response = await dynamodb_client.get_item(
+        response = await get_dynamo_client_from_store(store=store).get_item(
             TableName=DYNAMODB_TEST_TABLE, Key={"collection": {"S": "test"}, "key": {"S": "test_key"}}
         )
         assert get_value_from_response(response=response) == snapshot(
@@ -128,7 +128,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
 
-        response = await dynamodb_client.get_item(
+        response = await get_dynamo_client_from_store(store=store).get_item(
             TableName=DYNAMODB_TEST_TABLE, Key={"collection": {"S": "test"}, "key": {"S": "test_key"}}
         )
         assert get_value_from_response(response=response) == snapshot(
