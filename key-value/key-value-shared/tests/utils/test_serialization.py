@@ -32,6 +32,21 @@ class TestBasicSerializationAdapter:
     def adapter(self) -> BasicSerializationAdapter:
         return BasicSerializationAdapter()
 
+    def test_empty_dict(self, adapter: BasicSerializationAdapter):
+        managed_entry = adapter.load_json(
+            json_str='{"created_at": "2025-01-01T00:00:00+00:00", "expires_at": "2025-01-01T00:00:10+00:00", "value": {}}'
+        )
+        assert managed_entry == snapshot(
+            ManagedEntry(value={}, created_at=FIXED_DATETIME_ONE, expires_at=FIXED_DATETIME_ONE_PLUS_10_SECONDS)
+        )
+
+        managed_entry = adapter.load_dict(
+            data={"created_at": FIXED_DATETIME_ONE_ISOFORMAT, "expires_at": FIXED_DATETIME_ONE_PLUS_10_SECONDS_ISOFORMAT, "value": {}}
+        )
+        assert managed_entry == snapshot(
+            ManagedEntry(value={}, created_at=FIXED_DATETIME_ONE, expires_at=FIXED_DATETIME_ONE_PLUS_10_SECONDS)
+        )
+
     def test_entry_one(self, adapter: BasicSerializationAdapter):
         assert adapter.dump_dict(entry=TEST_ENTRY_ONE) == snapshot(
             {

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, overload
 
@@ -183,7 +184,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         """Retrieve a managed entry from DynamoDB."""
-        response = await self._connected_client.get_item(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        response = await self._connected_client.get_item(
             TableName=self._table_name,
             Key={
                 "collection": {"S": collection},
@@ -191,15 +192,21 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             },
         )
 
-        item = response.get("Item")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        item = response.get("Item")
         if not item:
             return None
 
-        json_value = item.get("value", {}).get("S")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        json_value = item.get("value", {}).get("S")
         if not json_value:
             return None
 
-        return self._serialization_adapter.load_json(json_str=json_value)
+        managed_entry = self._serialization_adapter.load_json(json_str=json_value)
+
+        ttl = item.get("ttl", {}).get("N")
+        if ttl:
+            managed_entry.expires_at = datetime.fromtimestamp(int(ttl), tz=timezone.utc)
+
+        return managed_entry
 
     @override
     async def _put_managed_entry(

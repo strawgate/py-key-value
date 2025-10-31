@@ -1,10 +1,10 @@
 import contextlib
 import json
 from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 
 import pytest
 from dirty_equals import IsDatetime
-from glide.glide_client import BaseClient
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
@@ -16,6 +16,9 @@ from tests.stores.base import (
     BaseStoreTests,
     ContextManagerStoreTestMixin,
 )
+
+if TYPE_CHECKING:
+    from glide.glide_client import BaseClient
 
 # Valkey test configuration
 VALKEY_HOST = "localhost"
@@ -36,7 +39,7 @@ class ValkeyFailedToStartError(Exception):
     pass
 
 
-def get_valkey_client_from_store(store: ValkeyStore) -> BaseClient:
+def get_valkey_client_from_store(store: ValkeyStore):
     return store._connected_client  # pyright: ignore[reportPrivateUsage, reportReturnType]
 
 
@@ -90,10 +93,6 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         return store
 
-    @pytest.fixture
-    async def valkey_client(self, store: ValkeyStore):
-        return store._connected_client  # pyright: ignore[reportPrivateUsage]
-
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
@@ -101,7 +100,7 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
     async def test_value_stored(self, store: ValkeyStore):
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
-        valkey_client = get_valkey_client_from_store(store=store)
+        valkey_client: BaseClient | None = get_valkey_client_from_store(store=store)
         value = await valkey_client.get(key="test::test_key")
         assert value is not None
         value_as_dict = json.loads(value.decode("utf-8"))

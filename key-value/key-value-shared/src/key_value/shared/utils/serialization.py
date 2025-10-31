@@ -80,11 +80,13 @@ class SerializationAdapter(ABC):
             if expires_at := key_must_be(data, key="expires_at", expected_type=datetime):
                 managed_entry_proto["expires_at"] = expires_at
 
-        if not (value := data.get("value")):
+        if "value" not in data:
             msg = "Value field not found"
             raise DeserializationError(message=msg)
 
-        managed_entry_value: dict[str, Any] = {}
+        value = data["value"]
+
+        managed_entry_value: dict[str, Any] = data["value"]
 
         if isinstance(value, str):
             managed_entry_value = load_from_json(json_str=value)

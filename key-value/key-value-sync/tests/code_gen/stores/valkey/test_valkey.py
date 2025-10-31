@@ -4,10 +4,10 @@
 import contextlib
 import json
 from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 from dirty_equals import IsDatetime
-from glide_sync.glide_client import BaseClient
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import wait_for_true
 from typing_extensions import override
@@ -16,6 +16,9 @@ from key_value.sync.code_gen.stores.base import BaseStore
 from key_value.sync.code_gen.stores.valkey import ValkeyStore
 from tests.code_gen.conftest import detect_on_windows, docker_container, should_skip_docker_tests
 from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
+
+if TYPE_CHECKING:
+    from glide_sync.glide_client import BaseClient
 
 # Valkey test configuration
 VALKEY_HOST = "localhost"
@@ -34,7 +37,7 @@ class ValkeyFailedToStartError(Exception):
     pass
 
 
-def get_valkey_client_from_store(store: ValkeyStore) -> BaseClient:
+def get_valkey_client_from_store(store: ValkeyStore):
     return store._connected_client  # pyright: ignore[reportPrivateUsage, reportReturnType]
 
 
@@ -88,10 +91,6 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         return store
 
-    @pytest.fixture
-    def valkey_client(self, store: ValkeyStore):
-        return store._connected_client  # pyright: ignore[reportPrivateUsage]
-
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     def test_not_unbounded(self, store: BaseStore): ...
@@ -99,7 +98,7 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
     def test_value_stored(self, store: ValkeyStore):
         store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
-        valkey_client = get_valkey_client_from_store(store=store)
+        valkey_client: BaseClient | None = get_valkey_client_from_store(store=store)
         value = valkey_client.get(key="test::test_key")
         assert value is not None
         value_as_dict = json.loads(value.decode("utf-8"))

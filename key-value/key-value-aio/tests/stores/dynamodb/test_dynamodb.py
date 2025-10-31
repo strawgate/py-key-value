@@ -1,6 +1,7 @@
 import contextlib
 import json
 from collections.abc import AsyncGenerator
+from datetime import datetime, timezone
 from typing import Any
 
 import pytest
@@ -126,6 +127,8 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
             {"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}}
         )
 
+        assert "ttl" not in response.get("Item", {})
+
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
 
         response = await get_dynamo_client_from_store(store=store).get_item(
@@ -134,3 +137,9 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         assert get_value_from_response(response=response) == snapshot(
             {"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}, "expires_at": IsDatetime(iso_string=True)}
         )
+        # Verify DynamoDB TTL attribute is set for automatic expiration
+        assert "ttl" in response.get("Item", {}), "DynamoDB TTL attribute should be set when ttl parameter is provided"
+        ttl_value = int(response["Item"]["ttl"]["N"])  # pyright: ignore[reportTypedDictNotRequiredAccess]
+        now = datetime.now(timezone.utc)
+        assert ttl_value > now.timestamp(), "TTL timestamp should be a positive integer"
+        assert ttl_value < now.timestamp() + 10, "TTL timestamp should be less than the expected expiration time"
