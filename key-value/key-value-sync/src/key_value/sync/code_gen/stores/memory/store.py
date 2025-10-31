@@ -61,7 +61,7 @@ class MemoryCollection:
             max_entries: The maximum number of entries per collection. Defaults to no limit.
         """
         self._cache = TLRUCache[str, MemoryCacheEntry](
-            maxsize=max_entries or sys.maxsize, ttu=_memory_cache_ttu, getsizeof=_memory_cache_getsizeof
+            maxsize=max_entries if max_entries is not None else sys.maxsize, ttu=_memory_cache_ttu, getsizeof=_memory_cache_getsizeof
         )
 
         self._serialization_adapter = BasicSerializationAdapter()
