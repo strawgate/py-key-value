@@ -3,9 +3,11 @@ from datetime import datetime
 from typing import Any, overload
 from urllib.parse import urlparse
 
+from key_value.shared.errors import DeserializationError
 from key_value.shared.type_checking.bear_spray import bear_spray
 from key_value.shared.utils.compound import compound_key, get_keys_from_compound_keys
 from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.serialization import BasicSerializationAdapter, SerializationAdapter
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseEnumerateKeysStore, BaseStore
@@ -20,41 +22,11 @@ DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
 
 
-def managed_entry_to_json(managed_entry: ManagedEntry) -> str:
-    """Convert a ManagedEntry to a JSON string for Redis storage.
-
-    This function serializes a ManagedEntry to JSON format including all metadata (TTL, creation,
-    and expiration timestamps). The serialization is designed to preserve all entry information
-    for round-trip conversion back to a ManagedEntry.
-
-    Args:
-        managed_entry: The ManagedEntry to serialize.
-
-    Returns:
-        A JSON string representation of the ManagedEntry with full metadata.
-    """
-    return managed_entry.to_json(include_metadata=True, include_expiration=True, include_creation=True)
-
-
-def json_to_managed_entry(json_str: str) -> ManagedEntry:
-    """Convert a JSON string from Redis storage back to a ManagedEntry.
-
-    This function deserializes a JSON string (created by `managed_entry_to_json`) back to a
-    ManagedEntry object, preserving all metadata including TTL, creation, and expiration timestamps.
-
-    Args:
-        json_str: The JSON string to deserialize.
-
-    Returns:
-        A ManagedEntry object reconstructed from the JSON string.
-    """
-    return ManagedEntry.from_json(json_str=json_str, includes_metadata=True)
-
-
 class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):
     """Redis-based key-value store."""
 
     _client: Redis
+    _adapter: SerializationAdapter
 
     @overload
     def __init__(self, *, client: Redis, default_collection: str | None = None) -> None: ...
@@ -111,6 +83,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             )
 
         self._stable_api = True
+        self._adapter = BasicSerializationAdapter(date_format="isoformat", value_format="dict")
 
         super().__init__(default_collection=default_collection)
 
@@ -123,9 +96,10 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         if not isinstance(redis_response, str):
             return None
 
-        managed_entry: ManagedEntry = json_to_managed_entry(json_str=redis_response)
-
-        return managed_entry
+        try:
+            return self._adapter.load_json(json_str=redis_response)
+        except DeserializationError:
+            return None
 
     @override
     async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
@@ -139,7 +113,10 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         entries: list[ManagedEntry | None] = []
         for redis_response in redis_responses:
             if isinstance(redis_response, str):
-                entries.append(json_to_managed_entry(json_str=redis_response))
+                try:
+                    entries.append(self._adapter.load_json(json_str=redis_response))
+                except DeserializationError:
+                    entries.append(None)
             else:
                 entries.append(None)
 
@@ -155,7 +132,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
     ) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        json_value: str = managed_entry_to_json(managed_entry=managed_entry)
+        json_value: str = self._adapter.dump_json(entry=managed_entry)
 
         if managed_entry.ttl is not None:
             # Redis does not support <= 0 TTLs
@@ -181,10 +158,10 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
         if ttl is None:
             # If there is no TTL, we can just do a simple mset
-            mapping: dict[str, str] = {
-                compound_key(collection=collection, key=key): managed_entry_to_json(managed_entry=managed_entry)
-                for key, managed_entry in zip(keys, managed_entries, strict=True)
-            }
+            mapping: dict[str, str] = {}
+            for key, managed_entry in zip(keys, managed_entries, strict=True):
+                json_value = self._adapter.dump_json(entry=managed_entry)
+                mapping[compound_key(collection=collection, key=key)] = json_value
 
             await self._client.mset(mapping=mapping)
 
@@ -198,7 +175,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             combo_key: str = compound_key(collection=collection, key=key)
-            json_value: str = managed_entry_to_json(managed_entry=managed_entry)
+            json_value = self._adapter.dump_json(entry=managed_entry)
 
             pipeline.setex(name=combo_key, time=ttl_seconds, value=json_value)
 

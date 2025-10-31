@@ -8,6 +8,7 @@ from key_value.sync.code_gen.stores.simple.store import SimpleStore
 from tests.code_gen.stores.base import BaseStoreTests
 
 
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestSimpleStore(BaseStoreTests):
     @override
     @pytest.fixture

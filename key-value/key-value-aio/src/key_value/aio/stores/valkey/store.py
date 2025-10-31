@@ -95,7 +95,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
 
         decoded_response: str = response.decode("utf-8")
 
-        return ManagedEntry.from_json(json_str=decoded_response)
+        return self._serialization_adapter.load_json(json_str=decoded_response)
 
     @override
     async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
@@ -110,7 +110,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         for response in responses:
             if isinstance(response, bytes):
                 decoded_response: str = response.decode("utf-8")
-                entries.append(ManagedEntry.from_json(json_str=decoded_response))
+                entries.append(self._serialization_adapter.load_json(json_str=decoded_response))
             else:
                 entries.append(None)
 
@@ -126,7 +126,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
     ) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        json_value: str = managed_entry.to_json()
+        json_value: str = self._serialization_adapter.dump_json(entry=managed_entry)
 
         expiry: ExpirySet | None = ExpirySet(expiry_type=ExpiryType.SEC, value=int(managed_entry.ttl)) if managed_entry.ttl else None
 

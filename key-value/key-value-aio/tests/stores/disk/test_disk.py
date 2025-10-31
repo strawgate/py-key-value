@@ -1,7 +1,11 @@
+import json
 import tempfile
 from collections.abc import AsyncGenerator
 
 import pytest
+from dirty_equals import IsDatetime
+from diskcache.core import Cache
+from inline_snapshot import snapshot
 from typing_extensions import override
 
 from key_value.aio.stores.disk import DiskStore
@@ -22,3 +26,22 @@ class TestDiskStore(ContextManagerStoreTestMixin, BaseStoreTests):
         disk_store._cache.clear()  # pyright: ignore[reportPrivateUsage]
 
         return disk_store
+
+    @pytest.fixture
+    async def disk_cache(self, disk_store: DiskStore) -> Cache:
+        return disk_store._cache  # pyright: ignore[reportPrivateUsage]
+
+    async def test_value_stored(self, store: DiskStore, disk_cache: Cache):
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
+
+        value = disk_cache.get(key="test::test_key")
+        value_as_dict = json.loads(value)
+        assert value_as_dict == snapshot({"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}})
+
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
+
+        value = disk_cache.get(key="test::test_key")
+        value_as_dict = json.loads(value)
+        assert value_as_dict == snapshot(
+            {"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}, "expires_at": IsDatetime(iso_string=True)}
+        )

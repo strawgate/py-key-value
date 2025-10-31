@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, overload
 
@@ -183,7 +184,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         """Retrieve a managed entry from DynamoDB."""
-        response = await self._connected_client.get_item(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        response = await self._connected_client.get_item(
             TableName=self._table_name,
             Key={
                 "collection": {"S": collection},
@@ -191,15 +192,23 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             },
         )
 
-        item = response.get("Item")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        item = response.get("Item")
         if not item:
             return None
 
-        json_value = item.get("value", {}).get("S")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        json_value = item.get("value", {}).get("S")
         if not json_value:
             return None
 
-        return ManagedEntry.from_json(json_str=json_value)  # pyright: ignore[reportUnknownArgumentType]
+        managed_entry: ManagedEntry = self._serialization_adapter.load_json(json_str=json_value)
+
+        expires_at_epoch = item.get("ttl", {}).get("N")
+
+        # Our managed entry may carry a TTL, but the TTL in DynamoDB takes precedence.
+        if expires_at_epoch:
+            managed_entry.expires_at = datetime.fromtimestamp(int(expires_at_epoch), tz=timezone.utc)
+
+        return managed_entry
 
     @override
     async def _put_managed_entry(
@@ -210,7 +219,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         managed_entry: ManagedEntry,
     ) -> None:
         """Store a managed entry in DynamoDB."""
-        json_value = managed_entry.to_json()
+        json_value = self._serialization_adapter.dump_json(entry=managed_entry)
 
         item: dict[str, Any] = {
             "collection": {"S": collection},
@@ -219,9 +228,9 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         }
 
         # Add TTL if present
-        if managed_entry.ttl is not None and managed_entry.created_at is not None:
+        if managed_entry.expires_at is not None:
             # DynamoDB TTL expects a Unix timestamp
-            ttl_timestamp = int(managed_entry.created_at.timestamp() + managed_entry.ttl)
+            ttl_timestamp = int(managed_entry.expires_at.timestamp())
             item["ttl"] = {"N": str(ttl_timestamp)}
 
         await self._connected_client.put_item(  # pyright: ignore[reportUnknownMemberType]
