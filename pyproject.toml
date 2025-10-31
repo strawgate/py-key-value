@@ -74,6 +74,12 @@ line-length = 140
     "ARG001", # Unused argument, Pyright captures this for us
     "ARG002", # Unused argument, Pyright captures this for us
 ]
+"**/test_*.py" = [
+    "S101", # Ignore asserts
+    "DTZ005", # Ignore datetime.UTC
+    "PLR2004", # Ignore magic values
+    "E501", # Ignore line length
+]
 
 [project.optional-dependencies]
 dev = [
