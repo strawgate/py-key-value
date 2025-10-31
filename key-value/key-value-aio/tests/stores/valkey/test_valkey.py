@@ -18,7 +18,7 @@ from tests.stores.base import (
 )
 
 if TYPE_CHECKING:
-    from glide.glide_client import BaseClient
+    from glide.glide_client import BaseClient  # noqa: TC004
 
 # Valkey test configuration
 VALKEY_HOST = "localhost"
@@ -39,7 +39,7 @@ class ValkeyFailedToStartError(Exception):
     pass
 
 
-def get_valkey_client_from_store(store: ValkeyStore):
+def get_valkey_client_from_store(store: ValkeyStore) -> BaseClient:
     return store._connected_client  # pyright: ignore[reportPrivateUsage, reportReturnType]
 
 
@@ -100,7 +100,7 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
     async def test_value_stored(self, store: ValkeyStore):
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
-        valkey_client: BaseClient | None = get_valkey_client_from_store(store=store)
+        valkey_client = get_valkey_client_from_store(store=store)
         value = await valkey_client.get(key="test::test_key")
         assert value is not None
         value_as_dict = json.loads(value.decode("utf-8"))
