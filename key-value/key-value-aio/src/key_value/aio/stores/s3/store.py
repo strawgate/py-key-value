@@ -247,14 +247,14 @@ class S3Store(BaseContextManagerStore, BaseStore):
         s3_key = self._get_s3_key(collection=collection, key=key)
 
         try:
-            response = await self._connected_client.get_object(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            response = await self._connected_client.get_object(
                 Bucket=self._bucket_name,
                 Key=s3_key,
             )
 
             # Read the object body
-            body_bytes = await response["Body"].read()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            json_value = body_bytes.decode("utf-8")  # pyright: ignore[reportUnknownMemberType]
+            body_bytes = await response["Body"].read()  # pyright: ignore[reportUnknownMemberType]
+            json_value = body_bytes.decode("utf-8")
 
             # Deserialize to ManagedEntry
             managed_entry = self._serialization_adapter.load_json(json_str=json_value)
@@ -266,7 +266,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
                 return None
             return managed_entry  # noqa: TRY300
 
-        except self._connected_client.exceptions.NoSuchKey:  # pyright: ignore[reportUnknownMemberType]
+        except self._connected_client.exceptions.NoSuchKey:
             # Object doesn't exist
             return None
 
@@ -300,7 +300,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
         if managed_entry.created_at:
             metadata["created-at"] = managed_entry.created_at.isoformat()
 
-        await self._connected_client.put_object(  # pyright: ignore[reportUnknownMemberType]
+        await self._connected_client.put_object(
             Bucket=self._bucket_name,
             Key=s3_key,
             Body=json_value.encode("utf-8"),
@@ -325,7 +325,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
 
         try:
             # Check if object exists before deletion
-            await self._connected_client.head_object(  # pyright: ignore[reportUnknownMemberType]
+            await self._connected_client.head_object(
                 Bucket=self._bucket_name,
                 Key=s3_key,
             )
@@ -342,7 +342,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
             raise
         else:
             # Object exists, delete it
-            await self._connected_client.delete_object(  # pyright: ignore[reportUnknownMemberType]
+            await self._connected_client.delete_object(
                 Bucket=self._bucket_name,
                 Key=s3_key,
             )
@@ -352,4 +352,4 @@ class S3Store(BaseContextManagerStore, BaseStore):
     async def _close(self) -> None:
         """Close the S3 client."""
         if self._client and self._raw_client:
-            await self._client.__aexit__(None, None, None)  # pyright: ignore[reportUnknownMemberType]
+            await self._client.__aexit__(None, None, None)
