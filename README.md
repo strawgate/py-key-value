@@ -10,6 +10,7 @@ This monorepo contains two libraries:
 
 - [Full Documentation](https://strawgate.com/py-key-value/)
 - [Getting Started Guide](https://strawgate.com/py-key-value/getting-started.html)
+- [Stores Guide](https://strawgate.com/py-key-value/stores.html)
 - [Wrappers Guide](https://strawgate.com/py-key-value/wrappers.html)
 - [Adapters Guide](https://strawgate.com/py-key-value/adapters.html)
 - [API Reference](https://strawgate.com/py-key-value/api/protocols.html)
@@ -196,7 +197,7 @@ Each store has a **stability rating** indicating likelihood of
 backwards-incompatible changes. Stable stores (Redis, Valkey, Disk, Keyring)
 are recommended for long-term storage.
 
-**[📚 View all stores, installation guides, and examples →](https://strawgate.com/py-key-value/stores/)**
+**[📚 View all stores, installation guides, and examples →](https://strawgate.com/py-key-value/stores.html)**
 
 ### Adapters
 
