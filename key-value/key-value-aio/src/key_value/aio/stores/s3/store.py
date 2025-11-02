@@ -223,10 +223,10 @@ class S3Store(BaseContextManagerStore, BaseStore):
         Returns:
             The S3 object key in format: {collection}/{key}
         """
-        # Hash collection and key if they exceed their max lengths
+        # Hash collection and key if they exceed their max byte lengths
         # This ensures the combined S3 key stays under 1024 bytes
-        safe_collection = hash_excess_length(collection, MAX_COLLECTION_LENGTH)
-        safe_key = hash_excess_length(key, MAX_KEY_LENGTH)
+        safe_collection = hash_excess_length(collection, MAX_COLLECTION_LENGTH, length_is_bytes=True)
+        safe_key = hash_excess_length(key, MAX_KEY_LENGTH, length_is_bytes=True)
         return f"{safe_collection}/{safe_key}"
 
     @override
