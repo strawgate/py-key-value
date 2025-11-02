@@ -6,6 +6,10 @@ on:
     types:
       - completed
 
+concurrency:
+  group: claude-test-failure-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
 jobs:
   claude-analyze-failure:
     # Only run if the test workflow failed
@@ -97,6 +101,17 @@ jobs:
           - You can also run git commands (e.g., `git status`, `git log`, `git diff`) to inspect the repository
           - You can use WebSearch and WebFetch to research errors, stack traces, or related issues
           - For bash commands, you are limited to make and git commands only
+
+          # CRITICAL: Loop Detection
+          **IMPORTANT**: Before posting your analysis, check the PR comments to detect if there's a loop where:
+          - CodeRabbit or another bot triggered this workflow
+          - Your previous analysis triggered CodeRabbit or another bot
+          - This created a repeating cycle of bot comments
+
+          If you detect such a loop (e.g., you see multiple similar bot comments or your own previous analysis comments):
+          1. **DO NOT** post another analysis comment
+          2. Instead, post a brief comment stating: "Loop detected: Multiple automated analysis comments found. Stopping to prevent further automated comments. Please review the existing analysis comments."
+          3. Exit immediately without further action
 
           # Problems Encountered
           If you encounter any problems during your analysis (e.g., unable to fetch logs, tools not working), document them clearly so the team knows what limitations you faced.
