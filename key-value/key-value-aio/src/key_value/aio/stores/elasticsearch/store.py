@@ -29,6 +29,7 @@ from key_value.aio.stores.elasticsearch.utils import LessCapableJsonSerializer, 
 
 try:
     from elasticsearch import AsyncElasticsearch
+
     from key_value.aio.stores.elasticsearch.utils import (
         get_aggregations_from_body,
         get_body_from_response,
