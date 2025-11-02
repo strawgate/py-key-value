@@ -164,6 +164,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
         await super().__aexit__(exc_type, exc_value, traceback)
         if self._client and self._raw_client:
             await self._client.__aexit__(exc_type, exc_value, traceback)
+            self._client = None
 
     @property
     def _connected_client(self) -> S3Client:
@@ -261,8 +262,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
 
             # Check for client-side expiration
             if managed_entry.is_expired:
-                # Entry expired, delete it and return None
-                await self._delete_managed_entry(key=key, collection=collection)
+                # Entry expired, return None without deleting
                 return None
             return managed_entry  # noqa: TRY300
 
@@ -353,3 +353,4 @@ class S3Store(BaseContextManagerStore, BaseStore):
         """Close the S3 client."""
         if self._client and self._raw_client:
             await self._client.__aexit__(None, None, None)  # pyright: ignore[reportUnknownMemberType]
+            self._client = None
