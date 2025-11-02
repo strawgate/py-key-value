@@ -1,6 +1,5 @@
 import time
 from datetime import datetime, timedelta, timezone
-from numbers import Real
 from typing import Any, SupportsFloat, overload
 
 from key_value.shared.errors import InvalidTTLError
@@ -50,7 +49,6 @@ def prepare_ttl(t: SupportsFloat) -> float: ...
 def prepare_ttl(t: SupportsFloat | None) -> float | None: ...
 
 
-@bear_enforce
 def prepare_ttl(t: SupportsFloat | None) -> float | None:
     """Prepare a TTL for use in a put operation.
 
@@ -61,11 +59,18 @@ def prepare_ttl(t: SupportsFloat | None) -> float | None:
     if a bool is provided, an InvalidTTLError will be raised. If the user passes TTL=True, true becomes `1` and the
     entry immediately expires which is likely not what the user intended.
     """
+    try:
+        return _validate_ttl(t=t)
+    except TypeError as e:
+        raise InvalidTTLError(ttl=t, extra_info={"type": type(t).__name__}) from e
+
+
+@bear_enforce
+def _validate_ttl(t: SupportsFloat | None) -> float | None:
     if t is None:
         return None
 
-    # This is not needed by the static type checker but is needed by the runtime type checker
-    if not isinstance(t, Real | SupportsFloat) or isinstance(t, bool):  # pyright: ignore[reportUnnecessaryIsInstance]
+    if isinstance(t, bool):
         raise InvalidTTLError(ttl=t, extra_info={"type": type(t).__name__})
 
     ttl = float(t)

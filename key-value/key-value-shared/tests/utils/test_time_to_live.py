@@ -54,6 +54,7 @@ def test_prepare_ttl(t: Any, expected: int | float | None):
         "bool-false",
     ],
 )
+@pytest.mark.filterwarnings("ignore:Function key_value.shared.utils")  # Ignore BearType warnings here
 def test_prepare_ttl_invalid(t: Any):
     with pytest.raises(InvalidTTLError):
         prepare_ttl(t)
