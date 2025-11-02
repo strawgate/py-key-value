@@ -1,6 +1,8 @@
 import hashlib
 from enum import Enum
 
+from key_value.shared.type_checking.bear_spray import bear_enforce
+
 MINIMUM_MAX_LENGTH = 16
 
 DEFAULT_HASH_FRAGMENT_SIZE = 8
@@ -59,6 +61,7 @@ def sanitize_characters_in_string(value: str, allowed_characters: str, replace_w
     return new_value
 
 
+@bear_enforce
 def sanitize_string(
     value: str,
     max_length: int,
@@ -133,6 +136,7 @@ def sanitize_string(
     return sanitized_value
 
 
+@bear_enforce
 def hash_excess_length(value: str, max_length: int) -> str:
     """Hash part of the value if it exceeds the maximum length. This operation
     will truncate the value to the maximum length minus 8 characters and will swap
