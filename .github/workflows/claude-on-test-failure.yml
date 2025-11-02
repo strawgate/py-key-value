@@ -95,7 +95,8 @@ jobs:
           - Provide specific file names, line numbers, and code references when possible
           - You can run make commands (e.g., `make lint`, `make typecheck`, `make sync`) to build, test, or lint the code
           - You can also run git commands (e.g., `git status`, `git log`, `git diff`) to inspect the repository
-          - You cannot run arbitrary bash commands - only make and git commands are allowed
+          - You can use WebSearch and WebFetch to research errors, stack traces, or related issues
+          - For bash commands, you are limited to make and git commands only
 
           # Problems Encountered
           If you encounter any problems during your analysis (e.g., unable to fetch logs, tools not working), document them clearly so the team knows what limitations you faced.
@@ -123,7 +124,7 @@ jobs:
                   "github-research-mcp"
                 ],
                 "env": {
-                  "DISABLE_SUMMARIES": "true",
+                  "DISABLE_SUMMARIES": "true",  # Disable verbose summaries for faster analysis
                   "GITHUB_PERSONAL_ACCESS_TOKEN": "${{ secrets.GITHUB_TOKEN }}"
                 }
               }
