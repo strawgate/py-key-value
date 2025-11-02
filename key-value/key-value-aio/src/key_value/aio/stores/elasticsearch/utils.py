@@ -6,7 +6,6 @@ from elastic_transport import (
     ObjectApiResponse,
     SerializationError,
 )
-
 from elasticsearch import AsyncElasticsearch
 
 
