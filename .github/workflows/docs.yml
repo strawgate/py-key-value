@@ -25,11 +25,11 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install documentation dependencies
-        run: uv pip install --system mkdocs mkdocs-material 'mkdocstrings[python]' mkdocstrings-python
+      - name: Install all packages and dependencies
+        run: uv sync --all-packages --group dev
 
       - name: Build documentation
-        run: mkdocs build
+        run: uv run --extra docs mkdocs build
 
       - name: Deploy to GitHub Pages
-        run: mkdocs gh-deploy --force
+        run: uv run --extra docs mkdocs gh-deploy --force
