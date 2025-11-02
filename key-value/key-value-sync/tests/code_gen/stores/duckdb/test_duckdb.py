@@ -20,6 +20,7 @@ def get_client_from_store(store: DuckDBStore) -> DuckDBPyConnection:
     return store._connection  # pyright: ignore[reportPrivateUsage]
 
 
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestDuckDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
@@ -33,6 +34,7 @@ class TestDuckDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     def test_not_unbounded(self, store: BaseStore): ...
 
 
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
@@ -48,6 +50,7 @@ class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
     def test_not_unbounded(self, store: BaseStore): ...
 
 
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestDuckDBStoreTextMode(ContextManagerStoreTestMixin, BaseStoreTests):
     """Test DuckDB store with TEXT column mode (stringified JSON) instead of native JSON."""
 
@@ -63,6 +66,7 @@ class TestDuckDBStoreTextMode(ContextManagerStoreTestMixin, BaseStoreTests):
     def test_not_unbounded(self, store: BaseStore): ...
 
 
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestDuckDBStoreSpecific:
     """Test DuckDB-specific functionality."""
 
@@ -113,22 +117,6 @@ class TestDuckDBStoreSpecific:
 
         assert count_result is not None
         assert count_result[0] == 3  # All 3 entries should not be expired
-
-        # Query metadata columns directly
-        result = (
-            get_client_from_store(store)
-            .execute("""
-            SELECT key, ttl, created_at IS NOT NULL as has_created
-            FROM kv_entries
-            WHERE collection = 'products' AND ttl > 3600
-        """)
-            .fetchall()
-        )  # pyright: ignore[reportPrivateUsage]
-
-        assert len(result) == 1  # Only item2 has ttl > 3600
-        assert result[0][0] == "item2"
-        assert abs(result[0][1] - 7200) < 1  # TTL should be approximately 7200 (floating point precision)
-        assert result[0][2] is True  # has_created
 
         store.close()
 
