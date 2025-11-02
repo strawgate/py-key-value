@@ -3,6 +3,7 @@
 # DO NOT CHANGE! Change the original file instead.
 """FileTreeStore implementation using native filesystem operations."""
 
+import asyncio
 from pathlib import Path
 
 from key_value.shared.errors import DeserializationError
@@ -78,8 +79,13 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
             The path to the collection directory.
 
         Raises:
-            ValueError: If the collection name would result in a path outside the base directory.
+            ValueError: If the collection name contains path separators or would escape the base directory.
         """
+        # Reject path separators to prevent nested directories
+        if "/" in collection or "\\" in collection:
+            msg = f"Invalid collection name: {collection!r} cannot contain path separators"
+            raise ValueError(msg)
+
         collection_path = (self._directory / collection).resolve()
 
         if not collection_path.is_relative_to(self._directory):
@@ -99,8 +105,13 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
             The path to the key file.
 
         Raises:
-            ValueError: If the collection or key name would result in a path outside the base directory.
+            ValueError: If the key name contains path separators or would escape the base directory.
         """
+        # Reject path separators to prevent nested directories
+        if "/" in key or "\\" in key:
+            msg = f"Invalid key name: {key!r} cannot contain path separators"
+            raise ValueError(msg)
+
         collection_path = self._get_collection_path(collection)
         key_path = (collection_path / f"{key}.json").resolve()
 
@@ -118,7 +129,7 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
             collection: The collection name.
         """
         collection_path = self._get_collection_path(collection)
-        collection_path.mkdir(parents=True, exist_ok=True)
+        asyncio.to_thread(collection_path.mkdir, parents=True, exist_ok=True)
 
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -133,11 +144,11 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
         """
         key_path = self._get_key_path(collection, key)
 
-        if not key_path.exists():
+        if not asyncio.to_thread(key_path.exists):
             return None
 
         try:
-            json_str = key_path.read_text(encoding="utf-8")
+            json_str = asyncio.to_thread(key_path.read_text, encoding="utf-8")
             return self._serialization_adapter.load_json(json_str=json_str)
         except (OSError, DeserializationError):
             # If we can't read or parse the file, treat it as not found
@@ -155,11 +166,11 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
         key_path = self._get_key_path(collection, key)
 
         # Ensure the parent directory exists
-        key_path.parent.mkdir(parents=True, exist_ok=True)
+        asyncio.to_thread(key_path.parent.mkdir, parents=True, exist_ok=True)
 
         # Write the managed entry to the file
         json_str = self._serialization_adapter.dump_json(entry=managed_entry)
-        key_path.write_text(json_str, encoding="utf-8")
+        asyncio.to_thread(key_path.write_text, json_str, encoding="utf-8")
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
@@ -174,11 +185,11 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
         """
         key_path = self._get_key_path(collection, key)
 
-        if not key_path.exists():
+        if not asyncio.to_thread(key_path.exists):
             return False
 
         try:
-            key_path.unlink()
+            asyncio.to_thread(key_path.unlink)
         except OSError:
             return False
         else:
@@ -198,17 +209,20 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
         limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
         collection_path = self._get_collection_path(collection)
 
-        if not collection_path.exists():
+        if not asyncio.to_thread(collection_path.exists):
             return []
 
-        keys: list[str] = []
-        for file_path in collection_path.iterdir():
-            if file_path.is_file() and file_path.suffix == ".json":
-                keys.append(file_path.stem)
-                if len(keys) >= limit:
-                    break
+        def _list_keys() -> list[str]:
+            """Helper to list keys in thread."""
+            keys: list[str] = []
+            for file_path in collection_path.iterdir():
+                if file_path.is_file() and file_path.suffix == ".json":
+                    keys.append(file_path.stem)
+                    if len(keys) >= limit:
+                        break
+            return keys
 
-        return keys
+        return asyncio.to_thread(_list_keys)
 
     @override
     def _get_collection_names(self, *, limit: int | None = None) -> list[str]:
@@ -222,14 +236,17 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
         """
         limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
 
-        collections: list[str] = []
-        for dir_path in self._directory.iterdir():
-            if dir_path.is_dir():
-                collections.append(dir_path.name)
-                if len(collections) >= limit:
-                    break
+        def _list_collections() -> list[str]:
+            """Helper to list collections in thread."""
+            collections: list[str] = []
+            for dir_path in self._directory.iterdir():
+                if dir_path.is_dir():
+                    collections.append(dir_path.name)
+                    if len(collections) >= limit:
+                        break
+            return collections
 
-        return collections
+        return asyncio.to_thread(_list_collections)
 
     @override
     def _delete_collection(self, *, collection: str) -> bool:
@@ -243,21 +260,25 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
         """
         collection_path = self._get_collection_path(collection)
 
-        if not collection_path.exists():
+        if not asyncio.to_thread(collection_path.exists):
             return False
 
-        try:
-            # Delete all files in the collection
-            for file_path in collection_path.iterdir():
-                if file_path.is_file():
-                    file_path.unlink()
+        def _delete() -> bool:
+            """Helper to delete collection in thread."""
+            try:
+                # Delete all files in the collection
+                for file_path in collection_path.iterdir():
+                    if file_path.is_file():
+                        file_path.unlink()
 
-            # Delete the collection directory
-            collection_path.rmdir()
-        except OSError:
-            return False
-        else:
-            return True
+                # Delete the collection directory
+                collection_path.rmdir()
+            except OSError:
+                return False
+            else:
+                return True
+
+        return asyncio.to_thread(_delete)
 
     @override
     def _delete_store(self) -> bool:
@@ -266,17 +287,85 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
         Returns:
             True if the store was deleted successfully.
         """
-        try:
-            # Delete all collections
-            for collection_path in self._directory.iterdir():
-                if collection_path.is_dir():
-                    # Delete all files in the collection
-                    for file_path in collection_path.iterdir():
-                        if file_path.is_file():
+
+        def _delete_all() -> bool:
+            """Helper to delete all collections in thread."""
+            try:
+                # Delete all collections
+                for collection_path in self._directory.iterdir():
+                    if collection_path.is_dir():
+                        # Delete all files in the collection
+                        for file_path in collection_path.iterdir():
+                            if file_path.is_file():
+                                file_path.unlink()
+                        # Delete the collection directory
+                        collection_path.rmdir()
+            except OSError:
+                return False
+            else:
+                return True
+
+        return asyncio.to_thread(_delete_all)
+
+    def cleanup_expired(self, *, collection: str | None = None) -> int:
+        """Remove expired entries from disk.
+
+        This utility method scans the specified collection (or all collections if None)
+        and deletes entries that have expired based on their TTL. This is useful for
+        manual cleanup of the store since expired entries are not automatically removed.
+
+        Args:
+            collection: The collection to clean up, or None to clean all collections.
+
+        Returns:
+            The number of entries deleted.
+        """
+        import time
+
+        def _cleanup_collection(collection_path: Path) -> int:
+            """Helper to cleanup a single collection."""
+            deleted_count = 0
+            try:
+                for file_path in collection_path.iterdir():
+                    if not file_path.is_file() or file_path.suffix != ".json":
+                        continue
+
+                    try:
+                        # Read and deserialize the entry
+                        json_str = file_path.read_text(encoding="utf-8")
+                        entry = self._serialization_adapter.load_json(json_str=json_str)
+
+                        # Check if expired
+                        if entry.expires_at is not None and entry.expires_at <= time.time():
                             file_path.unlink()
-                    # Delete the collection directory
-                    collection_path.rmdir()
-        except OSError:
-            return False
-        else:
-            return True
+                            deleted_count += 1
+                    except (OSError, DeserializationError):
+                        # Skip files that can't be read or parsed
+                        continue
+            except OSError:
+                # Skip if collection can't be read
+                pass
+
+            return deleted_count
+
+        if collection is not None:
+            # Clean specific collection
+            collection_path = self._get_collection_path(collection)
+            if not asyncio.to_thread(collection_path.exists):
+                return 0
+            return asyncio.to_thread(_cleanup_collection, collection_path)
+
+        # Clean all collections
+
+        def _cleanup_all() -> int:
+            """Helper to cleanup all collections."""
+            total_deleted = 0
+            try:
+                for dir_path in self._directory.iterdir():
+                    if dir_path.is_dir():
+                        total_deleted += _cleanup_collection(dir_path)
+            except OSError:
+                pass
+            return total_deleted
+
+        return asyncio.to_thread(_cleanup_all)
