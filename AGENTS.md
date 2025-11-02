@@ -224,6 +224,8 @@ GitHub Actions workflows are in `.github/workflows/`:
 - `publish.yml` - Publish packages to PyPI
 - `claude-on-mention.yml` - Claude Code assistant (can make PRs)
 - `claude-on-open-label.yml` - Claude triage assistant (read-only analysis)
+- `claude-on-test-failure.yml` - Claude test failure analysis (automatically
+  analyzes failed tests and suggests solutions)
 
 ## Version Management
 
