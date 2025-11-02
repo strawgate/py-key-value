@@ -10,11 +10,13 @@ from datetime import datetime
 from typing import Any, Literal, TypeVar
 
 from key_value.shared.errors import DeserializationError, SerializationError
+from key_value.shared.type_checking.bear_spray import bear_enforce
 from key_value.shared.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json, verify_dict
 
 T = TypeVar("T")
 
 
+@bear_enforce
 def key_must_be(dictionary: dict[str, Any], /, key: str, expected_type: type[T]) -> T | None:
     if key not in dictionary:
         return None
@@ -24,6 +26,7 @@ def key_must_be(dictionary: dict[str, Any], /, key: str, expected_type: type[T])
     return dictionary[key]
 
 
+@bear_enforce
 def parse_datetime_str(value: str) -> datetime:
     try:
         return datetime.fromisoformat(value)
