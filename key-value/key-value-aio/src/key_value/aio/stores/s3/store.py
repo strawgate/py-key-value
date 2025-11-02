@@ -150,10 +150,18 @@ class S3Store(BaseContextManagerStore, BaseStore):
 
         super().__init__(default_collection=default_collection)
 
+    async def _connect(self) -> None:
+        if self._client is None and self._raw_client:
+            self._client = await self._raw_client.__aenter__()
+
+    async def _disconnect(self) -> None:
+        if self._client is not None:
+            await self._client.__aexit__(None, None, None)
+            self._client = None
+
     @override
     async def __aenter__(self) -> Self:
-        if self._raw_client:
-            self._client = await self._raw_client.__aenter__()
+        await self._connect()
         await super().__aenter__()
         return self
 
@@ -162,9 +170,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
     ) -> None:
         await super().__aexit__(exc_type, exc_value, traceback)
-        if self._client and self._raw_client:
-            await self._client.__aexit__(exc_type, exc_value, traceback)
-            self._client = None
+        await self._disconnect()
 
     @property
     def _connected_client(self) -> S3Client:
@@ -188,8 +194,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
         This method creates the S3 bucket if it doesn't already exist. It uses the
         HeadBucket operation to check for bucket existence and creates it if not found.
         """
-        if not self._client and self._raw_client:
-            self._client = await self._raw_client.__aenter__()
+        await self._connect()
 
         from botocore.exceptions import ClientError
 
@@ -363,6 +368,4 @@ class S3Store(BaseContextManagerStore, BaseStore):
     @override
     async def _close(self) -> None:
         """Close the S3 client."""
-        if self._client and self._raw_client:
-            await self._client.__aexit__(None, None, None)  # pyright: ignore[reportUnknownMemberType]
-            self._client = None
+        await self._disconnect()
