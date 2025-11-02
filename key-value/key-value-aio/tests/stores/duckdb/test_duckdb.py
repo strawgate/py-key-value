@@ -79,7 +79,7 @@ class TestDuckDBStoreSpecific:
             FROM kv_entries
             WHERE collection = 'products'
             ORDER BY key
-        """).fetchall()
+        """).fetchall()  # pyright: ignore[reportPrivateUsage]
 
         assert len(result) == 2
         assert result[0][0] == "item1"
@@ -87,20 +87,21 @@ class TestDuckDBStoreSpecific:
         assert result[1][0] == "item2"
 
         # Query by expiration timestamp
-        result = store._connection.execute("""
+        count_result = store._connection.execute("""
             SELECT COUNT(*)
             FROM kv_entries
             WHERE expires_at > now() OR expires_at IS NULL
-        """).fetchone()
+        """).fetchone()  # pyright: ignore[reportPrivateUsage]
 
-        assert result[0] == 3  # All 3 entries should not be expired
+        assert count_result is not None
+        assert count_result[0] == 3  # All 3 entries should not be expired
 
         # Query metadata columns directly
         result = store._connection.execute("""
             SELECT key, ttl, created_at IS NOT NULL as has_created
             FROM kv_entries
             WHERE collection = 'products' AND ttl > 3600
-        """).fetchall()
+        """).fetchall()  # pyright: ignore[reportPrivateUsage]
 
         assert len(result) == 1  # Only item2 has ttl > 3600
         assert result[0][0] == "item2"
@@ -120,7 +121,7 @@ class TestDuckDBStoreSpecific:
             SELECT value_json, value_dict, typeof(value_json) as json_type, typeof(value_dict) as dict_type
             FROM kv_entries
             WHERE collection = 'test' AND key = 'key1'
-        """).fetchone()
+        """).fetchone()  # pyright: ignore[reportPrivateUsage]
 
         assert result is not None
         value_json, value_dict, json_type, _dict_type = result
@@ -235,7 +236,7 @@ class TestDuckDBStoreSpecific:
             SELECT key, collection
             FROM {custom_table}
             WHERE key = 'key1'
-        """).fetchone()  # noqa: S608
+        """).fetchone()  # pyright: ignore[reportPrivateUsage]  # noqa: S608
 
         assert result is not None
         assert result[0] == "key1"
@@ -246,7 +247,7 @@ class TestDuckDBStoreSpecific:
             SELECT table_name
             FROM information_schema.tables
             WHERE table_name = 'kv_entries'
-        """).fetchall()
+        """).fetchall()  # pyright: ignore[reportPrivateUsage]
 
         assert len(tables) == 0
 
@@ -258,14 +259,15 @@ class TestDuckDBStoreSpecific:
         store_native = DuckDBStore(native_storage=True)
         await store_native.put(collection="test", key="key1", value={"name": "native"})
 
-        result = store_native._connection.execute("""
+        result_native = store_native._connection.execute("""
             SELECT value_dict, value_json
             FROM kv_entries
             WHERE key = 'key1'
-        """).fetchone()
+        """).fetchone()  # pyright: ignore[reportPrivateUsage]
 
-        assert result[0] is not None  # value_dict should be populated
-        assert result[1] is None  # value_json should be NULL
+        assert result_native is not None
+        assert result_native[0] is not None  # value_dict should be populated
+        assert result_native[1] is None  # value_json should be NULL
 
         await store_native.close()
 
@@ -273,14 +275,15 @@ class TestDuckDBStoreSpecific:
         store_string = DuckDBStore(native_storage=False)
         await store_string.put(collection="test", key="key2", value={"name": "stringified"})
 
-        result = store_string._connection.execute("""
+        result_string = store_string._connection.execute("""
             SELECT value_dict, value_json
             FROM kv_entries
             WHERE key = 'key2'
-        """).fetchone()
+        """).fetchone()  # pyright: ignore[reportPrivateUsage]
 
-        assert result[0] is None  # value_dict should be NULL
-        assert result[1] is not None  # value_json should be populated
+        assert result_string is not None
+        assert result_string[0] is None  # value_dict should be NULL
+        assert result_string[1] is not None  # value_json should be populated
 
         await store_string.close()
 
