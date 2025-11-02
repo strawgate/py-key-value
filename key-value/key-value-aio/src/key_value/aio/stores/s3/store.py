@@ -206,7 +206,18 @@ class S3Store(BaseContextManagerStore, BaseStore):
                 import contextlib
 
                 with contextlib.suppress(self._connected_client.exceptions.BucketAlreadyOwnedByYou):  # pyright: ignore[reportUnknownMemberType]
-                    await self._connected_client.create_bucket(Bucket=self._bucket_name)  # pyright: ignore[reportUnknownMemberType]
+                    # Build create_bucket parameters
+                    create_params: dict[str, Any] = {"Bucket": self._bucket_name}
+
+                    # Get region from client metadata
+                    region_name = getattr(self._connected_client.meta, "region_name", None)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+                    # For regions other than us-east-1, we need to specify LocationConstraint
+                    # Skip this for custom endpoints (LocalStack, MinIO) which may not support it
+                    if region_name and region_name != "us-east-1" and not self._endpoint_url:
+                        create_params["CreateBucketConfiguration"] = {"LocationConstraint": region_name}
+
+                    await self._connected_client.create_bucket(**create_params)  # pyright: ignore[reportUnknownMemberType]
             else:
                 # Re-raise authentication, permission, or other errors
                 raise
@@ -253,8 +264,9 @@ class S3Store(BaseContextManagerStore, BaseStore):
                 Key=s3_key,
             )
 
-            # Read the object body
-            body_bytes = await response["Body"].read()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            # Read the object body and ensure the streaming body is closed
+            async with response["Body"] as stream:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                body_bytes = await stream.read()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             json_value = body_bytes.decode("utf-8")  # pyright: ignore[reportUnknownMemberType]
 
             # Deserialize to ManagedEntry
