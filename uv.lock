@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform != 'win32'",
@@ -1744,6 +1744,7 @@ disk = [
 ]
 duckdb = [
     { name = "duckdb" },
+    { name = "pytz" },
 ]
 dynamodb = [
     { name = "aioboto3" },
@@ -1815,6 +1816,7 @@ requires-dist = [
     { name = "py-key-value-shared", editable = "key-value/key-value-shared" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
     { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.0.0" },
+    { name = "pytz", marker = "extra == 'duckdb'", specifier = ">=2025.2" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=4.3.0" },
     { name = "rocksdict", marker = "python_full_version >= '3.12' and extra == 'rocksdb'", specifier = ">=0.3.24" },
     { name = "rocksdict", marker = "python_full_version < '3.12' and extra == 'rocksdb'", specifier = ">=0.3.2" },
@@ -1908,6 +1910,10 @@ disk = [
     { name = "diskcache" },
     { name = "pathvalidate" },
 ]
+duckdb = [
+    { name = "duckdb" },
+    { name = "pytz" },
+]
 elasticsearch = [
     { name = "aiohttp" },
     { name = "elasticsearch" },
@@ -1951,7 +1957,7 @@ wrappers-encryption = [
 [package.dev-dependencies]
 dev = [
     { name = "py-key-value", extra = ["dev"] },
-    { name = "py-key-value-sync", extra = ["disk", "elasticsearch", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "rocksdb", "vault", "wrappers-encryption"] },
+    { name = "py-key-value-sync", extra = ["disk", "duckdb", "elasticsearch", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "rocksdb", "vault", "wrappers-encryption"] },
     { name = "py-key-value-sync", extra = ["valkey"], marker = "sys_platform != 'win32'" },
 ]
 
@@ -1964,6 +1970,7 @@ requires-dist = [
     { name = "cryptography", marker = "extra == 'wrappers-encryption'", specifier = ">=45.0.0" },
     { name = "dbus-python", marker = "extra == 'keyring-linux'", specifier = ">=1.4.0" },
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.0.0" },
+    { name = "duckdb", marker = "extra == 'duckdb'", specifier = ">=1.0.0" },
     { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=8.0.0" },
     { name = "hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "keyring", marker = "extra == 'keyring'", specifier = ">=25.6.0" },
@@ -1972,19 +1979,20 @@ requires-dist = [
     { name = "py-key-value-shared", editable = "key-value/key-value-shared" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
     { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.0.0" },
+    { name = "pytz", marker = "extra == 'duckdb'", specifier = ">=2025.2" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=4.3.0" },
     { name = "rocksdict", marker = "python_full_version >= '3.12' and extra == 'rocksdb'", specifier = ">=0.3.24" },
     { name = "rocksdict", marker = "python_full_version < '3.12' and extra == 'rocksdb'", specifier = ">=0.3.2" },
     { name = "types-hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "valkey-glide-sync", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "pydantic", "keyring", "keyring-linux", "rocksdb", "wrappers-encryption"]
+provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "pydantic", "keyring", "keyring-linux", "rocksdb", "duckdb", "wrappers-encryption"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "py-key-value", extras = ["dev"], editable = "." },
     { name = "py-key-value-sync", extras = ["keyring"] },
-    { name = "py-key-value-sync", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb", "vault", "rocksdb"] },
+    { name = "py-key-value-sync", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb", "vault", "rocksdb", "duckdb"] },
     { name = "py-key-value-sync", extras = ["pydantic"] },
     { name = "py-key-value-sync", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-sync", extras = ["wrappers-encryption"] },
@@ -2322,6 +2330,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f0/26/19cadc79a718c5edbec86fd4919a6b6d3f681039a2f6d66d14be94e75fb9/python_dotenv-1.2.1.tar.gz", hash = "sha256:42667e897e16ab0d66954af0e60a9caa94f0fd4ecf3aaf6d2d260eec1aa36ad6", size = 44221, upload-time = "2025-10-26T15:12:10.434Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/14/1b/a298b06749107c305e1fe0f814c6c74aea7b2f1e10989cb30f544a1b3253/python_dotenv-1.2.1-py3-none-any.whl", hash = "sha256:b81ee9561e9ca4004139c6cbba3a238c32b03e4894671e181b671e8cb8425d61", size = 21230, upload-time = "2025-10-26T15:12:09.109Z" },
+]
+
+[[package]]
+name = "pytz"
+version = "2025.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f8/bf/abbd3cdfb8fbc7fb3d4d38d320f2441b1e7cbe29be4f23797b4a2b5d8aac/pytz-2025.2.tar.gz", hash = "sha256:360b9e3dbb49a209c21ad61809c7fb453643e048b38924c765813546746e81c3", size = 320884, upload-time = "2025-03-25T02:25:00.538Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/81/c4/34e93fe5f5429d7570ec1fa436f1986fb1f00c3e0f43a589fe2bbcd22c3f/pytz-2025.2-py2.py3-none-any.whl", hash = "sha256:5ddf76296dd8c44c26eb8f4b6f35488f3ccbf6fbbd7adee0b7262d43f0ec2f00", size = 509225, upload-time = "2025-03-25T02:24:58.468Z" },
 ]
 
 [[package]]
