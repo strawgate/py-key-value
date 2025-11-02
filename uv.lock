@@ -1718,6 +1718,9 @@ elasticsearch = [
     { name = "aiohttp" },
     { name = "elasticsearch" },
 ]
+filetree = [
+    { name = "aiofiles" },
+]
 keyring = [
     { name = "keyring" },
 ]
@@ -1757,13 +1760,14 @@ wrappers-encryption = [
 [package.dev-dependencies]
 dev = [
     { name = "py-key-value", extra = ["dev"] },
-    { name = "py-key-value-aio", extra = ["disk", "dynamodb", "elasticsearch", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "rocksdb", "vault", "wrappers-encryption"] },
+    { name = "py-key-value-aio", extra = ["disk", "dynamodb", "elasticsearch", "filetree", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "rocksdb", "vault", "wrappers-encryption"] },
     { name = "py-key-value-aio", extra = ["valkey"], marker = "sys_platform != 'win32'" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aioboto3", marker = "extra == 'dynamodb'", specifier = ">=13.3.0" },
+    { name = "aiofiles", marker = "extra == 'filetree'", specifier = ">=24.1.0" },
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
     { name = "beartype", specifier = ">=0.20.0" },
@@ -1786,13 +1790,13 @@ requires-dist = [
     { name = "types-hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "valkey-glide", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "dynamodb", "keyring", "keyring-linux", "pydantic", "rocksdb", "wrappers-encryption"]
+provides-extras = ["memory", "disk", "filetree", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "dynamodb", "keyring", "keyring-linux", "pydantic", "rocksdb", "wrappers-encryption"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "py-key-value", extras = ["dev"], editable = "." },
     { name = "py-key-value-aio", extras = ["keyring"] },
-    { name = "py-key-value-aio", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb", "vault", "dynamodb", "rocksdb"] },
+    { name = "py-key-value-aio", extras = ["memory", "disk", "filetree", "redis", "elasticsearch", "memcached", "mongodb", "vault", "dynamodb", "rocksdb"] },
     { name = "py-key-value-aio", extras = ["pydantic"] },
     { name = "py-key-value-aio", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extras = ["wrappers-encryption"] },
