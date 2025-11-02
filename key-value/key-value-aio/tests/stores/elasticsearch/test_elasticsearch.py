@@ -148,6 +148,7 @@ class BaseTestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
     """Test Elasticsearch store in native mode (i.e. it stores flattened objects)"""
 
@@ -207,6 +208,7 @@ class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
     """Test Elasticsearch store in non-native mode (i.e. it stores stringified JSON values)"""
 
