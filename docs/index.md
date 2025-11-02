@@ -20,6 +20,7 @@ py-key-value is a Python framework that offers:
 ## Quick Links
 
 - [Getting Started](getting-started.md) - Installation and basic usage
+- [Stores](stores.md) - Detailed documentation for all stores
 - [Wrappers](wrappers.md) - Detailed documentation for all wrappers
 - [Adapters](adapters.md) - Detailed documentation for all adapters
 - [API Reference](api/protocols.md) - Complete API documentation
