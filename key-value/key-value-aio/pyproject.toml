@@ -34,7 +34,7 @@ py-key-value-shared-test = { workspace = true }
 [project.optional-dependencies]
 memory = ["cachetools>=5.0.0"]
 disk = ["diskcache>=5.0.0", "pathvalidate>=3.3.1",]
-filetree = ["aiofiles>=24.1.0"]
+filetree = ["aiofile>=3.5.0", "anyio>=4.1.0", "aioshutil>=1.4"]
 redis = ["redis>=4.3.0"]
 mongodb = ["pymongo>=4.0.0"]
 valkey = ["valkey-glide>=2.1.0"]

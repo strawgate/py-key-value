@@ -1,27 +1,230 @@
 """FileTreeStore implementation using async filesystem operations."""
 
-import asyncio
+import os
+from collections.abc import AsyncGenerator
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
-import aiofiles
-import aiofiles.os
-from key_value.shared.errors import DeserializationError
-from key_value.shared.utils.managed_entry import ManagedEntry
+from aiofile import async_open as aopen
+from anyio import Path as AsyncPath
+from key_value.shared.errors import StoreSetupError
+from key_value.shared.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
+from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
 from key_value.shared.utils.serialization import BasicSerializationAdapter, SerializationAdapter
-from typing_extensions import override
+from key_value.shared.utils.time_to_live import now
+from typing_extensions import Self, override
 
 from key_value.aio.stores.base import (
-    BaseDestroyCollectionStore,
-    BaseDestroyStore,
-    BaseEnumerateCollectionsStore,
-    BaseEnumerateKeysStore,
+    BaseStore,
 )
 
 DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
 
+MAX_DIRECTORY_LENGTH = 255
+DIRECTORY_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
 
-class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseEnumerateKeysStore):
+MAX_FILE_NAME_LENGTH = 255
+FILE_NAME_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
+
+
+def validate_in_directory(path: AsyncPath | Path, directory: AsyncPath | Path) -> None:
+    if not path.is_relative_to(Path(directory)):
+        raise StoreSetupError(message=f"Path {path} would escape base directory")
+
+
+def _sanitize_collection_name(directory: AsyncPath | Path, collection: str) -> str:
+    directory_length: int = len(directory.as_posix())
+    max_directory_length: int = get_max_path_length(root=directory)
+    minimum_room_for_file_name: int = 22  # 5 for .json extension, 16 for minimum file name length
+
+    return sanitize_string(
+        value=collection,
+        replacement_character="_",
+        max_length=max_directory_length - directory_length - minimum_room_for_file_name,
+        allowed_characters=DIRECTORY_ALLOWED_CHARACTERS,
+    )
+
+
+def _sanitized_collection_path(directory: AsyncPath | Path, collection: str) -> AsyncPath:
+    sanitized_collection = _sanitize_collection_name(directory=directory, collection=collection)
+    sanitized_collection_path = directory / sanitized_collection
+
+    validate_in_directory(path=sanitized_collection_path, directory=directory)
+
+    return AsyncPath(sanitized_collection_path)
+
+
+def _sanitized_collection_info_path(directory: AsyncPath | Path, collection: str) -> AsyncPath:
+    sanitized_collection = _sanitize_collection_name(directory=directory, collection=collection)
+    return AsyncPath(directory / f"{sanitized_collection}-info.json")
+
+
+def _sanitize_file_name(directory: AsyncPath | Path, key: str) -> str:
+
+    # We need to account for our current location in the filesystem to stay under the max path length
+    max_path_length: int = get_max_path_length(root=directory)
+    current_path_length: int = len(directory.as_posix())
+
+    remaining_length: int = max_path_length - current_path_length
+
+    # We need to account for limits on file names
+    max_file_name_length: int = get_max_file_name_length(root=directory) - 5
+
+    # We need to stay under both limits
+    max_length = min(remaining_length, max_file_name_length)
+
+    return sanitize_string(
+        value=key,
+        replacement_character="_",
+        max_length=max_length,
+        allowed_characters=FILE_NAME_ALLOWED_CHARACTERS,
+    )
+
+
+def _sanitized_file_path(directory: AsyncPath | Path, key: str) -> AsyncPath:
+    sanitized_file_name = _sanitize_file_name(directory=directory, key=key)
+    return AsyncPath(directory / f"{sanitized_file_name}.json")
+
+
+@dataclass(kw_only=True)
+class DiskCollectionInfo:
+    version: int = 1
+
+    collection: str
+
+    directory: AsyncPath
+
+    created_at: datetime
+
+    serialization_adapter: SerializationAdapter
+
+    async def _list_file_paths(self) -> AsyncGenerator[AsyncPath]:
+        async for item_path in AsyncPath(self.directory).iterdir():
+            if not await item_path.is_file() or item_path.suffix != ".json":
+                continue
+            if item_path.stem == "info":
+                continue
+            yield item_path
+
+    async def get_entry(self, *, key: str) -> ManagedEntry | None:
+        key_path: AsyncPath = _sanitized_file_path(directory=self.directory, key=key)
+
+        if not await key_path.exists():
+            return None
+
+        data_dict: dict[str, Any] = await read_file(file=key_path)
+
+        return self.serialization_adapter.load_dict(data=data_dict)
+
+    async def gen_entries(self) -> AsyncGenerator[ManagedEntry]:
+        async for key_path in self._list_file_paths():
+            yield self.serialization_adapter.load_dict(data=await read_file(file=key_path))
+
+    async def put_entry(self, *, key: str, data: ManagedEntry) -> None:
+        key_path: AsyncPath = _sanitized_file_path(directory=self.directory, key=key)
+        await write_file(file=key_path, text=self.serialization_adapter.dump_json(entry=data))
+
+    async def delete_entry(self, *, key: str) -> bool:
+        key_path: AsyncPath = _sanitized_file_path(directory=self.directory, key=key)
+
+        if not await key_path.exists():
+            return False
+
+        await key_path.unlink()
+
+        return True
+
+    # async def delete_all_entries(self) -> None:
+    #     async for entry_path in self._list_file_paths():
+    #         await entry_path.unlink()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "version": self.version,
+            "collection": self.collection,
+            "directory": str(self.directory),
+            "created_at": self.created_at.isoformat(),
+        }
+
+    def to_json(self) -> str:
+        return dump_to_json(obj=self.to_dict())
+
+    @classmethod
+    def from_dict(cls, *, data: dict[str, Any]) -> Self:
+        return cls(
+            version=data["version"],
+            collection=data["collection"],
+            directory=AsyncPath(data["directory"]),
+            created_at=datetime.fromisoformat(data["created_at"]),
+            serialization_adapter=BasicSerializationAdapter(),
+        )
+
+    @classmethod
+    async def from_file(cls, *, file: AsyncPath) -> Self:
+        if data := await read_file(file=file):
+            data["directory"] = AsyncPath(data["directory"]).resolve()
+            return cls.from_dict(data=data)
+
+        msg = f"File {file} not found"
+
+        raise FileNotFoundError(msg)
+
+    @classmethod
+    async def create_or_get_info(cls, *, data_directory: AsyncPath, metadata_directory: AsyncPath, collection: str) -> Self:
+        info_file: AsyncPath = _sanitized_collection_info_path(directory=metadata_directory, collection=collection)
+
+        if await info_file.exists():
+            return await cls.from_file(file=info_file)
+
+        info = cls(
+            collection=collection,
+            directory=data_directory,
+            created_at=now(),
+            serialization_adapter=BasicSerializationAdapter(),
+        )
+
+        await write_file(file=info_file, text=info.to_json())
+        return info
+
+    # async def cull_entry(self, *, key: str) -> bool:
+    #     if entry := await self.get_entry(key=key):
+    #         if entry.is_expired:
+    #             await self.delete_entry(key=key)
+    #             return True
+
+    #     return False
+
+    # async def cull_all_entries(self, *, serialization_adapter: SerializationAdapter) -> int:
+    #     deleted_count: int = 0
+    #     async for key in self.list_entries():
+    #         if await self.cull_entry(key=key.stem, serialization_adapter=serialization_adapter):
+    #             deleted_count += 1
+    #     return deleted_count
+
+
+def get_max_path_length(root: Path | AsyncPath) -> int:
+    return os.pathconf(path=Path(root), name="PC_PATH_MAX")
+
+
+def get_max_file_name_length(root: Path | AsyncPath) -> int:
+    return os.pathconf(path=Path(root), name="PC_NAME_MAX")
+
+
+async def read_file(file: AsyncPath) -> dict[str, Any]:
+    async with aopen(file_specifier=Path(file), mode="r", encoding="utf-8") as f:
+        body: str = await f.read()
+        return load_from_json(json_str=body)
+
+
+async def write_file(file: AsyncPath, text: str) -> None:
+    async with aopen(file_specifier=Path(file), mode="w", encoding="utf-8") as f:
+        await f.write(data=text)
+
+
+class FileTreeStore(BaseStore):
     """A file-tree based store using directories for collections and files for keys.
 
     This store uses the native filesystem:
@@ -49,12 +252,16 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
     are only filtered out when read via get() or similar methods.
     """
 
-    _directory: Path
+    _data_directory: AsyncPath
+    _metadata_directory: AsyncPath
+
+    _collection_infos: dict[str, DiskCollectionInfo]
 
     def __init__(
         self,
         *,
-        directory: Path | str,
+        data_directory: Path | str,
+        metadata_directory: Path | str | None = None,
         serialization_adapter: SerializationAdapter | None = None,
         default_collection: str | None = None,
     ) -> None:
@@ -65,8 +272,20 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
             serialization_adapter: The serialization adapter to use for the store.
             default_collection: The default collection to use if no collection is provided.
         """
-        self._directory = Path(directory).resolve()
-        self._directory.mkdir(parents=True, exist_ok=True)
+        data_directory = Path(data_directory).resolve()
+        data_directory.mkdir(parents=True, exist_ok=True)
+
+        if metadata_directory is None:
+            metadata_directory = data_directory
+
+        metadata_directory = Path(metadata_directory).resolve()
+        metadata_directory.mkdir(parents=True, exist_ok=True)
+
+        self._data_directory = AsyncPath(data_directory)
+        self._metadata_directory = AsyncPath(metadata_directory)
+
+        self._collection_paths = {}
+        self._collection_infos = {}
 
         self._stable_api = False
 
@@ -75,57 +294,46 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
             default_collection=default_collection,
         )
 
-    def _get_collection_path(self, collection: str) -> Path:
-        """Get the path to a collection directory.
+    async def _get_data_directories(self) -> AsyncGenerator[AsyncPath]:
+        async for directory in self._data_directory.iterdir():
+            if await directory.is_dir():
+                yield directory
 
-        Args:
-            collection: The collection name.
+    async def _get_metadata_entries(self) -> AsyncGenerator[AsyncPath]:
+        async for entry in self._metadata_directory.iterdir():
+            if await entry.is_file() and entry.suffix == ".json":
+                yield await entry.resolve()
 
-        Returns:
-            The path to the collection directory.
+    async def _load_collection_infos(self) -> None:
+        async for entry in self._get_metadata_entries():
+            collection_info: DiskCollectionInfo = await DiskCollectionInfo.from_file(file=entry)
+            self._collection_infos[collection_info.collection] = collection_info
 
-        Raises:
-            ValueError: If the collection name contains path separators or would escape the base directory.
-        """
-        # Reject path separators to prevent nested directories
-        if "/" in collection or "\\" in collection:
-            msg = f"Invalid collection name: {collection!r} cannot contain path separators"
-            raise ValueError(msg)
+    # async def _generate_collection_path(self, collection: str) -> AsyncPath:
+    #     """Get the path to a collection directory.
 
-        collection_path = (self._directory / collection).resolve()
+    #     Args:
+    #         collection: The collection name.
 
-        if not collection_path.is_relative_to(self._directory):
-            msg = f"Invalid collection name: {collection!r} would escape base directory"
-            raise ValueError(msg)
+    #     Returns:
+    #         The path to the collection directory.
 
-        return collection_path
+    #     Raises:
+    #         ValueError: If the collection name contains path separators or would escape the base directory.
+    #     """
 
-    def _get_key_path(self, collection: str, key: str) -> Path:
-        """Get the path to a key file.
+    #     # Reject path separators to prevent nested directories
+    #     if "/" in collection or "\\" in collection:
+    #         msg = f"Invalid collection name: {collection!r} cannot contain path separators"
+    #         raise ValueError(msg)
 
-        Args:
-            collection: The collection name.
-            key: The key name.
+    #     collection_path = await AsyncPath(self._directory / collection).resolve()
 
-        Returns:
-            The path to the key file.
+    #     if not collection_path.is_relative_to(self._directory):
+    #         msg = f"Invalid collection name: {collection!r} would escape base directory"
+    #         raise ValueError(msg)
 
-        Raises:
-            ValueError: If the key name contains path separators or would escape the base directory.
-        """
-        # Reject path separators to prevent nested directories
-        if "/" in key or "\\" in key:
-            msg = f"Invalid key name: {key!r} cannot contain path separators"
-            raise ValueError(msg)
-
-        collection_path = self._get_collection_path(collection)
-        key_path = (collection_path / f"{key}.json").resolve()
-
-        if not key_path.is_relative_to(self._directory):
-            msg = f"Invalid key name: {key!r} would escape base directory"
-            raise ValueError(msg)
-
-        return key_path
+    #     return collection_path
 
     @override
     async def _setup_collection(self, *, collection: str) -> None:
@@ -134,8 +342,18 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
         Args:
             collection: The collection name.
         """
-        collection_path = self._get_collection_path(collection)
-        await aiofiles.os.makedirs(collection_path, exist_ok=True)
+        if collection in self._collection_infos:
+            return
+
+        data_directory: AsyncPath = _sanitized_collection_path(directory=self._data_directory, collection=collection)
+
+        await data_directory.mkdir(parents=True, exist_ok=True)
+
+        self._collection_infos[collection] = await DiskCollectionInfo.create_or_get_info(
+            data_directory=self._data_directory,
+            metadata_directory=self._metadata_directory,
+            collection=collection,
+        )
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -148,24 +366,12 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
         Returns:
             The managed entry if found and not expired, None otherwise.
         """
-        key_path = self._get_key_path(collection, key)
+        collection_info: DiskCollectionInfo = self._collection_infos[collection]
 
-        try:
-            async with aiofiles.open(key_path, encoding="utf-8") as f:
-                json_str = await f.read()
-            return self._serialization_adapter.load_json(json_str=json_str)
-        except (OSError, FileNotFoundError, DeserializationError):
-            # If we can't read or parse the file, treat it as not found
-            return None
+        return await collection_info.get_entry(key=key)
 
     @override
-    async def _put_managed_entry(
-        self,
-        *,
-        key: str,
-        collection: str,
-        managed_entry: ManagedEntry,
-    ) -> None:
+    async def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
         """Store a managed entry at the specified key in the collection.
 
         Args:
@@ -173,15 +379,8 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
             key: The key name.
             managed_entry: The managed entry to store.
         """
-        key_path = self._get_key_path(collection, key)
-
-        # Ensure the parent directory exists
-        await aiofiles.os.makedirs(key_path.parent, exist_ok=True)
-
-        # Write the managed entry to the file
-        json_str = self._serialization_adapter.dump_json(entry=managed_entry)
-        async with aiofiles.open(key_path, mode="w", encoding="utf-8") as f:
-            await f.write(json_str)
+        collection_info: DiskCollectionInfo = self._collection_infos[collection]
+        await collection_info.put_entry(key=key, data=managed_entry)
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
@@ -194,199 +393,148 @@ class FileTreeStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateC
         Returns:
             True if the entry was deleted, False if it didn't exist.
         """
-        key_path = self._get_key_path(collection, key)
+        collection_info: DiskCollectionInfo = self._collection_infos[collection]
 
-        try:
-            await aiofiles.os.remove(key_path)
-        except FileNotFoundError:
-            return False
-        except OSError:
-            return False
-        else:
-            return True
+        return await collection_info.delete_entry(key=key)
 
-    @override
-    async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
-        """List all keys in the specified collection.
+    # async def _gen_collection_keys(self, *, collection: str) -> AsyncGenerator[str]:
+    #     """Generate all keys in the specified collection."""
+    #     collection_info: DiskCollectionInfo = self._collection_infos[collection]
+    #     async for item_path in collection_info.list_entries():
+    #         yield item_path.stem
 
-        Args:
-            collection: The collection name.
-            limit: Maximum number of keys to return.
+    # @override
+    # async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
+    #     """List all keys in the specified collection.
 
-        Returns:
-            A list of key names (without the .json extension).
-        """
-        limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
-        collection_path = self._get_collection_path(collection)
+    #     Args:
+    #         collection: The collection name.
+    #         limit: Maximum number of keys to return.
 
-        # Note: Using asyncio.to_thread for directory operations since aiofiles
-        # doesn't provide async directory iteration
-        def _list_keys() -> list[str]:
-            """Helper to list keys (runs in thread pool)."""
-            if not collection_path.exists():
-                return []
+    #     Returns:
+    #         A list of key names (without the .json extension).
+    #     """
+    #     limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
+    #     keys: list[str] = []
+    #     async for key in self._gen_collection_keys(collection=collection):
+    #         keys.append(key)
+    #         if len(keys) >= limit:
+    #             break
+    #     return keys
 
-            keys: list[str] = []
-            for file_path in collection_path.iterdir():
-                if file_path.is_file() and file_path.suffix == ".json":
-                    keys.append(file_path.stem)
-                    if len(keys) >= limit:
-                        break
-            return keys
+    # @override
+    # async def _get_collection_names(self, *, limit: int | None = None) -> list[str]:
+    #     """List all collection names.
 
-        return await asyncio.to_thread(_list_keys)
+    #     Args:
+    #         limit: Maximum number of collections to return.
 
-    @override
-    async def _get_collection_names(self, *, limit: int | None = None) -> list[str]:
-        """List all collection names.
+    #     Returns:
+    #         A list of collection names.
+    #     """
+    #     if limit is None:
+    #         limit = DEFAULT_PAGE_SIZE
 
-        Args:
-            limit: Maximum number of collections to return.
+    #     collections: list[str] = [collection_info.collection for collection_info in self._collection_infos.values()]
 
-        Returns:
-            A list of collection names.
-        """
-        limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
+    #     return collections[:limit]
 
-        # Note: Using asyncio.to_thread for directory operations since aiofiles
-        # doesn't provide async directory iteration
-        def _list_collections() -> list[str]:
-            """Helper to list collections (runs in thread pool)."""
-            collections: list[str] = []
-            for dir_path in self._directory.iterdir():
-                if dir_path.is_dir():
-                    collections.append(dir_path.name)
-                    if len(collections) >= limit:
-                        break
-            return collections
+    # @override
+    # async def _delete_collection(self, *, collection: str) -> bool:
+    #     """Delete an entire collection and all its keys.
 
-        return await asyncio.to_thread(_list_collections)
+    #     Args:
+    #         collection: The collection name.
 
-    @override
-    async def _delete_collection(self, *, collection: str) -> bool:
-        """Delete an entire collection and all its keys.
+    #     Returns:
+    #         True if the collection was deleted, False if it didn't exist or an error occurred.
+    #     """
+    #     collection_info: DiskCollectionInfo = self._collection_infos[collection]
 
-        Args:
-            collection: The collection name.
+    #     await collection_info.delete_all_entries()
 
-        Returns:
-            True if the collection was deleted, False if it didn't exist or an error occurred.
-        """
-        collection_path = self._get_collection_path(collection)
+    #     del self._collection_infos[collection]
 
-        # Note: Using asyncio.to_thread for directory operations since they involve
-        # multiple filesystem operations that need to be atomic
-        def _delete() -> bool:
-            """Helper to delete collection (runs in thread pool)."""
-            if not collection_path.exists():
-                return False
+    #     return True
 
-            try:
-                # Delete all files in the collection
-                for file_path in collection_path.iterdir():
-                    if file_path.is_file():
-                        file_path.unlink()
+    # @override
+    # async def _delete_store(self) -> bool:
+    #     """Delete the entire store and all its collections.
 
-                # Delete the collection directory
-                collection_path.rmdir()
-            except OSError:
-                return False
-            else:
-                return True
+    #     Returns:
+    #         True if the store was deleted successfully.
+    #     """
 
-        return await asyncio.to_thread(_delete)
+    #     for collection_info in self._collection_infos.values():
+    #         await self._delete_collection(collection=collection_info.collection)
 
-    @override
-    async def _delete_store(self) -> bool:
-        """Delete the entire store and all its collections.
+    #     return True
 
-        Returns:
-            True if the store was deleted successfully.
-        """
+    # async def _cull_collection(self, *, collection: str) -> int:
+    #     """Cull a collection."""
+    #     collection_info: DiskCollectionInfo = self._collection_infos[collection]
+    #     deleted_count: int = 0
+    #     async for file in collection_path.iterdir():
+    #         if await self._cull_file(file=file):
+    #             deleted_count += 1
+    #     return deleted_count
 
-        def _delete_all() -> bool:
-            """Helper to delete all collections in thread."""
-            try:
-                # Delete all collections
-                for collection_path in self._directory.iterdir():
-                    if collection_path.is_dir():
-                        # Delete all files in the collection
-                        for file_path in collection_path.iterdir():
-                            if file_path.is_file():
-                                file_path.unlink()
-                        # Delete the collection directory
-                        collection_path.rmdir()
-            except OSError:
-                return False
-            else:
-                return True
+    # async def _cull_directory(self, *, directory: AsyncPath) -> int:
+    #     """Cull the directory."""
+    #     deleted_count: int = 0
+    #     async for collection_path in directory.iterdir():
+    #         if await self._cull_file(file=collection_path):
+    #             deleted_count += 1
+    #     return deleted_count
 
-        return await asyncio.to_thread(_delete_all)
+    # async def _cull_key(self, *, key: str, collection: str) -> bool:
+    #     """Cull a key."""
+    #     key_path = self._get_key_path(collection=collection, key=key)
+    #     return await self._cull_file(file=key_path)
 
-    async def cleanup_expired(self, *, collection: str | None = None) -> int:
-        """Remove expired entries from disk.
+    # async def _cull_file(self, *, file: AsyncPath) -> bool:
+    #     """Cull a file. If it is a managed entry, check if it is expired and remove it if it is."""
+    #     managed_entry: ManagedEntry | None = await self._read_file(file=file)
+    #     if managed_entry is not None and not managed_entry.is_expired:
+    #         return False
 
-        This utility method scans the specified collection (or all collections if None)
-        and deletes entries that have expired based on their TTL. This is useful for
-        manual cleanup of the store since expired entries are not automatically removed.
+    #     await file.unlink()
 
-        Args:
-            collection: The collection to clean up, or None to clean all collections.
+    #     return True
 
-        Returns:
-            The number of entries deleted.
-        """
+    # async def _get_collection_info(self, *, directory: AsyncPath) -> DiskCollectionInfo:
+    #     """Get the collection info."""
+    #     info_file: AsyncPath = await (directory / "info.json").resolve()
+    #     return await DiskCollectionInfo.from_file(file=info_file)
 
-        # Note: Using asyncio.to_thread for directory operations and file I/O
-        # since this involves multiple operations that need to be batched
-        def _cleanup_collection(collection_path: Path) -> int:
-            """Helper to cleanup a single collection (runs in thread pool)."""
-            deleted_count = 0
-            try:
-                for file_path in collection_path.iterdir():
-                    if not file_path.is_file() or file_path.suffix != ".json":
-                        continue
+    # async def _read_file(self, *, file: AsyncPath) -> ManagedEntry | None:
+    #     """Read a file and return the managed entry."""
+    #     if not await file.is_file() or file.suffix != ".json":
+    #         return None
 
-                    try:
-                        # Read and deserialize the entry
-                        json_str = file_path.read_text(encoding="utf-8")
-                        entry = self._serialization_adapter.load_json(json_str=json_str)
+    #     json_str = await file.read_text(encoding="utf-8")
+    #     return self._serialization_adapter.load_json(json_str=json_str)
 
-                        # Check if expired using the ManagedEntry property
-                        if entry.is_expired:
-                            file_path.unlink()
-                            deleted_count += 1
-                    except (OSError, DeserializationError):
-                        # Skip files that can't be read or parsed
-                        continue
-            except OSError:
-                # Skip if collection can't be read
-                pass
+    # async def cleanup_expired(self, *, collection: str | None = None) -> int:
+    #     """Remove expired entries from disk.
 
-            return deleted_count
+    #     This utility method scans the specified collection (or all collections if None)
+    #     and deletes entries that have expired based on their TTL. This is useful for
+    #     manual cleanup of the store since expired entries are not automatically removed.
 
-        if collection is not None:
-            # Clean specific collection
-            collection_path = self._get_collection_path(collection)
+    #     Args:
+    #         collection: The collection to clean up, or None to clean all collections.
 
-            def _check_and_cleanup() -> int:
-                """Check if collection exists and cleanup (runs in thread pool)."""
-                if not collection_path.exists():
-                    return 0
-                return _cleanup_collection(collection_path)
+    #     Returns:
+    #         The number of entries deleted.
+    #     """
 
-            return await asyncio.to_thread(_check_and_cleanup)
+    #     if collection is not None:
+    #         return await self._cull_collection(collection=collection)
 
-        # Clean all collections
-        def _cleanup_all() -> int:
-            """Helper to cleanup all collections (runs in thread pool)."""
-            total_deleted = 0
-            try:
-                for dir_path in self._directory.iterdir():
-                    if dir_path.is_dir():
-                        total_deleted += _cleanup_collection(dir_path)
-            except OSError:
-                pass
-            return total_deleted
+    #     deleted_count: int = 0
 
-        return await asyncio.to_thread(_cleanup_all)
+    #     async for directory in self._get_collection_directories():
+    #         deleted_count += await self._cull_directory(directory=directory)
+
+    #     return deleted_count
