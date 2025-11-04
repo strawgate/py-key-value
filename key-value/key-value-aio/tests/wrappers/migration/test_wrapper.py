@@ -1,13 +1,15 @@
-"""Tests for SanitizationMigrationWrapper."""
+"""Tests for MigrationWrapper."""
 
 import pytest
 
 from key_value.aio.stores.memory import MemoryStore
-from key_value.aio.wrappers.sanitization_migration import SanitizationMigrationWrapper
+from key_value.aio.wrappers.migration import MigrationWrapper
+
+pytestmark = pytest.mark.asyncio
 
 
-class TestSanitizationMigrationWrapper:
-    """Tests for SanitizationMigrationWrapper."""
+class TestMigrationWrapper:
+    """Tests for MigrationWrapper."""
 
     @pytest.fixture
     def current_store(self) -> MemoryStore:
@@ -20,9 +22,9 @@ class TestSanitizationMigrationWrapper:
         return MemoryStore()
 
     @pytest.fixture
-    def wrapper(self, current_store: MemoryStore, legacy_store: MemoryStore) -> SanitizationMigrationWrapper:
+    def wrapper(self, current_store: MemoryStore, legacy_store: MemoryStore) -> MigrationWrapper:
         """Create a migration wrapper."""
-        return SanitizationMigrationWrapper(
+        return MigrationWrapper(
             current_store=current_store,
             legacy_store=legacy_store,
             migrate_on_read=False,
@@ -30,9 +32,9 @@ class TestSanitizationMigrationWrapper:
         )
 
     @pytest.fixture
-    def migrating_wrapper(self, current_store: MemoryStore, legacy_store: MemoryStore) -> SanitizationMigrationWrapper:
+    def migrating_wrapper(self, current_store: MemoryStore, legacy_store: MemoryStore) -> MigrationWrapper:
         """Create a migration wrapper with migrate_on_read=True."""
-        return SanitizationMigrationWrapper(
+        return MigrationWrapper(
             current_store=current_store,
             legacy_store=legacy_store,
             migrate_on_read=True,
@@ -40,7 +42,7 @@ class TestSanitizationMigrationWrapper:
             cache_size=100,
         )
 
-    async def test_get_from_current_store(self, wrapper: SanitizationMigrationWrapper, current_store: MemoryStore) -> None:
+    async def test_get_from_current_store(self, wrapper: MigrationWrapper, current_store: MemoryStore) -> None:
         """Test getting a value from the current store."""
         await current_store.put(key="test_key", value={"data": "current"}, collection="default")
 
@@ -48,9 +50,7 @@ class TestSanitizationMigrationWrapper:
         assert result is not None
         assert result["data"] == "current"
 
-    async def test_get_from_legacy_store(
-        self, wrapper: SanitizationMigrationWrapper, legacy_store: MemoryStore, current_store: MemoryStore
-    ) -> None:
+    async def test_get_from_legacy_store(self, wrapper: MigrationWrapper, legacy_store: MemoryStore, current_store: MemoryStore) -> None:
         """Test getting a value from the legacy store when not in current."""
         await legacy_store.put(key="test_key", value={"data": "legacy"}, collection="default")
 
@@ -62,13 +62,13 @@ class TestSanitizationMigrationWrapper:
         current_result = await current_store.get(key="test_key", collection="default")
         assert current_result is None
 
-    async def test_get_missing_key(self, wrapper: SanitizationMigrationWrapper) -> None:
+    async def test_get_missing_key(self, wrapper: MigrationWrapper) -> None:
         """Test getting a missing key returns None."""
         result = await wrapper.get(key="missing_key", collection="default")
         assert result is None
 
     async def test_migrate_on_read(
-        self, migrating_wrapper: SanitizationMigrationWrapper, legacy_store: MemoryStore, current_store: MemoryStore
+        self, migrating_wrapper: MigrationWrapper, legacy_store: MemoryStore, current_store: MemoryStore
     ) -> None:
         """Test that migrate_on_read copies data from legacy to current."""
         await legacy_store.put(key="test_key", value={"data": "legacy"}, collection="default", ttl=3600)
@@ -88,7 +88,7 @@ class TestSanitizationMigrationWrapper:
 
     async def test_migrate_on_read_with_delete(self, legacy_store: MemoryStore, current_store: MemoryStore) -> None:
         """Test that delete_after_migration removes from legacy."""
-        wrapper = SanitizationMigrationWrapper(
+        wrapper = MigrationWrapper(
             current_store=current_store,
             legacy_store=legacy_store,
             migrate_on_read=True,
@@ -106,7 +106,7 @@ class TestSanitizationMigrationWrapper:
         assert legacy_result is None
 
     async def test_cache_avoids_repeated_lookups(
-        self, wrapper: SanitizationMigrationWrapper, current_store: MemoryStore, legacy_store: MemoryStore
+        self, wrapper: MigrationWrapper, current_store: MemoryStore, legacy_store: MemoryStore
     ) -> None:
         """Test that cache avoids repeated lookups."""
         await current_store.put(key="test_key", value={"data": "current"}, collection="default")
@@ -125,7 +125,7 @@ class TestSanitizationMigrationWrapper:
         assert result2 is not None
         assert result2["data"] == "current"  # Still from current, not legacy
 
-    async def test_cache_missing_keys(self, wrapper: SanitizationMigrationWrapper) -> None:
+    async def test_cache_missing_keys(self, wrapper: MigrationWrapper) -> None:
         """Test that missing keys are cached."""
         # First get - should cache as missing
         result1 = await wrapper.get(key="missing_key", collection="default")
@@ -139,9 +139,7 @@ class TestSanitizationMigrationWrapper:
         result2 = await wrapper.get(key="missing_key", collection="default")
         assert result2 is None
 
-    async def test_put_updates_cache(
-        self, wrapper: SanitizationMigrationWrapper, current_store: MemoryStore, legacy_store: MemoryStore
-    ) -> None:
+    async def test_put_updates_cache(self, wrapper: MigrationWrapper, current_store: MemoryStore, legacy_store: MemoryStore) -> None:
         """Test that put updates the cache."""
         # Put initially in legacy
         await legacy_store.put(key="test_key", value={"data": "legacy"}, collection="default")
@@ -159,9 +157,7 @@ class TestSanitizationMigrationWrapper:
         assert result is not None
         assert result["data"] == "new"
 
-    async def test_delete_from_both_stores(
-        self, wrapper: SanitizationMigrationWrapper, current_store: MemoryStore, legacy_store: MemoryStore
-    ) -> None:
+    async def test_delete_from_both_stores(self, wrapper: MigrationWrapper, current_store: MemoryStore, legacy_store: MemoryStore) -> None:
         """Test that delete removes from both stores."""
         await current_store.put(key="key1", value={"data": "current"}, collection="default")
         await legacy_store.put(key="key2", value={"data": "legacy"}, collection="default")
@@ -177,7 +173,7 @@ class TestSanitizationMigrationWrapper:
         assert await current_store.get(key="key1", collection="default") is None
         assert await legacy_store.get(key="key2", collection="default") is None
 
-    async def test_get_many(self, wrapper: SanitizationMigrationWrapper, current_store: MemoryStore, legacy_store: MemoryStore) -> None:
+    async def test_get_many(self, wrapper: MigrationWrapper, current_store: MemoryStore, legacy_store: MemoryStore) -> None:
         """Test get_many with keys in different stores."""
         await current_store.put(key="key1", value={"data": "current1"}, collection="default")
         await legacy_store.put(key="key2", value={"data": "legacy2"}, collection="default")
@@ -192,7 +188,7 @@ class TestSanitizationMigrationWrapper:
         assert results[2] is None
 
     async def test_get_many_with_migration(
-        self, migrating_wrapper: SanitizationMigrationWrapper, legacy_store: MemoryStore, current_store: MemoryStore
+        self, migrating_wrapper: MigrationWrapper, legacy_store: MemoryStore, current_store: MemoryStore
     ) -> None:
         """Test get_many migrates keys from legacy to current."""
         await legacy_store.put(key="key1", value={"data": "legacy1"}, collection="default")
@@ -210,7 +206,7 @@ class TestSanitizationMigrationWrapper:
         assert current_result1 is not None
         assert current_result2 is not None
 
-    async def test_ttl_from_current(self, wrapper: SanitizationMigrationWrapper, current_store: MemoryStore) -> None:
+    async def test_ttl_from_current(self, wrapper: MigrationWrapper, current_store: MemoryStore) -> None:
         """Test ttl from current store."""
         await current_store.put(key="test_key", value={"data": "current"}, collection="default", ttl=3600)
 
@@ -220,9 +216,7 @@ class TestSanitizationMigrationWrapper:
         assert ttl is not None
         assert ttl > 0
 
-    async def test_ttl_from_legacy(
-        self, wrapper: SanitizationMigrationWrapper, legacy_store: MemoryStore, current_store: MemoryStore
-    ) -> None:
+    async def test_ttl_from_legacy(self, wrapper: MigrationWrapper, legacy_store: MemoryStore, current_store: MemoryStore) -> None:
         """Test ttl from legacy store."""
         await legacy_store.put(key="test_key", value={"data": "legacy"}, collection="default", ttl=3600)
 
@@ -236,7 +230,7 @@ class TestSanitizationMigrationWrapper:
         assert current_result is None
 
     async def test_ttl_with_migration(
-        self, migrating_wrapper: SanitizationMigrationWrapper, legacy_store: MemoryStore, current_store: MemoryStore
+        self, migrating_wrapper: MigrationWrapper, legacy_store: MemoryStore, current_store: MemoryStore
     ) -> None:
         """Test ttl migrates from legacy to current."""
         await legacy_store.put(key="test_key", value={"data": "legacy"}, collection="default", ttl=3600)
@@ -250,7 +244,7 @@ class TestSanitizationMigrationWrapper:
         assert current_value is not None
         assert current_ttl is not None
 
-    async def test_put_many(self, wrapper: SanitizationMigrationWrapper, current_store: MemoryStore) -> None:
+    async def test_put_many(self, wrapper: MigrationWrapper, current_store: MemoryStore) -> None:
         """Test put_many writes to current store."""
         await wrapper.put_many(
             keys=["key1", "key2"],
@@ -264,7 +258,7 @@ class TestSanitizationMigrationWrapper:
         assert result1 is not None
         assert result2 is not None
 
-    async def test_delete_many(self, wrapper: SanitizationMigrationWrapper, current_store: MemoryStore, legacy_store: MemoryStore) -> None:
+    async def test_delete_many(self, wrapper: MigrationWrapper, current_store: MemoryStore, legacy_store: MemoryStore) -> None:
         """Test delete_many removes from both stores."""
         await current_store.put(key="key1", value={"data": "current"}, collection="default")
         await legacy_store.put(key="key2", value={"data": "legacy"}, collection="default")
@@ -278,7 +272,7 @@ class TestSanitizationMigrationWrapper:
 
     async def test_cache_disabled(self, current_store: MemoryStore, legacy_store: MemoryStore) -> None:
         """Test wrapper with caching disabled."""
-        wrapper = SanitizationMigrationWrapper(
+        wrapper = MigrationWrapper(
             current_store=current_store,
             legacy_store=legacy_store,
             cache_size=0,  # Disable cache
@@ -292,7 +286,7 @@ class TestSanitizationMigrationWrapper:
         # Cache should be disabled
         assert not wrapper._cache_enabled  # pyright: ignore[reportPrivateUsage]
 
-    async def test_ttl_many(self, wrapper: SanitizationMigrationWrapper, current_store: MemoryStore, legacy_store: MemoryStore) -> None:
+    async def test_ttl_many(self, wrapper: MigrationWrapper, current_store: MemoryStore, legacy_store: MemoryStore) -> None:
         """Test ttl_many with keys in different stores."""
         await current_store.put(key="key1", value={"data": "current1"}, collection="default", ttl=3600)
         await legacy_store.put(key="key2", value={"data": "legacy2"}, collection="default", ttl=7200)

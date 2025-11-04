@@ -1,12 +1,12 @@
-"""Wrapper for migrating between sanitization strategies.
+"""Wrapper for migrating between two key-value stores.
 
-This wrapper enables gradual migration from one sanitization strategy to another
-without breaking access to existing data. It wraps two stores configured with
-different sanitization strategies and provides:
+This wrapper enables gradual migration from one store configuration to another
+without breaking access to existing data. It wraps two stores (current and legacy)
+and provides:
 
-1. **Collision detection**: Skips migration if both strategies produce the same key
+1. **Dual-store read**: Tries current store first, falls back to legacy
 2. **LRU caching**: Caches lookup results to avoid repeated fallback checks
-3. **Lazy migration**: Optionally migrates keys from old to new format on read
+3. **Lazy migration**: Optionally migrates keys from legacy to current on read
 """
 
 from collections.abc import Mapping, Sequence
@@ -19,47 +19,52 @@ from key_value.aio.protocols.key_value import AsyncKeyValue
 from key_value.aio.wrappers.base import BaseWrapper
 
 
-class SanitizationMigrationWrapper(BaseWrapper):
-    """Wrapper for migrating between sanitization strategies.
+class MigrationWrapper(BaseWrapper):
+    """Wrapper for migrating between two key-value stores.
 
-    This wrapper manages the transition between two stores using different sanitization
-    strategies. It tries the current store first, then falls back to the legacy store
-    if the key is not found. Optionally, it can migrate keys from the legacy store to
-    the current store on read.
+    This wrapper manages the transition between two stores (e.g., stores with different
+    configurations such as sanitization strategies, encryption, compression, etc.).
+    It tries the current store first, then falls back to the legacy store if the key
+    is not found. Optionally, it can migrate keys from the legacy store to the current
+    store on read.
 
     The wrapper includes:
-    - **Collision detection**: If both strategies produce the same sanitized key, no
-      fallback is performed (no migration needed)
+    - **Dual-store read**: Tries current store first, falls back to legacy
     - **LRU cache**: Caches which keys are in current vs. legacy store to avoid
       repeated lookups
     - **Lazy migration**: Optionally copies data from legacy to current store on read
 
-    Example:
+    Common use cases:
+    - Migrating between sanitization strategies
+    - Migrating between encryption configurations
+    - Migrating between compression settings
+    - Migrating between different backend stores
+
+    Example (sanitization strategy migration):
         ```python
         from key_value.aio.stores.memcached import MemcachedStore
         from key_value.shared.utils.sanitization_strategy import (
             HashLongKeysSanitizationStrategy,
         )
-        from key_value.aio.wrappers.sanitization_migration import (
-            SanitizationMigrationWrapper,
-        )
+        from key_value.aio.wrappers.migration import MigrationWrapper
 
-        # Old strategy (no prefix - collision risk!)
-        old_strategy = HashLongKeysSanitizationStrategy(max_length=240)
+        # Legacy store with old configuration
         legacy_store = MemcachedStore(
             host="localhost",
-            sanitization_strategy=old_strategy,
+            sanitization_strategy=HashLongKeysSanitizationStrategy(max_length=240),
         )
 
-        # New strategy (with H_ prefix - collision safe)
-        new_strategy = HashLongKeysSanitizationStrategy(max_length=240)
+        # Current store with new configuration
         current_store = MemcachedStore(
             host="localhost",
-            sanitization_strategy=new_strategy,
+            sanitization_strategy=HashLongKeysSanitizationStrategy(
+                max_length=240,
+                add_prefix=True,
+            ),
         )
 
         # Wrap with migration support
-        migrating_store = SanitizationMigrationWrapper(
+        migrating_store = MigrationWrapper(
             current_store=current_store,
             legacy_store=legacy_store,
             migrate_on_read=True,  # Copy old data to new location
@@ -68,8 +73,8 @@ class SanitizationMigrationWrapper(BaseWrapper):
         ```
 
     Args:
-        current_store: Store using the new sanitization strategy.
-        legacy_store: Store using the old sanitization strategy.
+        current_store: The target store (new configuration).
+        legacy_store: The source store (old configuration).
         migrate_on_read: If True, copy keys from legacy to current on read.
         delete_after_migration: If True, delete from legacy after migration.
         cache_size: Maximum number of keys to cache. Set to 0 to disable caching.
@@ -94,8 +99,8 @@ class SanitizationMigrationWrapper(BaseWrapper):
         """Initialize the migration wrapper.
 
         Args:
-            current_store: Store using the new sanitization strategy.
-            legacy_store: Store using the old sanitization strategy.
+            current_store: The target store (new configuration).
+            legacy_store: The source store (old configuration).
             migrate_on_read: If True, copy keys from legacy to current on read.
             delete_after_migration: If True, delete from legacy after migration.
             cache_size: Maximum number of keys to cache. Set to 0 to disable.
