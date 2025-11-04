@@ -186,7 +186,7 @@ class SanitizationMigrationWrapper(BaseWrapper):
         return result
 
     @override
-    def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:  # noqa: PLR0912
+    def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:  # noqa: PLR0912, PLR0915
         """Get multiple values, falling back to legacy store for missing keys.
 
         Args:
@@ -197,10 +197,10 @@ class SanitizationMigrationWrapper(BaseWrapper):
             List of values (None for missing keys).
         """
         # Separate keys by cached location
-        current_keys = []
-        legacy_keys = []
-        missing_keys = []
-        unknown_keys = []
+        current_keys: list[str] = []
+        legacy_keys: list[str] = []
+        missing_keys: list[str] = []
+        unknown_keys: list[str] = []
 
         for key in keys:
             cached_location = self._cache_get(key, collection)
@@ -214,7 +214,7 @@ class SanitizationMigrationWrapper(BaseWrapper):
                 unknown_keys.append(key)
 
         # Start with all None
-        key_to_value: dict[str, dict[str, Any] | None] = dict.fromkeys(keys, None)
+        key_to_value: dict[str, dict[str, Any] | None] = dict.fromkeys(keys, None)  # type: ignore[arg-type]
 
         # Fetch known current keys
         if current_keys:
@@ -226,12 +226,13 @@ class SanitizationMigrationWrapper(BaseWrapper):
         if legacy_keys:
             legacy_results = self.legacy_store.get_many(keys=legacy_keys, collection=collection)
             for i, key in enumerate(legacy_keys):
-                key_to_value[key] = legacy_results[i]
+                legacy_value = legacy_results[i]
+                key_to_value[key] = legacy_value
 
                 # Optionally migrate
-                if self.migrate_on_read and legacy_results[i] is not None:
+                if self.migrate_on_read and legacy_value is not None:
                     (_, ttl) = self.legacy_store.ttl(key=key, collection=collection)
-                    self.current_store.put(key=key, value=legacy_results[i], collection=collection, ttl=ttl)
+                    self.current_store.put(key=key, value=legacy_value, collection=collection, ttl=ttl)
                     if self.delete_after_migration:
                         self.legacy_store.delete(key=key, collection=collection)
                     self._cache_put(key, collection, "current")
@@ -241,7 +242,7 @@ class SanitizationMigrationWrapper(BaseWrapper):
             current_results = self.current_store.get_many(keys=unknown_keys, collection=collection)
 
             # Identify which unknown keys were not found in current
-            not_in_current = []
+            not_in_current: list[str] = []
             for i, key in enumerate(unknown_keys):
                 if current_results[i] is not None:
                     key_to_value[key] = current_results[i]
@@ -253,13 +254,14 @@ class SanitizationMigrationWrapper(BaseWrapper):
             if not_in_current:
                 legacy_results = self.legacy_store.get_many(keys=not_in_current, collection=collection)
                 for i, key in enumerate(not_in_current):
-                    if legacy_results[i] is not None:
-                        key_to_value[key] = legacy_results[i]
+                    legacy_value = legacy_results[i]
+                    if legacy_value is not None:
+                        key_to_value[key] = legacy_value
 
                         # Optionally migrate
                         if self.migrate_on_read:
                             (_, ttl) = self.legacy_store.ttl(key=key, collection=collection)
-                            self.current_store.put(key=key, value=legacy_results[i], collection=collection, ttl=ttl)
+                            self.current_store.put(key=key, value=legacy_value, collection=collection, ttl=ttl)
                             if self.delete_after_migration:
                                 self.legacy_store.delete(key=key, collection=collection)
                             self._cache_put(key, collection, "current")
@@ -327,10 +329,10 @@ class SanitizationMigrationWrapper(BaseWrapper):
             List of (value, ttl) tuples.
         """
         # Similar logic to get_many but with TTL
-        current_keys = []
-        legacy_keys = []
-        missing_keys = []
-        unknown_keys = []
+        current_keys: list[str] = []
+        legacy_keys: list[str] = []
+        missing_keys: list[str] = []
+        unknown_keys: list[str] = []
 
         for key in keys:
             cached_location = self._cache_get(key, collection)
@@ -343,7 +345,7 @@ class SanitizationMigrationWrapper(BaseWrapper):
             else:
                 unknown_keys.append(key)
 
-        key_to_value: dict[str, tuple[dict[str, Any] | None, float | None]] = dict.fromkeys(keys, (None, None))  # type: ignore
+        key_to_value: dict[str, tuple[dict[str, Any] | None, float | None]] = dict.fromkeys(keys, (None, None))
 
         # Fetch from current
         if current_keys:
@@ -368,7 +370,7 @@ class SanitizationMigrationWrapper(BaseWrapper):
         if unknown_keys:
             current_results = self.current_store.ttl_many(keys=unknown_keys, collection=collection)
 
-            not_in_current = []
+            not_in_current: list[str] = []
             for i, key in enumerate(unknown_keys):
                 if current_results[i][0] is not None:
                     key_to_value[key] = current_results[i]

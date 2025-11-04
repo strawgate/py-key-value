@@ -229,7 +229,21 @@ class CharacterSanitizationStrategy(SanitizationStrategy):
             # Add prefix, hash fragment, and return
             return f"S_{sanitized}-{hash_fragment}"
 
-        # No hash needed - return sanitized value (or original if unchanged)
+        # No hash needed - but still need to enforce max_length and prefix if changed
+        needs_truncation = len(sanitized) > self.max_length
+        if needs_truncation:
+            sanitized = sanitized[: self.max_length]
+            changed = True
+
+        if changed:
+            # Add S_ prefix since we modified the input
+            prefixed = f"S_{sanitized}"
+            # Ensure the prefixed result fits within max_length
+            if len(prefixed) > self.max_length:
+                sanitized = sanitized[: self.max_length - 2]
+                prefixed = f"S_{sanitized}"
+            return prefixed
+
         return sanitized
 
     def validate(self, value: str) -> None:
