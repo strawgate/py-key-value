@@ -116,7 +116,7 @@ class TestSanitizationMigrationWrapper:
         assert result1 is not None
 
         # Check cache
-        cached_location = wrapper._cache_get(key="test_key", collection="default")
+        cached_location = wrapper._cache_get(key="test_key", collection="default")  # pyright: ignore[reportPrivateUsage]
         assert cached_location == "current"
 
         # Second get - should use cache (wouldn't check legacy even if we added to it)
@@ -132,7 +132,7 @@ class TestSanitizationMigrationWrapper:
         assert result1 is None
 
         # Check cache
-        cached_location = wrapper._cache_get(key="missing_key", collection="default")
+        cached_location = wrapper._cache_get(key="missing_key", collection="default")  # pyright: ignore[reportPrivateUsage]
         assert cached_location == "missing"
 
         # Second get - should use cache
@@ -148,11 +148,11 @@ class TestSanitizationMigrationWrapper:
 
         # Get - should cache as legacy
         await wrapper.get(key="test_key", collection="default")
-        assert wrapper._cache_get(key="test_key", collection="default") == "legacy"
+        assert wrapper._cache_get(key="test_key", collection="default") == "legacy"  # pyright: ignore[reportPrivateUsage]
 
         # Put - should update cache to current
         await wrapper.put(key="test_key", value={"data": "new"}, collection="default")
-        assert wrapper._cache_get(key="test_key", collection="default") == "current"
+        assert wrapper._cache_get(key="test_key", collection="default") == "current"  # pyright: ignore[reportPrivateUsage]
 
         # Get - should get from current, not legacy
         result = await wrapper.get(key="test_key", collection="default")
@@ -290,7 +290,7 @@ class TestSanitizationMigrationWrapper:
         assert result is not None
 
         # Cache should be disabled
-        assert not wrapper._cache_enabled
+        assert not wrapper._cache_enabled  # pyright: ignore[reportPrivateUsage]
 
     async def test_ttl_many(self, wrapper: SanitizationMigrationWrapper, current_store: MemoryStore, legacy_store: MemoryStore) -> None:
         """Test ttl_many with keys in different stores."""
