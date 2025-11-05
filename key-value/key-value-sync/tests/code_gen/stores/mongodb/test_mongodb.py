@@ -147,7 +147,7 @@ class TestMongoDBStoreNativeMode(BaseMongoDBStoreTests):
 
         # Get the raw MongoDB document
         store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
         doc = collection.find_one({"key": "test_key"})
 
@@ -163,7 +163,7 @@ class TestMongoDBStoreNativeMode(BaseMongoDBStoreTests):
     def test_migration_from_legacy_mode(self, store: MongoDBStore):
         """Verify native mode can read legacy JSON string data."""
         store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
 
         collection.insert_one({"key": "legacy_key", "value": {"string": '{"legacy": "data"}'}})
@@ -191,7 +191,7 @@ class TestMongoDBStoreNonNativeMode(BaseMongoDBStoreTests):
 
         # Get the raw MongoDB document
         store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
         doc = collection.find_one({"key": "test_key"})
 
@@ -207,7 +207,7 @@ class TestMongoDBStoreNonNativeMode(BaseMongoDBStoreTests):
     def test_migration_from_native_mode(self, store: MongoDBStore):
         """Verify non-native mode can read native mode data."""
         store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
 
         collection.insert_one({"key": "legacy_key", "value": {"object": {"name": "Alice", "age": 30}}})

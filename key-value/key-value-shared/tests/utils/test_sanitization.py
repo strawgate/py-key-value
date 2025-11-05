@@ -3,27 +3,27 @@
 import pytest
 
 from key_value.shared.errors.key_value import InvalidKeyError
-from key_value.shared.utils.sanitization_strategy import (
-    CharacterSanitizationStrategy,
+from key_value.shared.utils.sanitization import (
+    HashExcessLengthStrategy,
     HashFragmentMode,
-    HashLongKeysSanitizationStrategy,
-    NoOpSanitizationStrategy,
+    HybridSanitizationStrategy,
+    PassthroughStrategy,
 )
 
 
-class TestNoOpSanitizationStrategy:
-    """Tests for NoOpSanitizationStrategy."""
+class TestPassthroughStrategy:
+    """Tests for PassthroughStrategy."""
 
     def test_sanitize_returns_unchanged(self) -> None:
         """Test that sanitize returns the value unchanged."""
-        strategy = NoOpSanitizationStrategy()
+        strategy = PassthroughStrategy()
         assert strategy.sanitize("test") == "test"
         assert strategy.sanitize("test::key::with::colons") == "test::key::with::colons"
         assert strategy.sanitize("a" * 1000) == "a" * 1000
 
     def test_validate_accepts_any_value(self) -> None:
         """Test that validate accepts any value."""
-        strategy = NoOpSanitizationStrategy()
+        strategy = PassthroughStrategy()
         strategy.validate("test")
         strategy.validate("H_something")
         strategy.validate("S_something")
@@ -31,22 +31,22 @@ class TestNoOpSanitizationStrategy:
 
     def test_try_unsanitize_returns_value(self) -> None:
         """Test that try_unsanitize returns the value."""
-        strategy = NoOpSanitizationStrategy()
+        strategy = PassthroughStrategy()
         assert strategy.try_unsanitize("test") == "test"
 
 
-class TestHashLongKeysSanitizationStrategy:
-    """Tests for HashLongKeysSanitizationStrategy."""
+class TestHashExcessLengthStrategy:
+    """Tests for HashExcessLengthStrategy."""
 
     def test_sanitize_short_key_unchanged(self) -> None:
         """Test that short keys are returned unchanged."""
-        strategy = HashLongKeysSanitizationStrategy(max_length=240)
+        strategy = HashExcessLengthStrategy(max_length=240)
         short_key = "a" * 240
         assert strategy.sanitize(short_key) == short_key
 
     def test_sanitize_long_key_hashed(self) -> None:
         """Test that long keys are hashed with H_ prefix."""
-        strategy = HashLongKeysSanitizationStrategy(max_length=240)
+        strategy = HashExcessLengthStrategy(max_length=240)
         long_key = "a" * 241
         sanitized = strategy.sanitize(long_key)
 
@@ -55,7 +55,7 @@ class TestHashLongKeysSanitizationStrategy:
 
     def test_sanitize_deterministic(self) -> None:
         """Test that sanitization is deterministic."""
-        strategy = HashLongKeysSanitizationStrategy(max_length=240)
+        strategy = HashExcessLengthStrategy(max_length=240)
         long_key = "a" * 241
 
         result1 = strategy.sanitize(long_key)
@@ -65,7 +65,7 @@ class TestHashLongKeysSanitizationStrategy:
 
     def test_sanitize_different_keys_different_hashes(self) -> None:
         """Test that different keys produce different hashes."""
-        strategy = HashLongKeysSanitizationStrategy(max_length=240)
+        strategy = HashExcessLengthStrategy(max_length=240)
         key1 = "a" * 241
         key2 = "b" * 241
 
@@ -76,28 +76,28 @@ class TestHashLongKeysSanitizationStrategy:
 
     def test_validate_rejects_h_prefix(self) -> None:
         """Test that validate rejects keys starting with H_."""
-        strategy = HashLongKeysSanitizationStrategy()
+        strategy = HashExcessLengthStrategy()
 
         with pytest.raises(InvalidKeyError, match="reserved prefixes"):
             strategy.validate("H_something")
 
     def test_validate_rejects_s_prefix(self) -> None:
         """Test that validate rejects keys starting with S_."""
-        strategy = HashLongKeysSanitizationStrategy()
+        strategy = HashExcessLengthStrategy()
 
         with pytest.raises(InvalidKeyError, match="reserved prefixes"):
             strategy.validate("S_something")
 
     def test_validate_accepts_normal_keys(self) -> None:
         """Test that validate accepts normal keys."""
-        strategy = HashLongKeysSanitizationStrategy()
+        strategy = HashExcessLengthStrategy()
         strategy.validate("test")
         strategy.validate("test_key")
         strategy.validate("test-key")
 
     def test_custom_max_length(self) -> None:
         """Test custom max_length parameter."""
-        strategy = HashLongKeysSanitizationStrategy(max_length=100)
+        strategy = HashExcessLengthStrategy(max_length=100)
         long_key = "a" * 101
 
         sanitized = strategy.sanitize(long_key)
@@ -105,19 +105,19 @@ class TestHashLongKeysSanitizationStrategy:
         assert len(sanitized) <= 100
 
 
-class TestCharacterSanitizationStrategy:
-    """Tests for CharacterSanitizationStrategy."""
+class TestHybridSanitizationStrategy:
+    """Tests for HybridSanitizationStrategy."""
 
     def test_sanitize_no_change_returns_original(self) -> None:
         """Test that unchanged values are returned as-is."""
-        strategy = CharacterSanitizationStrategy()
+        strategy = HybridSanitizationStrategy()
         assert strategy.sanitize("test") == "test"
         assert strategy.sanitize("test_key") == "test_key"
         assert strategy.sanitize("test-key") == "test-key"
 
     def test_sanitize_replaces_invalid_characters(self) -> None:
         """Test that invalid characters are replaced."""
-        strategy = CharacterSanitizationStrategy()
+        strategy = HybridSanitizationStrategy()
         sanitized = strategy.sanitize("test::key")
 
         assert sanitized.startswith("S_")
@@ -126,7 +126,7 @@ class TestCharacterSanitizationStrategy:
 
     def test_sanitize_adds_hash_fragment(self) -> None:
         """Test that hash fragment is added when value changes."""
-        strategy = CharacterSanitizationStrategy(hash_fragment_length=8)
+        strategy = HybridSanitizationStrategy(hash_fragment_length=8)
         sanitized = strategy.sanitize("test::key")
 
         assert sanitized.startswith("S_")
@@ -136,7 +136,7 @@ class TestCharacterSanitizationStrategy:
 
     def test_sanitize_deterministic(self) -> None:
         """Test that sanitization is deterministic."""
-        strategy = CharacterSanitizationStrategy()
+        strategy = HybridSanitizationStrategy()
         result1 = strategy.sanitize("test::key")
         result2 = strategy.sanitize("test::key")
 
@@ -144,7 +144,7 @@ class TestCharacterSanitizationStrategy:
 
     def test_sanitize_different_values_different_hashes(self) -> None:
         """Test that different values produce different hashes."""
-        strategy = CharacterSanitizationStrategy()
+        strategy = HybridSanitizationStrategy()
         result1 = strategy.sanitize("test::key1")
         result2 = strategy.sanitize("test::key2")
 
@@ -152,7 +152,7 @@ class TestCharacterSanitizationStrategy:
 
     def test_sanitize_truncates_to_max_length(self) -> None:
         """Test that values are truncated to max_length."""
-        strategy = CharacterSanitizationStrategy(max_length=50, hash_fragment_length=8)
+        strategy = HybridSanitizationStrategy(max_length=50, hash_fragment_length=8)
         long_value = "a" * 200 + "::invalid"
 
         sanitized = strategy.sanitize(long_value)
@@ -162,7 +162,7 @@ class TestCharacterSanitizationStrategy:
 
     def test_hash_fragment_mode_always(self) -> None:
         """Test ALWAYS mode adds hash even for unchanged values."""
-        strategy = CharacterSanitizationStrategy(hash_fragment_mode=HashFragmentMode.ALWAYS)
+        strategy = HybridSanitizationStrategy(hash_fragment_mode=HashFragmentMode.ALWAYS)
         # This value doesn't need sanitization, but should still get hash
         sanitized = strategy.sanitize("test_key")
 
@@ -171,17 +171,16 @@ class TestCharacterSanitizationStrategy:
 
     def test_hash_fragment_mode_never(self) -> None:
         """Test NEVER mode doesn't add hash even for changed values."""
-        strategy = CharacterSanitizationStrategy(hash_fragment_mode=HashFragmentMode.NEVER)
+        strategy = HybridSanitizationStrategy(hash_fragment_mode=HashFragmentMode.NEVER)
         sanitized = strategy.sanitize("test::key")
 
         # Should just be replaced characters, no prefix, no hash
-        assert sanitized == "test__key"
-        assert not sanitized.startswith("S_")
+        assert sanitized == "S_test__key"
         assert "-" not in sanitized
 
     def test_hash_fragment_mode_only_if_changed(self) -> None:
         """Test ONLY_IF_CHANGED mode (default behavior)."""
-        strategy = CharacterSanitizationStrategy(hash_fragment_mode=HashFragmentMode.ONLY_IF_CHANGED)
+        strategy = HybridSanitizationStrategy(hash_fragment_mode=HashFragmentMode.ONLY_IF_CHANGED)
 
         # Unchanged - no hash
         unchanged = strategy.sanitize("test_key")
@@ -195,41 +194,41 @@ class TestCharacterSanitizationStrategy:
 
     def test_validate_rejects_h_prefix(self) -> None:
         """Test that validate rejects keys starting with H_."""
-        strategy = CharacterSanitizationStrategy()
+        strategy = HybridSanitizationStrategy()
 
         with pytest.raises(InvalidKeyError, match="reserved prefixes"):
             strategy.validate("H_something")
 
     def test_validate_rejects_s_prefix(self) -> None:
         """Test that validate rejects keys starting with S_."""
-        strategy = CharacterSanitizationStrategy()
+        strategy = HybridSanitizationStrategy()
 
         with pytest.raises(InvalidKeyError, match="reserved prefixes"):
             strategy.validate("S_something")
 
     def test_validate_accepts_normal_keys(self) -> None:
         """Test that validate accepts normal keys."""
-        strategy = CharacterSanitizationStrategy()
+        strategy = HybridSanitizationStrategy()
         strategy.validate("test")
         strategy.validate("test_key")
         strategy.validate("test-key")
 
     def test_custom_replacement_character(self) -> None:
         """Test custom replacement character."""
-        strategy = CharacterSanitizationStrategy(replacement_character="-", hash_fragment_mode=HashFragmentMode.NEVER)
+        strategy = HybridSanitizationStrategy(replacement_character="-", hash_fragment_mode=HashFragmentMode.NEVER)
         sanitized = strategy.sanitize("test::key")
 
-        assert sanitized == "test--key"
+        assert sanitized == "S_test--key"
 
     def test_custom_allowed_characters(self) -> None:
         """Test custom allowed characters pattern."""
         # Only allow lowercase letters
-        strategy = CharacterSanitizationStrategy(allowed_characters=r"[a-z]", hash_fragment_mode=HashFragmentMode.NEVER)
+        strategy = HybridSanitizationStrategy(allowed_characters=r"[a-z]", hash_fragment_mode=HashFragmentMode.NEVER)
         sanitized = strategy.sanitize("Test123")
 
         assert "T" not in sanitized  # Uppercase removed
         assert "1" not in sanitized  # Numbers removed
-        assert sanitized == "_est___"
+        assert sanitized == "S__est___"
 
 
 class TestSanitizationStrategyEdgeCases:
@@ -237,7 +236,7 @@ class TestSanitizationStrategyEdgeCases:
 
     def test_collision_prevention_hash_strategy(self) -> None:
         """Test that H_ prefix prevents collisions."""
-        strategy = HashLongKeysSanitizationStrategy(max_length=10)
+        strategy = HashExcessLengthStrategy(max_length=10)
 
         # User provides a short key that looks like a hash
         user_key = "H_abc123"
@@ -248,7 +247,7 @@ class TestSanitizationStrategyEdgeCases:
 
     def test_collision_prevention_character_strategy(self) -> None:
         """Test that S_ prefix prevents collisions."""
-        strategy = CharacterSanitizationStrategy()
+        strategy = HybridSanitizationStrategy()
 
         # User provides a key that looks sanitized
         user_key = "S_my_key-12345678"
@@ -259,9 +258,9 @@ class TestSanitizationStrategyEdgeCases:
 
     def test_empty_string_handling(self) -> None:
         """Test handling of empty strings."""
-        noop = NoOpSanitizationStrategy()
-        hash_strategy = HashLongKeysSanitizationStrategy()
-        char_strategy = CharacterSanitizationStrategy()
+        noop = PassthroughStrategy()
+        hash_strategy = HashExcessLengthStrategy()
+        char_strategy = HybridSanitizationStrategy()
 
         assert noop.sanitize("") == ""
         assert hash_strategy.sanitize("") == ""

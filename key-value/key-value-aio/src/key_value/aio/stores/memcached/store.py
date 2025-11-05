@@ -4,6 +4,7 @@ from typing import overload
 
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.sanitization import HashExcessLengthStrategy
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseStore
@@ -46,7 +47,12 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         """
         self._client = client or Client(host=host, port=port)
 
-        super().__init__(default_collection=default_collection)
+        sanitization_strategy = HashExcessLengthStrategy(max_length=MAX_KEY_LENGTH)
+
+        super().__init__(
+            default_collection=default_collection,
+            key_sanitization_strategy=sanitization_strategy,
+        )
 
     def sanitize_key(self, key: str) -> str:
         if len(key) > MAX_KEY_LENGTH:

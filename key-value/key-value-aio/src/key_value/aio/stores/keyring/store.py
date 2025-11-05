@@ -2,7 +2,8 @@
 
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
+from key_value.shared.utils.sanitization import HybridSanitizationStrategy
+from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -15,11 +16,9 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 DEFAULT_KEYCHAIN_SERVICE = "py-key-value"
-MAX_KEY_LENGTH = 256
-ALLOWED_KEY_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
-MAX_COLLECTION_LENGTH = 256
-ALLOWED_COLLECTION_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
+MAX_KEY_COLLECTION_LENGTH = 256
+ALLOWED_KEY_COLLECTION_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
 
 class KeyringStore(BaseStore):
@@ -48,25 +47,19 @@ class KeyringStore(BaseStore):
         """
         self._service_name = service_name
 
-        super().__init__(default_collection=default_collection)
-
-    def _sanitize_collection_name(self, collection: str) -> str:
-        return sanitize_string(
-            value=collection,
-            max_length=MAX_COLLECTION_LENGTH,
-            allowed_characters=ALLOWED_COLLECTION_CHARACTERS,
+        sanitization_strategy = HybridSanitizationStrategy(
+            replacement_character="_", max_length=MAX_KEY_COLLECTION_LENGTH, allowed_characters=ALLOWED_KEY_COLLECTION_CHARACTERS
         )
 
-    def _sanitize_key(self, key: str) -> str:
-        return sanitize_string(
-            value=key,
-            max_length=MAX_KEY_LENGTH,
-            allowed_characters=ALLOWED_KEY_CHARACTERS,
+        super().__init__(
+            default_collection=default_collection,
+            collection_sanitization_strategy=sanitization_strategy,
+            key_sanitization_strategy=sanitization_strategy,
         )
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        sanitized_collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection(collection=collection)
         sanitized_key = self._sanitize_key(key=key)
 
         combo_key: str = compound_key(collection=sanitized_collection, key=sanitized_key)
@@ -83,7 +76,7 @@ class KeyringStore(BaseStore):
 
     @override
     async def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
-        sanitized_collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection(collection=collection)
         sanitized_key = self._sanitize_key(key=key)
 
         combo_key: str = compound_key(collection=sanitized_collection, key=sanitized_key)
@@ -94,7 +87,7 @@ class KeyringStore(BaseStore):
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        sanitized_collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection(collection=collection)
         sanitized_key = self._sanitize_key(key=key)
 
         combo_key: str = compound_key(collection=sanitized_collection, key=sanitized_key)

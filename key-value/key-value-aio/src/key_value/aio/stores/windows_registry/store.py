@@ -4,7 +4,8 @@ from typing import Literal
 from winreg import HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE
 
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
+from key_value.shared.utils.sanitization import HybridSanitizationStrategy
+from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -17,13 +18,11 @@ except ImportError as e:
     msg = "WindowsRegistryStore requires Windows platform (winreg module)"
     raise ImportError(msg) from e
 
-MAX_KEY_LENGTH = 96
-ALLOWED_KEY_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
-
-MAX_COLLECTION_LENGTH = 96
-ALLOWED_COLLECTION_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 DEFAULT_REGISTRY_PATH = "Software\\py-key-value"
 DEFAULT_HIVE = "HKEY_CURRENT_USER"
+
+MAX_KEY_COLLECTION_LENGTH = 96
+ALLOWED_KEY_COLLECTION_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
 
 class WindowsRegistryStore(BaseStore):
@@ -53,25 +52,19 @@ class WindowsRegistryStore(BaseStore):
         self._hive = HKEY_LOCAL_MACHINE if hive == "HKEY_LOCAL_MACHINE" else HKEY_CURRENT_USER
         self._registry_path = registry_path or DEFAULT_REGISTRY_PATH
 
-        super().__init__(default_collection=default_collection)
-
-    def _sanitize_collection_name(self, collection: str) -> str:
-        return sanitize_string(
-            value=collection,
-            max_length=MAX_COLLECTION_LENGTH,
-            allowed_characters=ALLOWED_COLLECTION_CHARACTERS,
+        sanitization_strategy = HybridSanitizationStrategy(
+            max_length=MAX_KEY_COLLECTION_LENGTH, allowed_characters=ALLOWED_KEY_COLLECTION_CHARACTERS
         )
 
-    def _sanitize_key(self, key: str) -> str:
-        return sanitize_string(
-            value=key,
-            max_length=MAX_KEY_LENGTH,
-            allowed_characters=ALLOWED_KEY_CHARACTERS,
+        super().__init__(
+            default_collection=default_collection,
+            key_sanitization_strategy=sanitization_strategy,
+            collection_sanitization_strategy=sanitization_strategy,
         )
 
     def _get_registry_path(self, *, collection: str) -> str:
         """Get the full registry path for a collection."""
-        sanitized_collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection(collection=collection)
         return f"{self._registry_path}\\{sanitized_collection}"
 
     @override

@@ -5,7 +5,8 @@ from typing import Any, overload
 from bson.errors import InvalidDocument
 from key_value.shared.errors import DeserializationError, SerializationError
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
+from key_value.shared.utils.sanitization import HybridSanitizationStrategy
+from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
 from key_value.shared.utils.serialization import SerializationAdapter
 from typing_extensions import Self, override
 
@@ -174,7 +175,12 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         self._collections_by_name = {}
         self._adapter = MongoDBSerializationAdapter(native_storage=native_storage)
 
-        super().__init__(default_collection=default_collection)
+        super().__init__(
+            default_collection=default_collection,
+            collection_sanitization_strategy=HybridSanitizationStrategy(
+                replacement_character="_", max_length=MAX_COLLECTION_LENGTH, allowed_characters=COLLECTION_ALLOWED_CHARACTERS
+            ),
+        )
 
     @override
     async def __aenter__(self) -> Self:
@@ -187,31 +193,16 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         await super().__aexit__(exc_type, exc_val, exc_tb)
         await self._client.__aexit__(exc_type, exc_val, exc_tb)
 
-    def _sanitize_collection_name(self, collection: str) -> str:
-        """Sanitize a collection name to meet MongoDB naming requirements.
-
-        MongoDB has specific requirements for collection names (length limits, allowed characters).
-        This method ensures collection names are compliant by truncating to the maximum allowed length
-        and replacing invalid characters with safe alternatives.
-
-        Args:
-            collection: The collection name to sanitize.
-
-        Returns:
-            A sanitized collection name that meets MongoDB requirements.
-        """
-        return sanitize_string(value=collection, max_length=MAX_COLLECTION_LENGTH, allowed_characters=COLLECTION_ALLOWED_CHARACTERS)
-
     @override
     async def _setup_collection(self, *, collection: str) -> None:
         # Ensure index on the unique combo key and supporting queries
-        collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection(collection=collection)
 
         collection_filter: dict[str, str] = {"name": collection}
         matching_collections: list[str] = await self._db.list_collection_names(filter=collection_filter)
 
         if matching_collections:
-            self._collections_by_name[collection] = self._db[collection]
+            self._collections_by_name[collection] = self._db[sanitized_collection]
             return
 
         new_collection: AsyncCollection[dict[str, Any]] = await self._db.create_collection(name=collection)
@@ -226,7 +217,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        sanitized_collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection(collection=collection)
 
         if doc := await self._collections_by_name[sanitized_collection].find_one(filter={"key": key}):
             try:
@@ -241,7 +232,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         if not keys:
             return []
 
-        sanitized_collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection(collection=collection)
 
         # Use find with $in operator to get multiple documents at once
         cursor = self._collections_by_name[sanitized_collection].find(filter={"key": {"$in": keys}})
@@ -267,7 +258,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
     ) -> None:
         mongo_doc = self._adapter.dump_dict(entry=managed_entry)
 
-        sanitized_collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection(collection=collection)
 
         try:
             # Ensure that the value is serializable to JSON
@@ -300,7 +291,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         if not keys:
             return
 
-        sanitized_collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection(collection=collection)
 
         operations: list[UpdateOne] = []
         for key, managed_entry in zip(keys, managed_entries, strict=True):
@@ -324,7 +315,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        sanitized_collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection(collection=collection)
 
         result: DeleteResult = await self._collections_by_name[sanitized_collection].delete_one(filter={"key": key})
         return bool(result.deleted_count)
@@ -334,7 +325,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         if not keys:
             return 0
 
-        sanitized_collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection(collection=collection)
 
         # Use delete_many with $in operator for efficient batch deletion
         result: DeleteResult = await self._collections_by_name[sanitized_collection].delete_many(filter={"key": {"$in": keys}})
@@ -351,7 +342,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
     @override
     async def _delete_collection(self, *, collection: str) -> bool:
-        sanitized_collection = self._sanitize_collection_name(collection=collection)
+        sanitized_collection = self._sanitize_collection(collection=collection)
 
         _ = await self._db.drop_collection(name_or_collection=sanitized_collection)
         if sanitized_collection in self._collections_by_name:

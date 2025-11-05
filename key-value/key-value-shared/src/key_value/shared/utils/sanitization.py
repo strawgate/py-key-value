@@ -77,7 +77,7 @@ class SanitizationStrategy(ABC):
         return None
 
 
-class NoOpSanitizationStrategy(SanitizationStrategy):
+class PassthroughStrategy(SanitizationStrategy):
     """Pass-through strategy that performs no sanitization.
 
     Use this for stores that have no character or length restrictions (e.g., Redis,
@@ -96,7 +96,7 @@ class NoOpSanitizationStrategy(SanitizationStrategy):
         return value
 
 
-class HashLongKeysSanitizationStrategy(SanitizationStrategy):
+class HashExcessLengthStrategy(SanitizationStrategy):
     """Strategy that hashes keys exceeding a maximum length.
 
     This strategy is used by stores like Memcached that accept any characters but
@@ -147,7 +147,7 @@ class HashLongKeysSanitizationStrategy(SanitizationStrategy):
             raise InvalidKeyError(msg)
 
 
-class CharacterSanitizationStrategy(SanitizationStrategy):
+class HybridSanitizationStrategy(SanitizationStrategy):
     """Strategy that replaces invalid characters and adds hash fragments.
 
     This strategy is used by stores with character restrictions (e.g., Elasticsearch,

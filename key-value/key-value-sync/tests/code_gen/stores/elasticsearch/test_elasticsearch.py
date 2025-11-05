@@ -156,8 +156,8 @@ class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
 
         # Check raw Elasticsearch document using public sanitization methods
         # Note: We need to access these internal methods for testing the storage format
-        index_name = store._sanitize_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        doc_id = store._sanitize_document_id(key="test_key")  # pyright: ignore[reportPrivateUsage]
+        index_name = store._collection_sanitization_strategy.sanitize(value="test")  # pyright: ignore[reportPrivateUsage]
+        doc_id = store._key_sanitization_strategy.sanitize(value="test_key")  # pyright: ignore[reportPrivateUsage]
 
         response = es_client.get(index=index_name, id=doc_id)
         assert response.body["_source"] == snapshot(
@@ -177,9 +177,8 @@ class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
 
     def test_migration_from_non_native_mode(self, store: ElasticsearchStore, es_client: Elasticsearch):
         """Verify native mode can read a document with stringified data"""
-        index_name = store._sanitize_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        doc_id = store._sanitize_document_id(key="legacy_key")  # pyright: ignore[reportPrivateUsage]
-
+        index_name = store._collection_sanitization_strategy.sanitize(value="test")
+        doc_id = store._key_sanitization_strategy.sanitize(value="legacy_key")
         es_client.index(
             index=index_name, id=doc_id, body={"collection": "test", "key": "legacy_key", "value": {"string": '{"legacy": "data"}'}}
         )
@@ -203,8 +202,8 @@ class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
         """Verify values are stored as JSON strings"""
         store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
-        index_name = store._sanitize_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        doc_id = store._sanitize_document_id(key="test_key")  # pyright: ignore[reportPrivateUsage]
+        index_name = store._collection_sanitization_strategy.sanitize(value="test")  # pyright: ignore[reportPrivateUsage]
+        doc_id = store._key_sanitization_strategy.sanitize(value="test_key")  # pyright: ignore[reportPrivateUsage]
 
         response = es_client.get(index=index_name, id=doc_id)
         assert response.body["_source"] == snapshot(
@@ -224,8 +223,8 @@ class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
 
     def test_migration_from_native_mode(self, store: ElasticsearchStore, es_client: Elasticsearch):
         """Verify non-native mode can read native mode data"""
-        index_name = store._sanitize_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        doc_id = store._sanitize_document_id(key="legacy_key")  # pyright: ignore[reportPrivateUsage]
+        index_name = store._collection_sanitization_strategy.sanitize(value="test")  # pyright: ignore[reportPrivateUsage]
+        doc_id = store._key_sanitization_strategy.sanitize(value="legacy_key")  # pyright: ignore[reportPrivateUsage]
 
         es_client.index(
             index=index_name,
