@@ -41,9 +41,19 @@ class TestPassthroughStrategy:
 class TestAlwaysHashStrategy:
     """Tests for AlwaysHashStrategy."""
 
+    def test_init_raises_value_error_if_hash_length_is_less_than_8(self) -> None:
+        """Test that init raises ValueError if hash_length is less than 8."""
+        with pytest.raises(ValueError, match="hash_length must be greater than 8 and less than 64: 7"):
+            AlwaysHashStrategy(hash_length=7)
+
+    def test_init_raises_value_error_if_hash_length_is_greater_than_64(self) -> None:
+        """Test that init raises ValueError if hash_length is greater than 64."""
+        with pytest.raises(ValueError, match="hash_length must be greater than 8 and less than 64: 65"):
+            AlwaysHashStrategy(hash_length=65)
+
     def test_sanitize_returns_hashed_value(self) -> None:
         """Test that sanitize returns a hashed value."""
-        strategy = AlwaysHashStrategy(hash_length=99)
+        strategy = AlwaysHashStrategy()
         assert strategy.sanitize("test") == snapshot("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
         assert strategy.sanitize("test_key") == snapshot("92488e1e3eeecdf99f3ed2ce59233efb4b4fb612d5655c0ce9ea52b5a502e655")
         assert strategy.sanitize("test-key") == snapshot("62af8704764faf8ea82fc61ce9c4c3908b6cb97d463a634e9e587d7c885db0ef")

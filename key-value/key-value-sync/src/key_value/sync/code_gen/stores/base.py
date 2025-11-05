@@ -76,7 +76,8 @@ class BaseStore(KeyValueProtocol, ABC):
     _setup_collection_complete: defaultdict[str, bool]
 
     _serialization_adapter: SerializationAdapter
-    _sanitization_strategy: SanitizationStrategy
+    _key_sanitization_strategy: SanitizationStrategy
+    _collection_sanitization_strategy: SanitizationStrategy
 
     _seed: FROZEN_SEED_DATA_TYPE
 
