@@ -14,6 +14,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 
 from key_value.shared.errors.key_value import InvalidKeyError
+from key_value.shared.utils.sanitize import sanitize_characters_in_string
 
 
 class HashFragmentMode(Enum):
@@ -175,13 +176,13 @@ class HybridSanitizationStrategy(SanitizationStrategy):
 
         Args:
             max_length: Maximum length after sanitization.
-            allowed_characters: Regex pattern of allowed characters (default: alphanumeric + dash + underscore).
+            allowed_characters: list of allowed characters. Defaults to None (all characters allowed).
             replacement_character: Character to use for invalid characters.
             hash_fragment_mode: When to add hash fragments.
             hash_fragment_length: Length of hash fragment.
         """
         self.max_length = max_length
-        self.allowed_characters = allowed_characters or r"[a-zA-Z0-9_\-]"
+        self.allowed_characters: str | None = allowed_characters
         self.replacement_character = replacement_character
         self.hash_fragment_mode = hash_fragment_mode
         self.hash_fragment_length = hash_fragment_length
@@ -201,10 +202,11 @@ class HybridSanitizationStrategy(SanitizationStrategy):
         Returns:
             The sanitized value with 'S_' prefix if modified.
         """
-        import re
-
-        # Replace invalid characters
-        sanitized = re.sub(f"[^{self.allowed_characters[1:-1]}]", self.replacement_character, value)
+        sanitized: str = value
+        if self.allowed_characters:
+            sanitized = sanitize_characters_in_string(
+                value=value, allowed_characters=self.allowed_characters, replace_with=self.replacement_character
+            )
 
         # Check if sanitization occurred
         changed = sanitized != value

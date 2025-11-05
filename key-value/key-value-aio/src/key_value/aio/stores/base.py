@@ -130,9 +130,11 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         return self._collection_sanitization_strategy.sanitize(value=collection), self._key_sanitization_strategy.sanitize(value=key)
 
     def _sanitize_collection(self, collection: str) -> str:
+        self._collection_sanitization_strategy.validate(value=collection)
         return self._collection_sanitization_strategy.sanitize(value=collection)
 
     def _sanitize_key(self, key: str) -> str:
+        self._key_sanitization_strategy.validate(value=key)
         return self._key_sanitization_strategy.sanitize(value=key)
 
     async def _seed_store(self) -> None:

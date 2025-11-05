@@ -1,6 +1,7 @@
 """Tests for sanitization strategies."""
 
 import pytest
+from inline_snapshot import snapshot
 
 from key_value.shared.errors.key_value import InvalidKeyError
 from key_value.shared.utils.sanitization import (
@@ -9,6 +10,7 @@ from key_value.shared.utils.sanitization import (
     HybridSanitizationStrategy,
     PassthroughStrategy,
 )
+from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, LOWERCASE_ALPHABET
 
 
 class TestPassthroughStrategy:
@@ -110,29 +112,28 @@ class TestHybridSanitizationStrategy:
 
     def test_sanitize_no_change_returns_original(self) -> None:
         """Test that unchanged values are returned as-is."""
-        strategy = HybridSanitizationStrategy()
+        strategy = HybridSanitizationStrategy(allowed_characters=ALPHANUMERIC_CHARACTERS + "-_")
         assert strategy.sanitize("test") == "test"
         assert strategy.sanitize("test_key") == "test_key"
         assert strategy.sanitize("test-key") == "test-key"
 
     def test_sanitize_replaces_invalid_characters(self) -> None:
         """Test that invalid characters are replaced."""
-        strategy = HybridSanitizationStrategy()
+        strategy = HybridSanitizationStrategy(allowed_characters=ALPHANUMERIC_CHARACTERS)
         sanitized = strategy.sanitize("test::key")
 
         assert sanitized.startswith("S_")
-        assert "::" not in sanitized
-        assert "test__key" in sanitized
+        assert "-" in sanitized
+        assert sanitized == snapshot("S_test_key-a2bc4860")
 
     def test_sanitize_adds_hash_fragment(self) -> None:
         """Test that hash fragment is added when value changes."""
-        strategy = HybridSanitizationStrategy(hash_fragment_length=8)
+        strategy = HybridSanitizationStrategy(hash_fragment_length=8, allowed_characters=ALPHANUMERIC_CHARACTERS + "-_")
         sanitized = strategy.sanitize("test::key")
 
         assert sanitized.startswith("S_")
-        assert "-" in sanitized  # Hash separator
-        # Format should be: S_test__key-<8-char-hash>
-        assert len(sanitized.split("-")[-1]) == 8
+        assert "-" in sanitized
+        assert sanitized == snapshot("S_test_key-a2bc4860")
 
     def test_sanitize_deterministic(self) -> None:
         """Test that sanitization is deterministic."""
@@ -171,16 +172,18 @@ class TestHybridSanitizationStrategy:
 
     def test_hash_fragment_mode_never(self) -> None:
         """Test NEVER mode doesn't add hash even for changed values."""
-        strategy = HybridSanitizationStrategy(hash_fragment_mode=HashFragmentMode.NEVER)
+        strategy = HybridSanitizationStrategy(hash_fragment_mode=HashFragmentMode.NEVER, allowed_characters=ALPHANUMERIC_CHARACTERS)
         sanitized = strategy.sanitize("test::key")
 
         # Should just be replaced characters, no prefix, no hash
-        assert sanitized == "S_test__key"
         assert "-" not in sanitized
+        assert sanitized == snapshot("S_test_key")
 
     def test_hash_fragment_mode_only_if_changed(self) -> None:
         """Test ONLY_IF_CHANGED mode (default behavior)."""
-        strategy = HybridSanitizationStrategy(hash_fragment_mode=HashFragmentMode.ONLY_IF_CHANGED)
+        strategy = HybridSanitizationStrategy(
+            hash_fragment_mode=HashFragmentMode.ONLY_IF_CHANGED, allowed_characters=ALPHANUMERIC_CHARACTERS
+        )
 
         # Unchanged - no hash
         unchanged = strategy.sanitize("test_key")
@@ -194,41 +197,43 @@ class TestHybridSanitizationStrategy:
 
     def test_validate_rejects_h_prefix(self) -> None:
         """Test that validate rejects keys starting with H_."""
-        strategy = HybridSanitizationStrategy()
+        strategy = HybridSanitizationStrategy(allowed_characters=ALPHANUMERIC_CHARACTERS + "-_")
 
         with pytest.raises(InvalidKeyError, match="reserved prefixes"):
             strategy.validate("H_something")
 
     def test_validate_rejects_s_prefix(self) -> None:
         """Test that validate rejects keys starting with S_."""
-        strategy = HybridSanitizationStrategy()
+        strategy = HybridSanitizationStrategy(allowed_characters=ALPHANUMERIC_CHARACTERS + "-_")
 
         with pytest.raises(InvalidKeyError, match="reserved prefixes"):
             strategy.validate("S_something")
 
     def test_validate_accepts_normal_keys(self) -> None:
         """Test that validate accepts normal keys."""
-        strategy = HybridSanitizationStrategy()
+        strategy = HybridSanitizationStrategy(allowed_characters=ALPHANUMERIC_CHARACTERS + "-_")
         strategy.validate("test")
         strategy.validate("test_key")
         strategy.validate("test-key")
 
     def test_custom_replacement_character(self) -> None:
         """Test custom replacement character."""
-        strategy = HybridSanitizationStrategy(replacement_character="-", hash_fragment_mode=HashFragmentMode.NEVER)
+        strategy = HybridSanitizationStrategy(
+            replacement_character="-", hash_fragment_mode=HashFragmentMode.NEVER, allowed_characters=ALPHANUMERIC_CHARACTERS
+        )
         sanitized = strategy.sanitize("test::key")
 
-        assert sanitized == "S_test--key"
+        assert sanitized == snapshot("S_test-key")
 
     def test_custom_allowed_characters(self) -> None:
         """Test custom allowed characters pattern."""
         # Only allow lowercase letters
-        strategy = HybridSanitizationStrategy(allowed_characters=r"[a-z]", hash_fragment_mode=HashFragmentMode.NEVER)
+        strategy = HybridSanitizationStrategy(hash_fragment_mode=HashFragmentMode.NEVER, allowed_characters=LOWERCASE_ALPHABET)
         sanitized = strategy.sanitize("Test123")
 
         assert "T" not in sanitized  # Uppercase removed
         assert "1" not in sanitized  # Numbers removed
-        assert sanitized == "S__est___"
+        assert sanitized == snapshot("S__est_")
 
 
 class TestSanitizationStrategyEdgeCases:
