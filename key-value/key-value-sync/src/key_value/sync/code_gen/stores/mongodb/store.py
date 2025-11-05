@@ -212,7 +212,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
             self._collections_by_name[collection] = self._db[sanitized_collection]
             return
 
-        new_collection: Collection[dict[str, Any]] = self._db.create_collection(name=collection)
+        new_collection: Collection[dict[str, Any]] = self._db.create_collection(name=sanitized_collection)
 
         # Index for efficient key lookups
         _ = new_collection.create_index(keys="key")
@@ -224,9 +224,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
 
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        sanitized_collection = self._sanitize_collection(collection=collection)
-
-        if doc := self._collections_by_name[sanitized_collection].find_one(filter={"key": key}):
+        if doc := self._collections_by_name[collection].find_one(filter={"key": key}):
             try:
                 return self._adapter.load_dict(data=doc)
             except DeserializationError:
@@ -239,10 +237,8 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         if not keys:
             return []
 
-        sanitized_collection = self._sanitize_collection(collection=collection)
-
         # Use find with $in operator to get multiple documents at once
-        cursor = self._collections_by_name[sanitized_collection].find(filter={"key": {"$in": keys}})
+        cursor = self._collections_by_name[collection].find(filter={"key": {"$in": keys}})
 
         managed_entries_by_key: dict[str, ManagedEntry | None] = dict.fromkeys(keys)
 
@@ -259,12 +255,10 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
         mongo_doc = self._adapter.dump_dict(entry=managed_entry)
 
-        sanitized_collection = self._sanitize_collection(collection=collection)
-
         try:
             # Ensure that the value is serializable to JSON
             _ = managed_entry.value_as_json
-            _ = self._collections_by_name[sanitized_collection].update_one(
+            _ = self._collections_by_name[collection].update_one(
                 filter={"key": key}, update={"$set": {"key": key, **mongo_doc}}, upsert=True
             )
         except InvalidDocument as e:
@@ -285,8 +279,6 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         if not keys:
             return
 
-        sanitized_collection = self._sanitize_collection(collection=collection)
-
         operations: list[UpdateOne] = []
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             mongo_doc = self._adapter.dump_dict(entry=managed_entry)
@@ -295,13 +287,11 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
                 UpdateOne(filter={"key": key}, update={"$set": {"collection": collection, "key": key, **mongo_doc}}, upsert=True)
             )
 
-        _ = self._collections_by_name[sanitized_collection].bulk_write(operations)  # pyright: ignore[reportUnknownMemberType]
+        _ = self._collections_by_name[collection].bulk_write(operations)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        sanitized_collection = self._sanitize_collection(collection=collection)
-
-        result: DeleteResult = self._collections_by_name[sanitized_collection].delete_one(filter={"key": key})
+        result: DeleteResult = self._collections_by_name[collection].delete_one(filter={"key": key})
         return bool(result.deleted_count)
 
     @override

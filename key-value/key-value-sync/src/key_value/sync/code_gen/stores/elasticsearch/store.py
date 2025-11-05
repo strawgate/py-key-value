@@ -180,9 +180,13 @@ class ElasticsearchStore(
         self._native_storage = native_storage
         self._is_serverless = False
 
+        # We have 240 characters to work with
+        # We need to account for the index prefix and the hyphen.
+        max_index_length = MAX_INDEX_LENGTH - (len(self._index_prefix) + 1)
+
         self._serializer = ElasticsearchSerializationAdapter(native_storage=native_storage)
         self._collection_sanitization = HybridSanitizationStrategy(
-            replacement_character="_", max_length=MAX_INDEX_LENGTH, allowed_characters=ALLOWED_INDEX_CHARACTERS
+            replacement_character="_", max_length=max_index_length, allowed_characters=ALLOWED_INDEX_CHARACTERS
         )
         self._key_sanitization = AlwaysHashStrategy()
 
