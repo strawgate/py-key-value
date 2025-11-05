@@ -127,7 +127,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         """Initialize the collection (called once before first use of the collection)."""
 
     def _sanitize_collection_and_key(self, collection: str, key: str) -> tuple[str, str]:
-        return self._collection_sanitization_strategy.sanitize(value=collection), self._key_sanitization_strategy.sanitize(value=key)
+        return self._sanitize_collection(collection=collection), self._sanitize_key(key=key)
 
     def _sanitize_collection(self, collection: str) -> str:
         self._collection_sanitization_strategy.validate(value=collection)

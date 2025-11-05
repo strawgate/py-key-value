@@ -97,6 +97,37 @@ class PassthroughStrategy(SanitizationStrategy):
         return value
 
 
+MINIMUM_HASH_LENGTH = 8
+MAXIMUM_HASH_LENGTH = 64
+
+
+class AlwaysHashStrategy(SanitizationStrategy):
+    """Strategy that always hashes keys."""
+
+    def __init__(self, hash_length: int = 64) -> None:
+        """Initialize the always hash strategy.
+
+        Args:
+            hash_length: The length of the hash to generate. Must be greater than 8 and less than 64.
+        """
+        if hash_length <= MINIMUM_HASH_LENGTH or hash_length > MAXIMUM_HASH_LENGTH:
+            msg = f"hash_length must be greater than {MINIMUM_HASH_LENGTH} and less than {MAXIMUM_HASH_LENGTH}: {hash_length}"
+            raise ValueError(msg)
+
+        self.hash_length: int = hash_length
+
+    def sanitize(self, value: str) -> str:
+        """Hash the value."""
+        return hashlib.sha256(value.encode()).hexdigest()[: self.hash_length]
+
+    def validate(self, value: str) -> None:
+        """No validation needed for always hash strategy."""
+
+    def try_unsanitize(self, value: str) -> str | None:
+        """Return the value unchanged since no sanitization occurred."""
+        return value
+
+
 class HashExcessLengthStrategy(SanitizationStrategy):
     """Strategy that hashes keys exceeding a maximum length.
 
@@ -176,7 +207,7 @@ class HybridSanitizationStrategy(SanitizationStrategy):
 
         Args:
             max_length: Maximum length after sanitization.
-            allowed_characters: list of allowed characters. Defaults to None (all characters allowed).
+            allowed_characters: String of allowed characters. Defaults to None (all characters allowed).
             replacement_character: Character to use for invalid characters.
             hash_fragment_mode: When to add hash fragments.
             hash_fragment_length: Length of hash fragment.

@@ -5,6 +5,7 @@ from inline_snapshot import snapshot
 
 from key_value.shared.errors.key_value import InvalidKeyError
 from key_value.shared.utils.sanitization import (
+    AlwaysHashStrategy,
     HashExcessLengthStrategy,
     HashFragmentMode,
     HybridSanitizationStrategy,
@@ -35,6 +36,25 @@ class TestPassthroughStrategy:
         """Test that try_unsanitize returns the value."""
         strategy = PassthroughStrategy()
         assert strategy.try_unsanitize("test") == "test"
+
+
+class TestAlwaysHashStrategy:
+    """Tests for AlwaysHashStrategy."""
+
+    def test_sanitize_returns_hashed_value(self) -> None:
+        """Test that sanitize returns a hashed value."""
+        strategy = AlwaysHashStrategy(hash_length=99)
+        assert strategy.sanitize("test") == snapshot("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
+        assert strategy.sanitize("test_key") == snapshot("92488e1e3eeecdf99f3ed2ce59233efb4b4fb612d5655c0ce9ea52b5a502e655")
+        assert strategy.sanitize("test-key") == snapshot("62af8704764faf8ea82fc61ce9c4c3908b6cb97d463a634e9e587d7c885db0ef")
+
+    def test_validate_accepts_any_value(self) -> None:
+        """Test that validate accepts any value."""
+        strategy = AlwaysHashStrategy()
+        strategy.validate("test")
+        strategy.validate("H_something")
+        strategy.validate("S_something")
+        strategy.validate("")
 
 
 class TestHashExcessLengthStrategy:
