@@ -176,7 +176,7 @@ class ElasticsearchStore(
         LessCapableJsonSerializer.install_default_serializer(client=self._client)
         LessCapableNdjsonSerializer.install_serializer(client=self._client)
 
-        self._index_prefix = index_prefix
+        self._index_prefix = index_prefix.lower()
         self._native_storage = native_storage
         self._is_serverless = False
 
@@ -206,7 +206,7 @@ class ElasticsearchStore(
         _ = self._client.options(ignore_status=404).indices.create(index=index_name, mappings=DEFAULT_MAPPING, settings={})
 
     def _get_index_name(self, collection: str) -> str:
-        return self._index_prefix + "-" + self._collection_sanitization.sanitize(value=collection)
+        return self._index_prefix + "-" + self._collection_sanitization.sanitize(value=collection).lower()
 
     def _get_document_id(self, key: str) -> str:
         return self._key_sanitization.sanitize(value=key)
