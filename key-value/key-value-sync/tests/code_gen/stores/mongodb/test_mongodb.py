@@ -124,8 +124,9 @@ class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
         store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
         assert store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
 
-        collections = store.collections()
-        assert collections == snapshot(["test_collection_-daf4a2ec"])
+        collections = store._collections_by_name.values()
+        collection_names = [collection.name for collection in collections]
+        assert collection_names == snapshot(["S_test_collection_-daf4a2ec"])
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")

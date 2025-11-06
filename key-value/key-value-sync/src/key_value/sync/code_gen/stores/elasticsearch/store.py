@@ -11,7 +11,7 @@ from elastic_transport import SerializationError as ElasticsearchSerializationEr
 from key_value.shared.errors import DeserializationError, SerializationError
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitization import AlwaysHashStrategy, HashFragmentMode, HybridSanitizationStrategy
-from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, LOWERCASE_ALPHABET, NUMBERS
+from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, LOWERCASE_ALPHABET, NUMBERS, UPPERCASE_ALPHABET
 from key_value.shared.utils.serialization import SerializationAdapter
 from key_value.shared.utils.time_to_live import now_as_epoch
 from typing_extensions import override
@@ -185,10 +185,13 @@ class ElasticsearchStore(
         max_index_length = MAX_INDEX_LENGTH - (len(self._index_prefix) + 1)
 
         self._serializer = ElasticsearchSerializationAdapter(native_storage=native_storage)
+
+        # We allow uppercase through the sanitizer so we can lowercase them instead of them
+        # all turning into underscores.
         collection_sanitization = HybridSanitizationStrategy(
             replacement_character="_",
             max_length=max_index_length,
-            allowed_characters=ALLOWED_INDEX_CHARACTERS,
+            allowed_characters=UPPERCASE_ALPHABET + ALLOWED_INDEX_CHARACTERS,
             hash_fragment_mode=HashFragmentMode.ALWAYS,
         )
         key_sanitization = AlwaysHashStrategy()

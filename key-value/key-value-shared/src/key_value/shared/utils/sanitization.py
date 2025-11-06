@@ -189,7 +189,7 @@ class HybridSanitizationStrategy(SanitizationStrategy):
 
     Args:
         max_length: Maximum length after sanitization. Defaults to 240.
-        allowed_characters: Regex pattern of allowed characters. Defaults to alphanumeric + dash + underscore.
+        allowed_characters: List of allowed characters. Defaults to alphanumeric + dash + underscore.
         replacement_character: Character to use for invalid characters. Defaults to underscore.
         hash_fragment_mode: When to add hash fragments. Defaults to ONLY_IF_CHANGED.
         hash_fragment_length: Length of hash fragment. Defaults to 8.

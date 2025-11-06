@@ -12,6 +12,7 @@ from key_value.shared.utils.sanitize import (
     ALPHANUMERIC_CHARACTERS,
     LOWERCASE_ALPHABET,
     NUMBERS,
+    UPPERCASE_ALPHABET,
 )
 from key_value.shared.utils.serialization import SerializationAdapter
 from key_value.shared.utils.time_to_live import now_as_epoch
@@ -216,10 +217,13 @@ class ElasticsearchStore(
         max_index_length = MAX_INDEX_LENGTH - (len(self._index_prefix) + 1)
 
         self._serializer = ElasticsearchSerializationAdapter(native_storage=native_storage)
+
+        # We allow uppercase through the sanitizer so we can lowercase them instead of them
+        # all turning into underscores.
         collection_sanitization = HybridSanitizationStrategy(
             replacement_character="_",
             max_length=max_index_length,
-            allowed_characters=ALLOWED_INDEX_CHARACTERS,
+            allowed_characters=UPPERCASE_ALPHABET + ALLOWED_INDEX_CHARACTERS,
             hash_fragment_mode=HashFragmentMode.ALWAYS,
         )
         key_sanitization = AlwaysHashStrategy()

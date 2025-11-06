@@ -10,7 +10,7 @@ from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
 from key_value.shared.utils.serialization import SerializationAdapter
 from typing_extensions import Self, override
 
-from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseStore
+from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseStore
 
 try:
     from pymongo import AsyncMongoClient, UpdateOne
@@ -89,7 +89,7 @@ class MongoDBSerializationAdapter(SerializationAdapter):
         return data
 
 
-class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
+class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
     """MongoDB-based key-value store using pymongo."""
 
     _client: AsyncMongoClient[dict[str, Any]]
@@ -320,20 +320,14 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         return result.deleted_count
 
     @override
-    async def _get_collection_names(self, *, limit: int | None = None) -> list[str]:
-        limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
-
-        collections: list[str] = await self._db.list_collection_names(filter={})
-
-        return collections[:limit]
-
-    @override
     async def _delete_collection(self, *, collection: str) -> bool:
-        sanitized_collection = self._sanitize_collection(collection=collection)
+        collection_name = self._collections_by_name[collection].name
 
-        _ = await self._db.drop_collection(name_or_collection=sanitized_collection)
-        if sanitized_collection in self._collections_by_name:
-            del self._collections_by_name[sanitized_collection]
+        _ = await self._db.drop_collection(name_or_collection=collection_name)
+
+        if collection_name in self._collections_by_name:
+            del self._collections_by_name[collection_name]
+
         return True
 
     @override

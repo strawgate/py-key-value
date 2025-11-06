@@ -136,8 +136,56 @@ class BaseTestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         indices = es_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
         assert len(indices.body) == 2
-        assert "kv-store-e2e-test-test_collection" in indices
-        assert "kv-store-e2e-test-test_collection_2" in indices
+        assert indices.keys() == snapshot(
+            {
+                "kv-store-e2e-test-s_test_collection-f61504ae": {
+                    "aliases": {},
+                    "mappings": {
+                        "properties": {
+                            "collection": {"type": "keyword"},
+                            "created_at": {"type": "date"},
+                            "expires_at": {"type": "date"},
+                            "key": {"type": "keyword"},
+                            "value": {"properties": {"flattened": {"type": "flattened"}, "string": {"type": "object", "enabled": False}}},
+                        }
+                    },
+                    "settings": {
+                        "index": {
+                            "routing": {"allocation": {"include": {"_tier_preference": "data_content"}}},
+                            "number_of_shards": "1",
+                            "provided_name": "kv-store-e2e-test-s_test_collection-f61504ae",
+                            "creation_date": "1762397457580",
+                            "number_of_replicas": "1",
+                            "uuid": "zkVjeB2SRmCPpKtPUVUxfg",
+                            "version": {"created": "9009000"},
+                        }
+                    },
+                },
+                "kv-store-e2e-test-s_test_collection_2-7647fec2": {
+                    "aliases": {},
+                    "mappings": {
+                        "properties": {
+                            "collection": {"type": "keyword"},
+                            "created_at": {"type": "date"},
+                            "expires_at": {"type": "date"},
+                            "key": {"type": "keyword"},
+                            "value": {"properties": {"flattened": {"type": "flattened"}, "string": {"type": "object", "enabled": False}}},
+                        }
+                    },
+                    "settings": {
+                        "index": {
+                            "routing": {"allocation": {"include": {"_tier_preference": "data_content"}}},
+                            "number_of_shards": "1",
+                            "provided_name": "kv-store-e2e-test-s_test_collection_2-7647fec2",
+                            "creation_date": "1762397457776",
+                            "number_of_replicas": "1",
+                            "uuid": "Hw53b5KMQ3iv9JTq9tdvZg",
+                            "version": {"created": "9009000"},
+                        }
+                    },
+                },
+            }
+        )
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
