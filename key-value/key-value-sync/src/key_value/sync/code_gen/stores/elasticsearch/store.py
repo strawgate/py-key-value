@@ -10,7 +10,8 @@ from elastic_transport import ObjectApiResponse
 from elastic_transport import SerializationError as ElasticsearchSerializationError
 from key_value.shared.errors import DeserializationError, SerializationError
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, LOWERCASE_ALPHABET, NUMBERS, sanitize_string
+from key_value.shared.utils.sanitization import AlwaysHashStrategy, HashFragmentMode, HybridSanitizationStrategy
+from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, LOWERCASE_ALPHABET, NUMBERS, UPPERCASE_ALPHABET
 from key_value.shared.utils.serialization import SerializationAdapter
 from key_value.shared.utils.time_to_live import now_as_epoch
 from typing_extensions import override
@@ -124,7 +125,7 @@ class ElasticsearchStore(
 
     _native_storage: bool
 
-    _adapter: SerializationAdapter
+    _serializer: SerializationAdapter
 
     @overload
     def __init__(
@@ -175,12 +176,31 @@ class ElasticsearchStore(
         LessCapableJsonSerializer.install_default_serializer(client=self._client)
         LessCapableNdjsonSerializer.install_serializer(client=self._client)
 
-        self._index_prefix = index_prefix
+        self._index_prefix = index_prefix.lower()
         self._native_storage = native_storage
         self._is_serverless = False
-        self._adapter = ElasticsearchSerializationAdapter(native_storage=native_storage)
 
-        super().__init__(default_collection=default_collection)
+        # We have 240 characters to work with
+        # We need to account for the index prefix and the hyphen.
+        max_index_length = MAX_INDEX_LENGTH - (len(self._index_prefix) + 1)
+
+        self._serializer = ElasticsearchSerializationAdapter(native_storage=native_storage)
+
+        # We allow uppercase through the sanitizer so we can lowercase them instead of them
+        # all turning into underscores.
+        collection_sanitization = HybridSanitizationStrategy(
+            replacement_character="_",
+            max_length=max_index_length,
+            allowed_characters=UPPERCASE_ALPHABET + ALLOWED_INDEX_CHARACTERS,
+            hash_fragment_mode=HashFragmentMode.ALWAYS,
+        )
+        key_sanitization = AlwaysHashStrategy()
+
+        super().__init__(
+            default_collection=default_collection,
+            collection_sanitization_strategy=collection_sanitization,
+            key_sanitization_strategy=key_sanitization,
+        )
 
     @override
     def _setup(self) -> None:
@@ -190,27 +210,22 @@ class ElasticsearchStore(
 
     @override
     def _setup_collection(self, *, collection: str) -> None:
-        index_name = self._sanitize_index_name(collection=collection)
+        index_name = self._get_index_name(collection=collection)
 
         if self._client.options(ignore_status=404).indices.exists(index=index_name):
             return
 
         _ = self._client.options(ignore_status=404).indices.create(index=index_name, mappings=DEFAULT_MAPPING, settings={})
 
-    def _sanitize_index_name(self, collection: str) -> str:
-        return sanitize_string(
-            value=self._index_prefix + "-" + collection,
-            replacement_character="_",
-            max_length=MAX_INDEX_LENGTH,
-            allowed_characters=ALLOWED_INDEX_CHARACTERS,
-        )
+    def _get_index_name(self, collection: str) -> str:
+        return self._index_prefix + "-" + self._sanitize_collection(collection=collection).lower()
 
-    def _sanitize_document_id(self, key: str) -> str:
-        return sanitize_string(value=key, replacement_character="_", max_length=MAX_KEY_LENGTH, allowed_characters=ALLOWED_KEY_CHARACTERS)
+    def _get_document_id(self, key: str) -> str:
+        return self._sanitize_key(key=key)
 
     def _get_destination(self, *, collection: str, key: str) -> tuple[str, str]:
-        index_name: str = self._sanitize_index_name(collection=collection)
-        document_id: str = self._sanitize_document_id(key=key)
+        index_name: str = self._get_index_name(collection=collection)
+        document_id: str = self._get_document_id(key=key)
 
         return (index_name, document_id)
 
@@ -226,7 +241,7 @@ class ElasticsearchStore(
             return None
 
         try:
-            return self._adapter.load_dict(data=source)
+            return self._serializer.load_dict(data=source)
         except DeserializationError:
             return None
 
@@ -236,8 +251,8 @@ class ElasticsearchStore(
             return []
 
         # Use mget for efficient batch retrieval
-        index_name = self._sanitize_index_name(collection=collection)
-        document_ids = [self._sanitize_document_id(key=key) for key in keys]
+        index_name = self._get_index_name(collection=collection)
+        document_ids = [self._get_document_id(key=key) for key in keys]
         docs = [{"_id": document_id} for document_id in document_ids]
 
         elasticsearch_response = self._client.options(ignore_status=404).mget(index=index_name, docs=docs)
@@ -259,7 +274,7 @@ class ElasticsearchStore(
                 continue
 
             try:
-                entries_by_id[doc_id] = self._adapter.load_dict(data=source)
+                entries_by_id[doc_id] = self._serializer.load_dict(data=source)
             except DeserializationError as e:
                 logger.error(
                     "Failed to deserialize Elasticsearch document in batch operation",
@@ -277,10 +292,10 @@ class ElasticsearchStore(
 
     @override
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
-        index_name: str = self._sanitize_index_name(collection=collection)
-        document_id: str = self._sanitize_document_id(key=key)
+        index_name: str = self._get_index_name(collection=collection)
+        document_id: str = self._get_document_id(key=key)
 
-        document: dict[str, Any] = self._adapter.dump_dict(entry=managed_entry)
+        document: dict[str, Any] = self._serializer.dump_dict(entry=managed_entry)
 
         try:
             _ = self._client.index(index=index_name, id=document_id, body=document, refresh=self._should_refresh_on_put)
@@ -306,14 +321,14 @@ class ElasticsearchStore(
 
         operations: list[dict[str, Any]] = []
 
-        index_name: str = self._sanitize_index_name(collection=collection)
+        index_name: str = self._get_index_name(collection=collection)
 
         for key, managed_entry in zip(keys, managed_entries, strict=True):
-            document_id: str = self._sanitize_document_id(key=key)
+            document_id: str = self._get_document_id(key=key)
 
             index_action: dict[str, Any] = new_bulk_action(action="index", index=index_name, document_id=document_id)
 
-            document: dict[str, Any] = self._adapter.dump_dict(entry=managed_entry)
+            document: dict[str, Any] = self._serializer.dump_dict(entry=managed_entry)
 
             operations.extend([index_action, document])
 
@@ -327,8 +342,8 @@ class ElasticsearchStore(
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        index_name: str = self._sanitize_index_name(collection=collection)
-        document_id: str = self._sanitize_document_id(key=key)
+        index_name: str = self._get_index_name(collection=collection)
+        document_id: str = self._get_document_id(key=key)
 
         elasticsearch_response: ObjectApiResponse[Any] = self._client.options(ignore_status=404).delete(index=index_name, id=document_id)
 
@@ -374,7 +389,7 @@ class ElasticsearchStore(
         limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
 
         result: ObjectApiResponse[Any] = self._client.options(ignore_status=404).search(
-            index=self._sanitize_index_name(collection=collection),
+            index=self._get_index_name(collection=collection),
             fields=[{"key": None}],
             body={"query": {"term": {"collection": collection}}},
             source_includes=[],
@@ -414,7 +429,7 @@ class ElasticsearchStore(
     @override
     def _delete_collection(self, *, collection: str) -> bool:
         result: ObjectApiResponse[Any] = self._client.options(ignore_status=404).delete_by_query(
-            index=self._sanitize_index_name(collection=collection), body={"query": {"term": {"collection": collection}}}
+            index=self._get_index_name(collection=collection), body={"query": {"term": {"collection": collection}}}
         )
 
         body: dict[str, Any] = get_body_from_response(response=result)

@@ -13,8 +13,6 @@ from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseDestroyStore, BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseStore
 
-DEFAULT_SIMPLE_STORE_MAX_ENTRIES = 10000
-
 
 @dataclass
 class SimpleStoreEntry:
