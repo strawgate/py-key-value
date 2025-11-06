@@ -14,7 +14,11 @@ from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
 from key_value.sync.code_gen.stores.elasticsearch import ElasticsearchStore
-from key_value.sync.code_gen.stores.elasticsearch.store import ElasticsearchSerializationAdapter
+from key_value.sync.code_gen.stores.elasticsearch.store import (
+    ElasticsearchSerializationAdapter,
+    ElasticsearchV1CollectionSanitizationStrategy,
+    ElasticsearchV1KeySanitizationStrategy,
+)
 from tests.code_gen.conftest import docker_container, should_skip_docker_tests
 from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -94,7 +98,24 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture
     def es_client(self) -> Generator[Elasticsearch, None, None]:
         with Elasticsearch(hosts=[ES_URL]) as es_client:
-            yield es_client
+            try:
+                yield es_client
+            finally:
+                es_client.close()
+
+    @override
+    @pytest.fixture
+    def store(self) -> ElasticsearchStore:
+        return ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test")
+
+    @pytest.fixture
+    def sanitizing_store(self) -> ElasticsearchStore:
+        return ElasticsearchStore(
+            url=ES_URL,
+            index_prefix="kv-store-e2e-test",
+            key_sanitization_strategy=ElasticsearchV1KeySanitizationStrategy(),
+            collection_sanitization_strategy=ElasticsearchV1CollectionSanitizationStrategy(),
+        )
 
     @pytest.fixture(autouse=True)
     def cleanup_elasticsearch_indices(self, es_client: Elasticsearch):
@@ -110,6 +131,25 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     def test_concurrent_operations(self, store: BaseStore): ...
 
+    @override
+    def test_long_collection_name(self, store: ElasticsearchStore, sanitizing_store: ElasticsearchStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        "Tests that a long collection name will not raise an error."
+
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
+
+        sanitizing_store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
+        assert sanitizing_store.get(collection="test_collection" * 100, key="test_key") == {"test": "test"}
+
+    @override
+    def test_long_key_name(self, store: ElasticsearchStore, sanitizing_store: ElasticsearchStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        "Tests that a long key name will not raise an error."
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            store.put(collection="test_collection", key="test_key" * 100, value={"test": "test"})
+
+        sanitizing_store.put(collection="test_collection", key="test_key" * 100, value={"test": "test"})
+        assert sanitizing_store.get(collection="test_collection", key="test_key" * 100) == {"test": "test"}
+
     def test_put_put_two_indices(self, store: ElasticsearchStore, es_client: Elasticsearch):
         store.put(collection="test_collection", key="test_key", value={"test": "test"})
         store.put(collection="test_collection_2", key="test_key", value={"test": "test"})
@@ -119,7 +159,7 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         indices = es_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
         assert len(indices.body) == 2
         index_names: list[str] = [str(key) for key in indices]
-        assert index_names == snapshot(["kv-store-e2e-test-s_test_collection-f61504ae", "kv-store-e2e-test-s_test_collection_2-7647fec2"])
+        assert index_names == snapshot(["kv-store-e2e-test-test_collection", "kv-store-e2e-test-test_collection_2"])
 
     def test_value_stored_as_flattened_object(self, store: ElasticsearchStore, es_client: Elasticsearch):
         """Verify values are stored as flattened objects, not JSON strings"""
@@ -145,3 +185,8 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 "expires_at": IsStr(min_length=20, max_length=40),
             }
         )
+
+    @override
+    def test_special_characters_in_collection_name(self, store: ElasticsearchStore, sanitizing_store: ElasticsearchStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        "Tests that a special characters in the collection name will not raise an error."
+        super().test_special_characters_in_collection_name(store=sanitizing_store)

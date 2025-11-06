@@ -3,11 +3,11 @@
 # DO NOT CHANGE! Change the original file instead.
 """Windows Registry-based key-value store."""
 
-from typing import Literal
+from typing import Any, Literal
 from winreg import HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE
 
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitization import HybridSanitizationStrategy
+from key_value.shared.utils.sanitization import HybridSanitizationStrategy, PassthroughStrategy, SanitizationStrategy
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
 from typing_extensions import override
 
@@ -34,11 +34,21 @@ MAX_KEY_COLLECTION_LENGTH = 96
 ALLOWED_KEY_COLLECTION_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
 
+class WindowsRegistryV1SanitizationStrategy(HybridSanitizationStrategy):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(max_length=MAX_KEY_COLLECTION_LENGTH, allowed_characters=ALLOWED_KEY_COLLECTION_CHARACTERS)
+
+
 class WindowsRegistryStore(BaseStore):
     """Windows Registry-based key-value store.
 
     This store uses the Windows Registry to persist key-value pairs. Each entry is stored
     as a string value in the registry under HKEY_CURRENT_USER\\Software\\{root}\\{collection}\\{key}.
+
+    By default, keys and collections are not sanitized. This means that there are character and length restrictions on
+    keys and collections that may cause errors when trying to get and put entries.
+
+    To avoid issues, you may want to consider leveraging the `WindowsRegistryV1SanitizationStrategy` strategy.
 
     Note: TTL is not natively supported by Windows Registry, so TTL information is stored
     within the JSON payload and checked at retrieval time.
@@ -50,6 +60,8 @@ class WindowsRegistryStore(BaseStore):
         hive: Literal["HKEY_CURRENT_USER", "HKEY_LOCAL_MACHINE"] | None = None,
         registry_path: str | None = None,
         default_collection: str | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
         """Initialize the Windows Registry store.
 
@@ -57,18 +69,16 @@ class WindowsRegistryStore(BaseStore):
             hive: The hive to use. Defaults to "HKEY_CURRENT_USER".
             registry_path: The registry path to use. Must be a valid registry path under the hive. Defaults to "Software\\py-key-value".
             default_collection: The default collection to use if no collection is provided.
+            key_sanitization_strategy: The sanitization strategy to use for keys.
+            collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
         self._hive = HKEY_LOCAL_MACHINE if hive == "HKEY_LOCAL_MACHINE" else HKEY_CURRENT_USER
         self._registry_path = registry_path or DEFAULT_REGISTRY_PATH
 
-        sanitization_strategy = HybridSanitizationStrategy(
-            max_length=MAX_KEY_COLLECTION_LENGTH, allowed_characters=ALLOWED_KEY_COLLECTION_CHARACTERS
-        )
-
         super().__init__(
             default_collection=default_collection,
-            key_sanitization_strategy=sanitization_strategy,
-            collection_sanitization_strategy=sanitization_strategy,
+            key_sanitization_strategy=key_sanitization_strategy or PassthroughStrategy(),
+            collection_sanitization_strategy=collection_sanitization_strategy or PassthroughStrategy(),
         )
 
     def _get_registry_path(self, *, collection: str) -> str:

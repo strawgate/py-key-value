@@ -1,8 +1,10 @@
 """Python keyring-based key-value store."""
 
+from typing import Any
+
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitization import HybridSanitizationStrategy
+from key_value.shared.utils.sanitization import HybridSanitizationStrategy, PassthroughStrategy, SanitizationStrategy
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
 from typing_extensions import override
 
@@ -21,11 +23,25 @@ MAX_KEY_COLLECTION_LENGTH = 256
 ALLOWED_KEY_COLLECTION_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
 
+class KeyringV1SanitizationStrategy(HybridSanitizationStrategy):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: ARG002
+        super().__init__(
+            replacement_character="_",
+            max_length=MAX_KEY_COLLECTION_LENGTH,
+            allowed_characters=ALLOWED_KEY_COLLECTION_CHARACTERS,
+        )
+
+
 class KeyringStore(BaseStore):
     """Python keyring-based key-value store using keyring library.
 
     This store uses the Python keyring to persist key-value pairs. Each entry is stored
     as a password in the keychain with the combination of collection and key as the username.
+
+    By default, keys and collections are not sanitized. This means that there are character and length restrictions on
+    keys and collections that may cause errors when trying to get and put entries.
+
+    To avoid issues, you may want to consider leveraging the `KeyringV1SanitizationStrategy` strategy.
 
     Note: TTL is not natively supported by Python keyring, so TTL information is stored
     within the JSON payload and checked at retrieval time.
@@ -38,23 +54,23 @@ class KeyringStore(BaseStore):
         *,
         service_name: str = DEFAULT_KEYCHAIN_SERVICE,
         default_collection: str | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
         """Initialize the Python keyring store.
 
         Args:
             service_name: The service name to use in the keychain. Defaults to "py-key-value".
             default_collection: The default collection to use if no collection is provided.
+            key_sanitization_strategy: The sanitization strategy to use for keys.
+            collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
         self._service_name = service_name
 
-        sanitization_strategy = HybridSanitizationStrategy(
-            replacement_character="_", max_length=MAX_KEY_COLLECTION_LENGTH, allowed_characters=ALLOWED_KEY_COLLECTION_CHARACTERS
-        )
-
         super().__init__(
             default_collection=default_collection,
-            collection_sanitization_strategy=sanitization_strategy,
-            key_sanitization_strategy=sanitization_strategy,
+            collection_sanitization_strategy=collection_sanitization_strategy or PassthroughStrategy(),
+            key_sanitization_strategy=key_sanitization_strategy or PassthroughStrategy(),
         )
 
     @override

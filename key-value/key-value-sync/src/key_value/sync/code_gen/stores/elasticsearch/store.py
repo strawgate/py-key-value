@@ -66,7 +66,7 @@ PAGE_LIMIT = 10000
 MAX_KEY_LENGTH = 256
 ALLOWED_KEY_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
-MAX_INDEX_LENGTH = 240
+MAX_INDEX_LENGTH = 200
 ALLOWED_INDEX_CHARACTERS: str = LOWERCASE_ALPHABET + NUMBERS + "_" + "-" + "."
 
 
@@ -97,7 +97,7 @@ class ElasticsearchSerializationAdapter(SerializationAdapter):
 
 class ElasticsearchV1KeySanitizationStrategy(AlwaysHashStrategy):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(hash_length=MAX_KEY_LENGTH)
+        super().__init__(hash_length=64)
 
 
 class ElasticsearchV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
@@ -175,8 +175,6 @@ class ElasticsearchStore(
             api_key: The api key to use.
             index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
             default_collection: The default collection to use if no collection is provided.
-            key_sanitization_strategy: The sanitization strategy to use for keys.
-            collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
 
     def __init__(
