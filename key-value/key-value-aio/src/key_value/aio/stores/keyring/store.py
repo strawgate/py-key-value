@@ -1,6 +1,5 @@
 """Python keyring-based key-value store."""
 
-from typing import Any
 
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
@@ -24,7 +23,7 @@ ALLOWED_KEY_COLLECTION_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
 
 class KeyringV1SanitizationStrategy(HybridSanitizationStrategy):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: ARG002
+    def __init__(self) -> None:
         super().__init__(
             replacement_character="_",
             max_length=MAX_KEY_COLLECTION_LENGTH,

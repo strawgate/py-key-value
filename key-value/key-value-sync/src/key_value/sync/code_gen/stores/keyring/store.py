@@ -3,8 +3,6 @@
 # DO NOT CHANGE! Change the original file instead.
 """Python keyring-based key-value store."""
 
-from typing import Any
-
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitization import HybridSanitizationStrategy, PassthroughStrategy, SanitizationStrategy
@@ -27,7 +25,7 @@ ALLOWED_KEY_COLLECTION_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
 
 class KeyringV1SanitizationStrategy(HybridSanitizationStrategy):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self) -> None:
         super().__init__(
             replacement_character="_", max_length=MAX_KEY_COLLECTION_LENGTH, allowed_characters=ALLOWED_KEY_COLLECTION_CHARACTERS
         )

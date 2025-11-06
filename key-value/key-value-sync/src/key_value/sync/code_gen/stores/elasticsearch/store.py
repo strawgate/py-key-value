@@ -96,12 +96,12 @@ class ElasticsearchSerializationAdapter(SerializationAdapter):
 
 
 class ElasticsearchV1KeySanitizationStrategy(AlwaysHashStrategy):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self) -> None:
         super().__init__(hash_length=64)
 
 
 class ElasticsearchV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self) -> None:
         super().__init__(
             replacement_character="_",
             max_length=MAX_INDEX_LENGTH,

@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any, overload
+from typing import overload
 
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
@@ -18,7 +18,7 @@ MAX_KEY_LENGTH = 240
 
 
 class MemcachedV1KeySanitizationStrategy(HashExcessLengthStrategy):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:  # noqa: ARG002
+    def __init__(self) -> None:
         super().__init__(max_length=MAX_KEY_LENGTH)
 
 

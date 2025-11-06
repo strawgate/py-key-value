@@ -3,7 +3,7 @@
 # DO NOT CHANGE! Change the original file instead.
 """Windows Registry-based key-value store."""
 
-from typing import Any, Literal
+from typing import Literal
 from winreg import HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE
 
 from key_value.shared.utils.managed_entry import ManagedEntry
@@ -35,7 +35,7 @@ ALLOWED_KEY_COLLECTION_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
 
 class WindowsRegistryV1SanitizationStrategy(HybridSanitizationStrategy):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self) -> None:
         super().__init__(max_length=MAX_KEY_COLLECTION_LENGTH, allowed_characters=ALLOWED_KEY_COLLECTION_CHARACTERS)
 
 

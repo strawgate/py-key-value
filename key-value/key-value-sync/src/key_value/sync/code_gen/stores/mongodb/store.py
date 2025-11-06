@@ -92,7 +92,7 @@ class MongoDBSerializationAdapter(SerializationAdapter):
 
 
 class MongoDBV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self) -> None:
         super().__init__(replacement_character="_", max_length=MAX_COLLECTION_LENGTH, allowed_characters=COLLECTION_ALLOWED_CHARACTERS)
 
 
