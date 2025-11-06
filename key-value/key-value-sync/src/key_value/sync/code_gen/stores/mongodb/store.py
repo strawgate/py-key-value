@@ -299,10 +299,7 @@ class MongoDBStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, Ba
         if not keys:
             return 0
 
-        sanitized_collection = self._sanitize_collection(collection=collection)
-
-        # Use delete_many with $in operator for efficient batch deletion
-        result: DeleteResult = self._collections_by_name[sanitized_collection].delete_many(filter={"key": {"$in": keys}})
+        result: DeleteResult = self._collections_by_name[collection].delete_many(filter={"key": {"$in": keys}})
 
         return result.deleted_count
 
