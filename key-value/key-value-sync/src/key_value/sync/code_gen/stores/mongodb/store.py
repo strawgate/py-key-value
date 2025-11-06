@@ -305,7 +305,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         _ = self._db.drop_collection(name_or_collection=collection_name)
 
         if collection_name in self._collections_by_name:
-            del self._collections_by_name[collection_name]
+            del self._collections_by_name[collection]
 
         return True
 
