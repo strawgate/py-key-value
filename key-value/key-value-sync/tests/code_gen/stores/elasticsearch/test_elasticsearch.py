@@ -56,27 +56,7 @@ def test_managed_entry_document_conversion():
     expires_at = created_at + timedelta(seconds=10)
 
     managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
-    adapter = ElasticsearchSerializationAdapter(native_storage=False)
-    document = adapter.dump_dict(entry=managed_entry)
-
-    assert document == snapshot(
-        {"value": {"string": '{"test": "test"}'}, "created_at": "2025-01-01T00:00:00+00:00", "expires_at": "2025-01-01T00:00:10+00:00"}
-    )
-
-    round_trip_managed_entry = adapter.load_dict(data=document)
-
-    assert round_trip_managed_entry.value == managed_entry.value
-    assert round_trip_managed_entry.created_at == created_at
-    assert round_trip_managed_entry.ttl == IsFloat(lt=0)
-    assert round_trip_managed_entry.expires_at == expires_at
-
-
-def test_managed_entry_document_conversion_native_storage():
-    created_at = datetime(year=2025, month=1, day=1, hour=0, minute=0, second=0, tzinfo=timezone.utc)
-    expires_at = created_at + timedelta(seconds=10)
-
-    managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
-    adapter = ElasticsearchSerializationAdapter(native_storage=True)
+    adapter = ElasticsearchSerializationAdapter()
     document = adapter.dump_dict(entry=managed_entry)
 
     assert document == snapshot(
@@ -91,7 +71,9 @@ def test_managed_entry_document_conversion_native_storage():
     assert round_trip_managed_entry.expires_at == expires_at
 
 
-class BaseTestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
+@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
+class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=ELASTICSEARCH_VERSIONS_TO_TEST)
     def setup_elasticsearch(self, request: pytest.FixtureRequest) -> Generator[None, None, None]:
         version = request.param
@@ -139,17 +121,6 @@ class BaseTestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         index_names: list[str] = [str(key) for key in indices]
         assert index_names == snapshot(["kv-store-e2e-test-s_test_collection-f61504ae", "kv-store-e2e-test-s_test_collection_2-7647fec2"])
 
-
-@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
-@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
-class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
-    """Test Elasticsearch store in native mode (i.e. it stores flattened objects)"""
-
-    @override
-    @pytest.fixture
-    def store(self) -> ElasticsearchStore:
-        return ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test", native_storage=True)
-
     def test_value_stored_as_flattened_object(self, store: ElasticsearchStore, es_client: Elasticsearch):
         """Verify values are stored as flattened objects, not JSON strings"""
         store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
@@ -174,65 +145,3 @@ class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
                 "expires_at": IsStr(min_length=20, max_length=40),
             }
         )
-
-    def test_migration_from_non_native_mode(self, store: ElasticsearchStore, es_client: Elasticsearch):
-        """Verify native mode can read a document with stringified data"""
-        index_name = store._get_index_name(collection="test")
-        doc_id = store._get_document_id(key="legacy_key")
-        es_client.index(
-            index=index_name, id=doc_id, body={"collection": "test", "key": "legacy_key", "value": {"string": '{"legacy": "data"}'}}
-        )
-        es_client.indices.refresh(index=index_name)
-
-        result = store.get(collection="test", key="legacy_key")
-        assert result == snapshot({"legacy": "data"})
-
-
-@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
-@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
-class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
-    """Test Elasticsearch store in non-native mode (i.e. it stores stringified JSON values)"""
-
-    @override
-    @pytest.fixture
-    def store(self) -> ElasticsearchStore:
-        return ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test", native_storage=False)
-
-    def test_value_stored_as_json_string(self, store: ElasticsearchStore, es_client: Elasticsearch):
-        """Verify values are stored as JSON strings"""
-        store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
-
-        index_name = store._get_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        doc_id = store._get_document_id(key="test_key")  # pyright: ignore[reportPrivateUsage]
-
-        response = es_client.get(index=index_name, id=doc_id)
-        assert response.body["_source"] == snapshot(
-            {"value": {"string": '{"age": 30, "name": "Alice"}'}, "created_at": IsStr(min_length=20, max_length=40)}
-        )
-
-        # Test with TTL
-        store.put(collection="test", key="test_key", value={"name": "Bob", "age": 25}, ttl=10)
-        response = es_client.get(index=index_name, id=doc_id)
-        assert response.body["_source"] == snapshot(
-            {
-                "value": {"string": '{"age": 25, "name": "Bob"}'},
-                "created_at": IsStr(min_length=20, max_length=40),
-                "expires_at": IsStr(min_length=20, max_length=40),
-            }
-        )
-
-    def test_migration_from_native_mode(self, store: ElasticsearchStore, es_client: Elasticsearch):
-        """Verify non-native mode can read native mode data"""
-        index_name = store._get_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        doc_id = store._get_document_id(key="legacy_key")  # pyright: ignore[reportPrivateUsage]
-
-        es_client.index(
-            index=index_name,
-            id=doc_id,
-            body={"collection": "test", "key": "legacy_key", "value": {"flattened": {"name": "Alice", "age": 30}}},
-        )
-
-        es_client.indices.refresh(index=index_name)
-
-        result = store.get(collection="test", key="legacy_key")
-        assert result == snapshot({"name": "Alice", "age": 30})

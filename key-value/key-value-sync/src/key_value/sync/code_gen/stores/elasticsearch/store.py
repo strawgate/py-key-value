@@ -10,7 +10,13 @@ from elastic_transport import ObjectApiResponse
 from elastic_transport import SerializationError as ElasticsearchSerializationError
 from key_value.shared.errors import DeserializationError, SerializationError
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitization import AlwaysHashStrategy, HashFragmentMode, HybridSanitizationStrategy
+from key_value.shared.utils.sanitization import (
+    AlwaysHashStrategy,
+    HashFragmentMode,
+    HybridSanitizationStrategy,
+    PassthroughStrategy,
+    SanitizationStrategy,
+)
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, LOWERCASE_ALPHABET, NUMBERS, UPPERCASE_ALPHABET
 from key_value.shared.utils.serialization import SerializationAdapter
 from key_value.shared.utils.time_to_live import now_as_epoch
@@ -44,15 +50,13 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_INDEX_PREFIX = "kv_store"
 
-# You might think the `string` field should be a text/keyword field
-# but this is the recommended mapping for large stringified json
 DEFAULT_MAPPING = {
     "properties": {
         "created_at": {"type": "date"},
         "expires_at": {"type": "date"},
         "collection": {"type": "keyword"},
         "key": {"type": "keyword"},
-        "value": {"properties": {"string": {"type": "object", "enabled": False}, "flattened": {"type": "flattened"}}},
+        "value": {"properties": {"flattened": {"type": "flattened"}}},
     }
 }
 
@@ -69,53 +73,56 @@ ALLOWED_INDEX_CHARACTERS: str = LOWERCASE_ALPHABET + NUMBERS + "_" + "-" + "."
 class ElasticsearchSerializationAdapter(SerializationAdapter):
     """Adapter for Elasticsearch with support for native and string storage modes."""
 
-    _native_storage: bool
-
-    def __init__(self, *, native_storage: bool = True) -> None:
-        """Initialize the Elasticsearch adapter.
-
-        Args:
-            native_storage: If True (default), store values as flattened dicts.
-                            If False, store values as JSON strings.
-        """
+    def __init__(self) -> None:
+        """Initialize the Elasticsearch adapter"""
         super().__init__()
 
-        self._native_storage = native_storage
         self._date_format = "isoformat"
-        self._value_format = "dict" if native_storage else "string"
+        self._value_format = "dict"
 
     @override
     def prepare_dump(self, data: dict[str, Any]) -> dict[str, Any]:
         value = data.pop("value")
 
-        data["value"] = {}
-
-        if self._native_storage:
-            data["value"]["flattened"] = value
-        else:
-            data["value"]["string"] = value
+        data["value"] = {"flattened": value}
 
         return data
 
     @override
     def prepare_load(self, data: dict[str, Any]) -> dict[str, Any]:
-        value = data.pop("value")
-
-        if "flattened" in value:
-            data["value"] = value["flattened"]
-        elif "string" in value:
-            data["value"] = value["string"]
-        else:
-            msg = "Value field not found in Elasticsearch document"
-            raise DeserializationError(message=msg)
+        data["value"] = data.pop("value").get("flattened")
 
         return data
+
+
+class ElasticsearchV1KeySanitizationStrategy(AlwaysHashStrategy):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(hash_length=MAX_KEY_LENGTH)
+
+
+class ElasticsearchV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(
+            replacement_character="_",
+            max_length=MAX_INDEX_LENGTH,
+            allowed_characters=UPPERCASE_ALPHABET + ALLOWED_INDEX_CHARACTERS,
+            hash_fragment_mode=HashFragmentMode.ALWAYS,
+        )
 
 
 class ElasticsearchStore(
     BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCullStore, BaseContextManagerStore, BaseStore
 ):
-    """A elasticsearch-based store."""
+    """An Elasticsearch-based store.
+
+    Stores collections in their own indices and stores values in Flattened fields.
+
+    By default, keys and collections are not sanitized. This means that there are character and length restrictions on
+    keys and collections that may cause errors when trying to get and put entries.
+
+    To avoid issues, you may want to consider leveraging the `ElasticsearchV1KeySanitizationStrategy` and
+    `ElasticsearchV1CollectionSanitizationStrategy` strategies.
+    """
 
     _client: Elasticsearch
 
@@ -123,19 +130,54 @@ class ElasticsearchStore(
 
     _index_prefix: str
 
-    _native_storage: bool
+    _default_collection: str | None
 
     _serializer: SerializationAdapter
 
-    @overload
-    def __init__(
-        self, *, elasticsearch_client: Elasticsearch, index_prefix: str, native_storage: bool = True, default_collection: str | None = None
-    ) -> None: ...
+    _key_sanitization_strategy: SanitizationStrategy
+    _collection_sanitization_strategy: SanitizationStrategy
 
     @overload
     def __init__(
-        self, *, url: str, api_key: str | None = None, index_prefix: str, native_storage: bool = True, default_collection: str | None = None
-    ) -> None: ...
+        self,
+        *,
+        elasticsearch_client: Elasticsearch,
+        index_prefix: str,
+        default_collection: str | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
+    ) -> None:
+        """Initialize the elasticsearch store.
+
+        Args:
+            elasticsearch_client: The elasticsearch client to use.
+            index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
+            default_collection: The default collection to use if no collection is provided.
+            key_sanitization_strategy: The sanitization strategy to use for keys.
+            collection_sanitization_strategy: The sanitization strategy to use for collections.
+        """
+
+    @overload
+    def __init__(
+        self,
+        *,
+        url: str,
+        api_key: str | None = None,
+        index_prefix: str,
+        default_collection: str | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
+    ) -> None:
+        """Initialize the elasticsearch store.
+
+        Args:
+            url: The url of the elasticsearch cluster.
+            api_key: The api key to use.
+            index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
+            default_collection: The default collection to use if no collection is provided.
+            key_sanitization_strategy: The sanitization strategy to use for keys.
+            collection_sanitization_strategy: The sanitization strategy to use for collections.
+        """
 
     def __init__(
         self,
@@ -144,8 +186,9 @@ class ElasticsearchStore(
         url: str | None = None,
         api_key: str | None = None,
         index_prefix: str,
-        native_storage: bool = True,
         default_collection: str | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
         """Initialize the elasticsearch store.
 
@@ -154,9 +197,11 @@ class ElasticsearchStore(
             url: The url of the elasticsearch cluster.
             api_key: The api key to use.
             index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
+            default_collection: The default collection to use if no collection is provided.
             native_storage: Whether to use native storage mode (flattened field type) or serialize
                             all values to JSON strings. Defaults to True.
-            default_collection: The default collection to use if no collection is provided.
+            key_sanitization_strategy: The sanitization strategy to use for keys.
+            collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
         if elasticsearch_client is None and url is None:
             msg = "Either elasticsearch_client or url must be provided"
@@ -177,29 +222,14 @@ class ElasticsearchStore(
         LessCapableNdjsonSerializer.install_serializer(client=self._client)
 
         self._index_prefix = index_prefix.lower()
-        self._native_storage = native_storage
         self._is_serverless = False
 
-        # We have 240 characters to work with
-        # We need to account for the index prefix and the hyphen.
-        max_index_length = MAX_INDEX_LENGTH - (len(self._index_prefix) + 1)
-
-        self._serializer = ElasticsearchSerializationAdapter(native_storage=native_storage)
-
-        # We allow uppercase through the sanitizer so we can lowercase them instead of them
-        # all turning into underscores.
-        collection_sanitization = HybridSanitizationStrategy(
-            replacement_character="_",
-            max_length=max_index_length,
-            allowed_characters=UPPERCASE_ALPHABET + ALLOWED_INDEX_CHARACTERS,
-            hash_fragment_mode=HashFragmentMode.ALWAYS,
-        )
-        key_sanitization = AlwaysHashStrategy()
+        self._serializer = ElasticsearchSerializationAdapter()
 
         super().__init__(
             default_collection=default_collection,
-            collection_sanitization_strategy=collection_sanitization,
-            key_sanitization_strategy=key_sanitization,
+            collection_sanitization_strategy=collection_sanitization_strategy or PassthroughStrategy(),
+            key_sanitization_strategy=key_sanitization_strategy or PassthroughStrategy(),
         )
 
     @override
