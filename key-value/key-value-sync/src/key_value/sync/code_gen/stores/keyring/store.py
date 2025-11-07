@@ -3,6 +3,7 @@
 # DO NOT CHANGE! Change the original file instead.
 """Python keyring-based key-value store."""
 
+from key_value.shared.errors.key_value import ValueTooLargeError
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitization import HybridSanitizationStrategy, SanitizationStrategy
@@ -19,6 +20,8 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 DEFAULT_KEYCHAIN_SERVICE = "py-key-value"
+
+WINDOWS_MAX_VALUE_LENGTH = 2560  # bytes
 
 MAX_KEY_COLLECTION_LENGTH = 256
 ALLOWED_KEY_COLLECTION_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
@@ -105,6 +108,10 @@ class KeyringStore(BaseStore):
         combo_key: str = compound_key(collection=sanitized_collection, key=sanitized_key)
 
         json_str: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
+        encoded_json_bytes: bytes = json_str.encode(encoding="utf-8")
+
+        if len(encoded_json_bytes) > WINDOWS_MAX_VALUE_LENGTH:
+            raise ValueTooLargeError(size=len(encoded_json_bytes), max_size=2560, collection=sanitized_collection, key=sanitized_key)
 
         keyring.set_password(service_name=self._service_name, username=combo_key, password=json_str)
 
