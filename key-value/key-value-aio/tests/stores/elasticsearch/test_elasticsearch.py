@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
 
@@ -32,6 +33,8 @@ ELASTICSEARCH_VERSIONS_TO_TEST = [
     "9.2.0",  # Released Oct 2025
 ]
 
+logger = logging.getLogger(__name__)
+
 
 def get_elasticsearch_client() -> AsyncElasticsearch:
     return AsyncElasticsearch(hosts=[ES_URL])
@@ -41,7 +44,11 @@ async def ping_elasticsearch() -> bool:
     es_client: AsyncElasticsearch = get_elasticsearch_client()
 
     async with es_client:
-        return await es_client.ping()
+        if await es_client.ping():
+            logger.info("Elasticsearch pinged, wait for yellow status")
+            await es_client.cluster.health(wait_for_status="yellow", timeout="10s")
+            logger.info("Elasticsearch is ready")
+        return False
 
 
 async def cleanup_elasticsearch_indices(elasticsearch_client: AsyncElasticsearch):

@@ -50,7 +50,7 @@ class S3FailedToStartError(Exception):
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session", params=LOCALSTACK_VERSIONS_TO_TEST)
+    @pytest.fixture(scope="session", params=LOCALSTACK_VERSIONS_TO_TEST)
     async def setup_s3(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
         version = request.param
 
