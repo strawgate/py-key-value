@@ -3,8 +3,6 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, overload
 
-from elastic_transport import ObjectApiResponse
-from elastic_transport import SerializationError as ElasticsearchSerializationError
 from key_value.shared.errors import DeserializationError, SerializationError
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitization import (
@@ -34,7 +32,10 @@ from key_value.aio.stores.base import (
 from key_value.aio.stores.elasticsearch.utils import LessCapableJsonSerializer, LessCapableNdjsonSerializer, new_bulk_action
 
 try:
+    from elastic_transport import ObjectApiResponse
+    from elastic_transport import SerializationError as ElasticsearchSerializationError
     from elasticsearch import AsyncElasticsearch
+    from elasticsearch.exceptions import BadRequestError
 
     from key_value.aio.stores.elasticsearch.utils import (
         get_aggregations_from_body,
@@ -261,7 +262,12 @@ class ElasticsearchStore(
         if await self._client.options(ignore_status=404).indices.exists(index=index_name):
             return
 
-        _ = await self._client.options(ignore_status=404).indices.create(index=index_name, mappings=DEFAULT_MAPPING, settings={})
+        try:
+            _ = await self._client.options(ignore_status=404).indices.create(index=index_name, mappings=DEFAULT_MAPPING, settings={})
+        except BadRequestError as e:
+            if "index_already_exists_exception" in str(e).lower():
+                return
+            raise
 
     def _get_index_name(self, collection: str) -> str:
         return self._index_prefix + "-" + self._sanitize_collection(collection=collection).lower()
