@@ -108,7 +108,7 @@ class VaultStore(BaseStore):
     async def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        json_str: str = self._serialization_adapter.dump_json(entry=managed_entry)
+        json_str: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
         # Store the JSON string in a 'value' field
         secret_data = {"value": json_str}

@@ -105,7 +105,7 @@ class KeyringStore(BaseStore):
 
         combo_key: str = compound_key(collection=sanitized_collection, key=sanitized_key)
 
-        json_str: str = self._serialization_adapter.dump_json(entry=managed_entry)
+        json_str: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
         keyring.set_password(service_name=self._service_name, username=combo_key, password=json_str)
 
