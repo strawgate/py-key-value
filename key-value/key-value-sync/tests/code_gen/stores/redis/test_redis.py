@@ -99,8 +99,21 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         raw_documents_dicts: list[dict[str, Any]] = [json.loads(raw_document) for raw_document in raw_documents]
         assert raw_documents_dicts == snapshot(
             [
-                {"created_at": IsDatetime(iso_string=True), "value": {"test_1": "value_1"}},
-                {"created_at": IsDatetime(iso_string=True), "expires_at": IsDatetime(iso_string=True), "value": {"test_2": "value_2"}},
+                {
+                    "collection": "test",
+                    "created_at": IsDatetime(iso_string=True),
+                    "key": "document_format_test_1",
+                    "value": {"test_1": "value_1"},
+                    "version": 1,
+                },
+                {
+                    "collection": "test",
+                    "created_at": IsDatetime(iso_string=True),
+                    "expires_at": IsDatetime(iso_string=True),
+                    "key": "document_format_test_2",
+                    "value": {"test_2": "value_2"},
+                    "version": 1,
+                },
             ]
         )
 
@@ -114,8 +127,22 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         raw_documents_dicts = [json.loads(raw_document) for raw_document in raw_documents]
         assert raw_documents_dicts == snapshot(
             [
-                {"created_at": IsDatetime(iso_string=True), "expires_at": IsDatetime(iso_string=True), "value": {"test_3": "value_3"}},
-                {"created_at": IsDatetime(iso_string=True), "expires_at": IsDatetime(iso_string=True), "value": {"test_4": "value_4"}},
+                {
+                    "collection": "test",
+                    "created_at": IsDatetime(iso_string=True),
+                    "expires_at": IsDatetime(iso_string=True),
+                    "key": "document_format_test_3",
+                    "value": {"test_3": "value_3"},
+                    "version": 1,
+                },
+                {
+                    "collection": "test",
+                    "created_at": IsDatetime(iso_string=True),
+                    "expires_at": IsDatetime(iso_string=True),
+                    "key": "document_format_test_4",
+                    "value": {"test_4": "value_4"},
+                    "version": 1,
+                },
             ]
         )
 
@@ -123,7 +150,14 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         raw_document: Any = redis_client.get(name="test::document_format_test")
         raw_document_dict = json.loads(raw_document)
         assert raw_document_dict == snapshot(
-            {"created_at": IsDatetime(iso_string=True), "expires_at": IsDatetime(iso_string=True), "value": {"test": "value"}}
+            {
+                "collection": "test",
+                "created_at": IsDatetime(iso_string=True),
+                "expires_at": IsDatetime(iso_string=True),
+                "key": "document_format_test",
+                "value": {"test": "value"},
+                "version": 1,
+            }
         )
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")

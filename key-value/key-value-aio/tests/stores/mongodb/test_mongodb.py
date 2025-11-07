@@ -59,6 +59,7 @@ def test_managed_entry_document_conversion_native_mode():
 
     assert document == snapshot(
         {
+            "version": 1,
             "value": {"object": {"test": "test"}},
             "created_at": datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc),
             "expires_at": datetime(2025, 1, 1, 0, 0, 10, tzinfo=timezone.utc),
@@ -83,6 +84,7 @@ def test_managed_entry_document_conversion_legacy_mode():
 
     assert document == snapshot(
         {
+            "version": 1,
             "value": {"string": '{"test": "test"}'},
             "created_at": datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc),
             "expires_at": datetime(2025, 1, 1, 0, 0, 10, tzinfo=timezone.utc),
@@ -188,8 +190,10 @@ class TestMongoDBStoreNativeMode(BaseMongoDBStoreTests):
             {
                 "_id": IsInstance(expected_type=ObjectId),
                 "key": "test_key",
+                "collection": "test",
                 "created_at": IsDatetime(),
                 "value": {"object": {"name": "Alice", "age": 30}},
+                "version": 1,
             }
         )
 
@@ -250,8 +254,10 @@ class TestMongoDBStoreNonNativeMode(BaseMongoDBStoreTests):
             {
                 "_id": IsInstance(expected_type=ObjectId),
                 "key": "test_key",
+                "collection": "test",
                 "created_at": IsDatetime(),
                 "value": {"string": '{"age": 30, "name": "Alice"}'},
+                "version": 1,
             }
         )
 

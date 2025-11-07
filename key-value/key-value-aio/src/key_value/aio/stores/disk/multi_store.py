@@ -132,7 +132,11 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
-        _ = self._cache[collection].set(key=key, value=self._serialization_adapter.dump_json(entry=managed_entry), expire=managed_entry.ttl)
+        _ = self._cache[collection].set(
+            key=key,
+            value=self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection),
+            expire=managed_entry.ttl,
+        )
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:

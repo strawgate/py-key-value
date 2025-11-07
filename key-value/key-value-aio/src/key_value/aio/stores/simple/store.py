@@ -69,7 +69,7 @@ class SimpleStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDes
             _ = self._data.pop(next(iter(self._data)))
 
         self._data[combo_key] = SimpleStoreEntry(
-            json_str=self._serialization_adapter.dump_json(entry=managed_entry),
+            json_str=self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection),
             expires_at=managed_entry.expires_at,
             created_at=managed_entry.created_at,
         )

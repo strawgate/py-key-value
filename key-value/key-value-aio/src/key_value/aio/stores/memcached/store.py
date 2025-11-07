@@ -125,7 +125,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         else:
             exptime = max(int(managed_entry.ttl), 1)
 
-        json_value: str = self._serialization_adapter.dump_json(entry=managed_entry)
+        json_value: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
         _ = await self._client.set(
             key=combo_key.encode(encoding="utf-8"),
