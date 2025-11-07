@@ -10,7 +10,7 @@ from dirty_equals import IsFloat
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import wait_for_true
 from key_value.shared.utils.managed_entry import ManagedEntry
-from opensearchpy import AsyncOpenSearch
+from opensearchpy import OpenSearch
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
@@ -35,12 +35,12 @@ WAIT_FOR_OPENSEARCH_TIMEOUT = 30
 OPENSEARCH_VERSIONS_TO_TEST = ["2.11.0", "2.18.0"]
 
 
-def get_opensearch_client() -> AsyncOpenSearch:
-    return AsyncOpenSearch(hosts=[OS_URL], use_ssl=False, verify_certs=False)
+def get_opensearch_client() -> OpenSearch:
+    return OpenSearch(hosts=[OS_URL], use_ssl=False, verify_certs=False)
 
 
 def ping_opensearch() -> bool:
-    os_client: AsyncOpenSearch = get_opensearch_client()
+    os_client: OpenSearch = get_opensearch_client()
 
     with os_client:
         try:
@@ -49,7 +49,7 @@ def ping_opensearch() -> bool:
             return False
 
 
-def cleanup_opensearch_indices(opensearch_client: AsyncOpenSearch):
+def cleanup_opensearch_indices(opensearch_client: OpenSearch):
     with contextlib.suppress(Exception):
         indices = opensearch_client.indices.get(index="opensearch-kv-store-e2e-test-*")
         for index in indices:
@@ -101,7 +101,7 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
             yield
 
     @pytest.fixture
-    def opensearch_client(self, setup_opensearch: None) -> Generator[AsyncOpenSearch, None, None]:
+    def opensearch_client(self, setup_opensearch: None) -> Generator[OpenSearch, None, None]:
         os_client = get_opensearch_client()
 
         with os_client:
@@ -111,7 +111,7 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @override
     @pytest.fixture
-    def default_store(self, opensearch_client: AsyncOpenSearch) -> Generator[BaseStore, None, None]:
+    def default_store(self, opensearch_client: OpenSearch) -> Generator[BaseStore, None, None]:
         store = OpenSearchStore(
             opensearch_client=opensearch_client, index_prefix="opensearch-kv-store-e2e-test", default_collection="test-collection"
         )
@@ -121,7 +121,7 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @override
     @pytest.fixture
-    def collection_sanitized_store(self, opensearch_client: AsyncOpenSearch) -> Generator[BaseStore, None, None]:
+    def collection_sanitized_store(self, opensearch_client: OpenSearch) -> Generator[BaseStore, None, None]:
         store = OpenSearchStore(
             opensearch_client=opensearch_client,
             index_prefix="opensearch-kv-store-e2e-test",
@@ -134,7 +134,7 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @override
     @pytest.fixture
-    def key_sanitized_store(self, opensearch_client: AsyncOpenSearch) -> Generator[BaseStore, None, None]:
+    def key_sanitized_store(self, opensearch_client: OpenSearch) -> Generator[BaseStore, None, None]:
         store = OpenSearchStore(
             opensearch_client=opensearch_client,
             index_prefix="opensearch-kv-store-e2e-test",
@@ -147,7 +147,7 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @override
     @pytest.fixture
-    def fully_sanitized_store(self, opensearch_client: AsyncOpenSearch) -> Generator[BaseStore, None, None]:
+    def fully_sanitized_store(self, opensearch_client: OpenSearch) -> Generator[BaseStore, None, None]:
         store = OpenSearchStore(
             opensearch_client=opensearch_client,
             index_prefix="opensearch-kv-store-e2e-test",

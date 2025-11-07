@@ -3,7 +3,7 @@
 # DO NOT CHANGE! Change the original file instead.
 from typing import Any, TypeVar, cast
 
-from opensearchpy import AsyncOpenSearch
+from opensearchpy import OpenSearch
 from opensearchpy.serializer import JSONSerializer
 
 
@@ -128,6 +128,6 @@ class LessCapableJsonSerializer(JSONSerializer):
         raise TypeError(msg)
 
     @classmethod
-    def install_serializer(cls, client: AsyncOpenSearch) -> None:
+    def install_serializer(cls, client: OpenSearch) -> None:
         # OpenSearch uses a different serializer architecture
         client.transport.serializer = cls()  # type: ignore[reportUnknownMemberType]

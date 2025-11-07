@@ -44,7 +44,7 @@ try:
         get_source_from_body,
     )
 except ImportError as e:
-    msg = "OpenSearchStore requires py-key-value-aio[opensearch]"
+    msg = "OpenSearchStore requires opensearch-py[async]>=2.0.0. Install with: pip install 'py-key-value-aio[opensearch]'"
     raise ImportError(msg) from e
 
 

@@ -26,7 +26,7 @@ from key_value.sync.code_gen.stores.base import (
 from key_value.sync.code_gen.stores.opensearch.utils import LessCapableJsonSerializer, new_bulk_action
 
 try:
-    from opensearchpy import AsyncOpenSearch
+    from opensearchpy import OpenSearch
     from opensearchpy.exceptions import RequestError
 
     from key_value.sync.code_gen.stores.opensearch.utils import (
@@ -37,7 +37,7 @@ try:
         get_source_from_body,
     )
 except ImportError as e:
-    msg = "OpenSearchStore requires py-key-value-aio[opensearch]"
+    msg = "OpenSearchStore requires opensearch-py[async]>=2.0.0. Install with: pip install 'py-key-value-aio[opensearch]'"
     raise ImportError(msg) from e
 
 logger = logging.getLogger(__name__)
@@ -118,7 +118,7 @@ class OpenSearchStore(
     `OpenSearchV1CollectionSanitizationStrategy` strategies.
     """
 
-    _client: AsyncOpenSearch
+    _client: OpenSearch
 
     _index_prefix: str
 
@@ -133,7 +133,7 @@ class OpenSearchStore(
     def __init__(
         self,
         *,
-        opensearch_client: AsyncOpenSearch,
+        opensearch_client: OpenSearch,
         index_prefix: str,
         default_collection: str | None = None,
         key_sanitization_strategy: SanitizationStrategy | None = None,
@@ -172,7 +172,7 @@ class OpenSearchStore(
     def __init__(
         self,
         *,
-        opensearch_client: AsyncOpenSearch | None = None,
+        opensearch_client: OpenSearch | None = None,
         url: str | None = None,
         api_key: str | None = None,
         index_prefix: str,
@@ -203,7 +203,7 @@ class OpenSearchStore(
             if api_key:
                 client_kwargs["api_key"] = api_key
 
-            self._client = AsyncOpenSearch(**client_kwargs)
+            self._client = OpenSearch(**client_kwargs)
         else:
             msg = "Either opensearch_client or url must be provided"
             raise ValueError(msg)
