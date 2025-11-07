@@ -30,12 +30,17 @@ theme:
     - navigation.top
     - navigation.tracking
     - navigation.instant
-    - toc.integrate
+    - navigation.path
+    - navigation.indexes
+    - navigation.footer
     - toc.follow
     - search.suggest
     - search.highlight
+    - search.share
     - content.code.copy
     - content.code.annotate
+    - content.action.edit
+    - content.action.view
 
 plugins:
   - search
@@ -71,10 +76,12 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
-  - Stores: stores.md
-  - Wrappers: wrappers.md
-  - Adapters: adapters.md
+  - User Guide:
+      - Stores: stores.md
+      - Wrappers: wrappers.md
+      - Adapters: adapters.md
   - API Reference:
+      - api/index.md
       - Protocols: api/protocols.md
       - Stores: api/stores.md
       - Wrappers: api/wrappers.md
