@@ -6,7 +6,7 @@ Complete API reference documentation for py-key-value.
 
 The py-key-value API is organized into four main components:
 
-- **[Protocols](protocols.md)** - Core interfaces that define the key-value store contract
+- **[Protocols](protocols.md)** - Core interfaces for the key-value store
 - **[Stores](stores.md)** - Backend implementations for different storage systems
 - **[Wrappers](wrappers.md)** - Decorators that add functionality to stores
 - **[Adapters](adapters.md)** - Utilities that simplify working with stores
