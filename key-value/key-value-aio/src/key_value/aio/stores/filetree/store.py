@@ -31,10 +31,26 @@ FILE_NAME_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
 
 
 def get_max_path_length(root: Path | AsyncPath) -> int:
+    """Get the maximum path length for the filesystem.
+
+    Returns platform-specific limits:
+    - Windows: 260 characters (MAX_PATH)
+    - Unix/Linux: Uses pathconf to get PC_PATH_MAX
+    """
+    if os.name == "nt":  # Windows
+        return 260  # MAX_PATH on Windows
     return os.pathconf(path=Path(root), name="PC_PATH_MAX")
 
 
 def get_max_file_name_length(root: Path | AsyncPath) -> int:
+    """Get the maximum filename length for the filesystem.
+
+    Returns platform-specific limits:
+    - Windows: 255 characters
+    - Unix/Linux: Uses pathconf to get PC_NAME_MAX
+    """
+    if os.name == "nt":  # Windows
+        return 255  # Maximum filename length on Windows (NTFS, FAT32, etc.)
     return os.pathconf(path=Path(root), name="PC_NAME_MAX")
 
 
