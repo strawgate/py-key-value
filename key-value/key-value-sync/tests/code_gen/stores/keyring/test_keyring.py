@@ -41,6 +41,7 @@ class BaseTestKeychainStore(BaseStoreTests):
 
 
 @pytest.mark.skipif(condition=not detect_on_macos(), reason="Keyrings do not support large values on MacOS")
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestMacOSKeychainStore(BaseTestKeychainStore):
     pass
 
