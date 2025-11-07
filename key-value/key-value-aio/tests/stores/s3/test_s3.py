@@ -70,12 +70,17 @@ class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self, setup_s3: None) -> S3Store:
+        from key_value.aio.stores.s3 import S3CollectionSanitizationStrategy, S3KeySanitizationStrategy
+
         store = S3Store(
             bucket_name=S3_TEST_BUCKET,
             endpoint_url=S3_ENDPOINT,
             aws_access_key_id="test",
             aws_secret_access_key="test",
             region_name="us-east-1",
+            # Use sanitization strategies for tests to handle long collection/key names
+            collection_sanitization_strategy=S3CollectionSanitizationStrategy(),
+            key_sanitization_strategy=S3KeySanitizationStrategy(),
         )
 
         # Clean up test bucket if it exists
