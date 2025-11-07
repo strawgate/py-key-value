@@ -15,8 +15,6 @@ from key_value.aio.stores.base import (
     BaseStore,
 )
 
-DEFAULT_SIMPLE_STORE_MAX_ENTRIES = 10000
-
 
 @dataclass
 class SimpleStoreEntry:

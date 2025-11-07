@@ -123,8 +123,9 @@ class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
         await store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
         assert await store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
 
-        collections = await store.collections()
-        assert collections == snapshot(["test_collection_-daf4a2ec"])
+        collections = store._collections_by_name.values()
+        collection_names = [collection.name for collection in collections]
+        assert collection_names == snapshot(["S_test_collection_-daf4a2ec"])
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
@@ -146,7 +147,7 @@ class TestMongoDBStoreNativeMode(BaseMongoDBStoreTests):
 
         # Get the raw MongoDB document
         await store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
         doc = await collection.find_one({"key": "test_key"})
 
@@ -162,7 +163,7 @@ class TestMongoDBStoreNativeMode(BaseMongoDBStoreTests):
     async def test_migration_from_legacy_mode(self, store: MongoDBStore):
         """Verify native mode can read legacy JSON string data."""
         await store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
 
         await collection.insert_one(
@@ -195,7 +196,7 @@ class TestMongoDBStoreNonNativeMode(BaseMongoDBStoreTests):
 
         # Get the raw MongoDB document
         await store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
         doc = await collection.find_one({"key": "test_key"})
 
@@ -211,7 +212,7 @@ class TestMongoDBStoreNonNativeMode(BaseMongoDBStoreTests):
     async def test_migration_from_native_mode(self, store: MongoDBStore):
         """Verify non-native mode can read native mode data."""
         await store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
 
         await collection.insert_one(

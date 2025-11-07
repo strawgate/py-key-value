@@ -33,3 +33,7 @@ class InvalidTTLError(KeyValueOperationError):
             message="A TTL is invalid.",
             extra_info={"ttl": str(ttl), **(extra_info or {})},
         )
+
+
+class InvalidKeyError(KeyValueOperationError):
+    """Raised when a key is invalid (e.g., uses reserved prefixes)."""
