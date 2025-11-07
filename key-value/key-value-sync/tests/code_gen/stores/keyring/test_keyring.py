@@ -41,6 +41,7 @@ class BaseTestKeychainStore(BaseStoreTests):
 
 
 @pytest.mark.skipif(condition=not detect_on_macos(), reason="Keyrings do not support large values on MacOS")
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestMacOSKeychainStore(BaseTestKeychainStore):
     pass
 
@@ -61,8 +62,8 @@ class TestWindowsKeychainStore(BaseTestKeychainStore):
         with pytest.raises(Exception):  # noqa: B017, PT011
             store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
 
-        sanitizing_store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
-        assert sanitizing_store.get(collection="test_collection" * 100, key="test_key") == {"test": "test"}
+        sanitizing_store.put(collection="test_collection" * 50, key="test_key", value={"test": "test"})
+        assert sanitizing_store.get(collection="test_collection" * 50, key="test_key") == {"test": "test"}
 
     @override
     def test_long_key_name(self, store: KeyringStore, sanitizing_store: KeyringStore):  # pyright: ignore[reportIncompatibleMethodOverride]

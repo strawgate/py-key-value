@@ -219,7 +219,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         managed_entry: ManagedEntry,
     ) -> None:
         """Store a managed entry in DynamoDB."""
-        json_value = self._serialization_adapter.dump_json(entry=managed_entry)
+        json_value = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
         item: dict[str, Any] = {
             "collection": {"S": collection},

@@ -37,3 +37,13 @@ class InvalidTTLError(KeyValueOperationError):
 
 class InvalidKeyError(KeyValueOperationError):
     """Raised when a key is invalid (e.g., uses reserved prefixes)."""
+
+
+class ValueTooLargeError(KeyValueOperationError):
+    """Raised when a value is too large."""
+
+    def __init__(self, size: int, max_size: int, collection: str | None = None, key: str | None = None):
+        super().__init__(
+            message="Value size exceeds the maximum allowed size.",
+            extra_info={"size": size, "max_size": max_size, "collection": collection or "default", "key": key},
+        )

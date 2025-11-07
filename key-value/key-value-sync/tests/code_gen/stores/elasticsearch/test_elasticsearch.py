@@ -71,7 +71,12 @@ def test_managed_entry_document_conversion():
     document = adapter.dump_dict(entry=managed_entry)
 
     assert document == snapshot(
-        {"value": {"flattened": {"test": "test"}}, "created_at": "2025-01-01T00:00:00+00:00", "expires_at": "2025-01-01T00:00:10+00:00"}
+        {
+            "version": 1,
+            "value": {"flattened": {"test": "test"}},
+            "created_at": "2025-01-01T00:00:00+00:00",
+            "expires_at": "2025-01-01T00:00:10+00:00",
+        }
     )
 
     round_trip_managed_entry = adapter.load_dict(data=document)
@@ -177,7 +182,13 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         response = es_client.get(index=index_name, id=doc_id)
         assert response.body["_source"] == snapshot(
-            {"value": {"flattened": {"name": "Alice", "age": 30}}, "created_at": IsStr(min_length=20, max_length=40)}
+            {
+                "version": 1,
+                "key": "test_key",
+                "collection": "test",
+                "value": {"flattened": {"name": "Alice", "age": 30}},
+                "created_at": IsStr(min_length=20, max_length=40),
+            }
         )
 
         # Test with TTL
@@ -185,6 +196,9 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         response = es_client.get(index=index_name, id=doc_id)
         assert response.body["_source"] == snapshot(
             {
+                "version": 1,
+                "key": "test_key",
+                "collection": "test",
                 "value": {"flattened": {"name": "Bob", "age": 25}},
                 "created_at": IsStr(min_length=20, max_length=40),
                 "expires_at": IsStr(min_length=20, max_length=40),
