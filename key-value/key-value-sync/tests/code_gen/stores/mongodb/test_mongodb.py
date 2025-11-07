@@ -121,7 +121,6 @@ class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @override
     def test_long_collection_name(self, store: MongoDBStore, sanitizing_store: MongoDBStore):  # pyright: ignore[reportIncompatibleMethodOverride]
-        """Tests that a long collection name will not raise an error."""
         with pytest.raises(Exception):  # noqa: B017, PT011
             store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
 
