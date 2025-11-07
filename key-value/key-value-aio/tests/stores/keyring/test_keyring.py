@@ -5,13 +5,13 @@ from key_value.shared_test.cases import LARGE_DATA_CASES, PositiveCases
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
-from key_value.aio.stores.keyring.store import KeyringStore
-from tests.conftest import detect_on_linux, detect_on_windows
+from key_value.aio.stores.elasticsearch.store import ElasticsearchStore
+from key_value.aio.stores.keyring.store import KeyringStore, KeyringV1CollectionSanitizationStrategy, KeyringV1KeySanitizationStrategy
+from tests.conftest import detect_on_macos, detect_on_windows
 from tests.stores.base import BaseStoreTests
 
 
-@pytest.mark.skipif(condition=detect_on_linux(), reason="KeyringStore is not available on Linux CI")
-class TestKeychainStore(BaseStoreTests):
+class BaseTestKeychainStore(BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self) -> KeyringStore:
@@ -31,3 +31,37 @@ class TestKeychainStore(BaseStoreTests):
     @PositiveCases.parametrize(cases=[LARGE_DATA_CASES])
     async def test_get_large_put_get(self, store: BaseStore, data: dict[str, Any], json: str, round_trip: dict[str, Any]):
         await super().test_get_large_put_get(store, data, json, round_trip=round_trip)
+
+
+@pytest.mark.skipif(condition=not detect_on_macos(), reason="Keyrings do not support large values on MacOS")
+class TestMacOSKeychainStore(BaseTestKeychainStore):
+    pass
+
+
+@pytest.mark.skipif(condition=not detect_on_windows(), reason="Keyrings do not support large values on Windows")
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
+class TestWindowsKeychainStore(BaseTestKeychainStore):
+    @pytest.fixture
+    async def sanitizing_store(self) -> KeyringStore:
+        return KeyringStore(
+            service_name="py-key-value-test",
+            key_sanitization_strategy=KeyringV1KeySanitizationStrategy(),
+            collection_sanitization_strategy=KeyringV1CollectionSanitizationStrategy(),
+        )
+
+    @override
+    async def test_long_collection_name(self, store: KeyringStore, sanitizing_store: ElasticsearchStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            await store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
+
+        await sanitizing_store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
+        assert await sanitizing_store.get(collection="test_collection" * 100, key="test_key") == {"test": "test"}
+
+    @override
+    async def test_long_key_name(self, store: KeyringStore, sanitizing_store: KeyringStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Tests that a long key name will not raise an error."""
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            await store.put(collection="test_collection", key="test_key" * 100, value={"test": "test"})
+
+        await sanitizing_store.put(collection="test_collection", key="test_key" * 100, value={"test": "test"})
+        assert await sanitizing_store.get(collection="test_collection", key="test_key" * 100) == {"test": "test"}

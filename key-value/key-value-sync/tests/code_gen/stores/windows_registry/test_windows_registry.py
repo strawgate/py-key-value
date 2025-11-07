@@ -35,6 +35,27 @@ class TestWindowsRegistryStore(BaseStoreTests):
 
         return WindowsRegistryStore(registry_path=TEST_REGISTRY_PATH, hive="HKEY_CURRENT_USER")
 
+    @pytest.fixture
+    def sanitizing_store(self):
+        from key_value.sync.code_gen.stores.windows_registry.store import (
+            WindowsRegistryStore,
+            WindowsRegistryV1CollectionSanitizationStrategy,
+        )
+
+        return WindowsRegistryStore(
+            registry_path=TEST_REGISTRY_PATH,
+            hive="HKEY_CURRENT_USER",
+            collection_sanitization_strategy=WindowsRegistryV1CollectionSanitizationStrategy(),
+        )
+
     @override
     @pytest.mark.skip(reason="We do not test boundedness of registry stores")
     def test_not_unbounded(self, store: BaseStore): ...
+
+    @override
+    def test_long_collection_name(self, store: "WindowsRegistryStore", sanitizing_store: "WindowsRegistryStore"):  # pyright: ignore[reportIncompatibleMethodOverride]
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
+
+        sanitizing_store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
+        assert sanitizing_store.get(collection="test_collection" * 100, key="test_key") == {"test": "test"}

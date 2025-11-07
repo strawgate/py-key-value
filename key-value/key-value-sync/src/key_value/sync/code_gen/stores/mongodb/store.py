@@ -8,7 +8,7 @@ from typing import Any, overload
 from bson.errors import InvalidDocument
 from key_value.shared.errors import DeserializationError, SerializationError
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitization import HybridSanitizationStrategy
+from key_value.shared.utils.sanitization import HybridSanitizationStrategy, SanitizationStrategy
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
 from key_value.shared.utils.serialization import SerializationAdapter
 from typing_extensions import Self, override
@@ -91,8 +91,21 @@ class MongoDBSerializationAdapter(SerializationAdapter):
         return data
 
 
+class MongoDBV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
+    def __init__(self) -> None:
+        super().__init__(replacement_character="_", max_length=MAX_COLLECTION_LENGTH, allowed_characters=COLLECTION_ALLOWED_CHARACTERS)
+
+
 class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
-    """MongoDB-based key-value store using pymongo."""
+    """MongoDB-based key-value store using pymongo.
+
+    Stores collections as MongoDB collections and stores values in document fields.
+
+    By default, collections are not sanitized. This means that there are character and length restrictions on
+    collection names that may cause errors when trying to get and put entries.
+
+    To avoid issues, you may want to consider leveraging the `MongoDBV1CollectionSanitizationStrategy` strategy.
+    """
 
     _client: MongoClient[dict[str, Any]]
     _db: Database[dict[str, Any]]
@@ -108,6 +121,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         coll_name: str | None = None,
         native_storage: bool = True,
         default_collection: str | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
         """Initialize the MongoDB store.
 
@@ -117,6 +131,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
             coll_name: The name of the MongoDB collection.
             native_storage: Whether to use native BSON storage (True, default) or JSON string storage (False).
             default_collection: The default collection to use if no collection is provided.
+            collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
 
     @overload
@@ -128,6 +143,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         coll_name: str | None = None,
         native_storage: bool = True,
         default_collection: str | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
         """Initialize the MongoDB store.
 
@@ -137,6 +153,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
             coll_name: The name of the MongoDB collection.
             native_storage: Whether to use native BSON storage (True, default) or JSON string storage (False).
             default_collection: The default collection to use if no collection is provided.
+            collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
 
     def __init__(
@@ -148,6 +165,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         coll_name: str | None = None,
         native_storage: bool = True,
         default_collection: str | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
         """Initialize the MongoDB store.
 
@@ -160,6 +178,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
                            Native storage stores values as BSON dicts for better query support.
                            Legacy mode stores values as JSON strings for backward compatibility.
             default_collection: The default collection to use if no collection is provided.
+            collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
 
         if client:
@@ -177,12 +196,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         self._collections_by_name = {}
         self._adapter = MongoDBSerializationAdapter(native_storage=native_storage)
 
-        super().__init__(
-            default_collection=default_collection,
-            collection_sanitization_strategy=HybridSanitizationStrategy(
-                replacement_character="_", max_length=MAX_COLLECTION_LENGTH, allowed_characters=COLLECTION_ALLOWED_CHARACTERS
-            ),
-        )
+        super().__init__(default_collection=default_collection, collection_sanitization_strategy=collection_sanitization_strategy)
 
     @override
     def __enter__(self) -> Self:
