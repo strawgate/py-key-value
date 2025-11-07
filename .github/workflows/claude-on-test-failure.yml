@@ -110,8 +110,7 @@ jobs:
 
           If you detect such a loop (e.g., you see multiple similar bot comments or your own previous analysis comments):
           1. **DO NOT** post another analysis comment
-          2. Instead, post a brief comment stating: "Loop detected: Multiple automated analysis comments found. Stopping to prevent further automated comments. Please review the existing analysis comments."
-          3. Exit immediately without further action
+          2. Exit immediately without further action
 
           # Problems Encountered
           If you encounter any problems during your analysis (e.g., unable to fetch logs, tools not working), document them clearly so the team knows what limitations you faced.
@@ -139,7 +138,7 @@ jobs:
                   "github-research-mcp"
                 ],
                 "env": {
-                  "DISABLE_SUMMARIES": "true",  # Disable verbose summaries for faster analysis
+                  "DISABLE_SUMMARIES": "true",
                   "GITHUB_PERSONAL_ACCESS_TOKEN": "${{ secrets.GITHUB_TOKEN }}"
                 }
               }
@@ -157,7 +156,6 @@ jobs:
             actions: read
 
           prompt: ${{ steps.analysis-prompt.outputs.PROMPT }}
-          track_progress: true
           claude_args: |
             --allowed-tools mcp__repository-summary,mcp__code-search,mcp__github-research,WebSearch,WebFetch,Bash(make:*,git:*)
             --mcp-config /tmp/mcp-config/mcp-servers.json
