@@ -3,7 +3,7 @@ from typing import overload
 
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitization import HashExcessLengthStrategy, PassthroughStrategy, SanitizationStrategy
+from key_value.shared.utils.sanitization import HashExcessLengthStrategy, SanitizationStrategy
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseStore
@@ -70,7 +70,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
 
         super().__init__(
             default_collection=default_collection,
-            key_sanitization_strategy=key_sanitization_strategy or PassthroughStrategy(),
+            key_sanitization_strategy=key_sanitization_strategy,
         )
 
     @override

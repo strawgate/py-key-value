@@ -11,7 +11,6 @@ from key_value.shared.utils.sanitization import (
     AlwaysHashStrategy,
     HashFragmentMode,
     HybridSanitizationStrategy,
-    PassthroughStrategy,
     SanitizationStrategy,
 )
 from key_value.shared.utils.sanitize import (
@@ -245,8 +244,8 @@ class ElasticsearchStore(
 
         super().__init__(
             default_collection=default_collection,
-            collection_sanitization_strategy=collection_sanitization_strategy or PassthroughStrategy(),
-            key_sanitization_strategy=key_sanitization_strategy or PassthroughStrategy(),
+            collection_sanitization_strategy=collection_sanitization_strategy,
+            key_sanitization_strategy=key_sanitization_strategy,
         )
 
     @override

@@ -4,7 +4,7 @@ from typing import Literal
 from winreg import HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE
 
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitization import HybridSanitizationStrategy, PassthroughStrategy, SanitizationStrategy
+from key_value.shared.utils.sanitization import HybridSanitizationStrategy, SanitizationStrategy
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
 from typing_extensions import override
 
@@ -21,16 +21,7 @@ except ImportError as e:
 DEFAULT_REGISTRY_PATH = "Software\\py-key-value"
 DEFAULT_HIVE = "HKEY_CURRENT_USER"
 
-MAX_KEY_LENGTH = 96
 MAX_COLLECTION_LENGTH = 96
-
-
-class WindowsRegistryV1KeySanitizationStrategy(HybridSanitizationStrategy):
-    def __init__(self) -> None:
-        super().__init__(
-            max_length=MAX_KEY_LENGTH,
-            allowed_characters=ALPHANUMERIC_CHARACTERS,
-        )
 
 
 class WindowsRegistryV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
@@ -45,16 +36,17 @@ class WindowsRegistryStore(BaseStore):
     """Windows Registry-based key-value store.
 
     This store uses the Windows Registry to persist key-value pairs. Each entry is stored
-    as a string value in the registry under HKEY_CURRENT_USER\\Software\\{root}\\{collection}\\{key}.
+    as a string value in the registry under HKEY_CURRENT_USER\\Software\\{root}\\{collection}
+    with the key being a registry reg_sz value named `{key}`.
 
-    This store has specific restrictions on what is allowed in keys and collections. Keys and collections are not sanitized
+    This store has specific restrictions on what is allowed in collections. Collections are not sanitized
     by default which may result in errors when using the store.
 
-    To avoid issues, you may want to consider leveraging the `WindowsRegistryV1KeySanitizationStrategy` and
-    `WindowsRegistryV1CollectionSanitizationStrategy` strategies.
+    To avoid issues, you may want to consider leveraging the `WindowsRegistryV1CollectionSanitizationStrategy`.
 
     Note: TTL is not natively supported by Windows Registry, so TTL information is stored
-    within the JSON payload and checked at retrieval time.
+    within the JSON payload and checked at retrieval time. The store does not currently cull
+    expired entries.
     """
 
     def __init__(
@@ -80,8 +72,8 @@ class WindowsRegistryStore(BaseStore):
 
         super().__init__(
             default_collection=default_collection,
-            key_sanitization_strategy=key_sanitization_strategy or PassthroughStrategy(),
-            collection_sanitization_strategy=collection_sanitization_strategy or PassthroughStrategy(),
+            key_sanitization_strategy=key_sanitization_strategy,
+            collection_sanitization_strategy=collection_sanitization_strategy,
         )
 
     def _get_registry_path(self, *, collection: str) -> str:

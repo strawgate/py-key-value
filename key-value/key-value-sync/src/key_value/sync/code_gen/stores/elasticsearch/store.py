@@ -10,13 +10,7 @@ from elastic_transport import ObjectApiResponse
 from elastic_transport import SerializationError as ElasticsearchSerializationError
 from key_value.shared.errors import DeserializationError, SerializationError
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitization import (
-    AlwaysHashStrategy,
-    HashFragmentMode,
-    HybridSanitizationStrategy,
-    PassthroughStrategy,
-    SanitizationStrategy,
-)
+from key_value.shared.utils.sanitization import AlwaysHashStrategy, HashFragmentMode, HybridSanitizationStrategy, SanitizationStrategy
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, LOWERCASE_ALPHABET, NUMBERS, UPPERCASE_ALPHABET
 from key_value.shared.utils.serialization import SerializationAdapter
 from key_value.shared.utils.time_to_live import now_as_epoch
@@ -224,8 +218,8 @@ class ElasticsearchStore(
 
         super().__init__(
             default_collection=default_collection,
-            collection_sanitization_strategy=collection_sanitization_strategy or PassthroughStrategy(),
-            key_sanitization_strategy=key_sanitization_strategy or PassthroughStrategy(),
+            collection_sanitization_strategy=collection_sanitization_strategy,
+            key_sanitization_strategy=key_sanitization_strategy,
         )
 
     @override

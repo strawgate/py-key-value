@@ -2,7 +2,7 @@
 
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitization import HybridSanitizationStrategy, PassthroughStrategy, SanitizationStrategy
+from key_value.shared.utils.sanitization import HybridSanitizationStrategy, SanitizationStrategy
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
 from typing_extensions import override
 
@@ -77,8 +77,8 @@ class KeyringStore(BaseStore):
 
         super().__init__(
             default_collection=default_collection,
-            collection_sanitization_strategy=collection_sanitization_strategy or PassthroughStrategy(),
-            key_sanitization_strategy=key_sanitization_strategy or PassthroughStrategy(),
+            collection_sanitization_strategy=collection_sanitization_strategy,
+            key_sanitization_strategy=key_sanitization_strategy,
         )
 
     @override
