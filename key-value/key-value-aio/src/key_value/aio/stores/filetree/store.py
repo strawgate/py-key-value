@@ -63,7 +63,6 @@ def _sanitized_collection_info_path(directory: AsyncPath | Path, collection: str
 
 
 def _sanitize_file_name(directory: AsyncPath | Path, key: str) -> str:
-
     # We need to account for our current location in the filesystem to stay under the max path length
     max_path_length: int = get_max_path_length(root=directory)
     current_path_length: int = len(directory.as_posix())
