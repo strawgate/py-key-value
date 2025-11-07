@@ -88,7 +88,7 @@ ALLOWED_INDEX_CHARACTERS: str = LOWERCASE_ALPHABET + NUMBERS + "_" + "-" + "."
 
 
 class ElasticsearchSerializationAdapter(SerializationAdapter):
-    """Adapter for Elasticsearch with support for native and string storage modes."""
+    """Adapter for Elasticsearch."""
 
     def __init__(self) -> None:
         """Initialize the Elasticsearch adapter"""
@@ -217,8 +217,6 @@ class ElasticsearchStore(
             api_key: The api key to use.
             index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
             default_collection: The default collection to use if no collection is provided.
-            native_storage: Whether to use native storage mode (flattened field type) or serialize
-                            all values to JSON strings. Defaults to True.
             key_sanitization_strategy: The sanitization strategy to use for keys.
             collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
