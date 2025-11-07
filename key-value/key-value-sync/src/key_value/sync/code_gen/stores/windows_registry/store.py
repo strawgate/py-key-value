@@ -45,8 +45,8 @@ class WindowsRegistryStore(BaseStore):
     This store uses the Windows Registry to persist key-value pairs. Each entry is stored
     as a string value in the registry under HKEY_CURRENT_USER\\Software\\{root}\\{collection}\\{key}.
 
-    By default, keys and collections are not sanitized. This means that there are character and length restrictions on
-    keys and collections that may cause errors when trying to get and put entries.
+    This store has specific restrictions on what is allowed in keys and collections. Keys and collections are not sanitized
+    by default which may result in errors when using the store.
 
     To avoid issues, you may want to consider leveraging the `WindowsRegistryV1SanitizationStrategy` strategy.
 

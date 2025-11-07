@@ -24,7 +24,14 @@ MAX_KEY_COLLECTION_LENGTH = 256
 ALLOWED_KEY_COLLECTION_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
 
-class KeyringV1SanitizationStrategy(HybridSanitizationStrategy):
+class KeyringV1KeySanitizationStrategy(HybridSanitizationStrategy):
+    def __init__(self) -> None:
+        super().__init__(
+            replacement_character="_", max_length=MAX_KEY_COLLECTION_LENGTH, allowed_characters=ALLOWED_KEY_COLLECTION_CHARACTERS
+        )
+
+
+class KeyringV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
     def __init__(self) -> None:
         super().__init__(
             replacement_character="_", max_length=MAX_KEY_COLLECTION_LENGTH, allowed_characters=ALLOWED_KEY_COLLECTION_CHARACTERS
@@ -34,13 +41,14 @@ class KeyringV1SanitizationStrategy(HybridSanitizationStrategy):
 class KeyringStore(BaseStore):
     """Python keyring-based key-value store using keyring library.
 
-    This store uses the Python keyring to persist key-value pairs. Each entry is stored
+    This store uses the system's keyring to persist key-value pairs. Each entry is stored
     as a password in the keychain with the combination of collection and key as the username.
 
-    By default, keys and collections are not sanitized. This means that there are character and length restrictions on
-    keys and collections that may cause errors when trying to get and put entries.
+    This store has specific restrictions on what is allowed in keys and collections. Keys and collections are not sanitized
+    by default which may result in errors when using the store.
 
-    To avoid issues, you may want to consider leveraging the `KeyringV1SanitizationStrategy` strategy.
+    To avoid issues, you may want to consider leveraging the `KeyringV1KeySanitizationStrategy`
+    and `KeyringV1CollectionSanitizationStrategy` strategies.
 
     Note: TTL is not natively supported by Python keyring, so TTL information is stored
     within the JSON payload and checked at retrieval time.

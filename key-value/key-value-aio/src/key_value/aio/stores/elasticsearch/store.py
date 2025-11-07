@@ -138,8 +138,8 @@ class ElasticsearchStore(
 
     Stores collections in their own indices and stores values in Flattened fields.
 
-    By default, keys and collections are not sanitized. This means that there are character and length restrictions on
-    keys and collections that may cause errors when trying to get and put entries.
+    This store has specific restrictions on what is allowed in keys and collections. Keys and collections are not sanitized
+    by default which may result in errors when using the store.
 
     To avoid issues, you may want to consider leveraging the `ElasticsearchV1KeySanitizationStrategy` and
     `ElasticsearchV1CollectionSanitizationStrategy` strategies.
