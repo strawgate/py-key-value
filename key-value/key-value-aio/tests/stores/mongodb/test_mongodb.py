@@ -14,7 +14,10 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.mongodb import MongoDBStore
-from key_value.aio.stores.mongodb.store import MongoDBSerializationAdapter
+from key_value.aio.stores.mongodb.store import (
+    MongoDBSerializationAdapter,
+    MongoDBV1CollectionSanitizationStrategy,
+)
 from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -118,12 +121,29 @@ class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
 
-    async def test_mongodb_collection_name_sanitization(self, store: MongoDBStore):
-        """Tests that a special characters in the collection name will not raise an error."""
-        await store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
-        assert await store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
+    @override
+    async def test_long_collection_name(self, store: MongoDBStore, sanitizing_store: MongoDBStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            await store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
 
-        collections = store._collections_by_name.values()
+        await sanitizing_store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
+        assert await sanitizing_store.get(collection="test_collection" * 100, key="test_key") == {"test": "test"}
+
+    @override
+    async def test_special_characters_in_collection_name(self, store: MongoDBStore, sanitizing_store: MongoDBStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Tests that special characters in the collection name will not raise an error."""
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            await store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
+
+        await sanitizing_store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
+        assert await sanitizing_store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
+
+    async def test_mongodb_collection_name_sanitization(self, sanitizing_store: MongoDBStore):
+        """Tests that the V1 sanitization strategy produces the expected collection names."""
+        await sanitizing_store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
+        assert await sanitizing_store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
+
+        collections = sanitizing_store._collections_by_name.values()
         collection_names = [collection.name for collection in collections]
         assert collection_names == snapshot(["S_test_collection_-daf4a2ec"])
 
@@ -136,6 +156,19 @@ class TestMongoDBStoreNativeMode(BaseMongoDBStoreTests):
     @pytest.fixture
     async def store(self, setup_mongodb: None) -> MongoDBStore:
         store = MongoDBStore(url=f"mongodb://{MONGODB_HOST}:{MONGODB_HOST_PORT}", db_name=f"{MONGODB_TEST_DB}-native", native_storage=True)
+
+        await clean_mongodb_database(store=store)
+
+        return store
+
+    @pytest.fixture
+    async def sanitizing_store(self, setup_mongodb: None) -> MongoDBStore:
+        store = MongoDBStore(
+            url=f"mongodb://{MONGODB_HOST}:{MONGODB_HOST_PORT}",
+            db_name=f"{MONGODB_TEST_DB}-native-sanitizing",
+            native_storage=True,
+            collection_sanitization_strategy=MongoDBV1CollectionSanitizationStrategy(),
+        )
 
         await clean_mongodb_database(store=store)
 
@@ -185,6 +218,19 @@ class TestMongoDBStoreNonNativeMode(BaseMongoDBStoreTests):
     @pytest.fixture
     async def store(self, setup_mongodb: None) -> MongoDBStore:
         store = MongoDBStore(url=f"mongodb://{MONGODB_HOST}:{MONGODB_HOST_PORT}", db_name=MONGODB_TEST_DB, native_storage=False)
+
+        await clean_mongodb_database(store=store)
+
+        return store
+
+    @pytest.fixture
+    async def sanitizing_store(self, setup_mongodb: None) -> MongoDBStore:
+        store = MongoDBStore(
+            url=f"mongodb://{MONGODB_HOST}:{MONGODB_HOST_PORT}",
+            db_name=f"{MONGODB_TEST_DB}-sanitizing",
+            native_storage=False,
+            collection_sanitization_strategy=MongoDBV1CollectionSanitizationStrategy(),
+        )
 
         await clean_mongodb_database(store=store)
 
