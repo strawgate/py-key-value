@@ -59,11 +59,3 @@ class TestWindowsRegistryStore(BaseStoreTests):
 
         sanitizing_store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
         assert sanitizing_store.get(collection="test_collection" * 100, key="test_key") == {"test": "test"}
-
-    @override
-    def test_long_key_name(self, store: "WindowsRegistryStore", sanitizing_store: "WindowsRegistryStore"):  # pyright: ignore[reportIncompatibleMethodOverride]
-        with pytest.raises(Exception):  # noqa: B017, PT011
-            store.put(collection="test_collection", key="test_key" * 100, value={"test": "test"})
-
-        sanitizing_store.put(collection="test_collection", key="test_key" * 100, value={"test": "test"})
-        assert sanitizing_store.get(collection="test_collection", key="test_key" * 100) == {"test": "test"}
