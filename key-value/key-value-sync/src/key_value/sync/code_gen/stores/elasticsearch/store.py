@@ -6,9 +6,6 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, overload
 
-from elastic_transport import ObjectApiResponse
-from elastic_transport import SerializationError as ElasticsearchSerializationError
-from elasticsearch.exceptions import BadRequestError
 from key_value.shared.errors import DeserializationError, SerializationError
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitization import AlwaysHashStrategy, HashFragmentMode, HybridSanitizationStrategy, SanitizationStrategy
@@ -28,7 +25,10 @@ from key_value.sync.code_gen.stores.base import (
 from key_value.sync.code_gen.stores.elasticsearch.utils import LessCapableJsonSerializer, LessCapableNdjsonSerializer, new_bulk_action
 
 try:
+    from elastic_transport import ObjectApiResponse
+    from elastic_transport import SerializationError as ElasticsearchSerializationError
     from elasticsearch import Elasticsearch
+    from elasticsearch.exceptions import BadRequestError
 
     from key_value.sync.code_gen.stores.elasticsearch.utils import (
         get_aggregations_from_body,
