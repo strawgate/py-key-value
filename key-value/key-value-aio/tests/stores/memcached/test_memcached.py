@@ -107,7 +107,15 @@ class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
         value = await memcached_client.get(key=b"test::test_key")
         assert value is not None
         value_as_dict = json.loads(value.decode("utf-8"))
-        assert value_as_dict == snapshot({"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}})
+        assert value_as_dict == snapshot(
+            {
+                "collection": "test",
+                "created_at": IsDatetime(iso_string=True),
+                "key": "test_key",
+                "value": {"age": 30, "name": "Alice"},
+                "version": 1,
+            }
+        )
 
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
 
@@ -116,8 +124,11 @@ class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
         value_as_dict = json.loads(value.decode("utf-8"))
         assert value_as_dict == snapshot(
             {
+                "collection": "test",
                 "created_at": IsDatetime(iso_string=True),
                 "expires_at": IsDatetime(iso_string=True),
+                "key": "test_key",
                 "value": {"age": 30, "name": "Alice"},
+                "version": 1,
             }
         )

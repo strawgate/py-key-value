@@ -126,7 +126,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
     ) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        json_value: str = self._serialization_adapter.dump_json(entry=managed_entry)
+        json_value: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
         expiry: ExpirySet | None = ExpirySet(expiry_type=ExpiryType.SEC, value=int(managed_entry.ttl)) if managed_entry.ttl else None
 
