@@ -9,9 +9,9 @@ from typing import Any
 
 from aiofile import async_open as aopen
 from anyio import Path as AsyncPath
-from key_value.shared.errors import StoreSetupError
 from key_value.shared.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
-from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, sanitize_string
+from key_value.shared.utils.sanitization import HybridSanitizationStrategy, SanitizationStrategy
+from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
 from key_value.shared.utils.serialization import BasicSerializationAdapter, SerializationAdapter
 from key_value.shared.utils.time_to_live import now
 from typing_extensions import Self, override
@@ -30,62 +30,64 @@ MAX_FILE_NAME_LENGTH = 255
 FILE_NAME_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
 
 
-def validate_in_directory(path: AsyncPath | Path, directory: AsyncPath | Path) -> None:
-    if not path.is_relative_to(Path(directory)):
-        raise StoreSetupError(message=f"Path {path} would escape base directory")
+def get_max_path_length(root: Path | AsyncPath) -> int:
+    return os.pathconf(path=Path(root), name="PC_PATH_MAX")
 
 
-def _sanitize_collection_name(directory: AsyncPath | Path, collection: str) -> str:
-    directory_length: int = len(directory.as_posix())
-    max_directory_length: int = get_max_path_length(root=directory)
-    minimum_room_for_file_name: int = 22  # 5 for .json extension, 16 for minimum file name length
-
-    return sanitize_string(
-        value=collection,
-        replacement_character="_",
-        max_length=max_directory_length - directory_length - minimum_room_for_file_name,
-        allowed_characters=DIRECTORY_ALLOWED_CHARACTERS,
-    )
+def get_max_file_name_length(root: Path | AsyncPath) -> int:
+    return os.pathconf(path=Path(root), name="PC_NAME_MAX")
 
 
-def _sanitized_collection_path(directory: AsyncPath | Path, collection: str) -> AsyncPath:
-    sanitized_collection = _sanitize_collection_name(directory=directory, collection=collection)
-    sanitized_collection_path = directory / sanitized_collection
+class FileTreeV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
+    """V1 sanitization strategy for FileTreeStore collections.
 
-    validate_in_directory(path=sanitized_collection_path, directory=directory)
+    This strategy sanitizes collection names to comply with filesystem directory naming requirements.
+    It replaces invalid characters with underscores and truncates to fit within directory name length limits.
 
-    return AsyncPath(sanitized_collection_path)
+    Collection names (directories) are subject to the same length limit as file names (typically 255 bytes).
+    The sanitized name is also used for the collection info file (with `-info.json` suffix), so we need
+    to leave room for that suffix (10 characters).
+    """
 
+    def __init__(self, directory: Path | AsyncPath) -> None:
+        # Directory names are subject to the same NAME_MAX limit as file names
+        max_name_length: int = get_max_file_name_length(root=directory)
 
-def _sanitized_collection_info_path(directory: AsyncPath | Path, collection: str) -> AsyncPath:
-    sanitized_collection = _sanitize_collection_name(directory=directory, collection=collection)
-    return AsyncPath(directory / f"{sanitized_collection}-info.json")
+        # Leave room for `-info.json` suffix (10 chars) that's added to the metadata file name
+        suffix_length = 10
 
-
-def _sanitize_file_name(directory: AsyncPath | Path, key: str) -> str:
-    # We need to account for our current location in the filesystem to stay under the max path length
-    max_path_length: int = get_max_path_length(root=directory)
-    current_path_length: int = len(directory.as_posix())
-
-    remaining_length: int = max_path_length - current_path_length
-
-    # We need to account for limits on file names
-    max_file_name_length: int = get_max_file_name_length(root=directory) - 5
-
-    # We need to stay under both limits
-    max_length = min(remaining_length, max_file_name_length)
-
-    return sanitize_string(
-        value=key,
-        replacement_character="_",
-        max_length=max_length,
-        allowed_characters=FILE_NAME_ALLOWED_CHARACTERS,
-    )
+        super().__init__(
+            replacement_character="_",
+            max_length=max_name_length - suffix_length,
+            allowed_characters=DIRECTORY_ALLOWED_CHARACTERS,
+        )
 
 
-def _sanitized_file_path(directory: AsyncPath | Path, key: str) -> AsyncPath:
-    sanitized_file_name = _sanitize_file_name(directory=directory, key=key)
-    return AsyncPath(directory / f"{sanitized_file_name}.json")
+class FileTreeV1KeySanitizationStrategy(HybridSanitizationStrategy):
+    """V1 sanitization strategy for FileTreeStore keys.
+
+    This strategy sanitizes key names to comply with filesystem file naming requirements.
+    It replaces invalid characters with underscores and truncates to fit within both path
+    length limits and filename length limits.
+    """
+
+    def __init__(self, directory: Path | AsyncPath) -> None:
+        # We need to account for our current location in the filesystem to stay under the max path length
+        max_path_length: int = get_max_path_length(root=directory)
+        current_path_length: int = len(Path(directory).as_posix())
+        remaining_length: int = max_path_length - current_path_length
+
+        # We need to account for limits on file names
+        max_file_name_length: int = get_max_file_name_length(root=directory) - 5  # 5 for .json extension
+
+        # We need to stay under both limits
+        max_length = min(remaining_length, max_file_name_length)
+
+        super().__init__(
+            replacement_character="_",
+            max_length=max_length,
+            allowed_characters=FILE_NAME_ALLOWED_CHARACTERS,
+        )
 
 
 @dataclass(kw_only=True)
@@ -99,6 +101,7 @@ class DiskCollectionInfo:
     created_at: datetime
 
     serialization_adapter: SerializationAdapter
+    key_sanitization_strategy: SanitizationStrategy
 
     async def _list_file_paths(self) -> AsyncGenerator[AsyncPath]:
         async for item_path in AsyncPath(self.directory).iterdir():
@@ -109,7 +112,8 @@ class DiskCollectionInfo:
             yield item_path
 
     async def get_entry(self, *, key: str) -> ManagedEntry | None:
-        key_path: AsyncPath = _sanitized_file_path(directory=self.directory, key=key)
+        sanitized_key = self.key_sanitization_strategy.sanitize(value=key)
+        key_path: AsyncPath = AsyncPath(self.directory / f"{sanitized_key}.json")
 
         if not await key_path.exists():
             return None
@@ -123,11 +127,13 @@ class DiskCollectionInfo:
             yield self.serialization_adapter.load_dict(data=await read_file(file=key_path))
 
     async def put_entry(self, *, key: str, data: ManagedEntry) -> None:
-        key_path: AsyncPath = _sanitized_file_path(directory=self.directory, key=key)
+        sanitized_key = self.key_sanitization_strategy.sanitize(value=key)
+        key_path: AsyncPath = AsyncPath(self.directory / f"{sanitized_key}.json")
         await write_file(file=key_path, text=self.serialization_adapter.dump_json(entry=data))
 
     async def delete_entry(self, *, key: str) -> bool:
-        key_path: AsyncPath = _sanitized_file_path(directory=self.directory, key=key)
+        sanitized_key = self.key_sanitization_strategy.sanitize(value=key)
+        key_path: AsyncPath = AsyncPath(self.directory / f"{sanitized_key}.json")
 
         if not await key_path.exists():
             return False
@@ -152,37 +158,56 @@ class DiskCollectionInfo:
         return dump_to_json(obj=self.to_dict())
 
     @classmethod
-    def from_dict(cls, *, data: dict[str, Any]) -> Self:
+    def from_dict(
+        cls, *, data: dict[str, Any], serialization_adapter: SerializationAdapter, key_sanitization_strategy: SanitizationStrategy
+    ) -> Self:
         return cls(
             version=data["version"],
             collection=data["collection"],
             directory=AsyncPath(data["directory"]),
             created_at=datetime.fromisoformat(data["created_at"]),
-            serialization_adapter=BasicSerializationAdapter(),
+            serialization_adapter=serialization_adapter,
+            key_sanitization_strategy=key_sanitization_strategy,
         )
 
     @classmethod
-    async def from_file(cls, *, file: AsyncPath) -> Self:
+    async def from_file(
+        cls, *, file: AsyncPath, serialization_adapter: SerializationAdapter, key_sanitization_strategy: SanitizationStrategy
+    ) -> Self:
         if data := await read_file(file=file):
             data["directory"] = AsyncPath(data["directory"]).resolve()
-            return cls.from_dict(data=data)
+            return cls.from_dict(
+                data=data, serialization_adapter=serialization_adapter, key_sanitization_strategy=key_sanitization_strategy
+            )
 
         msg = f"File {file} not found"
 
         raise FileNotFoundError(msg)
 
     @classmethod
-    async def create_or_get_info(cls, *, data_directory: AsyncPath, metadata_directory: AsyncPath, collection: str) -> Self:
-        info_file: AsyncPath = _sanitized_collection_info_path(directory=metadata_directory, collection=collection)
+    async def create_or_get_info(
+        cls,
+        *,
+        data_directory: AsyncPath,
+        metadata_directory: AsyncPath,
+        collection: str,
+        sanitized_collection: str,
+        serialization_adapter: SerializationAdapter,
+        key_sanitization_strategy: SanitizationStrategy,
+    ) -> Self:
+        info_file: AsyncPath = AsyncPath(metadata_directory / f"{sanitized_collection}-info.json")
 
         if await info_file.exists():
-            return await cls.from_file(file=info_file)
+            return await cls.from_file(
+                file=info_file, serialization_adapter=serialization_adapter, key_sanitization_strategy=key_sanitization_strategy
+            )
 
         info = cls(
             collection=collection,
             directory=data_directory,
             created_at=now(),
-            serialization_adapter=BasicSerializationAdapter(),
+            serialization_adapter=serialization_adapter,
+            key_sanitization_strategy=key_sanitization_strategy,
         )
 
         await write_file(file=info_file, text=info.to_json())
@@ -202,14 +227,6 @@ class DiskCollectionInfo:
     #         if await self.cull_entry(key=key.stem, serialization_adapter=serialization_adapter):
     #             deleted_count += 1
     #     return deleted_count
-
-
-def get_max_path_length(root: Path | AsyncPath) -> int:
-    return os.pathconf(path=Path(root), name="PC_PATH_MAX")
-
-
-def get_max_file_name_length(root: Path | AsyncPath) -> int:
-    return os.pathconf(path=Path(root), name="PC_NAME_MAX")
 
 
 async def read_file(file: AsyncPath) -> dict[str, Any]:
@@ -239,6 +256,12 @@ class FileTreeStore(BaseStore):
             {collection_2}/
                 {key_3}.json
 
+    By default, collections and keys are not sanitized. This means that filesystem limitations
+    on path lengths and special characters may cause errors when trying to get and put entries.
+
+    To avoid issues, you may want to consider leveraging the `FileTreeV1CollectionSanitizationStrategy`
+    and `FileTreeV1KeySanitizationStrategy` strategies.
+
     Warning:
         This store is intended for development and testing purposes only.
         It is not suitable for production use due to:
@@ -262,13 +285,18 @@ class FileTreeStore(BaseStore):
         data_directory: Path | str,
         metadata_directory: Path | str | None = None,
         serialization_adapter: SerializationAdapter | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
         default_collection: str | None = None,
     ) -> None:
         """Initialize the file-tree store.
 
         Args:
-            directory: The base directory to use for storing collections and keys.
+            data_directory: The base directory to use for storing collections and keys.
+            metadata_directory: The directory to use for storing metadata. Defaults to data_directory.
             serialization_adapter: The serialization adapter to use for the store.
+            key_sanitization_strategy: The sanitization strategy to use for keys.
+            collection_sanitization_strategy: The sanitization strategy to use for collections.
             default_collection: The default collection to use if no collection is provided.
         """
         data_directory = Path(data_directory).resolve()
@@ -283,13 +311,14 @@ class FileTreeStore(BaseStore):
         self._data_directory = AsyncPath(data_directory)
         self._metadata_directory = AsyncPath(metadata_directory)
 
-        self._collection_paths = {}
         self._collection_infos = {}
 
         self._stable_api = False
 
         super().__init__(
             serialization_adapter=serialization_adapter or BasicSerializationAdapter(),
+            key_sanitization_strategy=key_sanitization_strategy,
+            collection_sanitization_strategy=collection_sanitization_strategy,
             default_collection=default_collection,
         )
 
@@ -305,7 +334,11 @@ class FileTreeStore(BaseStore):
 
     async def _load_collection_infos(self) -> None:
         async for entry in self._get_metadata_entries():
-            collection_info: DiskCollectionInfo = await DiskCollectionInfo.from_file(file=entry)
+            collection_info: DiskCollectionInfo = await DiskCollectionInfo.from_file(
+                file=entry,
+                serialization_adapter=self._serialization_adapter,
+                key_sanitization_strategy=self._key_sanitization_strategy,
+            )
             self._collection_infos[collection_info.collection] = collection_info
 
     # async def _generate_collection_path(self, collection: str) -> AsyncPath:
@@ -344,14 +377,20 @@ class FileTreeStore(BaseStore):
         if collection in self._collection_infos:
             return
 
-        data_directory: AsyncPath = _sanitized_collection_path(directory=self._data_directory, collection=collection)
+        # Sanitize the collection name using the strategy
+        sanitized_collection = self._sanitize_collection(collection=collection)
 
+        # Create the collection directory under the data directory
+        data_directory: AsyncPath = AsyncPath(self._data_directory / sanitized_collection)
         await data_directory.mkdir(parents=True, exist_ok=True)
 
         self._collection_infos[collection] = await DiskCollectionInfo.create_or_get_info(
-            data_directory=self._data_directory,
+            data_directory=data_directory,
             metadata_directory=self._metadata_directory,
             collection=collection,
+            sanitized_collection=sanitized_collection,
+            serialization_adapter=self._serialization_adapter,
+            key_sanitization_strategy=self._key_sanitization_strategy,
         )
 
     @override
