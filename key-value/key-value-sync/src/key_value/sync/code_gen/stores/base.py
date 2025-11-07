@@ -17,6 +17,7 @@ from key_value.shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.shared.errors import StoreSetupError
 from key_value.shared.type_checking.bear_spray import bear_enforce
 from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.sanitization import PassthroughStrategy, SanitizationStrategy
 from key_value.shared.utils.serialization import BasicSerializationAdapter, SerializationAdapter
 from key_value.shared.utils.time_to_live import prepare_entry_timestamps
 from typing_extensions import Self, override
@@ -75,6 +76,8 @@ class BaseStore(KeyValueProtocol, ABC):
     _setup_collection_complete: defaultdict[str, bool]
 
     _serialization_adapter: SerializationAdapter
+    _key_sanitization_strategy: SanitizationStrategy
+    _collection_sanitization_strategy: SanitizationStrategy
 
     _seed: FROZEN_SEED_DATA_TYPE
 
@@ -84,6 +87,8 @@ class BaseStore(KeyValueProtocol, ABC):
         self,
         *,
         serialization_adapter: SerializationAdapter | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
         default_collection: str | None = None,
         seed: SEED_DATA_TYPE | None = None,
     ) -> None:
@@ -91,6 +96,8 @@ class BaseStore(KeyValueProtocol, ABC):
 
         Args:
             serialization_adapter: The serialization adapter to use for the store.
+            key_sanitization_strategy: The sanitization strategy to use for keys.
+            collection_sanitization_strategy: The sanitization strategy to use for collections.
             default_collection: The default collection to use if no collection is provided.
                 Defaults to "default_collection".
             seed: Optional seed data to pre-populate the store. Format: {collection: {key: {field: value, ...}}}.
@@ -109,6 +116,9 @@ class BaseStore(KeyValueProtocol, ABC):
 
         self._serialization_adapter = serialization_adapter or BasicSerializationAdapter()
 
+        self._key_sanitization_strategy = key_sanitization_strategy or PassthroughStrategy()
+        self._collection_sanitization_strategy = collection_sanitization_strategy or PassthroughStrategy()
+
         if not hasattr(self, "_stable_api"):
             self._stable_api = False
 
@@ -122,6 +132,17 @@ class BaseStore(KeyValueProtocol, ABC):
 
     def _setup_collection(self, *, collection: str) -> None:
         """Initialize the collection (called once before first use of the collection)."""
+
+    def _sanitize_collection_and_key(self, collection: str, key: str) -> tuple[str, str]:
+        return (self._sanitize_collection(collection=collection), self._sanitize_key(key=key))
+
+    def _sanitize_collection(self, collection: str) -> str:
+        self._collection_sanitization_strategy.validate(value=collection)
+        return self._collection_sanitization_strategy.sanitize(value=collection)
+
+    def _sanitize_key(self, key: str) -> str:
+        self._key_sanitization_strategy.validate(value=key)
+        return self._key_sanitization_strategy.sanitize(value=key)
 
     def _seed_store(self) -> None:
         """Seed the store with the data from the seed."""

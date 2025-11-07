@@ -14,7 +14,10 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.mongodb import MongoDBStore
-from key_value.aio.stores.mongodb.store import MongoDBSerializationAdapter
+from key_value.aio.stores.mongodb.store import (
+    MongoDBSerializationAdapter,
+    MongoDBV1CollectionSanitizationStrategy,
+)
 from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -118,13 +121,31 @@ class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
 
-    async def test_mongodb_collection_name_sanitization(self, store: MongoDBStore):
-        """Tests that a special characters in the collection name will not raise an error."""
-        await store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
-        assert await store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
+    @override
+    async def test_long_collection_name(self, store: MongoDBStore, sanitizing_store: MongoDBStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            await store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
 
-        collections = await store.collections()
-        assert collections == snapshot(["test_collection_-daf4a2ec"])
+        await sanitizing_store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
+        assert await sanitizing_store.get(collection="test_collection" * 100, key="test_key") == {"test": "test"}
+
+    @override
+    async def test_special_characters_in_collection_name(self, store: MongoDBStore, sanitizing_store: MongoDBStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Tests that special characters in the collection name will not raise an error."""
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            await store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
+
+        await sanitizing_store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
+        assert await sanitizing_store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
+
+    async def test_mongodb_collection_name_sanitization(self, sanitizing_store: MongoDBStore):
+        """Tests that the V1 sanitization strategy produces the expected collection names."""
+        await sanitizing_store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
+        assert await sanitizing_store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
+
+        collections = sanitizing_store._collections_by_name.values()
+        collection_names = [collection.name for collection in collections]
+        assert collection_names == snapshot(["S_test_collection_-daf4a2ec"])
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
@@ -140,13 +161,26 @@ class TestMongoDBStoreNativeMode(BaseMongoDBStoreTests):
 
         return store
 
+    @pytest.fixture
+    async def sanitizing_store(self, setup_mongodb: None) -> MongoDBStore:
+        store = MongoDBStore(
+            url=f"mongodb://{MONGODB_HOST}:{MONGODB_HOST_PORT}",
+            db_name=f"{MONGODB_TEST_DB}-native-sanitizing",
+            native_storage=True,
+            collection_sanitization_strategy=MongoDBV1CollectionSanitizationStrategy(),
+        )
+
+        await clean_mongodb_database(store=store)
+
+        return store
+
     async def test_value_stored_as_bson_dict(self, store: MongoDBStore):
         """Verify values are stored as BSON dicts, not JSON strings."""
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
         # Get the raw MongoDB document
         await store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
         doc = await collection.find_one({"key": "test_key"})
 
@@ -162,7 +196,7 @@ class TestMongoDBStoreNativeMode(BaseMongoDBStoreTests):
     async def test_migration_from_legacy_mode(self, store: MongoDBStore):
         """Verify native mode can read legacy JSON string data."""
         await store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
 
         await collection.insert_one(
@@ -189,13 +223,26 @@ class TestMongoDBStoreNonNativeMode(BaseMongoDBStoreTests):
 
         return store
 
+    @pytest.fixture
+    async def sanitizing_store(self, setup_mongodb: None) -> MongoDBStore:
+        store = MongoDBStore(
+            url=f"mongodb://{MONGODB_HOST}:{MONGODB_HOST_PORT}",
+            db_name=f"{MONGODB_TEST_DB}-sanitizing",
+            native_storage=False,
+            collection_sanitization_strategy=MongoDBV1CollectionSanitizationStrategy(),
+        )
+
+        await clean_mongodb_database(store=store)
+
+        return store
+
     async def test_value_stored_as_json(self, store: MongoDBStore):
         """Verify values are stored as JSON strings."""
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
         # Get the raw MongoDB document
         await store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
         doc = await collection.find_one({"key": "test_key"})
 
@@ -211,7 +258,7 @@ class TestMongoDBStoreNonNativeMode(BaseMongoDBStoreTests):
     async def test_migration_from_native_mode(self, store: MongoDBStore):
         """Verify non-native mode can read native mode data."""
         await store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = store._sanitize_collection_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        sanitized_collection = store._sanitize_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
         collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
 
         await collection.insert_one(

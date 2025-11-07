@@ -11,7 +11,11 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.elasticsearch import ElasticsearchStore
-from key_value.aio.stores.elasticsearch.store import ElasticsearchSerializationAdapter
+from key_value.aio.stores.elasticsearch.store import (
+    ElasticsearchSerializationAdapter,
+    ElasticsearchV1CollectionSanitizationStrategy,
+    ElasticsearchV1KeySanitizationStrategy,
+)
 from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -55,31 +59,7 @@ def test_managed_entry_document_conversion():
     expires_at = created_at + timedelta(seconds=10)
 
     managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
-    adapter = ElasticsearchSerializationAdapter(native_storage=False)
-    document = adapter.dump_dict(entry=managed_entry)
-
-    assert document == snapshot(
-        {
-            "value": {"string": '{"test": "test"}'},
-            "created_at": "2025-01-01T00:00:00+00:00",
-            "expires_at": "2025-01-01T00:00:10+00:00",
-        }
-    )
-
-    round_trip_managed_entry = adapter.load_dict(data=document)
-
-    assert round_trip_managed_entry.value == managed_entry.value
-    assert round_trip_managed_entry.created_at == created_at
-    assert round_trip_managed_entry.ttl == IsFloat(lt=0)
-    assert round_trip_managed_entry.expires_at == expires_at
-
-
-def test_managed_entry_document_conversion_native_storage():
-    created_at = datetime(year=2025, month=1, day=1, hour=0, minute=0, second=0, tzinfo=timezone.utc)
-    expires_at = created_at + timedelta(seconds=10)
-
-    managed_entry = ManagedEntry(value={"test": "test"}, created_at=created_at, expires_at=expires_at)
-    adapter = ElasticsearchSerializationAdapter(native_storage=True)
+    adapter = ElasticsearchSerializationAdapter()
     document = adapter.dump_dict(entry=managed_entry)
 
     assert document == snapshot(
@@ -98,7 +78,9 @@ def test_managed_entry_document_conversion_native_storage():
     assert round_trip_managed_entry.expires_at == expires_at
 
 
-class BaseTestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
+@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
+class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=ELASTICSEARCH_VERSIONS_TO_TEST)
     async def setup_elasticsearch(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
         version = request.param
@@ -119,7 +101,24 @@ class BaseTestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture
     async def es_client(self) -> AsyncGenerator[AsyncElasticsearch, None]:
         async with AsyncElasticsearch(hosts=[ES_URL]) as es_client:
-            yield es_client
+            try:
+                yield es_client
+            finally:
+                await es_client.close()
+
+    @override
+    @pytest.fixture
+    async def store(self) -> ElasticsearchStore:
+        return ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test")
+
+    @pytest.fixture
+    async def sanitizing_store(self) -> ElasticsearchStore:
+        return ElasticsearchStore(
+            url=ES_URL,
+            index_prefix="kv-store-e2e-test",
+            key_sanitization_strategy=ElasticsearchV1KeySanitizationStrategy(),
+            collection_sanitization_strategy=ElasticsearchV1CollectionSanitizationStrategy(),
+        )
 
     @pytest.fixture(autouse=True)
     async def cleanup_elasticsearch_indices(self, es_client: AsyncElasticsearch):
@@ -135,6 +134,23 @@ class BaseTestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     async def test_concurrent_operations(self, store: BaseStore): ...
 
+    @override
+    async def test_long_collection_name(self, store: ElasticsearchStore, sanitizing_store: ElasticsearchStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            await store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
+
+        await sanitizing_store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
+        assert await sanitizing_store.get(collection="test_collection" * 100, key="test_key") == {"test": "test"}
+
+    @override
+    async def test_long_key_name(self, store: ElasticsearchStore, sanitizing_store: ElasticsearchStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Tests that a long key name will not raise an error."""
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            await store.put(collection="test_collection", key="test_key" * 100, value={"test": "test"})
+
+        await sanitizing_store.put(collection="test_collection", key="test_key" * 100, value={"test": "test"})
+        assert await sanitizing_store.get(collection="test_collection", key="test_key" * 100) == {"test": "test"}
+
     async def test_put_put_two_indices(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
         await store.put(collection="test_collection", key="test_key", value={"test": "test"})
         await store.put(collection="test_collection_2", key="test_key", value={"test": "test"})
@@ -143,19 +159,8 @@ class BaseTestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         indices = await es_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
         assert len(indices.body) == 2
-        assert "kv-store-e2e-test-test_collection" in indices
-        assert "kv-store-e2e-test-test_collection_2" in indices
-
-
-@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
-@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
-class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
-    """Test Elasticsearch store in native mode (i.e. it stores flattened objects)"""
-
-    @override
-    @pytest.fixture
-    async def store(self) -> ElasticsearchStore:
-        return ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test", native_storage=True)
+        index_names: list[str] = [str(key) for key in indices]
+        assert index_names == snapshot(["kv-store-e2e-test-test_collection", "kv-store-e2e-test-test_collection_2"])
 
     async def test_value_stored_as_flattened_object(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
         """Verify values are stored as flattened objects, not JSON strings"""
@@ -163,8 +168,8 @@ class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
 
         # Check raw Elasticsearch document using public sanitization methods
         # Note: We need to access these internal methods for testing the storage format
-        index_name = store._sanitize_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        doc_id = store._sanitize_document_id(key="test_key")  # pyright: ignore[reportPrivateUsage]
+        index_name = store._get_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
+        doc_id = store._get_document_id(key="test_key")  # pyright: ignore[reportPrivateUsage]
 
         response = await es_client.get(index=index_name, id=doc_id)
         assert response.body["_source"] == snapshot(
@@ -185,80 +190,7 @@ class TestElasticsearchStoreNativeMode(BaseTestElasticsearchStore):
             }
         )
 
-    async def test_migration_from_non_native_mode(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
-        """Verify native mode can read a document with stringified data"""
-        index_name = store._sanitize_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        doc_id = store._sanitize_document_id(key="legacy_key")  # pyright: ignore[reportPrivateUsage]
-
-        await es_client.index(
-            index=index_name,
-            id=doc_id,
-            body={
-                "collection": "test",
-                "key": "legacy_key",
-                "value": {
-                    "string": '{"legacy": "data"}',
-                },
-            },
-        )
-        await es_client.indices.refresh(index=index_name)
-
-        result = await store.get(collection="test", key="legacy_key")
-        assert result == snapshot({"legacy": "data"})
-
-
-@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
-@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
-class TestElasticsearchStoreNonNativeMode(BaseTestElasticsearchStore):
-    """Test Elasticsearch store in non-native mode (i.e. it stores stringified JSON values)"""
-
     @override
-    @pytest.fixture
-    async def store(self) -> ElasticsearchStore:
-        return ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test", native_storage=False)
-
-    async def test_value_stored_as_json_string(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
-        """Verify values are stored as JSON strings"""
-        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
-
-        index_name = store._sanitize_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        doc_id = store._sanitize_document_id(key="test_key")  # pyright: ignore[reportPrivateUsage]
-
-        response = await es_client.get(index=index_name, id=doc_id)
-        assert response.body["_source"] == snapshot(
-            {
-                "value": {"string": '{"age": 30, "name": "Alice"}'},
-                "created_at": IsStr(min_length=20, max_length=40),
-            }
-        )
-
-        # Test with TTL
-        await store.put(collection="test", key="test_key", value={"name": "Bob", "age": 25}, ttl=10)
-        response = await es_client.get(index=index_name, id=doc_id)
-        assert response.body["_source"] == snapshot(
-            {
-                "value": {"string": '{"age": 25, "name": "Bob"}'},
-                "created_at": IsStr(min_length=20, max_length=40),
-                "expires_at": IsStr(min_length=20, max_length=40),
-            }
-        )
-
-    async def test_migration_from_native_mode(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
-        """Verify non-native mode can read native mode data"""
-        index_name = store._sanitize_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        doc_id = store._sanitize_document_id(key="legacy_key")  # pyright: ignore[reportPrivateUsage]
-
-        await es_client.index(
-            index=index_name,
-            id=doc_id,
-            body={
-                "collection": "test",
-                "key": "legacy_key",
-                "value": {"flattened": {"name": "Alice", "age": 30}},
-            },
-        )
-
-        await es_client.indices.refresh(index=index_name)
-
-        result = await store.get(collection="test", key="legacy_key")
-        assert result == snapshot({"name": "Alice", "age": 30})
+    async def test_special_characters_in_collection_name(self, store: ElasticsearchStore, sanitizing_store: ElasticsearchStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Tests that a special characters in the collection name will not raise an error."""
+        await super().test_special_characters_in_collection_name(store=sanitizing_store)

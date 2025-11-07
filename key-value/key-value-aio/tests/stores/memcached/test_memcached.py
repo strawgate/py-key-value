@@ -10,7 +10,7 @@ from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
-from key_value.aio.stores.memcached import MemcachedStore
+from key_value.aio.stores.memcached import MemcachedStore, MemcachedV1KeySanitizationStrategy
 from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -65,9 +65,37 @@ class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
         _ = await store._client.flush_all()  # pyright: ignore[reportPrivateUsage]
         return store
 
+    @pytest.fixture
+    async def sanitizing_store(self, setup_memcached: None) -> MemcachedStore:
+        store = MemcachedStore(
+            host=MEMCACHED_HOST,
+            port=MEMCACHED_PORT,
+            key_sanitization_strategy=MemcachedV1KeySanitizationStrategy(),
+        )
+        _ = await store._client.flush_all()  # pyright: ignore[reportPrivateUsage]
+        return store
+
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
+
+    @override
+    async def test_long_collection_name(self, store: MemcachedStore, sanitizing_store: MemcachedStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Tests that a long collection name will not raise an error."""
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            await store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
+
+        await sanitizing_store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
+        assert await sanitizing_store.get(collection="test_collection" * 100, key="test_key") == {"test": "test"}
+
+    @override
+    async def test_long_key_name(self, store: MemcachedStore, sanitizing_store: MemcachedStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Tests that a long key name will not raise an error."""
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            await store.put(collection="test_collection", key="test_key" * 100, value={"test": "test"})
+
+        await sanitizing_store.put(collection="test_collection", key="test_key" * 100, value={"test": "test"})
+        assert await sanitizing_store.get(collection="test_collection", key="test_key" * 100) == {"test": "test"}
 
     @pytest.fixture
     async def memcached_client(self, store: MemcachedStore) -> Client:

@@ -10,7 +10,6 @@ from tests.stores.base import BaseStoreTests
 if TYPE_CHECKING:
     from key_value.aio.stores.windows_registry.store import WindowsRegistryStore
 
-
 TEST_REGISTRY_PATH = "software\\py-key-value-test"
 
 
@@ -33,6 +32,27 @@ class TestWindowsRegistryStore(BaseStoreTests):
 
         return WindowsRegistryStore(registry_path=TEST_REGISTRY_PATH, hive="HKEY_CURRENT_USER")
 
+    @pytest.fixture
+    async def sanitizing_store(self):
+        from key_value.aio.stores.windows_registry.store import (
+            WindowsRegistryStore,
+            WindowsRegistryV1CollectionSanitizationStrategy,
+        )
+
+        return WindowsRegistryStore(
+            registry_path=TEST_REGISTRY_PATH,
+            hive="HKEY_CURRENT_USER",
+            collection_sanitization_strategy=WindowsRegistryV1CollectionSanitizationStrategy(),
+        )
+
     @override
     @pytest.mark.skip(reason="We do not test boundedness of registry stores")
     async def test_not_unbounded(self, store: BaseStore): ...
+
+    @override
+    async def test_long_collection_name(self, store: "WindowsRegistryStore", sanitizing_store: "WindowsRegistryStore"):  # pyright: ignore[reportIncompatibleMethodOverride]
+        with pytest.raises(Exception):  # noqa: B017, PT011
+            await store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
+
+        await sanitizing_store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
+        assert await sanitizing_store.get(collection="test_collection" * 100, key="test_key") == {"test": "test"}

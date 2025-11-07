@@ -6,11 +6,10 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, overload
 
-from elastic_transport import ObjectApiResponse
-from elastic_transport import SerializationError as ElasticsearchSerializationError
 from key_value.shared.errors import DeserializationError, SerializationError
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, LOWERCASE_ALPHABET, NUMBERS, sanitize_string
+from key_value.shared.utils.sanitization import AlwaysHashStrategy, HashFragmentMode, HybridSanitizationStrategy, SanitizationStrategy
+from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS, LOWERCASE_ALPHABET, NUMBERS, UPPERCASE_ALPHABET
 from key_value.shared.utils.serialization import SerializationAdapter
 from key_value.shared.utils.time_to_live import now_as_epoch
 from typing_extensions import override
@@ -26,7 +25,10 @@ from key_value.sync.code_gen.stores.base import (
 from key_value.sync.code_gen.stores.elasticsearch.utils import LessCapableJsonSerializer, LessCapableNdjsonSerializer, new_bulk_action
 
 try:
+    from elastic_transport import ObjectApiResponse
+    from elastic_transport import SerializationError as ElasticsearchSerializationError
     from elasticsearch import Elasticsearch
+    from elasticsearch.exceptions import BadRequestError
 
     from key_value.sync.code_gen.stores.elasticsearch.utils import (
         get_aggregations_from_body,
@@ -43,15 +45,13 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_INDEX_PREFIX = "kv_store"
 
-# You might think the `string` field should be a text/keyword field
-# but this is the recommended mapping for large stringified json
 DEFAULT_MAPPING = {
     "properties": {
         "created_at": {"type": "date"},
         "expires_at": {"type": "date"},
         "collection": {"type": "keyword"},
         "key": {"type": "keyword"},
-        "value": {"properties": {"string": {"type": "object", "enabled": False}, "flattened": {"type": "flattened"}}},
+        "value": {"properties": {"flattened": {"type": "flattened"}}},
     }
 }
 
@@ -61,60 +61,63 @@ PAGE_LIMIT = 10000
 MAX_KEY_LENGTH = 256
 ALLOWED_KEY_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
 
-MAX_INDEX_LENGTH = 240
+MAX_INDEX_LENGTH = 200
 ALLOWED_INDEX_CHARACTERS: str = LOWERCASE_ALPHABET + NUMBERS + "_" + "-" + "."
 
 
 class ElasticsearchSerializationAdapter(SerializationAdapter):
-    """Adapter for Elasticsearch with support for native and string storage modes."""
+    """Adapter for Elasticsearch."""
 
-    _native_storage: bool
-
-    def __init__(self, *, native_storage: bool = True) -> None:
-        """Initialize the Elasticsearch adapter.
-
-        Args:
-            native_storage: If True (default), store values as flattened dicts.
-                            If False, store values as JSON strings.
-        """
+    def __init__(self) -> None:
+        """Initialize the Elasticsearch adapter"""
         super().__init__()
 
-        self._native_storage = native_storage
         self._date_format = "isoformat"
-        self._value_format = "dict" if native_storage else "string"
+        self._value_format = "dict"
 
     @override
     def prepare_dump(self, data: dict[str, Any]) -> dict[str, Any]:
         value = data.pop("value")
 
-        data["value"] = {}
-
-        if self._native_storage:
-            data["value"]["flattened"] = value
-        else:
-            data["value"]["string"] = value
+        data["value"] = {"flattened": value}
 
         return data
 
     @override
     def prepare_load(self, data: dict[str, Any]) -> dict[str, Any]:
-        value = data.pop("value")
-
-        if "flattened" in value:
-            data["value"] = value["flattened"]
-        elif "string" in value:
-            data["value"] = value["string"]
-        else:
-            msg = "Value field not found in Elasticsearch document"
-            raise DeserializationError(message=msg)
+        data["value"] = data.pop("value").get("flattened")
 
         return data
+
+
+class ElasticsearchV1KeySanitizationStrategy(AlwaysHashStrategy):
+    def __init__(self) -> None:
+        super().__init__(hash_length=64)
+
+
+class ElasticsearchV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
+    def __init__(self) -> None:
+        super().__init__(
+            replacement_character="_",
+            max_length=MAX_INDEX_LENGTH,
+            allowed_characters=UPPERCASE_ALPHABET + ALLOWED_INDEX_CHARACTERS,
+            hash_fragment_mode=HashFragmentMode.ALWAYS,
+        )
 
 
 class ElasticsearchStore(
     BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCullStore, BaseContextManagerStore, BaseStore
 ):
-    """A elasticsearch-based store."""
+    """An Elasticsearch-based store.
+
+    Stores collections in their own indices and stores values in Flattened fields.
+
+    This store has specific restrictions on what is allowed in keys and collections. Keys and collections are not sanitized
+    by default which may result in errors when using the store.
+
+    To avoid issues, you may want to consider leveraging the `ElasticsearchV1KeySanitizationStrategy` and
+    `ElasticsearchV1CollectionSanitizationStrategy` strategies.
+    """
 
     _client: Elasticsearch
 
@@ -122,19 +125,52 @@ class ElasticsearchStore(
 
     _index_prefix: str
 
-    _native_storage: bool
+    _default_collection: str | None
 
-    _adapter: SerializationAdapter
+    _serializer: SerializationAdapter
 
-    @overload
-    def __init__(
-        self, *, elasticsearch_client: Elasticsearch, index_prefix: str, native_storage: bool = True, default_collection: str | None = None
-    ) -> None: ...
+    _key_sanitization_strategy: SanitizationStrategy
+    _collection_sanitization_strategy: SanitizationStrategy
 
     @overload
     def __init__(
-        self, *, url: str, api_key: str | None = None, index_prefix: str, native_storage: bool = True, default_collection: str | None = None
-    ) -> None: ...
+        self,
+        *,
+        elasticsearch_client: Elasticsearch,
+        index_prefix: str,
+        default_collection: str | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
+    ) -> None:
+        """Initialize the elasticsearch store.
+
+        Args:
+            elasticsearch_client: The elasticsearch client to use.
+            index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
+            default_collection: The default collection to use if no collection is provided.
+            key_sanitization_strategy: The sanitization strategy to use for keys.
+            collection_sanitization_strategy: The sanitization strategy to use for collections.
+        """
+
+    @overload
+    def __init__(
+        self,
+        *,
+        url: str,
+        api_key: str | None = None,
+        index_prefix: str,
+        default_collection: str | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
+    ) -> None:
+        """Initialize the elasticsearch store.
+
+        Args:
+            url: The url of the elasticsearch cluster.
+            api_key: The api key to use.
+            index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
+            default_collection: The default collection to use if no collection is provided.
+        """
 
     def __init__(
         self,
@@ -143,8 +179,9 @@ class ElasticsearchStore(
         url: str | None = None,
         api_key: str | None = None,
         index_prefix: str,
-        native_storage: bool = True,
         default_collection: str | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
         """Initialize the elasticsearch store.
 
@@ -153,9 +190,9 @@ class ElasticsearchStore(
             url: The url of the elasticsearch cluster.
             api_key: The api key to use.
             index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
-            native_storage: Whether to use native storage mode (flattened field type) or serialize
-                            all values to JSON strings. Defaults to True.
             default_collection: The default collection to use if no collection is provided.
+            key_sanitization_strategy: The sanitization strategy to use for keys.
+            collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
         if elasticsearch_client is None and url is None:
             msg = "Either elasticsearch_client or url must be provided"
@@ -175,12 +212,16 @@ class ElasticsearchStore(
         LessCapableJsonSerializer.install_default_serializer(client=self._client)
         LessCapableNdjsonSerializer.install_serializer(client=self._client)
 
-        self._index_prefix = index_prefix
-        self._native_storage = native_storage
+        self._index_prefix = index_prefix.lower()
         self._is_serverless = False
-        self._adapter = ElasticsearchSerializationAdapter(native_storage=native_storage)
 
-        super().__init__(default_collection=default_collection)
+        self._serializer = ElasticsearchSerializationAdapter()
+
+        super().__init__(
+            default_collection=default_collection,
+            collection_sanitization_strategy=collection_sanitization_strategy,
+            key_sanitization_strategy=key_sanitization_strategy,
+        )
 
     @override
     def _setup(self) -> None:
@@ -190,27 +231,27 @@ class ElasticsearchStore(
 
     @override
     def _setup_collection(self, *, collection: str) -> None:
-        index_name = self._sanitize_index_name(collection=collection)
+        index_name = self._get_index_name(collection=collection)
 
         if self._client.options(ignore_status=404).indices.exists(index=index_name):
             return
 
-        _ = self._client.options(ignore_status=404).indices.create(index=index_name, mappings=DEFAULT_MAPPING, settings={})
+        try:
+            _ = self._client.options(ignore_status=404).indices.create(index=index_name, mappings=DEFAULT_MAPPING, settings={})
+        except BadRequestError as e:
+            if "index_already_exists_exception" in str(e).lower():
+                return
+            raise
 
-    def _sanitize_index_name(self, collection: str) -> str:
-        return sanitize_string(
-            value=self._index_prefix + "-" + collection,
-            replacement_character="_",
-            max_length=MAX_INDEX_LENGTH,
-            allowed_characters=ALLOWED_INDEX_CHARACTERS,
-        )
+    def _get_index_name(self, collection: str) -> str:
+        return self._index_prefix + "-" + self._sanitize_collection(collection=collection).lower()
 
-    def _sanitize_document_id(self, key: str) -> str:
-        return sanitize_string(value=key, replacement_character="_", max_length=MAX_KEY_LENGTH, allowed_characters=ALLOWED_KEY_CHARACTERS)
+    def _get_document_id(self, key: str) -> str:
+        return self._sanitize_key(key=key)
 
     def _get_destination(self, *, collection: str, key: str) -> tuple[str, str]:
-        index_name: str = self._sanitize_index_name(collection=collection)
-        document_id: str = self._sanitize_document_id(key=key)
+        index_name: str = self._get_index_name(collection=collection)
+        document_id: str = self._get_document_id(key=key)
 
         return (index_name, document_id)
 
@@ -226,7 +267,7 @@ class ElasticsearchStore(
             return None
 
         try:
-            return self._adapter.load_dict(data=source)
+            return self._serializer.load_dict(data=source)
         except DeserializationError:
             return None
 
@@ -236,8 +277,8 @@ class ElasticsearchStore(
             return []
 
         # Use mget for efficient batch retrieval
-        index_name = self._sanitize_index_name(collection=collection)
-        document_ids = [self._sanitize_document_id(key=key) for key in keys]
+        index_name = self._get_index_name(collection=collection)
+        document_ids = [self._get_document_id(key=key) for key in keys]
         docs = [{"_id": document_id} for document_id in document_ids]
 
         elasticsearch_response = self._client.options(ignore_status=404).mget(index=index_name, docs=docs)
@@ -259,7 +300,7 @@ class ElasticsearchStore(
                 continue
 
             try:
-                entries_by_id[doc_id] = self._adapter.load_dict(data=source)
+                entries_by_id[doc_id] = self._serializer.load_dict(data=source)
             except DeserializationError as e:
                 logger.error(
                     "Failed to deserialize Elasticsearch document in batch operation",
@@ -277,10 +318,10 @@ class ElasticsearchStore(
 
     @override
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
-        index_name: str = self._sanitize_index_name(collection=collection)
-        document_id: str = self._sanitize_document_id(key=key)
+        index_name: str = self._get_index_name(collection=collection)
+        document_id: str = self._get_document_id(key=key)
 
-        document: dict[str, Any] = self._adapter.dump_dict(entry=managed_entry)
+        document: dict[str, Any] = self._serializer.dump_dict(entry=managed_entry)
 
         try:
             _ = self._client.index(index=index_name, id=document_id, body=document, refresh=self._should_refresh_on_put)
@@ -306,14 +347,14 @@ class ElasticsearchStore(
 
         operations: list[dict[str, Any]] = []
 
-        index_name: str = self._sanitize_index_name(collection=collection)
+        index_name: str = self._get_index_name(collection=collection)
 
         for key, managed_entry in zip(keys, managed_entries, strict=True):
-            document_id: str = self._sanitize_document_id(key=key)
+            document_id: str = self._get_document_id(key=key)
 
             index_action: dict[str, Any] = new_bulk_action(action="index", index=index_name, document_id=document_id)
 
-            document: dict[str, Any] = self._adapter.dump_dict(entry=managed_entry)
+            document: dict[str, Any] = self._serializer.dump_dict(entry=managed_entry)
 
             operations.extend([index_action, document])
 
@@ -327,8 +368,8 @@ class ElasticsearchStore(
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        index_name: str = self._sanitize_index_name(collection=collection)
-        document_id: str = self._sanitize_document_id(key=key)
+        index_name: str = self._get_index_name(collection=collection)
+        document_id: str = self._get_document_id(key=key)
 
         elasticsearch_response: ObjectApiResponse[Any] = self._client.options(ignore_status=404).delete(index=index_name, id=document_id)
 
@@ -374,7 +415,7 @@ class ElasticsearchStore(
         limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
 
         result: ObjectApiResponse[Any] = self._client.options(ignore_status=404).search(
-            index=self._sanitize_index_name(collection=collection),
+            index=self._get_index_name(collection=collection),
             fields=[{"key": None}],
             body={"query": {"term": {"collection": collection}}},
             source_includes=[],
@@ -414,7 +455,7 @@ class ElasticsearchStore(
     @override
     def _delete_collection(self, *, collection: str) -> bool:
         result: ObjectApiResponse[Any] = self._client.options(ignore_status=404).delete_by_query(
-            index=self._sanitize_index_name(collection=collection), body={"query": {"term": {"collection": collection}}}
+            index=self._get_index_name(collection=collection), body={"query": {"term": {"collection": collection}}}
         )
 
         body: dict[str, Any] = get_body_from_response(response=result)
