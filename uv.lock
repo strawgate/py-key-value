@@ -225,15 +225,6 @@ wheels = [
 ]
 
 [[package]]
-name = "aioshutil"
-version = "1.6"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d3/bd/dcea5abb1792269e70cc75d5f9ae9adbdfba0f0d08a207eb788ec3b469b6/aioshutil-1.6.tar.gz", hash = "sha256:9eae342b9a4cacc2c2c5877877a2d2f7a2b66c62aa1ab57d7e95c8cfd4ede507", size = 7843, upload-time = "2025-10-21T08:42:23.742Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/92/7020e67ad83095ecc2ce751c24a63df332fb9a34ebfe14bc12a6b21b8f58/aioshutil-1.6-py3-none-any.whl", hash = "sha256:e0711de25ade421b70094b2a27c69bef6356127013744fec05f019f36732c1bd", size = 4705, upload-time = "2025-10-21T08:42:22.892Z" },
-]
-
-[[package]]
 name = "aiosignal"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1761,7 +1752,6 @@ elasticsearch = [
 ]
 filetree = [
     { name = "aiofile" },
-    { name = "aioshutil" },
     { name = "anyio" },
 ]
 keyring = [
@@ -1813,7 +1803,6 @@ requires-dist = [
     { name = "aiofile", marker = "extra == 'filetree'", specifier = ">=3.5.0" },
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
-    { name = "aioshutil", marker = "extra == 'filetree'", specifier = ">=1.4" },
     { name = "anyio", marker = "extra == 'filetree'", specifier = ">=4.1.0" },
     { name = "beartype", specifier = ">=0.20.0" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=5.0.0" },
