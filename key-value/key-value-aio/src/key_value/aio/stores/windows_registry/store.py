@@ -21,15 +21,23 @@ except ImportError as e:
 DEFAULT_REGISTRY_PATH = "Software\\py-key-value"
 DEFAULT_HIVE = "HKEY_CURRENT_USER"
 
-MAX_KEY_COLLECTION_LENGTH = 96
-ALLOWED_KEY_COLLECTION_CHARACTERS: str = ALPHANUMERIC_CHARACTERS
+MAX_KEY_LENGTH = 96
+MAX_COLLECTION_LENGTH = 96
 
 
-class WindowsRegistryV1SanitizationStrategy(HybridSanitizationStrategy):
+class WindowsRegistryV1KeySanitizationStrategy(HybridSanitizationStrategy):
     def __init__(self) -> None:
         super().__init__(
-            max_length=MAX_KEY_COLLECTION_LENGTH,
-            allowed_characters=ALLOWED_KEY_COLLECTION_CHARACTERS,
+            max_length=MAX_KEY_LENGTH,
+            allowed_characters=ALPHANUMERIC_CHARACTERS,
+        )
+
+
+class WindowsRegistryV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
+    def __init__(self) -> None:
+        super().__init__(
+            max_length=MAX_COLLECTION_LENGTH,
+            allowed_characters=ALPHANUMERIC_CHARACTERS,
         )
 
 
@@ -42,7 +50,8 @@ class WindowsRegistryStore(BaseStore):
     This store has specific restrictions on what is allowed in keys and collections. Keys and collections are not sanitized
     by default which may result in errors when using the store.
 
-    To avoid issues, you may want to consider leveraging the `WindowsRegistryV1SanitizationStrategy` strategy.
+    To avoid issues, you may want to consider leveraging the `WindowsRegistryV1KeySanitizationStrategy` and
+    `WindowsRegistryV1CollectionSanitizationStrategy` strategies.
 
     Note: TTL is not natively supported by Windows Registry, so TTL information is stored
     within the JSON payload and checked at retrieval time.
