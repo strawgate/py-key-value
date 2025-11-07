@@ -4,7 +4,7 @@
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, overload
+from typing import Any, cast, overload
 
 from key_value.shared.errors import DeserializationError
 from key_value.shared.utils.managed_entry import ManagedEntry
@@ -44,21 +44,37 @@ class DuckDBSerializationAdapter(SerializationAdapter):
         """Prepare data for dumping to DuckDB.
 
         Moves the value to the appropriate column (value_dict or value_json)
-        and sets the other column to None.
+        and sets the other column to None. Also includes version, key, and collection
+        fields in the JSON for compatibility with deserialization.
         """
         value = data.pop("value")
+
+        # Extract version, key, and collection to include in the JSON
+        version = data.pop("version", None)
+        key = data.pop("key", None)
+        collection_name = data.pop("collection", None)
+
+        # Build the document to store in JSON columns
+        json_document: dict[str, Any] = {"value": value}
+
+        if version is not None:
+            json_document["version"] = version
+        if key is not None:
+            json_document["key"] = key
+        if collection_name is not None:
+            json_document["collection"] = collection_name
 
         # Set both columns to None, then populate the appropriate one
         data["value_json"] = None
         data["value_dict"] = None
 
         if self._native_storage:
-            # For native storage, we pass the JSON string to DuckDB's JSON column
+            # For native storage, convert the document to JSON string for DuckDB's JSON column
             # DuckDB will parse it and store it as native JSON
-            data["value_dict"] = value
+            data["value_dict"] = json.dumps(json_document)
         else:
-            # For TEXT storage, value should be a JSON string
-            data["value_json"] = value
+            # For TEXT storage, store as JSON string
+            data["value_json"] = json.dumps(json_document)
 
         return data
 
@@ -66,36 +82,54 @@ class DuckDBSerializationAdapter(SerializationAdapter):
     def prepare_load(self, data: dict[str, Any]) -> dict[str, Any]:
         """Prepare data loaded from DuckDB for conversion to ManagedEntry.
 
-        Extracts value from the appropriate column and handles timezone conversion
-        for DuckDB's naive timestamps.
+        Extracts value, version, key, and collection from the JSON columns
+        and handles timezone conversion for DuckDB's naive timestamps.
         """
         value_json = data.pop("value_json", None)
         value_dict = data.pop("value_dict", None)
 
-        # Determine which value column to use (prefer value_dict if present)
+        # Parse the JSON document from the appropriate column
+        json_document = self._parse_json_column(value_dict, value_json)
+
+        # Extract fields from the JSON document
+        data["value"] = json_document.get("value")
+        if "version" in json_document:
+            data["version"] = json_document["version"]
+        if "key" in json_document:
+            data["key"] = json_document["key"]
+        if "collection" in json_document:
+            data["collection"] = json_document["collection"]
+
+        # DuckDB always returns naive timestamps, but ManagedEntry expects timezone-aware ones
+        self._convert_timestamps_to_utc(data)
+
+        return data
+
+    def _parse_json_column(self, value_dict: Any, value_json: Any) -> dict[str, Any]:
+        "Parse JSON from value_dict or value_json column."
         if value_dict is not None:
             # Native storage mode - value_dict can be dict or string (DuckDB JSON returns as string)
             if isinstance(value_dict, dict):
-                data["value"] = value_dict
-            elif isinstance(value_dict, str):
-                # DuckDB sometimes returns JSON as string, parse it
-                data["value"] = json.loads(value_dict)
-            else:
-                msg = f"value_dict has unexpected type: {type(value_dict)}"
-                raise DeserializationError(message=msg)
-        elif value_json is not None:
-            # Stringified JSON mode - parse from string
-            if isinstance(value_json, str):
-                data["value"] = json.loads(value_json)
-            else:
-                msg = f"value_json has unexpected type: {type(value_json)}"
-                raise DeserializationError(message=msg)
-        else:
-            msg = "Neither value_dict nor value_json column contains data"
+                return cast("dict[str, Any]", value_dict)
+            if isinstance(value_dict, str):
+                parsed: dict[str, Any] = json.loads(value_dict)
+                return parsed
+            msg = f"value_dict has unexpected type: {type(value_dict)}"
             raise DeserializationError(message=msg)
 
-        # DuckDB always returns naive timestamps, but ManagedEntry expects timezone-aware ones
-        # Convert to timezone-aware UTC timestamps. Handle None values explicitly.
+        if value_json is not None:
+            # Stringified JSON mode - parse from string
+            if isinstance(value_json, str):
+                parsed_json: dict[str, Any] = json.loads(value_json)
+                return parsed_json
+            msg = f"value_json has unexpected type: {type(value_json)}"
+            raise DeserializationError(message=msg)
+
+        msg = "Neither value_dict nor value_json column contains data"
+        raise DeserializationError(message=msg)
+
+    def _convert_timestamps_to_utc(self, data: dict[str, Any]) -> None:
+        """Convert naive timestamps to UTC timezone-aware timestamps."""
         created_at = data.get("created_at")
         if created_at is not None and isinstance(created_at, datetime) and (created_at.tzinfo is None):
             data["created_at"] = created_at.astimezone(tz=timezone.utc)
@@ -103,8 +137,6 @@ class DuckDBSerializationAdapter(SerializationAdapter):
         expires_at = data.get("expires_at")
         if expires_at is not None and isinstance(expires_at, datetime) and (expires_at.tzinfo is None):
             data["expires_at"] = expires_at.astimezone(tz=timezone.utc)
-
-        return data
 
 
 class DuckDBStore(BaseContextManagerStore, BaseStore):
@@ -340,8 +372,8 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             msg = "Cannot operate on closed DuckDBStore"
             raise RuntimeError(msg)
 
-        # Use adapter to dump the managed entry to a dict
-        document = self._adapter.dump_dict(entry=managed_entry, exclude_none=False)
+        # Use adapter to dump the managed entry to a dict with key and collection
+        document = self._adapter.dump_dict(entry=managed_entry, exclude_none=False, key=key, collection=collection)
 
         # Insert or replace the entry with metadata in separate columns
         self._connection.execute(
