@@ -111,12 +111,38 @@ class SerializationAdapter(ABC):
 
         This method is used by subclasses to handle any required transformations before dumping the data to a dictionary."""
 
-    def dump_dict(self, entry: ManagedEntry, exclude_none: bool = True) -> dict[str, Any]:
-        """Convert a ManagedEntry to a dictionary."""
+    def dump_dict(
+        self,
+        entry: ManagedEntry,
+        exclude_none: bool = True,
+        *,
+        key: str | None = None,
+        collection: str | None = None,
+        version: int = 1,
+    ) -> dict[str, Any]:
+        """Convert a ManagedEntry to a dictionary.
+
+        Args:
+            entry: The ManagedEntry to serialize
+            exclude_none: Whether to exclude None values from the output
+            key: Optional unsanitized key name to include in the document
+            collection: Optional unsanitized collection name to include in the document
+            version: Document schema version (default: 1)
+
+        Returns:
+            A dictionary representation of the ManagedEntry with optional metadata fields
+        """
 
         data: dict[str, Any] = {
+            "version": version,
             "value": entry.value_as_dict if self._value_format == "dict" else entry.value_as_json,
         }
+
+        if key is not None:
+            data["key"] = key
+
+        if collection is not None:
+            data["collection"] = collection
 
         if self._date_format == "isoformat":
             data["created_at"] = entry.created_at_isoformat
@@ -131,12 +157,31 @@ class SerializationAdapter(ABC):
 
         return self.prepare_dump(data=data)
 
-    def dump_json(self, entry: ManagedEntry, exclude_none: bool = True) -> str:
-        """Convert a ManagedEntry to a JSON string."""
+    def dump_json(
+        self,
+        entry: ManagedEntry,
+        exclude_none: bool = True,
+        *,
+        key: str | None = None,
+        collection: str | None = None,
+        version: int = 1,
+    ) -> str:
+        """Convert a ManagedEntry to a JSON string.
+
+        Args:
+            entry: The ManagedEntry to serialize
+            exclude_none: Whether to exclude None values from the output
+            key: Optional unsanitized key name to include in the document
+            collection: Optional unsanitized collection name to include in the document
+            version: Document schema version (default: 1)
+
+        Returns:
+            A JSON string representation of the ManagedEntry with optional metadata fields
+        """
         if self._date_format == "datetime":
             msg = 'dump_json is incompatible with date_format="datetime"; use date_format="isoformat" or dump_dict().'
             raise SerializationError(msg)
-        return dump_to_json(obj=self.dump_dict(entry=entry, exclude_none=exclude_none))
+        return dump_to_json(obj=self.dump_dict(entry=entry, exclude_none=exclude_none, key=key, collection=collection, version=version))
 
 
 class BasicSerializationAdapter(SerializationAdapter):

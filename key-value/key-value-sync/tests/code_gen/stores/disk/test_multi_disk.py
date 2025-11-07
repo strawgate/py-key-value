@@ -41,12 +41,27 @@ class TestMultiDiskStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         value = disk_cache.get(key="test_key")
         value_as_dict = json.loads(value)
-        assert value_as_dict == snapshot({"value": {"name": "Alice", "age": 30}, "created_at": IsDatetime(iso_string=True)})
+        assert value_as_dict == snapshot(
+            {
+                "collection": "test",
+                "value": {"name": "Alice", "age": 30},
+                "key": "test_key",
+                "created_at": IsDatetime(iso_string=True),
+                "version": 1,
+            }
+        )
 
         store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
 
         value = disk_cache.get(key="test_key")
         value_as_dict = json.loads(value)
         assert value_as_dict == snapshot(
-            {"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}, "expires_at": IsDatetime(iso_string=True)}
+            {
+                "collection": "test",
+                "created_at": IsDatetime(iso_string=True),
+                "value": {"age": 30, "name": "Alice"},
+                "key": "test_key",
+                "expires_at": IsDatetime(iso_string=True),
+                "version": 1,
+            }
         )

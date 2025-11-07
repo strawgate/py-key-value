@@ -75,7 +75,15 @@ class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         value = rocksdb_client.get(key="test::test_key")
         assert value is not None
         value_as_dict = json.loads(value.decode("utf-8"))
-        assert value_as_dict == snapshot({"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}})
+        assert value_as_dict == snapshot(
+            {
+                "collection": "test",
+                "created_at": IsDatetime(iso_string=True),
+                "key": "test_key",
+                "value": {"age": 30, "name": "Alice"},
+                "version": 1,
+            }
+        )
 
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
 
@@ -83,5 +91,12 @@ class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         assert value is not None
         value_as_dict = json.loads(value.decode("utf-8"))
         assert value_as_dict == snapshot(
-            {"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}, "expires_at": IsDatetime(iso_string=True)}
+            {
+                "collection": "test",
+                "created_at": IsDatetime(iso_string=True),
+                "value": {"age": 30, "name": "Alice"},
+                "key": "test_key",
+                "expires_at": IsDatetime(iso_string=True),
+                "version": 1,
+            }
         )

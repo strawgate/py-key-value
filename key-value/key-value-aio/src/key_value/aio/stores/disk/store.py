@@ -107,7 +107,11 @@ class DiskStore(BaseContextManagerStore, BaseStore):
     ) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        _ = self._cache.set(key=combo_key, value=self._serialization_adapter.dump_json(entry=managed_entry), expire=managed_entry.ttl)
+        _ = self._cache.set(
+            key=combo_key,
+            value=self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection),
+            expire=managed_entry.ttl,
+        )
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:

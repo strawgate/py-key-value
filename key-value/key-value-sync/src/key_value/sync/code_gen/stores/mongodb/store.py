@@ -214,7 +214,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         # Ensure index on the unique combo key and supporting queries
         sanitized_collection = self._sanitize_collection(collection=collection)
 
-        collection_filter: dict[str, str] = {"name": collection}
+        collection_filter: dict[str, str] = {"name": sanitized_collection}
         matching_collections: list[str] = self._db.list_collection_names(filter=collection_filter)
 
         if matching_collections:
@@ -262,7 +262,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
     @override
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
-        mongo_doc = self._adapter.dump_dict(entry=managed_entry)
+        mongo_doc = self._adapter.dump_dict(entry=managed_entry, key=key, collection=collection)
 
         try:
             # Ensure that the value is serializable to JSON
@@ -290,7 +290,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
         operations: list[UpdateOne] = []
         for key, managed_entry in zip(keys, managed_entries, strict=True):
-            mongo_doc = self._adapter.dump_dict(entry=managed_entry)
+            mongo_doc = self._adapter.dump_dict(entry=managed_entry, key=key, collection=collection)
 
             operations.append(
                 UpdateOne(filter={"key": key}, update={"$set": {"collection": collection, "key": key, **mongo_doc}}, upsert=True)
@@ -318,8 +318,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
         _ = self._db.drop_collection(name_or_collection=collection_name)
 
-        if collection_name in self._collections_by_name:
-            del self._collections_by_name[collection]
+        self._collections_by_name.pop(collection, None)
 
         return True
 
