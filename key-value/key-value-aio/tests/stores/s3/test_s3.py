@@ -61,7 +61,7 @@ class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
             {str(LOCALSTACK_CONTAINER_PORT): S3_HOST_PORT},
             environment={"SERVICES": "s3"},
         ):
-            if not await async_wait_for_true(bool_fn=ping_s3, tries=WAIT_FOR_S3_TIMEOUT, wait_time=1):
+            if not await async_wait_for_true(bool_fn=ping_s3, tries=WAIT_FOR_S3_TIMEOUT, wait_time=2):
                 msg = f"LocalStack S3 {version} failed to start"
                 raise S3FailedToStartError(msg)
 
