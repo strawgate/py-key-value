@@ -37,13 +37,11 @@ class TestWindowsRegistryStore(BaseStoreTests):
         from key_value.aio.stores.windows_registry.store import (
             WindowsRegistryStore,
             WindowsRegistryV1CollectionSanitizationStrategy,
-            WindowsRegistryV1KeySanitizationStrategy,
         )
 
         return WindowsRegistryStore(
             registry_path=TEST_REGISTRY_PATH,
             hive="HKEY_CURRENT_USER",
-            key_sanitization_strategy=WindowsRegistryV1KeySanitizationStrategy(),
             collection_sanitization_strategy=WindowsRegistryV1CollectionSanitizationStrategy(),
         )
 
