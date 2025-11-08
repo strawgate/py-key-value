@@ -75,7 +75,7 @@ def test_managed_entry_document_conversion():
 
     assert document == snapshot(
         {
-            "value": {"f": {"test": "test"}},
+            "value": {"flat": {"test": "test"}},
             "created_at": "2025-01-01T00:00:00+00:00",
             "expires_at": "2025-01-01T00:00:10+00:00",
         }
@@ -199,7 +199,7 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         response = await opensearch_client.get(index=index_name, id=doc_id)
         assert response.body["_source"] == snapshot(
             {
-                "value": {"f": {"name": "Alice", "age": 30}},
+                "value": {"flat": {"name": "Alice", "age": 30}},
                 "created_at": IsStr(min_length=20, max_length=40),
             }
         )
@@ -209,7 +209,7 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         response = await opensearch_client.get(index=index_name, id=doc_id)
         assert response.body["_source"] == snapshot(
             {
-                "value": {"f": {"name": "Bob", "age": 25}},
+                "value": {"flat": {"name": "Bob", "age": 25}},
                 "created_at": IsStr(min_length=20, max_length=40),
                 "expires_at": IsStr(min_length=20, max_length=40),
             }
