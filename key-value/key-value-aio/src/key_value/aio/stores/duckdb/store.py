@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast, overload
@@ -52,9 +53,9 @@ class DuckDBSerializationAdapter(SerializationAdapter):
         if collection_name is not None:
             json_document["collection"] = collection_name
 
-        # Store as JSON string for DuckDB's JSON column
-        # DuckDB will parse it and store it as native JSON
-        data["value_dict"] = json.dumps(json_document)
+        # Store the dict directly for DuckDB's JSON column
+        # DuckDB's Python API accepts dict objects and stores them as queryable JSON
+        data["value_dict"] = json_document
 
         return data
 
@@ -103,12 +104,18 @@ class DuckDBSerializationAdapter(SerializationAdapter):
     def _convert_timestamps_to_utc(self, data: dict[str, Any]) -> None:
         """Convert naive timestamps to UTC timezone-aware timestamps."""
         created_at = data.get("created_at")
-        if created_at is not None and isinstance(created_at, datetime) and created_at.tzinfo is None:
-            data["created_at"] = created_at.astimezone(tz=timezone.utc)
+        if created_at is not None and isinstance(created_at, datetime):
+            if created_at.tzinfo is None:
+                data["created_at"] = created_at.replace(tzinfo=timezone.utc)
+            else:
+                data["created_at"] = created_at.astimezone(tz=timezone.utc)
 
         expires_at = data.get("expires_at")
-        if expires_at is not None and isinstance(expires_at, datetime) and expires_at.tzinfo is None:
-            data["expires_at"] = expires_at.astimezone(tz=timezone.utc)
+        if expires_at is not None and isinstance(expires_at, datetime):
+            if expires_at.tzinfo is None:
+                data["expires_at"] = expires_at.replace(tzinfo=timezone.utc)
+            else:
+                data["expires_at"] = expires_at.astimezone(tz=timezone.utc)
 
 
 class DuckDBStore(BaseContextManagerStore, BaseStore):
@@ -214,6 +221,11 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
 
         self._is_closed = False
         self._adapter = DuckDBSerializationAdapter()
+
+        # Validate table name to prevent SQL injection
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", table_name):
+            msg = "Table name must start with a letter or underscore and contain only letters, digits, or underscores"
+            raise ValueError(msg)
         self._table_name = table_name
         self._stable_api = False
 
@@ -345,9 +357,15 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         }
 
         if created_at is not None and isinstance(created_at, datetime):
-            document["created_at"] = created_at.astimezone(tz=timezone.utc)
+            if created_at.tzinfo is None:
+                document["created_at"] = created_at.replace(tzinfo=timezone.utc)
+            else:
+                document["created_at"] = created_at.astimezone(tz=timezone.utc)
         if expires_at is not None and isinstance(expires_at, datetime):
-            document["expires_at"] = expires_at.astimezone(tz=timezone.utc)
+            if expires_at.tzinfo is None:
+                document["expires_at"] = expires_at.replace(tzinfo=timezone.utc)
+            else:
+                document["expires_at"] = expires_at.astimezone(tz=timezone.utc)
 
         try:
             return self._adapter.load_dict(data=document)

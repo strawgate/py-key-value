@@ -3,8 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
-from _duckdb import DuckDBPyConnection
-from duckdb import CatalogException
+from duckdb import CatalogException, DuckDBPyConnection
 from inline_snapshot import snapshot
 from typing_extensions import override
 
