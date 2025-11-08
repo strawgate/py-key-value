@@ -88,7 +88,7 @@ class DuckDBSerializationAdapter(SerializationAdapter):
         return data
 
     def _parse_json_column(self, value_dict: Any) -> dict[str, Any]:
-        "Parse JSON from value_dict column."
+        """Parse JSON from value_dict column."""
         if value_dict is None:
             msg = "value_dict column contains no data"
             raise DeserializationError(message=msg)
