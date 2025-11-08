@@ -73,28 +73,6 @@ def test_managed_entry_document_conversion():
     assert round_trip_managed_entry.expires_at == expires_at
 
 
-def test_legacy_document_compatibility():
-    """Test that legacy JSON string documents can still be read."""
-    created_at = datetime(year=2025, month=1, day=1, hour=0, minute=0, second=0, tzinfo=timezone.utc)
-    expires_at = created_at + timedelta(seconds=10)
-
-    # Simulate a legacy document with JSON string storage
-    legacy_document = {
-        "version": 1,
-        "value": {"string": '{"test": "test"}'},
-        "created_at": datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc),
-        "expires_at": datetime(2025, 1, 1, 0, 0, 10, tzinfo=timezone.utc),
-    }
-
-    adapter = MongoDBSerializationAdapter()
-    round_trip_managed_entry = adapter.load_dict(data=legacy_document)
-
-    assert round_trip_managed_entry.value == {"test": "test"}
-    assert round_trip_managed_entry.created_at == created_at
-    assert round_trip_managed_entry.ttl == IsFloat(lt=0)
-    assert round_trip_managed_entry.expires_at == expires_at
-
-
 def clean_mongodb_database(store: MongoDBStore) -> None:
     with contextlib.suppress(Exception):
         _ = store._client.drop_database(name_or_database=store._db.name)  # pyright: ignore[reportPrivateUsage]
@@ -191,14 +169,3 @@ class TestMongoDBStore(BaseMongoDBStoreTests):
                 "version": 1,
             }
         )
-
-    def test_migration_from_legacy_mode(self, store: MongoDBStore):
-        """Verify that legacy JSON string data can still be read."""
-        store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = store._sanitize_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
-
-        collection.insert_one({"key": "legacy_key", "value": {"string": '{"legacy": "data"}'}})
-
-        result = store.get(collection="test", key="legacy_key")
-        assert result == {"legacy": "data"}

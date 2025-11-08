@@ -61,9 +61,6 @@ class MongoDBSerializationAdapter(SerializationAdapter):
 
         if "object" in value:
             data["value"] = value["object"]
-        elif "string" in value:
-            # Legacy support: can still read old JSON string data
-            data["value"] = value["string"]
         else:
             msg = "Value field not found in MongoDB document"
             raise DeserializationError(message=msg)
@@ -160,7 +157,6 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         """Initialize the MongoDB store.
 
         Values are stored as native BSON dictionaries for better query support and performance.
-        The store can still read legacy JSON string data for backward compatibility.
 
         Args:
             client: The MongoDB client to use (mutually exclusive with url).
