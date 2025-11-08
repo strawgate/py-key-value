@@ -50,7 +50,7 @@ DEFAULT_MAPPING = {
         "expires_at": {"type": "date"},
         "collection": {"type": "keyword"},
         "key": {"type": "keyword"},
-        "value": {"properties": {"flattened": {"type": "flattened"}}},
+        "value": {"properties": {"flat": {"type": "flat_object"}}},
     }
 }
 
@@ -78,13 +78,13 @@ class OpenSearchSerializationAdapter(SerializationAdapter):
     def prepare_dump(self, data: dict[str, Any]) -> dict[str, Any]:
         value = data.pop("value")
 
-        data["value"] = {"flattened": value}
+        data["value"] = {"flat": value}
 
         return data
 
     @override
     def prepare_load(self, data: dict[str, Any]) -> dict[str, Any]:
-        data["value"] = data.pop("value").get("flattened")
+        data["value"] = data.pop("value").get("flat")
 
         return data
 
@@ -198,7 +198,6 @@ class OpenSearchStore(
         if opensearch_client:
             self._client = opensearch_client
         elif url:
-            # Build kwargs for AsyncOpenSearch
             client_kwargs: dict[str, Any] = {"hosts": [url], "http_compress": True, "timeout": 10, "max_retries": 3}
             if api_key:
                 client_kwargs["api_key"] = api_key

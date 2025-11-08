@@ -68,8 +68,8 @@ DEFAULT_MAPPING = {
         },
         "value": {
             "properties": {
-                "flattened": {
-                    "type": "flattened",
+                "flat": {
+                    "type": "flat_object",
                 },
             },
         },
@@ -101,14 +101,14 @@ class OpenSearchSerializationAdapter(SerializationAdapter):
         value = data.pop("value")
 
         data["value"] = {
-            "flattened": value,
+            "flat": value,
         }
 
         return data
 
     @override
     def prepare_load(self, data: dict[str, Any]) -> dict[str, Any]:
-        data["value"] = data.pop("value").get("flattened")
+        data["value"] = data.pop("value").get("flat")
 
         return data
 
@@ -224,7 +224,6 @@ class OpenSearchStore(
         if opensearch_client:
             self._client = opensearch_client
         elif url:
-            # Build kwargs for AsyncOpenSearch
             client_kwargs: dict[str, Any] = {
                 "hosts": [url],
                 "http_compress": True,
