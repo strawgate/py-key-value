@@ -38,28 +38,20 @@ COLLECTION_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
 
 
 class MongoDBSerializationAdapter(SerializationAdapter):
-    """Adapter for MongoDB with support for native and string storage modes."""
+    """Adapter for MongoDB with native BSON storage."""
 
-    _native_storage: bool
-
-    def __init__(self, *, native_storage: bool = True) -> None:
+    def __init__(self) -> None:
         """Initialize the MongoDB adapter."""
         super().__init__()
 
-        self._native_storage = native_storage
         self._date_format = "datetime"
-        self._value_format = "dict" if native_storage else "string"
+        self._value_format = "dict"
 
     @override
     def prepare_dump(self, data: dict[str, Any]) -> dict[str, Any]:
         value = data.pop("value")
 
-        data["value"] = {}
-
-        if self._native_storage:
-            data["value"]["object"] = value
-        else:
-            data["value"]["string"] = value
+        data["value"] = {"object": value}
 
         return data
 
@@ -70,6 +62,7 @@ class MongoDBSerializationAdapter(SerializationAdapter):
         if "object" in value:
             data["value"] = value["object"]
         elif "string" in value:
+            # Legacy support: can still read old JSON string data
             data["value"] = value["string"]
         else:
             msg = "Value field not found in MongoDB document"
@@ -121,7 +114,6 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         client: AsyncMongoClient[dict[str, Any]],
         db_name: str | None = None,
         coll_name: str | None = None,
-        native_storage: bool = True,
         default_collection: str | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
@@ -131,7 +123,6 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
             client: The MongoDB client to use.
             db_name: The name of the MongoDB database.
             coll_name: The name of the MongoDB collection.
-            native_storage: Whether to use native BSON storage (True, default) or JSON string storage (False).
             default_collection: The default collection to use if no collection is provided.
             collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
@@ -143,7 +134,6 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         url: str,
         db_name: str | None = None,
         coll_name: str | None = None,
-        native_storage: bool = True,
         default_collection: str | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
@@ -153,7 +143,6 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
             url: The url of the MongoDB cluster.
             db_name: The name of the MongoDB database.
             coll_name: The name of the MongoDB collection.
-            native_storage: Whether to use native BSON storage (True, default) or JSON string storage (False).
             default_collection: The default collection to use if no collection is provided.
             collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
@@ -165,20 +154,19 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         url: str | None = None,
         db_name: str | None = None,
         coll_name: str | None = None,
-        native_storage: bool = True,
         default_collection: str | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
         """Initialize the MongoDB store.
+
+        Values are stored as native BSON dictionaries for better query support and performance.
+        The store can still read legacy JSON string data for backward compatibility.
 
         Args:
             client: The MongoDB client to use (mutually exclusive with url).
             url: The url of the MongoDB cluster (mutually exclusive with client).
             db_name: The name of the MongoDB database.
             coll_name: The name of the MongoDB collection.
-            native_storage: Whether to use native BSON storage (True, default) or JSON string storage (False).
-                           Native storage stores values as BSON dicts for better query support.
-                           Legacy mode stores values as JSON strings for backward compatibility.
             default_collection: The default collection to use if no collection is provided.
             collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
@@ -196,7 +184,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
         self._db = self._client[db_name]
         self._collections_by_name = {}
-        self._adapter = MongoDBSerializationAdapter(native_storage=native_storage)
+        self._adapter = MongoDBSerializationAdapter()
 
         super().__init__(
             default_collection=default_collection,
