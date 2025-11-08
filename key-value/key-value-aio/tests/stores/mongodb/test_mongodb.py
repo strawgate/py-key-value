@@ -75,8 +75,6 @@ def test_managed_entry_document_conversion():
     assert round_trip_managed_entry.expires_at == expires_at
 
 
-
-
 async def clean_mongodb_database(store: MongoDBStore) -> None:
     with contextlib.suppress(Exception):
         _ = await store._client.drop_database(name_or_database=store._db.name)  # pyright: ignore[reportPrivateUsage]
@@ -173,4 +171,3 @@ class TestMongoDBStore(BaseMongoDBStoreTests):
                 "version": 1,
             }
         )
-
