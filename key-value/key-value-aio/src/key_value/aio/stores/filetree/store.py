@@ -191,7 +191,8 @@ class DiskCollectionInfo:
         cls, *, file: AsyncPath, serialization_adapter: SerializationAdapter, key_sanitization_strategy: SanitizationStrategy
     ) -> Self:
         if data := await read_file(file=file):
-            data["directory"] = AsyncPath(data["directory"]).resolve()
+            resolved_directory = await AsyncPath(data["directory"]).resolve()
+            data["directory"] = str(resolved_directory)
             return cls.from_dict(
                 data=data, serialization_adapter=serialization_adapter, key_sanitization_strategy=key_sanitization_strategy
             )

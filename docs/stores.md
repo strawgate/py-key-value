@@ -154,7 +154,7 @@ store = FileTreeStore(directory="./debug-store")
 **Installation:**
 
 ```bash
-pip install py-key-value-aio
+pip install py-key-value-aio[filetree]
 ```
 
 **Use Cases:**

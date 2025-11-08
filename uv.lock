@@ -1803,7 +1803,7 @@ requires-dist = [
     { name = "aiofile", marker = "extra == 'filetree'", specifier = ">=3.5.0" },
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
-    { name = "anyio", marker = "extra == 'filetree'", specifier = ">=4.1.0" },
+    { name = "anyio", marker = "extra == 'filetree'", specifier = ">=4.4.0" },
     { name = "beartype", specifier = ">=0.20.0" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=5.0.0" },
     { name = "cryptography", marker = "extra == 'wrappers-encryption'", specifier = ">=45.0.0" },
