@@ -36,6 +36,10 @@ jobs:
       - name: Install UV
         uses: astral-sh/setup-uv@v7
 
+      # Install dependencies
+      - name: Install dependencies
+        run: uv sync --all-packages --group dev
+
       - name: Set analysis prompt
         id: analysis-prompt
         run: |
