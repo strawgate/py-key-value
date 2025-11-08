@@ -93,11 +93,22 @@ class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
         )
         async with session.client(service_name="s3", endpoint_url=S3_ENDPOINT) as client:  # type: ignore
             with contextlib.suppress(Exception):
-                # Delete all objects in the bucket
-                response = await client.list_objects_v2(Bucket=S3_TEST_BUCKET)  # type: ignore
-                if "Contents" in response:
-                    for obj in response["Contents"]:  # type: ignore
+                # Delete all objects in the bucket (handle pagination)
+                continuation_token: str | None = None
+                while True:
+                    list_kwargs = {"Bucket": S3_TEST_BUCKET}
+                    if continuation_token:
+                        list_kwargs["ContinuationToken"] = continuation_token
+                    response = await client.list_objects_v2(**list_kwargs)  # type: ignore
+
+                    # Delete objects from this page
+                    for obj in response.get("Contents", []):  # type: ignore
                         await client.delete_object(Bucket=S3_TEST_BUCKET, Key=obj["Key"])  # type: ignore
+
+                    # Check if there are more pages
+                    continuation_token = response.get("NextContinuationToken")  # type: ignore
+                    if not continuation_token:
+                        break
 
                 # Delete the bucket
                 await client.delete_bucket(Bucket=S3_TEST_BUCKET)  # type: ignore

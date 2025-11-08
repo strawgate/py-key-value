@@ -127,7 +127,11 @@ def sanitize_string(
         raise ValueError(msg)
 
     hash_fragment: str = generate_hash_fragment(value=value, size=hash_fragment_length)
-    hash_fragment_size_required: int = len(hash_fragment_separator) + len(hash_fragment)
+    hash_fragment_size_required: int = (
+        len((hash_fragment_separator + hash_fragment).encode("utf-8"))
+        if length_is_bytes
+        else len(hash_fragment_separator) + len(hash_fragment)
+    )
 
     sanitized_value: str = (
         sanitize_characters_in_string(value=value, allowed_characters=allowed_characters, replace_with=replacement_character)
@@ -164,7 +168,7 @@ def sanitize_string(
         msg = "Entire value was sanitized and hash_fragment_mode is HashFragmentMode.NEVER"
         raise ValueError(msg)
 
-    return _truncate_to_bytes(sanitized_value, max_length) if length_is_bytes else sanitized_value
+    return _truncate_to_bytes(sanitized_value, max_length) if length_is_bytes else sanitized_value[:max_length]
 
 
 @bear_enforce

@@ -364,7 +364,11 @@ class S3Store(BaseContextManagerStore, BaseStore):
 
             # Check for client-side expiration
             if managed_entry.is_expired:
-                # Entry expired, return None without deleting
+                # Entry expired, delete it and return None
+                await self._connected_client.delete_object(  # type: ignore[reportUnknownMemberType]
+                    Bucket=self._bucket_name,
+                    Key=s3_key,
+                )
                 return None
             return managed_entry  # noqa: TRY300
 
@@ -433,22 +437,32 @@ class S3Store(BaseContextManagerStore, BaseStore):
             )
 
         except ClientError as e:
-            # Check if it's a 404/not found error
-            error_code = e.response.get("Error", {}).get("Code", "")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            http_status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            error = e.response.get("Error", {})  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            metadata = e.response.get("ResponseMetadata", {})  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            error_code = error.get("Code", "")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            http_status = metadata.get("HTTPStatusCode", 0)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
             if error_code in ("404", "NoSuchKey") or http_status == HTTP_NOT_FOUND:
                 # Object doesn't exist
                 return False
-            # Re-raise other errors (auth, network, etc.)
+
+            # If AccessDenied on head_object, try delete anyway (delete-only IAM role)
+            if error_code in ("403", "AccessDenied"):
+                await self._connected_client.delete_object(  # pyright: ignore[reportUnknownMemberType]
+                    Bucket=self._bucket_name,
+                    Key=s3_key,
+                )
+                return True
+
+            # Re-raise other errors (network, etc.)
             raise
-        else:
-            # Object exists, delete it
-            await self._connected_client.delete_object(  # pyright: ignore[reportUnknownMemberType]
-                Bucket=self._bucket_name,
-                Key=s3_key,
-            )
-            return True
+
+        # Object exists, delete it
+        await self._connected_client.delete_object(  # pyright: ignore[reportUnknownMemberType]
+            Bucket=self._bucket_name,
+            Key=s3_key,
+        )
+        return True
 
     @override
     async def _close(self) -> None:
