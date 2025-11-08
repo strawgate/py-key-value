@@ -48,22 +48,6 @@ class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
 
 
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
-class TestDuckDBStoreTextMode(ContextManagerStoreTestMixin, BaseStoreTests):
-    """Test DuckDB store with TEXT column mode (stringified JSON) instead of native JSON."""
-
-    @override
-    @pytest.fixture
-    async def store(self) -> AsyncGenerator[DuckDBStore, None]:
-        """Test with in-memory DuckDB database using TEXT column for stringified JSON."""
-        duckdb_store = DuckDBStore(native_storage=False)
-        yield duckdb_store
-        await duckdb_store.close()
-
-    @pytest.mark.skip(reason="Local disk stores are unbounded")
-    async def test_not_unbounded(self, store: BaseStore): ...
-
-
-@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestDuckDBStoreSpecific:
     """Test DuckDB-specific functionality."""
 
@@ -76,7 +60,7 @@ class TestDuckDBStoreSpecific:
 
     async def test_native_sql_queryability(self):
         """Test that users can query the database directly with SQL."""
-        store = DuckDBStore(native_storage=True)
+        store = DuckDBStore()
 
         # Store some test data with known metadata
         await store.put(collection="products", key="item1", value={"name": "Widget", "price": 10.99}, ttl=3600)
@@ -88,7 +72,7 @@ class TestDuckDBStoreSpecific:
         result = (
             get_client_from_store(store)
             .execute("""
-            SELECT key, value_dict->'name' as name, value_dict->'price' as price
+            SELECT key, value_dict->'value'->'name' as name, value_dict->'value'->'price' as price
             FROM kv_entries
             WHERE collection = 'products'
             ORDER BY key
@@ -114,36 +98,6 @@ class TestDuckDBStoreSpecific:
 
         assert count_result is not None
         assert count_result[0] == 3  # All 3 entries should not be expired
-
-        await store.close()
-
-    async def test_text_mode_storage(self):
-        """Test that TEXT mode stores value as stringified JSON instead of native JSON."""
-        store = DuckDBStore(native_storage=False)
-
-        await store.put(collection="test", key="key1", value={"data": "value"})
-
-        # Query to check column type - in TEXT mode, value_json should be populated
-        result = (
-            get_client_from_store(store)
-            .execute("""
-            SELECT value_json, value_dict, typeof(value_json) as json_type, typeof(value_dict) as dict_type
-            FROM kv_entries
-            WHERE collection = 'test' AND key = 'key1'
-        """)
-            .fetchone()
-        )  # pyright: ignore[reportPrivateUsage]
-
-        assert result is not None
-        value_json, value_dict, json_type, _dict_type = result
-
-        # In TEXT mode (native_storage=False), value_json should be populated, value_dict should be NULL
-        assert value_json is not None
-        assert value_dict is None
-        assert json_type in ("VARCHAR", "TEXT")
-        # Value should be a JSON string
-        assert isinstance(value_json, str)
-        assert "data" in value_json
 
         await store.close()
 
@@ -259,48 +213,6 @@ class TestDuckDBStoreSpecific:
             get_client_from_store(store).table("kv_entries")
 
         await store.close()
-
-    async def test_native_vs_stringified_storage(self):
-        """Test that native and stringified storage modes work correctly."""
-        # Native storage (default)
-        store_native = DuckDBStore(native_storage=True)
-        await store_native.put(collection="test", key="key1", value={"name": "native"})
-
-        result_native = (
-            get_client_from_store(store_native)
-            .execute("""
-            SELECT value_dict, value_json
-            FROM kv_entries
-            WHERE key = 'key1'
-        """)
-            .fetchone()
-        )  # pyright: ignore[reportPrivateUsage]
-
-        assert result_native is not None
-        assert result_native[0] is not None  # value_dict should be populated
-        assert result_native[1] is None  # value_json should be NULL
-
-        await store_native.close()
-
-        # Stringified storage
-        store_string = DuckDBStore(native_storage=False)
-        await store_string.put(collection="test", key="key2", value={"name": "stringified"})
-
-        result_string = (
-            get_client_from_store(store_string)
-            .execute("""
-            SELECT value_dict, value_json
-            FROM kv_entries
-            WHERE key = 'key2'
-        """)
-            .fetchone()
-        )  # pyright: ignore[reportPrivateUsage]
-
-        assert result_string is not None
-        assert result_string[0] is None  # value_dict should be NULL
-        assert result_string[1] is not None  # value_json should be populated
-
-        await store_string.close()
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
     async def test_not_unbounded(self, store: BaseStore): ...
