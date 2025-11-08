@@ -64,6 +64,7 @@ def test_managed_entry_document_conversion():
 
     assert document == snapshot(
         {
+            "version": 1,
             "value": {"flattened": {"test": "test"}},
             "created_at": "2025-01-01T00:00:00+00:00",
             "expires_at": "2025-01-01T00:00:10+00:00",
@@ -174,6 +175,9 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         response = await es_client.get(index=index_name, id=doc_id)
         assert response.body["_source"] == snapshot(
             {
+                "version": 1,
+                "key": "test_key",
+                "collection": "test",
                 "value": {"flattened": {"name": "Alice", "age": 30}},
                 "created_at": IsStr(min_length=20, max_length=40),
             }
@@ -184,6 +188,9 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         response = await es_client.get(index=index_name, id=doc_id)
         assert response.body["_source"] == snapshot(
             {
+                "version": 1,
+                "key": "test_key",
+                "collection": "test",
                 "value": {"flattened": {"name": "Bob", "age": 25}},
                 "created_at": IsStr(min_length=20, max_length=40),
                 "expires_at": IsStr(min_length=20, max_length=40),

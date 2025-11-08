@@ -100,13 +100,19 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         assert raw_documents_dicts == snapshot(
             [
                 {
+                    "collection": "test",
                     "created_at": IsDatetime(iso_string=True),
+                    "key": "document_format_test_1",
                     "value": {"test_1": "value_1"},
+                    "version": 1,
                 },
                 {
+                    "collection": "test",
                     "created_at": IsDatetime(iso_string=True),
                     "expires_at": IsDatetime(iso_string=True),
+                    "key": "document_format_test_2",
                     "value": {"test_2": "value_2"},
+                    "version": 1,
                 },
             ]
         )
@@ -122,14 +128,20 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         assert raw_documents_dicts == snapshot(
             [
                 {
+                    "collection": "test",
                     "created_at": IsDatetime(iso_string=True),
                     "expires_at": IsDatetime(iso_string=True),
+                    "key": "document_format_test_3",
                     "value": {"test_3": "value_3"},
+                    "version": 1,
                 },
                 {
+                    "collection": "test",
                     "created_at": IsDatetime(iso_string=True),
                     "expires_at": IsDatetime(iso_string=True),
+                    "key": "document_format_test_4",
                     "value": {"test_4": "value_4"},
+                    "version": 1,
                 },
             ]
         )
@@ -138,7 +150,14 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         raw_document: Any = await redis_client.get(name="test::document_format_test")
         raw_document_dict = json.loads(raw_document)
         assert raw_document_dict == snapshot(
-            {"created_at": IsDatetime(iso_string=True), "expires_at": IsDatetime(iso_string=True), "value": {"test": "value"}}
+            {
+                "collection": "test",
+                "created_at": IsDatetime(iso_string=True),
+                "expires_at": IsDatetime(iso_string=True),
+                "key": "document_format_test",
+                "value": {"test": "value"},
+                "version": 1,
+            }
         )
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")

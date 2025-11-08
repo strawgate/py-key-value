@@ -102,7 +102,7 @@ class WindowsRegistryStore(BaseStore):
         sanitized_key = self._sanitize_key(key=key)
         registry_path = self._get_registry_path(collection=collection)
 
-        json_str: str = self._serialization_adapter.dump_json(entry=managed_entry)
+        json_str: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
         set_reg_sz_value(hive=self._hive, sub_key=registry_path, value_name=sanitized_key, value=json_str)
 
