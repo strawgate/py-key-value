@@ -48,7 +48,7 @@ rocksdb = [
     "rocksdict>=0.3.24 ; python_version >= '3.12'", # RocksDB 0.3.24 is the first version to support Python 3.13
     "rocksdict>=0.3.2 ; python_version < '3.12'"
 ]
-duckdb = ["duckdb>=1.0.0", "pytz>=2025.2"]
+duckdb = ["duckdb>=1.1.1", "pytz>=2025.2"]
 wrappers-encryption = ["cryptography>=45.0.0"]
 
 [tool.pytest.ini_options]
