@@ -359,7 +359,7 @@ class OpenSearchStore(
         index_name: str = self._get_index_name(collection=collection)
         document_id: str = self._get_document_id(key=key)
 
-        document: dict[str, Any] = self._serializer.dump_dict(entry=managed_entry)
+        document: dict[str, Any] = self._serializer.dump_dict(entry=managed_entry, key=key, collection=collection)
 
         try:
             _ = await self._client.index(  # type: ignore[reportUnknownVariableType]
@@ -395,7 +395,7 @@ class OpenSearchStore(
 
             index_action: dict[str, Any] = new_bulk_action(action="index", index=index_name, document_id=document_id)
 
-            document: dict[str, Any] = self._serializer.dump_dict(entry=managed_entry)
+            document: dict[str, Any] = self._serializer.dump_dict(entry=managed_entry, key=key, collection=collection)
 
             operations.extend([index_action, document])
 

@@ -5,7 +5,6 @@ from typing import Any
 
 import pytest
 from dirty_equals import IsFloat, IsStr
-from elasticsearch import AsyncElasticsearch
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
 from key_value.shared.utils.managed_entry import ManagedEntry
@@ -75,6 +74,7 @@ def test_managed_entry_document_conversion():
 
     assert document == snapshot(
         {
+            "version": 1,
             "value": {"flat": {"test": "test"}},
             "created_at": "2025-01-01T00:00:00+00:00",
             "expires_at": "2025-01-01T00:00:10+00:00",
@@ -189,7 +189,7 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         index_names: list[str] = list(indices.keys())
         assert index_names == snapshot(["opensearch-kv-store-e2e-test-test_collection", "opensearch-kv-store-e2e-test-test_collection_2"])
 
-    async def test_value_stored_as_f_object(self, store: OpenSearchStore, opensearch_client: AsyncElasticsearch):
+    async def test_value_stored_as_f_object(self, store: OpenSearchStore, opensearch_client: AsyncOpenSearch):
         """Verify values are stored as f objects, not JSON strings"""
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
@@ -199,6 +199,9 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         response = await opensearch_client.get(index=index_name, id=doc_id)
         assert response["_source"] == snapshot(
             {
+                "version": 1,
+                "key": "test_key",
+                "collection": "test",
                 "value": {"flat": {"name": "Alice", "age": 30}},
                 "created_at": IsStr(min_length=20, max_length=40),
             }
@@ -209,6 +212,9 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         response = await opensearch_client.get(index=index_name, id=doc_id)
         assert response["_source"] == snapshot(
             {
+                "version": 1,
+                "key": "test_key",
+                "collection": "test",
                 "value": {"flat": {"name": "Bob", "age": 25}},
                 "created_at": IsStr(min_length=20, max_length=40),
                 "expires_at": IsStr(min_length=20, max_length=40),
