@@ -50,6 +50,7 @@ rocksdb = [
     "rocksdict>=0.3.24 ; python_version >= '3.12'", # RocksDB 0.3.24 is the first version to support Python 3.13
     "rocksdict>=0.3.2 ; python_version < '3.12'"
 ]
+duckdb = ["duckdb>=1.1.1", "pytz>=2025.2"]
 wrappers-encryption = ["cryptography>=45.0.0"]
 
 [tool.pytest.ini_options]
@@ -69,7 +70,7 @@ env_files = [".env"]
 
 [dependency-groups]
 dev = [
-    "py-key-value-aio[memory,disk,filetree,redis,elasticsearch,memcached,mongodb,vault,dynamodb,s3,rocksdb]",
+    "py-key-value-aio[memory,disk,filetree,redis,elasticsearch,memcached,mongodb,vault,dynamodb,s3,rocksdb,duckdb]",
     "py-key-value-aio[valkey]; platform_system != 'Windows'",
     "py-key-value-aio[keyring]",
     "py-key-value-aio[pydantic]",
