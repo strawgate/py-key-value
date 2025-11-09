@@ -1956,6 +1956,9 @@ elasticsearch = [
     { name = "aiohttp" },
     { name = "elasticsearch" },
 ]
+filetree = [
+    { name = "anyio" },
+]
 keyring = [
     { name = "keyring" },
 ]
@@ -1995,7 +1998,7 @@ wrappers-encryption = [
 [package.dev-dependencies]
 dev = [
     { name = "py-key-value", extra = ["dev"] },
-    { name = "py-key-value-sync", extra = ["disk", "duckdb", "elasticsearch", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "rocksdb", "vault", "wrappers-encryption"] },
+    { name = "py-key-value-sync", extra = ["disk", "duckdb", "elasticsearch", "filetree", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "rocksdb", "vault", "wrappers-encryption"] },
     { name = "py-key-value-sync", extra = ["valkey"], marker = "sys_platform != 'win32'" },
 ]
 
@@ -2003,6 +2006,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
+    { name = "anyio", marker = "extra == 'filetree'", specifier = ">=4.4.0" },
     { name = "beartype", specifier = ">=0.20.0" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=5.0.0" },
     { name = "cryptography", marker = "extra == 'wrappers-encryption'", specifier = ">=45.0.0" },
@@ -2024,13 +2028,13 @@ requires-dist = [
     { name = "types-hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "valkey-glide-sync", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-provides-extras = ["memory", "disk", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "pydantic", "keyring", "keyring-linux", "rocksdb", "duckdb", "wrappers-encryption"]
+provides-extras = ["memory", "disk", "filetree", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "pydantic", "keyring", "keyring-linux", "rocksdb", "duckdb", "wrappers-encryption"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "py-key-value", extras = ["dev"], editable = "." },
     { name = "py-key-value-sync", extras = ["keyring"] },
-    { name = "py-key-value-sync", extras = ["memory", "disk", "redis", "elasticsearch", "memcached", "mongodb", "vault", "rocksdb", "duckdb"] },
+    { name = "py-key-value-sync", extras = ["memory", "disk", "filetree", "redis", "elasticsearch", "memcached", "mongodb", "vault", "rocksdb", "duckdb"] },
     { name = "py-key-value-sync", extras = ["pydantic"] },
     { name = "py-key-value-sync", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-sync", extras = ["wrappers-encryption"] },
