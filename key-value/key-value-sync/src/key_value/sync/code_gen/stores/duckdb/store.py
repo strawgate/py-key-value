@@ -28,7 +28,6 @@ class DuckDBSerializationAdapter(SerializationAdapter):
         super().__init__()
 
         self._date_format = "datetime"
-        self._value_format = "string"
 
     @override
     def prepare_dump(self, data: dict[str, Any]) -> dict[str, Any]:
