@@ -34,6 +34,7 @@ Local stores are stored in memory or on disk, local to the application.
 | Memory | N/A | ✅ | ✅ | Fast in-memory storage for development and caching |
 | Disk | Stable | ☑️ | ✅ | Persistent file-based storage in a single file |
 | Disk (Per-Collection) | Stable | ☑️ | ✅ | Persistent storage with separate files per collection |
+| FileTree (test) | Unstable | ☑️ | ✅ | Directory-based storage with JSON files for visual inspection |
 | Null (test) | N/A | ✅ | ✅ | No-op store for testing without side effects |
 | RocksDB | Unstable | ☑️ | ✅ | High-performance embedded database |
 | Simple (test) | N/A | ✅ | ✅ | Simple in-memory store for testing |
@@ -137,6 +138,74 @@ pip install py-key-value-aio[disk]
 - Better suited for many collections
 - Easier collection management
 - JSON-based storage
+
+---
+
+### FileTreeStore
+
+Directory-based storage for visual inspection and debugging.
+
+```python
+from key_value.aio.stores.filetree import FileTreeStore
+
+store = FileTreeStore(directory="./debug-store")
+```
+
+**Installation:**
+
+```bash
+pip install py-key-value-aio[filetree]
+```
+
+**Use Cases:**
+
+- Visual inspection of store contents
+- Debugging store behavior
+- Development and testing
+- Understanding data structure
+
+**Characteristics:**
+
+- Collections as directories
+- Keys as JSON files (`{key}.json`)
+- Human-readable filesystem layout
+- Easy to inspect and modify
+- **NOT for production use**
+
+**Directory Structure:**
+
+```text
+{base_directory}/
+  {collection_1}/
+    {key_1}.json
+    {key_2}.json
+  {collection_2}/
+    {key_3}.json
+```
+
+**Important Limitations:**
+
+- Poor performance with many keys
+- No atomic operations
+- No automatic cleanup of expired entries
+- Filesystem path length constraints
+- Subject to filesystem limitations
+
+**When to Use:**
+
+Use FileTreeStore when you need to:
+
+- Visually inspect what's being stored
+- Debug complex data structures
+- Understand how the store organizes data
+- Manually modify stored data for testing
+
+**When NOT to Use:**
+
+- Production environments
+- High-performance requirements
+- Large datasets
+- Concurrent access scenarios
 
 ---
 

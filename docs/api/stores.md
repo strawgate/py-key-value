@@ -23,6 +23,16 @@ Persistent disk-based key-value store using DiskCache.
       members:
         - __init__
 
+## FileTree Store
+
+Directory-based store for visual inspection and testing.
+
+::: key_value.aio.stores.filetree.FileTreeStore
+    options:
+      show_source: false
+      members:
+        - __init__
+
 ## Redis Store
 
 Redis-backed key-value store.
