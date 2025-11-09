@@ -58,6 +58,8 @@ EXCLUDE_DIRECTORIES = [
     "key-value/key-value-aio/tests/stores/memcached",
     "key-value/key-value-aio/src/key_value/aio/stores/filetree",
     "key-value/key-value-aio/tests/stores/filetree",
+    "key-value/key-value-aio/src/key_value/aio/stores/postgresql",
+    "key-value/key-value-aio/tests/stores/postgresql",
     "key-value/key-value-aio/src/key_value/aio/wrappers/timeout",
     "key-value/key-value-aio/tests/wrappers/timeout",
 ]
