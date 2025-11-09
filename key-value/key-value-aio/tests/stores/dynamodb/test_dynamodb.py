@@ -125,7 +125,13 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
             TableName=DYNAMODB_TEST_TABLE, Key={"collection": {"S": "test"}, "key": {"S": "test_key"}}
         )
         assert get_value_from_response(response=response) == snapshot(
-            {"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}}
+            {
+                "collection": "test",
+                "created_at": IsDatetime(iso_string=True),
+                "key": "test_key",
+                "value": {"age": 30, "name": "Alice"},
+                "version": 1,
+            }
         )
 
         assert "ttl" not in response.get("Item", {})
@@ -136,7 +142,14 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
             TableName=DYNAMODB_TEST_TABLE, Key={"collection": {"S": "test"}, "key": {"S": "test_key"}}
         )
         assert get_value_from_response(response=response) == snapshot(
-            {"created_at": IsDatetime(iso_string=True), "value": {"age": 30, "name": "Alice"}, "expires_at": IsDatetime(iso_string=True)}
+            {
+                "collection": "test",
+                "created_at": IsDatetime(iso_string=True),
+                "value": {"age": 30, "name": "Alice"},
+                "key": "test_key",
+                "expires_at": IsDatetime(iso_string=True),
+                "version": 1,
+            }
         )
         # Verify DynamoDB TTL attribute is set for automatic expiration
         assert "ttl" in response.get("Item", {}), "DynamoDB TTL attribute should be set when ttl parameter is provided"

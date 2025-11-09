@@ -105,7 +105,7 @@ class VaultStore(BaseStore):
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        json_str: str = self._serialization_adapter.dump_json(entry=managed_entry)
+        json_str: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
         # Store the JSON string in a 'value' field
         secret_data = {"value": json_str}
@@ -119,7 +119,7 @@ class VaultStore(BaseStore):
         try:
             # Vault doesnt tell us if the delete was successful so we read the entry and if it exists before we call delete,
             # we count it as a deletion.
-            entry = self._kv_v2.read_secret(path=combo_key, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+            entry = self._kv_v2.read_secret(path=combo_key, mount_point=self._mount_point, raise_on_deleted_version=True)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
             self._kv_v2.delete_metadata_and_all_versions(path=combo_key, mount_point=self._mount_point)  # pyright: ignore[reportUnknownMemberType]
         except InvalidPath:
             return False

@@ -1,9 +1,9 @@
-import hashlib
 from collections.abc import Sequence
 from typing import overload
 
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.sanitization import HashExcessLengthStrategy, SanitizationStrategy
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseStore
@@ -17,16 +17,36 @@ except ImportError as e:
 MAX_KEY_LENGTH = 240
 
 
+class MemcachedV1KeySanitizationStrategy(HashExcessLengthStrategy):
+    def __init__(self) -> None:
+        super().__init__(max_length=MAX_KEY_LENGTH)
+
+
 class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
-    """Memcached-based key-value store using aiomcache."""
+    """Memcached-based key-value store using aiomcache.
+
+    By default, keys are not sanitized. This means that there are character and length restrictions on
+    keys that may cause errors when trying to get and put entries.
+
+    To avoid issues, you may want to consider leveraging the `MemcachedV1KeySanitizationStrategy` strategy.
+    """
 
     _client: Client
 
     @overload
-    def __init__(self, *, client: Client, default_collection: str | None = None) -> None: ...
+    def __init__(
+        self, *, client: Client, default_collection: str | None = None, key_sanitization_strategy: SanitizationStrategy | None = None
+    ) -> None: ...
 
     @overload
-    def __init__(self, *, host: str = "127.0.0.1", port: int = 11211, default_collection: str | None = None) -> None: ...
+    def __init__(
+        self,
+        *,
+        host: str = "127.0.0.1",
+        port: int = 11211,
+        default_collection: str | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
+    ) -> None: ...
 
     def __init__(
         self,
@@ -35,6 +55,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         host: str = "127.0.0.1",
         port: int = 11211,
         default_collection: str | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
         """Initialize the Memcached store.
 
@@ -43,20 +64,18 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
             host: Memcached host. Defaults to 127.0.0.1.
             port: Memcached port. Defaults to 11211.
             default_collection: The default collection to use if no collection is provided.
+            key_sanitization_strategy: The sanitization strategy to use for keys.
         """
         self._client = client or Client(host=host, port=port)
 
-        super().__init__(default_collection=default_collection)
-
-    def sanitize_key(self, key: str) -> str:
-        if len(key) > MAX_KEY_LENGTH:
-            sha256_hash: str = hashlib.sha256(key.encode()).hexdigest()
-            return sha256_hash[:64]
-        return key
+        super().__init__(
+            default_collection=default_collection,
+            key_sanitization_strategy=key_sanitization_strategy,
+        )
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        combo_key: str = self.sanitize_key(compound_key(collection=collection, key=key))
+        combo_key: str = self._sanitize_key(compound_key(collection=collection, key=key))
 
         raw_value: bytes | None = await self._client.get(combo_key.encode("utf-8"))
 
@@ -72,7 +91,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         if not keys:
             return []
 
-        combo_keys: list[str] = [self.sanitize_key(compound_key(collection=collection, key=key)) for key in keys]
+        combo_keys: list[str] = [self._sanitize_key(compound_key(collection=collection, key=key)) for key in keys]
 
         # Use multi_get for efficient batch retrieval
         # multi_get returns a tuple in the same order as keys
@@ -96,7 +115,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
-        combo_key: str = self.sanitize_key(compound_key(collection=collection, key=key))
+        combo_key: str = self._sanitize_key(compound_key(collection=collection, key=key))
 
         # Memcached treats 0 as no-expiration. Do not pass <= 0 (other than 0) to avoid permanence errors.
         exptime: int
@@ -106,7 +125,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         else:
             exptime = max(int(managed_entry.ttl), 1)
 
-        json_value: str = self._serialization_adapter.dump_json(entry=managed_entry)
+        json_value: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
         _ = await self._client.set(
             key=combo_key.encode(encoding="utf-8"),
@@ -116,7 +135,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        combo_key: str = self.sanitize_key(compound_key(collection=collection, key=key))
+        combo_key: str = self._sanitize_key(compound_key(collection=collection, key=key))
 
         return await self._client.delete(key=combo_key.encode(encoding="utf-8"))
 

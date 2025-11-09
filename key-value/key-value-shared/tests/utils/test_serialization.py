@@ -50,6 +50,7 @@ class TestBasicSerializationAdapter:
     def test_entry_one(self, adapter: BasicSerializationAdapter):
         assert adapter.dump_dict(entry=TEST_ENTRY_ONE) == snapshot(
             {
+                "version": 1,
                 "value": TEST_DATA_ONE,
                 "created_at": FIXED_DATETIME_ONE_ISOFORMAT,
                 "expires_at": FIXED_DATETIME_ONE_PLUS_10_SECONDS_ISOFORMAT,
@@ -57,7 +58,7 @@ class TestBasicSerializationAdapter:
         )
 
         assert adapter.dump_json(entry=TEST_ENTRY_ONE) == snapshot(
-            '{"created_at": "2025-01-01T00:00:00+00:00", "expires_at": "2025-01-01T00:00:10+00:00", "value": {"key_one": "value_one", "key_three": {"nested_key": "nested_value"}, "key_two": "value_two"}}'
+            '{"created_at": "2025-01-01T00:00:00+00:00", "expires_at": "2025-01-01T00:00:10+00:00", "value": {"key_one": "value_one", "key_three": {"nested_key": "nested_value"}, "key_two": "value_two"}, "version": 1}'
         )
 
         assert adapter.load_dict(data=adapter.dump_dict(entry=TEST_ENTRY_ONE)) == snapshot(TEST_ENTRY_ONE)
@@ -66,6 +67,7 @@ class TestBasicSerializationAdapter:
     def test_entry_two(self, adapter: BasicSerializationAdapter):
         assert adapter.dump_dict(entry=TEST_ENTRY_TWO) == snapshot(
             {
+                "version": 1,
                 "value": TEST_DATA_TWO,
                 "created_at": FIXED_DATETIME_TWO_ISOFORMAT,
                 "expires_at": FIXED_DATETIME_TWO_PLUS_10_SECONDS_ISOFORMAT,
@@ -73,7 +75,7 @@ class TestBasicSerializationAdapter:
         )
 
         assert adapter.dump_json(entry=TEST_ENTRY_TWO) == snapshot(
-            '{"created_at": "2025-01-01T00:00:01+00:00", "expires_at": "2025-01-01T00:00:11+00:00", "value": {"key_one": ["value_one", "value_two", "value_three"], "key_three": {"nested_key": "nested_value"}, "key_two": 123}}'
+            '{"created_at": "2025-01-01T00:00:01+00:00", "expires_at": "2025-01-01T00:00:11+00:00", "value": {"key_one": ["value_one", "value_two", "value_three"], "key_three": {"nested_key": "nested_value"}, "key_two": 123}, "version": 1}'
         )
 
         assert adapter.load_dict(data=adapter.dump_dict(entry=TEST_ENTRY_TWO)) == snapshot(TEST_ENTRY_TWO)

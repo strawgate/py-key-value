@@ -123,7 +123,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        json_value: str = self._adapter.dump_json(entry=managed_entry)
+        json_value: str = self._adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
         if managed_entry.ttl is not None:
             # Redis does not support <= 0 TTLs
@@ -151,7 +151,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             # If there is no TTL, we can just do a simple mset
             mapping: dict[str, str] = {}
             for key, managed_entry in zip(keys, managed_entries, strict=True):
-                json_value = self._adapter.dump_json(entry=managed_entry)
+                json_value = self._adapter.dump_json(entry=managed_entry, key=key, collection=collection)
                 mapping[compound_key(collection=collection, key=key)] = json_value
 
             self._client.mset(mapping=mapping)
@@ -166,7 +166,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             combo_key: str = compound_key(collection=collection, key=key)
-            json_value = self._adapter.dump_json(entry=managed_entry)
+            json_value = self._adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
             pipeline.setex(name=combo_key, time=ttl_seconds, value=json_value)
 

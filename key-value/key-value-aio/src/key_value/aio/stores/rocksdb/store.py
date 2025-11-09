@@ -124,7 +124,7 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         self._fail_on_closed_store()
 
         combo_key: str = compound_key(collection=collection, key=key)
-        json_value: str = self._serialization_adapter.dump_json(entry=managed_entry)
+        json_value: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
         self._db[combo_key] = json_value.encode("utf-8")
 
@@ -147,7 +147,7 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         batch = WriteBatch()
         for key, managed_entry in zip(keys, managed_entries, strict=True):
             combo_key: str = compound_key(collection=collection, key=key)
-            json_value: str = self._serialization_adapter.dump_json(entry=managed_entry)
+            json_value: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
             batch.put(combo_key, json_value.encode("utf-8"))
 
         self._db.write(batch)
