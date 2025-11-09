@@ -1,8 +1,7 @@
-import json
 import re
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast, overload
+from typing import Any, overload
 
 from key_value.shared.errors import DeserializationError
 from key_value.shared.utils.managed_entry import ManagedEntry
@@ -14,7 +13,7 @@ from key_value.aio.stores.base import SEED_DATA_TYPE, BaseContextManagerStore, B
 try:
     import duckdb
 except ImportError as e:
-    msg = "DuckDBStore requires py-key-value-aio[duckdb]"
+    msg = "DuckDBStore requires the duckdb extra from py-key-value-aio or py-key-value-sync"
     raise ImportError(msg) from e
 
 
@@ -26,80 +25,23 @@ class DuckDBSerializationAdapter(SerializationAdapter):
         super().__init__()
 
         self._date_format = "datetime"
-        # Use string format - DuckDB needs JSON strings for JSON columns
         self._value_format = "string"
 
     @override
     def prepare_dump(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Prepare data for dumping to DuckDB.
-
-        Stores the value in the value_dict JSON column and includes version, key,
-        and collection fields in the JSON for compatibility with deserialization.
-        """
-        value = data.pop("value")
-
-        # Extract version, key, and collection to include in the JSON
-        version = data.pop("version", None)
-        key = data.pop("key", None)
-        collection_name = data.pop("collection", None)
-
-        # Build the document to store in JSON column
-        json_document: dict[str, Any] = {"value": value}
-
-        if version is not None:
-            json_document["version"] = version
-        if key is not None:
-            json_document["key"] = key
-        if collection_name is not None:
-            json_document["collection"] = collection_name
-
-        # Store the dict directly for DuckDB's JSON column
-        # DuckDB's Python API accepts dict objects and stores them as queryable JSON
-        data["value_dict"] = json_document
-
+        """Prepare data for dumping to DuckDB."""
         return data
 
     @override
     def prepare_load(self, data: dict[str, Any]) -> dict[str, Any]:
         """Prepare data loaded from DuckDB for conversion to ManagedEntry.
 
-        Extracts value, version, key, and collection from the JSON column
-        and handles timezone conversion for DuckDB's naive timestamps.
+        Handles timezone conversion for DuckDB's naive timestamps.
         """
-        value_dict = data.pop("value_dict", None)
-
-        # Parse the JSON document from the value_dict column
-        json_document = self._parse_json_column(value_dict)
-
-        # Extract fields from the JSON document
-        data["value"] = json_document.get("value")
-        if "version" in json_document:
-            data["version"] = json_document["version"]
-        if "key" in json_document:
-            data["key"] = json_document["key"]
-        if "collection" in json_document:
-            data["collection"] = json_document["collection"]
-
         # DuckDB always returns naive timestamps, but ManagedEntry expects timezone-aware ones
         self._convert_timestamps_to_utc(data)
 
         return data
-
-    def _parse_json_column(self, value_dict: Any) -> dict[str, Any]:
-        """Parse JSON from value_dict column."""
-        if value_dict is None:
-            msg = "value_dict column contains no data"
-            raise DeserializationError(message=msg)
-
-        # value_dict can be dict or string (DuckDB JSON returns as string)
-        if isinstance(value_dict, dict):
-            return cast("dict[str, Any]", value_dict)
-        if isinstance(value_dict, str):
-            parsed: dict[str, Any] = json.loads(value_dict)
-            return parsed
-
-        msg = f"value_dict has unexpected type: {type(value_dict)}"
-        raise DeserializationError(message=msg)
 
     def _convert_timestamps_to_utc(self, data: dict[str, Any]) -> None:
         """Convert naive timestamps to UTC timezone-aware timestamps."""
@@ -241,9 +183,10 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             CREATE TABLE IF NOT EXISTS {self._table_name} (
                 collection VARCHAR NOT NULL,
                 key VARCHAR NOT NULL,
-                value_dict JSON NOT NULL,
-                created_at TIMESTAMP,
-                expires_at TIMESTAMP,
+                value JSON NOT NULL,
+                created_at TIMESTAMPTZ,
+                expires_at TIMESTAMPTZ,
+                version INT NOT NULL,
                 PRIMARY KEY (collection, key)
             )
         """
@@ -277,7 +220,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             SQL SELECT statement with placeholders.
         """
         return f"""
-            SELECT value_dict, created_at, expires_at
+            SELECT value, created_at, expires_at, version
             FROM {self._table_name}
             WHERE collection = ? AND key = ?
         """  # noqa: S608
@@ -290,8 +233,8 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         """
         return f"""
             INSERT OR REPLACE INTO {self._table_name}
-            (collection, key, value_dict, created_at, expires_at)
-            VALUES (?, ?, ?, ?, ?)
+            (collection, key, value, created_at, expires_at, version)
+            VALUES (?, ?, ?, ?, ?, ?)
         """  # noqa: S608
 
     def _get_delete_sql(self) -> str:
@@ -311,7 +254,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         """Initialize the database schema for key-value storage.
 
         The schema uses native DuckDB types for efficient querying:
-        - value_dict: JSON column storing native dicts for queryability
+        - value: JSON column storing native dicts for queryability
         - created_at: TIMESTAMP for native datetime operations
         - expires_at: TIMESTAMP for native expiration queries
 
@@ -349,28 +292,24 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         if result is None:
             return None
 
-        value_dict, created_at, expires_at = result
+        value, created_at, expires_at, version = result
 
         # Build document dict for the adapter
         document: dict[str, Any] = {
-            "value_dict": value_dict,
+            "value": value,
+            "created_at": created_at,
+            "expires_at": expires_at,
+            "version": version,
         }
 
-        if created_at is not None and isinstance(created_at, datetime):
-            if created_at.tzinfo is None:
-                document["created_at"] = created_at.replace(tzinfo=timezone.utc)
-            else:
-                document["created_at"] = created_at.astimezone(tz=timezone.utc)
-        if expires_at is not None and isinstance(expires_at, datetime):
-            if expires_at.tzinfo is None:
-                document["expires_at"] = expires_at.replace(tzinfo=timezone.utc)
-            else:
-                document["expires_at"] = expires_at.astimezone(tz=timezone.utc)
+        document = {k: v for k, v in document.items() if v is not None}
 
         try:
-            return self._adapter.load_dict(data=document)
+            managed_entry = self._adapter.load_dict(data=document)
         except DeserializationError:
             return None
+
+        return managed_entry
 
     @override
     async def _put_managed_entry(
@@ -389,6 +328,9 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             msg = "Cannot operate on closed DuckDBStore"
             raise RuntimeError(msg)
 
+        # Ensure that the value is serializable to JSON
+        _ = managed_entry.value_as_json
+
         # Use adapter to dump the managed entry to a dict with key and collection
         document = self._adapter.dump_dict(entry=managed_entry, key=key, collection=collection)
 
@@ -398,9 +340,10 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             [
                 collection,
                 key,
-                document["value_dict"],
+                document["value"],
                 document.get("created_at"),
                 document.get("expires_at"),
+                document.get("version"),
             ],
         )
 

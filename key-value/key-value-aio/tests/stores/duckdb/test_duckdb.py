@@ -67,11 +67,11 @@ class TestDuckDBStoreSpecific:
         await store.put(collection="orders", key="order1", value={"total": 100.00, "items": 3})
 
         # Query directly via SQL to verify native storage
-        # Check that value_dict is stored as JSON (can extract fields)
+        # Check that value is stored as JSON (can extract fields)
         result = (
             get_client_from_store(store)
             .execute("""
-            SELECT key, value_dict->'value'->'name' as name, value_dict->'value'->'price' as price
+            SELECT key, value->'name' as name, value->'price' as price
             FROM kv_entries
             WHERE collection = 'products'
             ORDER BY key
