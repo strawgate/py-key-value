@@ -11,7 +11,6 @@ from key_value.shared.utils.managed_entry import ManagedEntry
 from opensearchpy import AsyncOpenSearch
 from typing_extensions import override
 
-from key_value.aio.protocols.key_value import AsyncKeyValueProtocol
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.opensearch import OpenSearchStore
 from key_value.aio.stores.opensearch.store import (
@@ -147,12 +146,6 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         async with store:
             yield store
-
-    @override
-    @pytest.mark.timeout(120)
-    async def test_store(self, store: BaseStore):
-        """Tests that the store is a valid AsyncKeyValueProtocol."""
-        assert isinstance(store, AsyncKeyValueProtocol) is True
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override

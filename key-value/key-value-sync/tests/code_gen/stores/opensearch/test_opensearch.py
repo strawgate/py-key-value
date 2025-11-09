@@ -14,7 +14,6 @@ from key_value.shared.utils.managed_entry import ManagedEntry
 from opensearchpy import OpenSearch
 from typing_extensions import override
 
-from key_value.sync.code_gen.protocols.key_value import KeyValueProtocol
 from key_value.sync.code_gen.stores.base import BaseStore
 from key_value.sync.code_gen.stores.opensearch import OpenSearchStore
 from key_value.sync.code_gen.stores.opensearch.store import (
@@ -141,12 +140,6 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         with store:
             yield store
-
-    @override
-    @pytest.mark.timeout(120)
-    def test_store(self, store: BaseStore):
-        """Tests that the store is a valid KeyValueProtocol."""
-        assert isinstance(store, KeyValueProtocol) is True
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
