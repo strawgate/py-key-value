@@ -21,12 +21,12 @@ WAIT_FOR_AEROSPIKE_TIMEOUT = 30
 
 async def ping_aerospike() -> bool:
     try:
-        import aerospike
+        import aerospike  # pyright: ignore[reportMissingImports]
 
         config = {"hosts": [(AEROSPIKE_HOST, AEROSPIKE_PORT)]}
-        client = aerospike.client(config)
-        client.connect()
-        client.close()
+        client = aerospike.client(config)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
+        client.connect()  # pyright: ignore[reportUnknownMemberType]
+        client.close()  # pyright: ignore[reportUnknownMemberType]
     except Exception:
         return False
     else:
@@ -51,17 +51,17 @@ class TestAerospikeStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self, setup_aerospike: None) -> AerospikeStore:
-        import aerospike
+        import aerospike  # pyright: ignore[reportMissingImports]
 
         config = {"hosts": [(AEROSPIKE_HOST, AEROSPIKE_PORT)]}
-        client = aerospike.client(config)
-        client.connect()
+        client = aerospike.client(config)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
+        client.connect()  # pyright: ignore[reportUnknownMemberType]
 
-        store = AerospikeStore(client=client, namespace=AEROSPIKE_NAMESPACE, set_name=AEROSPIKE_SET)
+        store = AerospikeStore(client=client, namespace=AEROSPIKE_NAMESPACE, set_name=AEROSPIKE_SET)  # pyright: ignore[reportUnknownArgumentType]
 
         # Clean up the set before tests
         with contextlib.suppress(Exception):
-            client.truncate(AEROSPIKE_NAMESPACE, AEROSPIKE_SET, 0)
+            client.truncate(AEROSPIKE_NAMESPACE, AEROSPIKE_SET, 0)  # pyright: ignore[reportUnknownMemberType]
 
         return store
 

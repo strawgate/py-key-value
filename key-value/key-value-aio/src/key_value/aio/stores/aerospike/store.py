@@ -10,7 +10,7 @@ from typing_extensions import override
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseEnumerateKeysStore, BaseStore
 
 try:
-    import aerospike
+    import aerospike  # pyright: ignore[reportMissingImports]
 except ImportError as e:
     msg = "AerospikeStore requires py-key-value-aio[aerospike]"
     raise ImportError(msg) from e
@@ -24,7 +24,7 @@ PAGE_LIMIT = 10000
 class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):
     """Aerospike-based key-value store."""
 
-    _client: aerospike.Client
+    _client: aerospike.Client  # pyright: ignore[reportUnknownMemberType]
     _namespace: str
     _set: str
     _adapter: SerializationAdapter
@@ -33,7 +33,7 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
     def __init__(
         self,
         *,
-        client: aerospike.Client,
+        client: aerospike.Client,  # pyright: ignore[reportUnknownMemberType, reportUnknownParameterType]
         namespace: str = DEFAULT_NAMESPACE,
         set_name: str = DEFAULT_SET,
         default_collection: str | None = None,
@@ -53,7 +53,7 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
     def __init__(
         self,
         *,
-        client: aerospike.Client | None = None,
+        client: aerospike.Client | None = None,  # pyright: ignore[reportUnknownMemberType, reportUnknownParameterType]
         hosts: list[tuple[str, int]] | None = None,
         namespace: str = DEFAULT_NAMESPACE,
         set_name: str = DEFAULT_SET,
@@ -73,7 +73,7 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         else:
             hosts = hosts or [("localhost", 3000)]
             config = {"hosts": hosts}
-            self._client = aerospike.client(config)
+            self._client = self._create_client(config)  # pyright: ignore[reportUnknownMemberType]
 
         self._namespace = namespace
         self._set = set_name
@@ -83,22 +83,75 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
 
         super().__init__(default_collection=default_collection)
 
+    # Helper methods to encapsulate aerospike client interactions with type ignore comments
+
+    def _create_client(self, config: dict[str, Any]) -> aerospike.Client:  # pyright: ignore[reportUnknownMemberType, reportUnknownParameterType]
+        """Create an Aerospike client."""
+        return aerospike.client(config)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+    def _connect_client(self) -> None:
+        """Connect the Aerospike client."""
+        self._client.connect()  # pyright: ignore[reportUnknownMemberType]
+
+    def _get_record(self, aerospike_key: tuple[str, str, str]) -> tuple[Any, Any, dict[str, Any]] | None:
+        """Get a record from Aerospike.
+
+        Returns:
+            Tuple of (key, metadata, bins) or None if not found.
+        """
+        try:
+            return self._client.get(aerospike_key)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        except aerospike.exception.RecordNotFound:  # pyright: ignore[reportUnknownMemberType]
+            return None
+
+    def _put_record(self, aerospike_key: tuple[str, str, str], bins: dict[str, Any], meta: dict[str, Any] | None = None) -> None:
+        """Put a record into Aerospike."""
+        if meta:
+            self._client.put(aerospike_key, bins, meta=meta)  # pyright: ignore[reportUnknownMemberType]
+        else:
+            self._client.put(aerospike_key, bins)  # pyright: ignore[reportUnknownMemberType]
+
+    def _remove_record(self, aerospike_key: tuple[str, str, str]) -> bool:
+        """Remove a record from Aerospike.
+
+        Returns:
+            True if the record was deleted, False if it didn't exist.
+        """
+        try:
+            self._client.remove(aerospike_key)  # pyright: ignore[reportUnknownMemberType]
+        except aerospike.exception.RecordNotFound:  # pyright: ignore[reportUnknownMemberType]
+            return False
+        else:
+            return True
+
+    def _scan_set(self, callback: Any) -> None:  # pyright: ignore[reportAny]
+        """Scan the entire set with a callback function."""
+        scan = self._client.scan(self._namespace, self._set)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        scan.foreach(callback)  # pyright: ignore[reportUnknownMemberType]
+
+    def _truncate_set(self) -> None:
+        """Truncate the set (delete all records)."""
+        self._client.truncate(self._namespace, self._set, 0)  # pyright: ignore[reportUnknownMemberType]
+
+    def _close_client(self) -> None:
+        """Close the Aerospike client connection."""
+        self._client.close()  # pyright: ignore[reportUnknownMemberType]
+
     @override
     async def _setup(self) -> None:
         """Connect to Aerospike."""
-        self._client.connect()
+        self._connect_client()
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         combo_key: str = compound_key(collection=collection, key=key)
-
         aerospike_key = (self._namespace, self._set, combo_key)
 
-        try:
-            (_key, _metadata, bins) = self._client.get(aerospike_key)
-        except aerospike.exception.RecordNotFound:
+        record = self._get_record(aerospike_key)
+        if record is None:
             return None
 
+        (_key, _metadata, bins) = record
         json_value: str | None = bins.get("value")
 
         if not isinstance(json_value, str):
@@ -118,31 +171,24 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         managed_entry: ManagedEntry,
     ) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
-
         aerospike_key = (self._namespace, self._set, combo_key)
         json_value: str = self._adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
         bins = {"value": json_value}
 
-        meta = {}
+        meta = None
         if managed_entry.ttl is not None:
             # Aerospike TTL is in seconds
-            meta["ttl"] = int(managed_entry.ttl)
+            meta = {"ttl": int(managed_entry.ttl)}
 
-        self._client.put(aerospike_key, bins, meta=meta)
+        self._put_record(aerospike_key, bins, meta=meta)
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
-
         aerospike_key = (self._namespace, self._set, combo_key)
 
-        try:
-            self._client.remove(aerospike_key)
-        except aerospike.exception.RecordNotFound:
-            return False
-        else:
-            return True
+        return self._remove_record(aerospike_key)
 
     @override
     async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
@@ -153,13 +199,15 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         keys: list[str] = []
 
         def callback(record: tuple[Any, Any, Any]) -> None:  # pyright: ignore[reportAny]
-            (_namespace, _set, primary_key, _bins) = record  # pyright: ignore[reportAny]
+            # Aerospike scan callback receives a 3-tuple: (key_tuple, metadata, bins)
+            # The key_tuple itself is (namespace, set, primary_key)
+            (key_tuple, _metadata, _bins) = record  # pyright: ignore[reportAny]
+            primary_key = key_tuple[2]  # Extract primary_key from the key_tuple
             if isinstance(primary_key, str) and primary_key.startswith(pattern):
                 keys.append(primary_key)
 
         # Scan the set for keys matching the collection
-        scan = self._client.scan(self._namespace, self._set)
-        scan.foreach(callback)
+        self._scan_set(callback)
 
         # Extract just the key part from compound keys
         result_keys = get_keys_from_compound_keys(compound_keys=keys, collection=collection)
@@ -171,10 +219,10 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         """Truncate the set (delete all records in the set)."""
         # Aerospike truncate requires a timestamp parameter
         # Using 0 means truncate everything
-        self._client.truncate(self._namespace, self._set, 0)
+        self._truncate_set()
         return True
 
     @override
     async def _close(self) -> None:
         """Close the Aerospike connection."""
-        self._client.close()
+        self._close_client()
