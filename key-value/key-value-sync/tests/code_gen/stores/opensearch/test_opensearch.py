@@ -187,14 +187,14 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         doc_id = store._get_document_id(key="test_key")  # pyright: ignore[reportPrivateUsage]
 
         response = opensearch_client.get(index=index_name, id=doc_id)
-        assert response.body["_source"] == snapshot(
+        assert response["_source"] == snapshot(
             {"value": {"flat": {"name": "Alice", "age": 30}}, "created_at": IsStr(min_length=20, max_length=40)}
         )
 
         # Test with TTL
         store.put(collection="test", key="test_key", value={"name": "Bob", "age": 25}, ttl=10)
         response = opensearch_client.get(index=index_name, id=doc_id)
-        assert response.body["_source"] == snapshot(
+        assert response["_source"] == snapshot(
             {
                 "value": {"flat": {"name": "Bob", "age": 25}},
                 "created_at": IsStr(min_length=20, max_length=40),
