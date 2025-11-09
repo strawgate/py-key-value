@@ -34,6 +34,7 @@ Local stores are stored in memory or on disk, local to the application.
 | Memory | N/A | ✅ | ✅ | Fast in-memory storage for development and caching |
 | Disk | Stable | ☑️ | ✅ | Persistent file-based storage in a single file |
 | Disk (Per-Collection) | Stable | ☑️ | ✅ | Persistent storage with separate files per collection |
+| FileTree (test) | Unstable | ☑️ | ✅ | Directory-based storage with JSON files for visual inspection |
 | Null (test) | N/A | ✅ | ✅ | No-op store for testing without side effects |
 | RocksDB | Unstable | ☑️ | ✅ | High-performance embedded database |
 | Simple (test) | N/A | ✅ | ✅ | Simple in-memory store for testing |
@@ -137,6 +138,74 @@ pip install py-key-value-aio[disk]
 - Better suited for many collections
 - Easier collection management
 - JSON-based storage
+
+---
+
+### FileTreeStore
+
+Directory-based storage for visual inspection and debugging.
+
+```python
+from key_value.aio.stores.filetree import FileTreeStore
+
+store = FileTreeStore(directory="./debug-store")
+```
+
+**Installation:**
+
+```bash
+pip install py-key-value-aio[filetree]
+```
+
+**Use Cases:**
+
+- Visual inspection of store contents
+- Debugging store behavior
+- Development and testing
+- Understanding data structure
+
+**Characteristics:**
+
+- Collections as directories
+- Keys as JSON files (`{key}.json`)
+- Human-readable filesystem layout
+- Easy to inspect and modify
+- **NOT for production use**
+
+**Directory Structure:**
+
+```text
+{base_directory}/
+  {collection_1}/
+    {key_1}.json
+    {key_2}.json
+  {collection_2}/
+    {key_3}.json
+```
+
+**Important Limitations:**
+
+- Poor performance with many keys
+- No atomic operations
+- No automatic cleanup of expired entries
+- Filesystem path length constraints
+- Subject to filesystem limitations
+
+**When to Use:**
+
+Use FileTreeStore when you need to:
+
+- Visually inspect what's being stored
+- Debug complex data structures
+- Understand how the store organizes data
+- Manually modify stored data for testing
+
+**When NOT to Use:**
+
+- Production environments
+- High-performance requirements
+- Large datasets
+- Concurrent access scenarios
 
 ---
 
@@ -328,6 +397,7 @@ Distributed stores provide network-based storage for multi-node applications.
 | Store | Stability | Async | Sync | Description |
 |-------|:---------:|:-----:|:----:|:------------|
 | DynamoDB | Unstable | ✅ | ✖️ | AWS DynamoDB key-value storage |
+| S3 | Unstable | ✅ | ✖️ | AWS S3 object storage |
 | Elasticsearch | Unstable | ✅ | ✅ | Full-text search with key-value capabilities |
 | Memcached | Unstable | ✅ | ✖️ | High-performance distributed memory cache |
 | MongoDB | Unstable | ✅ | ✅ | Document database used as key-value store |
@@ -429,6 +499,42 @@ pip install py-key-value-aio[dynamodb]
 - Fully managed
 - Auto-scaling
 - Global tables
+- Pay-per-use pricing
+- Stable storage format: **Unstable**
+
+---
+
+### S3Store
+
+AWS S3 object storage for durable, scalable key-value storage.
+
+```python
+from key_value.aio.stores.s3 import S3Store
+
+store = S3Store(
+    bucket_name="my-kv-bucket",
+    region_name="us-east-1"
+)
+```
+
+**Installation:**
+
+```bash
+pip install py-key-value-aio[s3]
+```
+
+**Use Cases:**
+
+- Large value storage (up to 5TB per object)
+- Durable, long-term storage
+- Cost-effective archival
+- Multi-region replication
+
+**Characteristics:**
+
+- 99.999999999% durability
+- Automatic key sanitization for S3 path limits
+- Supports lifecycle policies
 - Pay-per-use pricing
 - Stable storage format: **Unstable**
 
