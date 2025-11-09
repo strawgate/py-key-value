@@ -73,6 +73,7 @@ line-length = 140
 "**/code_gen/**/*.py" = [
     "ARG001", # Unused argument, Pyright captures this for us
     "ARG002", # Unused argument, Pyright captures this for us
+    "E501", # Ignore long lines
 ]
 
 [project.optional-dependencies]
