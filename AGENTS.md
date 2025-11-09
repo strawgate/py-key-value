@@ -23,7 +23,8 @@ make precommit
 ### Testing Requirements
 
 - All new features require tests in both async and sync packages
-- Run `make test` to execute all test suites
+- Run `make test` to execute all test suites (verbose output)
+- Run `make test-concise` for minimal output (recommended for AI agents)
 - Run `make test-aio` for async package tests only
 - Run `make test-sync` for sync package tests only
 - Test coverage should be maintained
@@ -253,10 +254,14 @@ type annotation issues to maintain type safety guarantees.
 | `make install` | Alias for `make sync` |
 | `make lint` | Lint Python + Markdown |
 | `make typecheck` | Run Basedpyright type checking |
-| `make test` | Run all test suites |
+| `make test` | Run all test suites (verbose) |
+| `make test-concise` | Run all test suites (concise output for AI) |
 | `make test-aio` | Run async package tests |
+| `make test-aio-concise` | Run async package tests (concise) |
 | `make test-sync` | Run sync package tests |
+| `make test-sync-concise` | Run sync package tests (concise) |
 | `make test-shared` | Run shared package tests |
+| `make test-shared-concise` | Run shared package tests (concise) |
 | `make codegen` | Generate sync library from async |
 | `make precommit` | Run lint + typecheck + codegen |
 | `make build` | Build all packages |
