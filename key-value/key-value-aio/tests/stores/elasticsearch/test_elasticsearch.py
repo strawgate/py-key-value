@@ -49,10 +49,11 @@ async def ping_elasticsearch() -> bool:
             try:
                 await es_client.cluster.health(wait_for_status="yellow", timeout="10s")
                 logger.info("Elasticsearch is ready")
-                return True
             except Exception as e:
                 logger.warning(f"Cluster health check failed: {e}")
                 return False
+            else:
+                return True
         return False
 
 

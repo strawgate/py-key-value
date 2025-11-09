@@ -240,7 +240,7 @@ class ElasticsearchStore(
         try:
             _ = self._client.options(ignore_status=404).indices.create(index=index_name, mappings=DEFAULT_MAPPING, settings={})
         except BadRequestError as e:
-            if "index_already_exists_exception" in str(e).lower():
+            if "already_exists_exception" in str(e).lower():
                 return
             raise
 
