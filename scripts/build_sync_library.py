@@ -50,6 +50,9 @@ PATHS_TO_LINT = [SYNC_PROJECT_MODULE_DIR, SYNC_PROJECT_TESTS_DIR]
 EXCLUDE_FILES = [
     "key-value/key-value-aio/src/key_value/aio/__init__.py",
     "key-value/key-value-aio/tests/stores/wrappers/test_timeout.py",
+    "key-value/key-value-aio/tests/stores/wrappers/test_bulkhead.py",
+    "key-value/key-value-aio/tests/stores/wrappers/test_circuit_breaker.py",
+    "key-value/key-value-aio/tests/stores/wrappers/test_rate_limit.py",
 ]
 EXCLUDE_DIRECTORIES = [
     "key-value/key-value-aio/src/key_value/aio/stores/dynamodb",
@@ -57,7 +60,9 @@ EXCLUDE_DIRECTORIES = [
     "key-value/key-value-aio/src/key_value/aio/stores/memcached",
     "key-value/key-value-aio/tests/stores/memcached",
     "key-value/key-value-aio/src/key_value/aio/wrappers/timeout",
-    "key-value/key-value-aio/tests/wrappers/timeout",
+    "key-value/key-value-aio/src/key_value/aio/wrappers/bulkhead",
+    "key-value/key-value-aio/src/key_value/aio/wrappers/circuit_breaker",
+    "key-value/key-value-aio/src/key_value/aio/wrappers/rate_limit",
 ]
 
 SCRIPT_NAME = Path(sys.argv[0]).name
