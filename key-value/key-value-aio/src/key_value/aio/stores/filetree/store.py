@@ -42,6 +42,9 @@ def get_max_path_length(root: Path | AsyncPath) -> int:
     return os.pathconf(path=Path(root), name="PC_PATH_MAX")
 
 
+DEFAULT_MAX_FILE_NAME_LENGTH = 255
+
+
 def get_max_file_name_length(root: Path | AsyncPath) -> int:
     """Get the maximum filename length for the filesystem.
 
@@ -50,8 +53,14 @@ def get_max_file_name_length(root: Path | AsyncPath) -> int:
     - Unix/Linux: Uses pathconf to get PC_NAME_MAX
     """
     if os.name == "nt":  # Windows
-        return 255  # Maximum filename length on Windows (NTFS, FAT32, etc.)
-    return os.pathconf(path=Path(root), name="PC_NAME_MAX")
+        return DEFAULT_MAX_FILE_NAME_LENGTH  # Maximum filename length on Windows (NTFS, FAT32, etc.)
+
+    reported_max_length = os.pathconf(path=Path(root), name="PC_NAME_MAX")
+
+    if reported_max_length > 0:
+        return DEFAULT_MAX_FILE_NAME_LENGTH
+
+    return reported_max_length
 
 
 class FileTreeV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
@@ -138,10 +147,6 @@ class DiskCollectionInfo:
 
         return self.serialization_adapter.load_dict(data=data_dict)
 
-    async def gen_entries(self) -> AsyncGenerator[ManagedEntry]:
-        async for key_path in self._list_file_paths():
-            yield self.serialization_adapter.load_dict(data=await read_file(file=key_path))
-
     async def put_entry(self, *, key: str, data: ManagedEntry) -> None:
         sanitized_key = self.key_sanitization_strategy.sanitize(value=key)
         key_path: AsyncPath = AsyncPath(self.directory / f"{sanitized_key}.json")
@@ -157,10 +162,6 @@ class DiskCollectionInfo:
         await key_path.unlink()
 
         return True
-
-    # async def delete_all_entries(self) -> None:
-    #     async for entry_path in self._list_file_paths():
-    #         await entry_path.unlink()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -230,21 +231,6 @@ class DiskCollectionInfo:
         await write_file(file=info_file, text=info.to_json())
         return info
 
-    # async def cull_entry(self, *, key: str) -> bool:
-    #     if entry := await self.get_entry(key=key):
-    #         if entry.is_expired:
-    #             await self.delete_entry(key=key)
-    #             return True
-
-    #     return False
-
-    # async def cull_all_entries(self, *, serialization_adapter: SerializationAdapter) -> int:
-    #     deleted_count: int = 0
-    #     async for key in self.list_entries():
-    #         if await self.cull_entry(key=key.stem, serialization_adapter=serialization_adapter):
-    #             deleted_count += 1
-    #     return deleted_count
-
 
 async def read_file(file: AsyncPath) -> dict[str, Any]:
     async with aopen(file_specifier=Path(file), mode="r", encoding="utf-8") as f:
@@ -301,20 +287,20 @@ class FileTreeStore(BaseStore):
         *,
         data_directory: Path | str,
         metadata_directory: Path | str | None = None,
+        default_collection: str | None = None,
         serialization_adapter: SerializationAdapter | None = None,
         key_sanitization_strategy: SanitizationStrategy | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
-        default_collection: str | None = None,
     ) -> None:
         """Initialize the file-tree store.
 
         Args:
             data_directory: The base directory to use for storing collections and keys.
             metadata_directory: The directory to use for storing metadata. Defaults to data_directory.
+            default_collection: The default collection to use if no collection is provided.
             serialization_adapter: The serialization adapter to use for the store.
             key_sanitization_strategy: The sanitization strategy to use for keys.
             collection_sanitization_strategy: The sanitization strategy to use for collections.
-            default_collection: The default collection to use if no collection is provided.
         """
         data_directory = Path(data_directory).resolve()
         data_directory.mkdir(parents=True, exist_ok=True)
@@ -357,32 +343,6 @@ class FileTreeStore(BaseStore):
                 key_sanitization_strategy=self._key_sanitization_strategy,
             )
             self._collection_infos[collection_info.collection] = collection_info
-
-    # async def _generate_collection_path(self, collection: str) -> AsyncPath:
-    #     """Get the path to a collection directory.
-
-    #     Args:
-    #         collection: The collection name.
-
-    #     Returns:
-    #         The path to the collection directory.
-
-    #     Raises:
-    #         ValueError: If the collection name contains path separators or would escape the base directory.
-    #     """
-
-    #     # Reject path separators to prevent nested directories
-    #     if "/" in collection or "\\" in collection:
-    #         msg = f"Invalid collection name: {collection!r} cannot contain path separators"
-    #         raise ValueError(msg)
-
-    #     collection_path = await AsyncPath(self._directory / collection).resolve()
-
-    #     if not collection_path.is_relative_to(self._directory):
-    #         msg = f"Invalid collection name: {collection!r} would escape base directory"
-    #         raise ValueError(msg)
-
-    #     return collection_path
 
     @override
     async def _setup_collection(self, *, collection: str) -> None:
@@ -451,145 +411,3 @@ class FileTreeStore(BaseStore):
         collection_info: DiskCollectionInfo = self._collection_infos[collection]
 
         return await collection_info.delete_entry(key=key)
-
-    # async def _gen_collection_keys(self, *, collection: str) -> AsyncGenerator[str]:
-    #     """Generate all keys in the specified collection."""
-    #     collection_info: DiskCollectionInfo = self._collection_infos[collection]
-    #     async for item_path in collection_info.list_entries():
-    #         yield item_path.stem
-
-    # @override
-    # async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
-    #     """List all keys in the specified collection.
-
-    #     Args:
-    #         collection: The collection name.
-    #         limit: Maximum number of keys to return.
-
-    #     Returns:
-    #         A list of key names (without the .json extension).
-    #     """
-    #     limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
-    #     keys: list[str] = []
-    #     async for key in self._gen_collection_keys(collection=collection):
-    #         keys.append(key)
-    #         if len(keys) >= limit:
-    #             break
-    #     return keys
-
-    # @override
-    # async def _get_collection_names(self, *, limit: int | None = None) -> list[str]:
-    #     """List all collection names.
-
-    #     Args:
-    #         limit: Maximum number of collections to return.
-
-    #     Returns:
-    #         A list of collection names.
-    #     """
-    #     if limit is None:
-    #         limit = DEFAULT_PAGE_SIZE
-
-    #     collections: list[str] = [collection_info.collection for collection_info in self._collection_infos.values()]
-
-    #     return collections[:limit]
-
-    # @override
-    # async def _delete_collection(self, *, collection: str) -> bool:
-    #     """Delete an entire collection and all its keys.
-
-    #     Args:
-    #         collection: The collection name.
-
-    #     Returns:
-    #         True if the collection was deleted, False if it didn't exist or an error occurred.
-    #     """
-    #     collection_info: DiskCollectionInfo = self._collection_infos[collection]
-
-    #     await collection_info.delete_all_entries()
-
-    #     del self._collection_infos[collection]
-
-    #     return True
-
-    # @override
-    # async def _delete_store(self) -> bool:
-    #     """Delete the entire store and all its collections.
-
-    #     Returns:
-    #         True if the store was deleted successfully.
-    #     """
-
-    #     for collection_info in self._collection_infos.values():
-    #         await self._delete_collection(collection=collection_info.collection)
-
-    #     return True
-
-    # async def _cull_collection(self, *, collection: str) -> int:
-    #     """Cull a collection."""
-    #     collection_info: DiskCollectionInfo = self._collection_infos[collection]
-    #     deleted_count: int = 0
-    #     async for file in collection_path.iterdir():
-    #         if await self._cull_file(file=file):
-    #             deleted_count += 1
-    #     return deleted_count
-
-    # async def _cull_directory(self, *, directory: AsyncPath) -> int:
-    #     """Cull the directory."""
-    #     deleted_count: int = 0
-    #     async for collection_path in directory.iterdir():
-    #         if await self._cull_file(file=collection_path):
-    #             deleted_count += 1
-    #     return deleted_count
-
-    # async def _cull_key(self, *, key: str, collection: str) -> bool:
-    #     """Cull a key."""
-    #     key_path = self._get_key_path(collection=collection, key=key)
-    #     return await self._cull_file(file=key_path)
-
-    # async def _cull_file(self, *, file: AsyncPath) -> bool:
-    #     """Cull a file. If it is a managed entry, check if it is expired and remove it if it is."""
-    #     managed_entry: ManagedEntry | None = await self._read_file(file=file)
-    #     if managed_entry is not None and not managed_entry.is_expired:
-    #         return False
-
-    #     await file.unlink()
-
-    #     return True
-
-    # async def _get_collection_info(self, *, directory: AsyncPath) -> DiskCollectionInfo:
-    #     """Get the collection info."""
-    #     info_file: AsyncPath = await (directory / "info.json").resolve()
-    #     return await DiskCollectionInfo.from_file(file=info_file)
-
-    # async def _read_file(self, *, file: AsyncPath) -> ManagedEntry | None:
-    #     """Read a file and return the managed entry."""
-    #     if not await file.is_file() or file.suffix != ".json":
-    #         return None
-
-    #     json_str = await file.read_text(encoding="utf-8")
-    #     return self._serialization_adapter.load_json(json_str=json_str)
-
-    # async def cleanup_expired(self, *, collection: str | None = None) -> int:
-    #     """Remove expired entries from disk.
-
-    #     This utility method scans the specified collection (or all collections if None)
-    #     and deletes entries that have expired based on their TTL. This is useful for
-    #     manual cleanup of the store since expired entries are not automatically removed.
-
-    #     Args:
-    #         collection: The collection to clean up, or None to clean all collections.
-
-    #     Returns:
-    #         The number of entries deleted.
-    #     """
-
-    #     if collection is not None:
-    #         return await self._cull_collection(collection=collection)
-
-    #     deleted_count: int = 0
-
-    #     async for directory in self._get_collection_directories():
-    #         deleted_count += await self._cull_directory(directory=directory)
-
-    #     return deleted_count
