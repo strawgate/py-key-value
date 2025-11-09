@@ -48,7 +48,7 @@ def ping_elasticsearch() -> bool:
         if es_client.ping():
             logger.info("Elasticsearch pinged, wait for yellow status")
             try:
-                es_client.cluster.health(wait_for_status="yellow", timeout="10s")
+                es_client.cluster.health(wait_for_status="yellow", timeout="15s")
                 logger.info("Elasticsearch is ready")
             except Exception as e:
                 logger.warning(f"Cluster health check failed: {e}")
