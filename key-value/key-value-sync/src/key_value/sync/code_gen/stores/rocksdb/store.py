@@ -16,7 +16,7 @@ from key_value.sync.code_gen.stores.base import BaseContextManagerStore, BaseSto
 try:
     from rocksdict import Options, Rdict, WriteBatch
 except ImportError as e:
-    msg = "RocksDBStore requires py-key-value-aio[rocksdb]"
+    msg = "RocksDBStore requires py-key-value-sync[rocksdb]"
     raise ImportError(msg) from e
 
 

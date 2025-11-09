@@ -4,7 +4,6 @@
 import contextlib
 import logging
 from collections.abc import Sequence
-from datetime import datetime
 from typing import Any, overload
 
 from key_value.shared.errors import DeserializationError, SerializationError
@@ -23,7 +22,7 @@ from key_value.sync.code_gen.stores.base import (
     BaseEnumerateKeysStore,
     BaseStore,
 )
-from key_value.sync.code_gen.stores.opensearch.utils import LessCapableJsonSerializer, new_bulk_action
+from key_value.sync.code_gen.stores.opensearch.utils import LessCapableJsonSerializer
 
 try:
     from opensearchpy import OpenSearch
@@ -327,39 +326,6 @@ class OpenSearchStore(
             raise SerializationError(message=msg) from e
 
     @override
-    def _put_managed_entries(
-        self,
-        *,
-        collection: str,
-        keys: Sequence[str],
-        managed_entries: Sequence[ManagedEntry],
-        ttl: float | None,
-        created_at: datetime,
-        expires_at: datetime | None,
-    ) -> None:
-        if not keys:
-            return
-
-        operations: list[dict[str, Any] | str] = []
-
-        index_name: str = self._get_index_name(collection=collection)
-
-        for key, managed_entry in zip(keys, managed_entries, strict=True):
-            document_id: str = self._get_document_id(key=key)
-
-            index_action: dict[str, Any] = new_bulk_action(action="index", index=index_name, document_id=document_id)
-
-            document: dict[str, Any] = self._serializer.dump_dict(entry=managed_entry, key=key, collection=collection)
-
-            operations.extend([index_action, document])
-
-        try:
-            _ = self._client.bulk(body=operations, params={"refresh": "true"})  # type: ignore[reportUnknownVariableType]
-        except Exception as e:
-            msg = f"Failed to serialize bulk operations: {e}"
-            raise SerializationError(message=msg) from e
-
-    @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         index_name: str = self._get_index_name(collection=collection)
         document_id: str = self._get_document_id(key=key)
@@ -375,37 +341,6 @@ class OpenSearchStore(
             return False
 
         return result == "deleted"
-
-    @override
-    def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
-        if not keys:
-            return 0
-
-        operations: list[dict[str, Any]] = []
-
-        for key in keys:
-            (index_name, document_id) = self._get_destination(collection=collection, key=key)
-
-            delete_action: dict[str, Any] = new_bulk_action(action="delete", index=index_name, document_id=document_id)
-
-            operations.append(delete_action)
-
-        try:
-            opensearch_response = self._client.bulk(body=operations)
-        except Exception:
-            return 0
-
-        body: dict[str, Any] = get_body_from_response(response=opensearch_response)
-
-        # Count successful deletions
-        deleted_count = 0
-        items = body.get("items", [])
-        for item in items:
-            delete_result = item.get("delete", {})
-            if delete_result.get("result") == "deleted":
-                deleted_count += 1
-
-        return deleted_count
 
     @override
     def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:

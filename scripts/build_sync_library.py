@@ -409,6 +409,16 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
                 pass
         return None
 
+    def visit_Constant(self, node: ast.Constant) -> ast.AST:
+        # Transform string literals containing package names
+        if isinstance(node.value, str):
+            # Replace py-key-value-aio with py-key-value-sync
+            node.value = node.value.replace("py-key-value-aio", "py-key-value-sync")
+            # Remove [async] extras from package install instructions
+            node.value = node.value.replace("opensearch-py[async]", "opensearch-py")
+        self.generic_visit(node)
+        return node
+
 
 class BlanksInserter(ast.NodeTransformer):  # type: ignore
     """

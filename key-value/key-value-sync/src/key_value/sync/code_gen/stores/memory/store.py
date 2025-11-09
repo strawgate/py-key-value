@@ -21,7 +21,7 @@ from key_value.sync.code_gen.stores.base import (
 try:
     from cachetools import TLRUCache
 except ImportError as e:
-    msg = "MemoryStore requires py-key-value-aio[memory]"
+    msg = "MemoryStore requires py-key-value-sync[memory]"
     raise ImportError(msg) from e
 
 

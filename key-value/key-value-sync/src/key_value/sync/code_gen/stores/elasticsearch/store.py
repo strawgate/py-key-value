@@ -38,7 +38,7 @@ try:
         get_source_from_body,
     )
 except ImportError as e:
-    msg = "ElasticsearchStore requires py-key-value-aio[elasticsearch]"
+    msg = "ElasticsearchStore requires py-key-value-sync[elasticsearch]"
     raise ImportError(msg) from e
 
 logger = logging.getLogger(__name__)

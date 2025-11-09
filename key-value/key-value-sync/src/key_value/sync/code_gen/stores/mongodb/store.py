@@ -21,7 +21,7 @@ try:
     from pymongo.database import Database
     from pymongo.results import DeleteResult  # noqa: TC002
 except ImportError as e:
-    msg = "MongoDBStore requires py-key-value-aio[mongodb]"
+    msg = "MongoDBStore requires py-key-value-sync[mongodb]"
     raise ImportError(msg) from e
 
 DEFAULT_DB = "kv-store-adapter"

@@ -16,7 +16,7 @@ try:
     from diskcache import Cache
     from pathvalidate import sanitize_filename
 except ImportError as e:
-    msg = "DiskStore requires py-key-value-aio[disk]"
+    msg = "DiskStore requires py-key-value-sync[disk]"
     raise ImportError(msg) from e
 
 CacheFactory = Callable[[str], Cache]

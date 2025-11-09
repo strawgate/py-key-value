@@ -15,7 +15,7 @@ try:
     from glide_sync.config import GlideClientConfiguration, NodeAddress, ServerCredentials
     from glide_sync.glide_client import BaseClient, GlideClient
 except ImportError as e:
-    msg = "ValkeyStore requires py-key-value-aio[valkey]"
+    msg = "ValkeyStore requires py-key-value-sync[valkey]"
     raise ImportError(msg) from e
 
 DEFAULT_PAGE_SIZE = 10000
