@@ -20,14 +20,13 @@ from key_value.aio.stores.base import (
     BaseStore,
 )
 
-DEFAULT_PAGE_SIZE = 10000
-PAGE_LIMIT = 10000
-
-MAX_DIRECTORY_LENGTH = 255
 DIRECTORY_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
 
 MAX_FILE_NAME_LENGTH = 255
 FILE_NAME_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
+
+
+MAX_PATH_LENGTH = 260
 
 
 def get_max_path_length(root: Path | AsyncPath) -> int:
@@ -38,11 +37,12 @@ def get_max_path_length(root: Path | AsyncPath) -> int:
     - Unix/Linux: Uses pathconf to get PC_PATH_MAX
     """
     if os.name == "nt":  # Windows
-        return 260  # MAX_PATH on Windows
-    return os.pathconf(path=Path(root), name="PC_PATH_MAX")
+        return MAX_PATH_LENGTH  # MAX_PATH on Windows
 
-
-DEFAULT_MAX_FILE_NAME_LENGTH = 255
+    reported_max_length = os.pathconf(path=Path(root), name="PC_PATH_MAX")
+    if reported_max_length > 0:
+        return reported_max_length
+    return MAX_PATH_LENGTH
 
 
 def get_max_file_name_length(root: Path | AsyncPath) -> int:
@@ -53,14 +53,14 @@ def get_max_file_name_length(root: Path | AsyncPath) -> int:
     - Unix/Linux: Uses pathconf to get PC_NAME_MAX
     """
     if os.name == "nt":  # Windows
-        return DEFAULT_MAX_FILE_NAME_LENGTH  # Maximum filename length on Windows (NTFS, FAT32, etc.)
+        return MAX_FILE_NAME_LENGTH  # Maximum filename length on Windows (NTFS, FAT32, etc.)
 
     reported_max_length = os.pathconf(path=Path(root), name="PC_NAME_MAX")
 
     if reported_max_length > 0:
-        return DEFAULT_MAX_FILE_NAME_LENGTH
+        return reported_max_length
 
-    return reported_max_length
+    return MAX_FILE_NAME_LENGTH
 
 
 class FileTreeV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
