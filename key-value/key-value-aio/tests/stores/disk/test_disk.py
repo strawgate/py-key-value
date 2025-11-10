@@ -15,21 +15,15 @@ TEST_SIZE_LIMIT = 100 * 1024  # 100KB
 
 
 class TestDiskStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(scope="session")
-    async def disk_store(self) -> AsyncGenerator[DiskStore, None]:
+    @override
+    @pytest.fixture
+    async def store(self) -> AsyncGenerator[DiskStore, None]:
         with tempfile.TemporaryDirectory() as temp_dir:
             yield DiskStore(directory=temp_dir, max_size=TEST_SIZE_LIMIT)
 
-    @override
     @pytest.fixture
-    async def store(self, disk_store: DiskStore) -> DiskStore:
-        disk_store._cache.clear()  # pyright: ignore[reportPrivateUsage]
-
-        return disk_store
-
-    @pytest.fixture
-    async def disk_cache(self, disk_store: DiskStore) -> Cache:
-        return disk_store._cache  # pyright: ignore[reportPrivateUsage]
+    async def disk_cache(self, store: DiskStore) -> Cache:
+        return store._cache  # pyright: ignore[reportPrivateUsage]
 
     async def test_value_stored(self, store: DiskStore, disk_cache: Cache):
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
