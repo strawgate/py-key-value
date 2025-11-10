@@ -21,9 +21,9 @@ from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
 ES_HOST = "localhost"
-ES_PORT = 9200
-ES_URL = f"http://{ES_HOST}:{ES_PORT}"
-ES_CONTAINER_PORT = 19200
+CONTAINER_PORT = 9200
+HOST_PORT = 19200
+ES_URL = f"http://{ES_HOST}:{HOST_PORT}"
 
 WAIT_FOR_ELASTICSEARCH_TIMEOUT = 30
 
@@ -90,7 +90,7 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         with docker_container(
             f"elasticsearch-test-{version}",
             es_image,
-            {str(ES_CONTAINER_PORT): ES_PORT},
+            {str(CONTAINER_PORT): HOST_PORT},
             {"discovery.type": "single-node", "xpack.security.enabled": "false"},
         ):
             if not await async_wait_for_true(bool_fn=ping_elasticsearch, tries=WAIT_FOR_ELASTICSEARCH_TIMEOUT, wait_time=2):
