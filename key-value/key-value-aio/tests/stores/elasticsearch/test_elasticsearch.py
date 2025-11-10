@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from dirty_equals import IsFloat, IsStr
@@ -19,11 +20,14 @@ from key_value.aio.stores.elasticsearch.store import (
 from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
+if TYPE_CHECKING:
+    from elastic_transport._response import ObjectApiResponse
+
 TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
 ES_HOST = "localhost"
-CONTAINER_PORT = 9200
-HOST_PORT = 19200
-ES_URL = f"http://{ES_HOST}:{HOST_PORT}"
+ES_PORT = 9200
+ES_URL = f"http://{ES_HOST}:{ES_PORT}"
+ES_CONTAINER_PORT = 9200
 
 WAIT_FOR_ELASTICSEARCH_TIMEOUT = 30
 
@@ -41,7 +45,12 @@ async def ping_elasticsearch() -> bool:
     es_client: AsyncElasticsearch = get_elasticsearch_client()
 
     async with es_client:
-        return await es_client.ping()
+        if not await es_client.ping():
+            return False
+
+        status: ObjectApiResponse[dict[str, Any]] = await es_client.options(ignore_status=404).cluster.health(wait_for_status="green")
+
+        return status.body.get("status") == "green"
 
 
 async def cleanup_elasticsearch_indices(elasticsearch_client: AsyncElasticsearch):
@@ -90,7 +99,7 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         with docker_container(
             f"elasticsearch-test-{version}",
             es_image,
-            {str(CONTAINER_PORT): HOST_PORT},
+            {str(ES_CONTAINER_PORT): ES_PORT},
             {"discovery.type": "single-node", "xpack.security.enabled": "false"},
         ):
             if not await async_wait_for_true(bool_fn=ping_elasticsearch, tries=WAIT_FOR_ELASTICSEARCH_TIMEOUT, wait_time=2):
@@ -98,6 +107,11 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 raise ElasticsearchFailedToStartError(msg)
 
             yield
+
+    @pytest.fixture
+    async def es_client(self) -> AsyncGenerator[AsyncElasticsearch, None]:
+        async with AsyncElasticsearch(hosts=[ES_URL]) as es_client:
+            yield es_client
 
     @override
     @pytest.fixture
@@ -114,11 +128,10 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         )
 
     @pytest.fixture(autouse=True)
-    async def cleanup_elasticsearch(self):
-        async with get_elasticsearch_client() as es_client:
-            await cleanup_elasticsearch_indices(elasticsearch_client=es_client)
-            yield
-            await cleanup_elasticsearch_indices(elasticsearch_client=es_client)
+    async def cleanup_elasticsearch_indices(self, es_client: AsyncElasticsearch):
+        await cleanup_elasticsearch_indices(elasticsearch_client=es_client)
+        yield
+        await cleanup_elasticsearch_indices(elasticsearch_client=es_client)
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
@@ -145,19 +158,18 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         await sanitizing_store.put(collection="test_collection", key="test_key" * 100, value={"test": "test"})
         assert await sanitizing_store.get(collection="test_collection", key="test_key" * 100) == {"test": "test"}
 
-    async def test_put_put_two_indices(self, store: ElasticsearchStore):
+    async def test_put_put_two_indices(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
         await store.put(collection="test_collection", key="test_key", value={"test": "test"})
         await store.put(collection="test_collection_2", key="test_key", value={"test": "test"})
         assert await store.get(collection="test_collection", key="test_key") == {"test": "test"}
         assert await store.get(collection="test_collection_2", key="test_key") == {"test": "test"}
 
-        async with get_elasticsearch_client() as es_client:
-            indices = await es_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
-            assert len(indices.body) == 2
-            index_names: list[str] = [str(key) for key in indices]
-            assert index_names == snapshot(["kv-store-e2e-test-test_collection", "kv-store-e2e-test-test_collection_2"])
+        indices = await es_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
+        assert len(indices.body) == 2
+        index_names: list[str] = [str(key) for key in indices]
+        assert index_names == snapshot(["kv-store-e2e-test-test_collection", "kv-store-e2e-test-test_collection_2"])
 
-    async def test_value_stored_as_flattened_object(self, store: ElasticsearchStore):
+    async def test_value_stored_as_flattened_object(self, store: ElasticsearchStore, es_client: AsyncElasticsearch):
         """Verify values are stored as flattened objects, not JSON strings"""
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
@@ -166,32 +178,30 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         index_name = store._get_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
         doc_id = store._get_document_id(key="test_key")  # pyright: ignore[reportPrivateUsage]
 
-        async with get_elasticsearch_client() as es_client:
-            response = await es_client.get(index=index_name, id=doc_id)
-            assert response.body["_source"] == snapshot(
-                {
-                    "version": 1,
-                    "key": "test_key",
-                    "collection": "test",
-                    "value": {"flattened": {"name": "Alice", "age": 30}},
-                    "created_at": IsStr(min_length=20, max_length=40),
-                }
-            )
+        response = await es_client.get(index=index_name, id=doc_id)
+        assert response.body["_source"] == snapshot(
+            {
+                "version": 1,
+                "key": "test_key",
+                "collection": "test",
+                "value": {"flattened": {"name": "Alice", "age": 30}},
+                "created_at": IsStr(min_length=20, max_length=40),
+            }
+        )
 
-            # Test with TTL
-            await store.put(collection="test", key="test_key", value={"name": "Bob", "age": 25}, ttl=10)
-
-            response = await es_client.get(index=index_name, id=doc_id)
-            assert response.body["_source"] == snapshot(
-                {
-                    "version": 1,
-                    "key": "test_key",
-                    "collection": "test",
-                    "value": {"flattened": {"name": "Bob", "age": 25}},
-                    "created_at": IsStr(min_length=20, max_length=40),
-                    "expires_at": IsStr(min_length=20, max_length=40),
-                }
-            )
+        # Test with TTL
+        await store.put(collection="test", key="test_key", value={"name": "Bob", "age": 25}, ttl=10)
+        response = await es_client.get(index=index_name, id=doc_id)
+        assert response.body["_source"] == snapshot(
+            {
+                "version": 1,
+                "key": "test_key",
+                "collection": "test",
+                "value": {"flattened": {"name": "Bob", "age": 25}},
+                "created_at": IsStr(min_length=20, max_length=40),
+                "expires_at": IsStr(min_length=20, max_length=40),
+            }
+        )
 
     @override
     async def test_special_characters_in_collection_name(self, store: ElasticsearchStore, sanitizing_store: ElasticsearchStore):  # pyright: ignore[reportIncompatibleMethodOverride]

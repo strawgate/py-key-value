@@ -270,8 +270,6 @@ class ElasticsearchStore(
         except BadRequestError as e:
             if "index_already_exists_exception" in str(e).lower():
                 return
-            if "resource_already_exists_exception" in str(e).lower():
-                return
             raise
 
     def _get_index_name(self, collection: str) -> str:

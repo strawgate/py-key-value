@@ -38,7 +38,7 @@ try:
         get_source_from_body,
     )
 except ImportError as e:
-    msg = "ElasticsearchStore requires py-key-value-sync[elasticsearch]"
+    msg = "ElasticsearchStore requires py-key-value-aio[elasticsearch]"
     raise ImportError(msg) from e
 
 logger = logging.getLogger(__name__)
@@ -241,8 +241,6 @@ class ElasticsearchStore(
             _ = self._client.options(ignore_status=404).indices.create(index=index_name, mappings=DEFAULT_MAPPING, settings={})
         except BadRequestError as e:
             if "index_already_exists_exception" in str(e).lower():
-                return
-            if "resource_already_exists_exception" in str(e).lower():
                 return
             raise
 
