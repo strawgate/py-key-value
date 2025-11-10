@@ -60,13 +60,20 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         """Initialize the Memcached store.
 
         Args:
-            client: An existing aiomcache client to use.
+            client: An existing aiomcache client to use. If provided, the store will not manage
+                the client's lifecycle (will not close it). The caller is responsible for
+                managing the client's lifecycle.
             host: Memcached host. Defaults to 127.0.0.1.
             port: Memcached port. Defaults to 11211.
             default_collection: The default collection to use if no collection is provided.
             key_sanitization_strategy: The sanitization strategy to use for keys.
         """
-        self._client = client or Client(host=host, port=port)
+        if client:
+            self._client = client
+            self._client_provided_by_user = True
+        else:
+            self._client = Client(host=host, port=port)
+            self._client_provided_by_user = False
 
         super().__init__(
             default_collection=default_collection,

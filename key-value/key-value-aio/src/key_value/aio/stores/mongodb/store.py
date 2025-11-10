@@ -159,7 +159,9 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         Values are stored as native BSON dictionaries for better query support and performance.
 
         Args:
-            client: The MongoDB client to use (mutually exclusive with url).
+            client: The MongoDB client to use (mutually exclusive with url). If provided, the store
+                will not manage the client's lifecycle (will not enter/exit its context manager or
+                close it). The caller is responsible for managing the client's lifecycle.
             url: The url of the MongoDB cluster (mutually exclusive with client).
             db_name: The name of the MongoDB database.
             coll_name: The name of the MongoDB collection.
@@ -169,11 +171,14 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
         if client:
             self._client = client
+            self._client_provided_by_user = True
         elif url:
             self._client = AsyncMongoClient(url)
+            self._client_provided_by_user = False
         else:
             # Defaults to localhost
             self._client = AsyncMongoClient()
+            self._client_provided_by_user = False
 
         db_name = db_name or DEFAULT_DB
         coll_name = coll_name or DEFAULT_COLLECTION
@@ -189,14 +194,18 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
     @override
     async def __aenter__(self) -> Self:
-        _ = await self._client.__aenter__()
+        # Only enter the client's context manager if the store created it
+        if not self._client_provided_by_user:
+            _ = await self._client.__aenter__()
         await super().__aenter__()
         return self
 
     @override
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
         await super().__aexit__(exc_type, exc_val, exc_tb)
-        await self._client.__aexit__(exc_type, exc_val, exc_tb)
+        # Only exit the client's context manager if the store created it
+        if not self._client_provided_by_user:
+            await self._client.__aexit__(exc_type, exc_val, exc_tb)
 
     @override
     async def _setup_collection(self, *, collection: str) -> None:

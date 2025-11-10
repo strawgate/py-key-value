@@ -4,7 +4,7 @@
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Any, overload
+from typing import overload
 
 from key_value.shared.errors.store import KeyValueStoreError
 from key_value.shared.utils.compound import compound_key
@@ -48,7 +48,9 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         """Initialize the RocksDB store.
 
         Args:
-            db: An existing Rdict database instance to use.
+            db: An existing Rdict database instance to use. If provided, the store will NOT
+                manage its lifecycle (will not close it). The caller is responsible for managing
+                the database's lifecycle.
             path: The path to the RocksDB database directory.
             default_collection: The default collection to use if no collection is provided.
         """
@@ -62,6 +64,7 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
         if db:
             self._db = db
+            self._client_provided_by_user = True
         elif path:
             path = Path(path)
             path.mkdir(parents=True, exist_ok=True)
@@ -70,15 +73,11 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
             opts.create_if_missing(True)
 
             self._db = Rdict(str(path), options=opts)
+            self._client_provided_by_user = False
 
         self._is_closed = False
 
         super().__init__(default_collection=default_collection)
-
-    @override
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
-        super().__exit__(exc_type, exc_val, exc_tb)
-        self._close()
 
     @override
     def _close(self) -> None:

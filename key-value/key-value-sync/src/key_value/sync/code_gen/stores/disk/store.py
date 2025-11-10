@@ -53,7 +53,9 @@ class DiskStore(BaseContextManagerStore, BaseStore):
         """Initialize the disk store.
 
         Args:
-            disk_cache: An existing diskcache Cache instance to use.
+            disk_cache: An existing diskcache Cache instance to use. If provided, the store will
+                not manage the cache's lifecycle (will not close it). The caller is responsible
+                for managing the cache's lifecycle.
             directory: The directory to use for the disk store.
             max_size: The maximum size of the disk store.
             default_collection: The default collection to use if no collection is provided.
@@ -68,6 +70,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
         if disk_cache:
             self._cache = disk_cache
+            self._client_provided_by_user = True
         elif directory:
             directory = Path(directory)
 
@@ -77,6 +80,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
                 self._cache = Cache(directory=directory, size_limit=max_size)
             else:
                 self._cache = Cache(directory=directory, eviction_policy="none")
+            self._client_provided_by_user = False
 
         self._stable_api = True
 

@@ -54,14 +54,29 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         username: str | None = None,
         password: str | None = None,
     ) -> None:
+        """Initialize the Valkey store.
+
+        Args:
+            client: An existing Valkey client to use. If provided, the store will not manage
+                the client's lifecycle (will not close it). The caller is responsible for
+                managing the client's lifecycle.
+            default_collection: The default collection to use if no collection is provided.
+            host: Valkey host. Defaults to localhost.
+            port: Valkey port. Defaults to 6379.
+            db: Valkey database number. Defaults to 0.
+            username: Valkey username. Defaults to None.
+            password: Valkey password. Defaults to None.
+        """
         if client is not None:
             self._connected_client = client
+            self._client_provided_by_user = True
         else:
             # redis client accepts URL
             addresses: list[NodeAddress] = [NodeAddress(host=host, port=port)]
             credentials: ServerCredentials | None = ServerCredentials(password=password, username=username) if password else None
             self._client_config = GlideClientConfiguration(addresses=addresses, database_id=db, credentials=credentials)
             self._connected_client = None
+            self._client_provided_by_user = False
 
         self._stable_api = True
 

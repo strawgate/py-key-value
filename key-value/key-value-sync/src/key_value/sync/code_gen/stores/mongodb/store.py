@@ -157,7 +157,9 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         Values are stored as native BSON dictionaries for better query support and performance.
 
         Args:
-            client: The MongoDB client to use (mutually exclusive with url).
+            client: The MongoDB client to use (mutually exclusive with url). If provided, the store
+                will not manage the client's lifecycle (will not enter/exit its context manager or
+                close it). The caller is responsible for managing the client's lifecycle.
             url: The url of the MongoDB cluster (mutually exclusive with client).
             db_name: The name of the MongoDB database.
             coll_name: The name of the MongoDB collection.
@@ -167,11 +169,14 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
         if client:
             self._client = client
+            self._client_provided_by_user = True
         elif url:
             self._client = MongoClient(url)
+            self._client_provided_by_user = False
         else:
             # Defaults to localhost
             self._client = MongoClient()
+            self._client_provided_by_user = False
 
         db_name = db_name or DEFAULT_DB
         coll_name = coll_name or DEFAULT_COLLECTION
@@ -184,14 +189,18 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
     @override
     def __enter__(self) -> Self:
-        _ = self._client.__enter__()
+        # Only enter the client's context manager if the store created it
+        if not self._client_provided_by_user:
+            _ = self._client.__enter__()
         super().__enter__()
         return self
 
     @override
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
         super().__exit__(exc_type, exc_val, exc_tb)
-        self._client.__exit__(exc_type, exc_val, exc_tb)
+        # Only exit the client's context manager if the store created it
+        if not self._client_provided_by_user:
+            self._client.__exit__(exc_type, exc_val, exc_tb)
 
     @override
     def _setup_collection(self, *, collection: str) -> None:

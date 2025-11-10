@@ -425,7 +425,14 @@ class BaseEnumerateKeysStore(BaseStore, AsyncEnumerateKeysProtocol, ABC):
 
 
 class BaseContextManagerStore(BaseStore, ABC):
-    """An abstract base class for context manager stores."""
+    """An abstract base class for context manager stores.
+
+    Stores that accept a client parameter should set `_client_provided_by_user = True` when
+    a client is provided by the user. This ensures the store does not manage the lifecycle
+    of user-provided clients (i.e., does not close them).
+    """
+
+    _client_provided_by_user: bool
 
     async def __aenter__(self) -> Self:
         await self.setup()
@@ -434,14 +441,22 @@ class BaseContextManagerStore(BaseStore, ABC):
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
     ) -> None:
-        await self._close()
+        # Only close the client if the store created it
+        if not getattr(self, "_client_provided_by_user", False):
+            await self._close()
 
     async def close(self) -> None:
-        await self._close()
+        # Only close the client if the store created it
+        if not getattr(self, "_client_provided_by_user", False):
+            await self._close()
 
     @abstractmethod
     async def _close(self) -> None:
-        """Close the store."""
+        """Close the store and its underlying client.
+
+        This method is only called if the store created the client itself.
+        If a client was provided by the user, this method will not be called.
+        """
         ...
 
 

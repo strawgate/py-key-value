@@ -90,6 +90,9 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         """Initialize the DynamoDB store.
 
         Args:
+            client: The DynamoDB client to use. If provided, the store will not manage the client's
+                lifecycle (will not enter/exit its context manager). The caller is responsible for
+                managing the client's lifecycle and must ensure the client is already entered.
             table_name: The name of the DynamoDB table to use.
             region_name: AWS region name. Defaults to None (uses AWS default).
             endpoint_url: Custom endpoint URL (useful for local DynamoDB). Defaults to None.
@@ -101,6 +104,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         self._table_name = table_name
         if client:
             self._client = client
+            self._client_provided_by_user = True
         else:
             session: Session = aioboto3.Session(
                 region_name=region_name,
@@ -112,12 +116,14 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             self._raw_client = session.client(service_name="dynamodb", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType]
 
             self._client = None
+            self._client_provided_by_user = False
 
         super().__init__(default_collection=default_collection)
 
     @override
     async def __aenter__(self) -> Self:
-        if self._raw_client:
+        # Only enter the client's context manager if the store created it
+        if not self._client_provided_by_user and self._raw_client:
             self._client = await self._raw_client.__aenter__()
         await super().__aenter__()
         return self
@@ -127,7 +133,8 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
     ) -> None:
         await super().__aexit__(exc_type, exc_value, traceback)
-        if self._client:
+        # Only exit the client's context manager if the store created it
+        if not self._client_provided_by_user and self._client:
             await self._client.__aexit__(exc_type, exc_value, traceback)
 
     @property

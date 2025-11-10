@@ -215,7 +215,9 @@ class ElasticsearchStore(
         """Initialize the elasticsearch store.
 
         Args:
-            elasticsearch_client: The elasticsearch client to use.
+            elasticsearch_client: The elasticsearch client to use. If provided, the store will not
+                manage the client's lifecycle (will not close it). The caller is responsible for
+                managing the client's lifecycle.
             url: The url of the elasticsearch cluster.
             api_key: The api key to use.
             index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
@@ -229,10 +231,12 @@ class ElasticsearchStore(
 
         if elasticsearch_client:
             self._client = elasticsearch_client
+            self._client_provided_by_user = True
         elif url:
             self._client = AsyncElasticsearch(
                 hosts=[url], api_key=api_key, http_compress=True, request_timeout=10, retry_on_timeout=True, max_retries=3
             )
+            self._client_provided_by_user = False
         else:
             msg = "Either elasticsearch_client or url must be provided"
             raise ValueError(msg)

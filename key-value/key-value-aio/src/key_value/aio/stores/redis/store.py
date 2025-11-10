@@ -54,7 +54,9 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         """Initialize the Redis store.
 
         Args:
-            client: An existing Redis client to use.
+            client: An existing Redis client to use. If provided, the store will not manage
+                the client's lifecycle (will not close it). The caller is responsible for
+                managing the client's lifecycle.
             url: Redis URL (e.g., redis://localhost:6379/0).
             host: Redis host. Defaults to localhost.
             port: Redis port. Defaults to 6379.
@@ -64,6 +66,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         """
         if client:
             self._client = client
+            self._client_provided_by_user = True
         elif url:
             parsed_url = urlparse(url)
             self._client = Redis(
@@ -73,6 +76,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
                 password=parsed_url.password or password,
                 decode_responses=True,
             )
+            self._client_provided_by_user = False
         else:
             self._client = Redis(
                 host=host,
@@ -81,6 +85,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
                 password=password,
                 decode_responses=True,
             )
+            self._client_provided_by_user = False
 
         self._stable_api = True
         self._adapter = BasicSerializationAdapter(date_format="isoformat", value_format="dict")

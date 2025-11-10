@@ -74,15 +74,10 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
 
     Values are stored in a JSON column as native dicts, allowing direct SQL queries
     on the stored data for analytics and reporting.
-
-    Note on connection ownership: When you provide an existing connection, the store
-    will take ownership and close it when the store is closed or garbage collected.
-    If you need to reuse a connection, create separate DuckDB connections for each store.
     """
 
     _connection: duckdb.DuckDBPyConnection
     _is_closed: bool
-    _owns_connection: bool
     _adapter: SerializationAdapter
     _table_name: str
 
@@ -97,9 +92,8 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
     ) -> None:
         """Initialize the DuckDB store with an existing connection.
 
-        Warning: The store will take ownership of the connection and close it
-        when the store is closed or garbage collected. If you need to reuse
-        a connection, create separate DuckDB connections for each store.
+        Note: If you provide a connection, the store will NOT manage its lifecycle (will not
+        close it). The caller is responsible for managing the connection's lifecycle.
 
         Args:
             connection: An existing DuckDB connection to use.
@@ -138,7 +132,9 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         """Initialize the DuckDB store.
 
         Args:
-            connection: An existing DuckDB connection to use.
+            connection: An existing DuckDB connection to use. If provided, the store will NOT
+                manage its lifecycle (will not close it). The caller is responsible for managing
+                the connection's lifecycle.
             database_path: Path to the database file. If None or ':memory:', uses in-memory database.
             table_name: Name of the table to store key-value entries. Defaults to "kv_entries".
             default_collection: The default collection to use if no collection is provided.
@@ -150,7 +146,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
 
         if connection is not None:
             self._connection = connection
-            self._owns_connection = True  # We take ownership even of provided connections
+            self._client_provided_by_user = True
         else:
             # Convert Path to string if needed
             if isinstance(database_path, Path):
@@ -160,7 +156,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
                 self._connection = duckdb.connect(":memory:")
             else:
                 self._connection = duckdb.connect(database=database_path)
-            self._owns_connection = True
+            self._client_provided_by_user = False
 
         self._is_closed = False
         self._adapter = DuckDBSerializationAdapter()
@@ -315,14 +311,14 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
     @override
     def _close(self) -> None:
         """Close the DuckDB connection."""
-        if not self._is_closed and self._owns_connection:
+        if not self._is_closed and (not self._client_provided_by_user):
             self._connection.close()
             self._is_closed = True
 
     def __del__(self) -> None:
         """Clean up the DuckDB connection on deletion."""
         try:
-            if not self._is_closed and self._owns_connection and hasattr(self, "_connection"):
+            if not self._is_closed and (not self._client_provided_by_user) and hasattr(self, "_connection"):
                 self._connection.close()
                 self._is_closed = True
         except Exception:  # noqa: S110
