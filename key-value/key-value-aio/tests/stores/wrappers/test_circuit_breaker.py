@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 from key_value.shared.errors.wrappers.circuit_breaker import CircuitOpenError
 from typing_extensions import override
@@ -16,12 +18,24 @@ class IntermittentlyFailingStore(MemoryStore):
         self.failures_before_success = failures_before_success
         self.attempt_count = 0
 
-    async def get(self, key: str, *, collection: str | None = None):
+    def _check_and_maybe_fail(self):
+        """Check if we should fail this operation."""
         self.attempt_count += 1
         if self.attempt_count <= self.failures_before_success:
             msg = "Simulated connection error"
             raise ConnectionError(msg)
+
+    async def get(self, key: str, *, collection: str | None = None):
+        self._check_and_maybe_fail()
         return await super().get(key=key, collection=collection)
+
+    async def put(self, key: str, value: dict[str, Any], *, collection: str | None = None, ttl: float | None = None):
+        self._check_and_maybe_fail()
+        return await super().put(key=key, value=value, collection=collection, ttl=ttl)
+
+    async def delete(self, key: str, *, collection: str | None = None):
+        self._check_and_maybe_fail()
+        return await super().delete(key=key, collection=collection)
 
     def reset_attempts(self):
         self.attempt_count = 0
@@ -101,7 +115,7 @@ class TestCircuitBreakerWrapper(BaseStoreTests):
         )
 
         # Store a value first (this will succeed after 3 failures)
-        await memory_store.put(collection="test", key="test", value={"test": "value"})
+        await failing_store.put(collection="test", key="test", value={"test": "value"})
 
         # Open the circuit with 3 failures
         for _ in range(3):

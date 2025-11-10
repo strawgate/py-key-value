@@ -77,15 +77,16 @@ class CircuitBreakerWrapper(BaseWrapper):
         self._state: CircuitState = CircuitState.CLOSED
         self._failure_count: int = 0
         self._success_count: int = 0
-        self._last_failure_time: float | None = None
+        self._last_failure_time: float | None = None  # Wall clock time for diagnostics
+        self._last_failure_tick: float | None = None  # Monotonic time for timeout calculations
 
         super().__init__()
 
     def _check_circuit(self) -> None:
         """Check the circuit state and potentially transition states."""
         if self._state == CircuitState.OPEN:
-            # Check if we should move to half-open
-            if self._last_failure_time is not None and time.time() - self._last_failure_time >= self.recovery_timeout:
+            # Check if we should move to half-open (using monotonic time for reliability)
+            if self._last_failure_tick is not None and time.monotonic() - self._last_failure_tick >= self.recovery_timeout:
                 self._state = CircuitState.HALF_OPEN
                 self._success_count = 0
             else:
@@ -107,7 +108,8 @@ class CircuitBreakerWrapper(BaseWrapper):
 
     def _on_failure(self) -> None:
         """Handle failed operation."""
-        self._last_failure_time = time.time()
+        self._last_failure_time = time.time()  # Wall clock for diagnostics
+        self._last_failure_tick = time.monotonic()  # Monotonic time for timeout calculations
 
         if self._state == CircuitState.HALF_OPEN:
             # Failed in half-open, go back to open

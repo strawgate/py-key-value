@@ -73,39 +73,43 @@ class RateLimitWrapper(BaseWrapper):
     async def _check_rate_limit_sliding(self) -> None:
         """Check rate limit using sliding window strategy."""
         async with self._lock:
-            now = time.time()
+            now = time.monotonic()
 
             # Remove requests outside the current window
             while self._request_times and self._request_times[0] < now - self.window_seconds:
                 self._request_times.popleft()
 
-            # Check if we're at the limit
-            if len(self._request_times) >= self.max_requests:
-                raise RateLimitExceededError(
-                    current_requests=len(self._request_times), max_requests=self.max_requests, window_seconds=self.window_seconds
-                )
-
-            # Record this request
+            # Record this request first
             self._request_times.append(now)
+
+            # Check if we exceeded the limit (after adding this request)
+            if len(self._request_times) > self.max_requests:
+                # Remove the request we just added since it exceeded the limit
+                self._request_times.pop()
+                raise RateLimitExceededError(
+                    current_requests=self.max_requests, max_requests=self.max_requests, window_seconds=self.window_seconds
+                )
 
     async def _check_rate_limit_fixed(self) -> None:
         """Check rate limit using fixed window strategy."""
         async with self._lock:
-            now = time.time()
+            now = time.monotonic()
 
             # Check if we need to start a new window
             if self._window_start is None or now >= self._window_start + self.window_seconds:
                 self._window_start = now
                 self._request_count = 0
 
-            # Check if we're at the limit
-            if self._request_count >= self.max_requests:
-                raise RateLimitExceededError(
-                    current_requests=self._request_count, max_requests=self.max_requests, window_seconds=self.window_seconds
-                )
-
-            # Record this request
+            # Record this request first
             self._request_count += 1
+
+            # Check if we exceeded the limit (after adding this request)
+            if self._request_count > self.max_requests:
+                # Decrement since this request exceeds the limit
+                self._request_count -= 1
+                raise RateLimitExceededError(
+                    current_requests=self.max_requests, max_requests=self.max_requests, window_seconds=self.window_seconds
+                )
 
     async def _check_rate_limit(self) -> None:
         """Check rate limit based on configured strategy."""

@@ -60,8 +60,8 @@ class VersioningWrapper(BaseWrapper):
 
     def _wrap_value(self, value: dict[str, Any]) -> dict[str, Any]:
         """Wrap a value with version information."""
-        # If already versioned, don't double-wrap
-        if _VERSION_KEY in value:
+        # If already properly versioned, don't double-wrap
+        if _VERSION_KEY in value and _VERSIONED_DATA_KEY in value:
             return value
 
         return {_VERSION_KEY: self.version, _VERSIONED_DATA_KEY: value}
@@ -80,8 +80,11 @@ class VersioningWrapper(BaseWrapper):
             # Version mismatch - auto-invalidate by returning None
             return None
 
-        # Extract the actual data
-        return value.get(_VERSIONED_DATA_KEY, value)
+        # Extract the actual data (must be present in properly wrapped data)
+        if _VERSIONED_DATA_KEY not in value:
+            # Malformed versioned data - treat as corruption
+            return None
+        return value[_VERSIONED_DATA_KEY]
 
     @override
     def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
@@ -103,7 +106,8 @@ class VersioningWrapper(BaseWrapper):
     @override
     def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
         results = self.key_value.ttl_many(keys=keys, collection=collection)
-        return [(self._unwrap_value(value), ttl if self._unwrap_value(value) is not None else None) for (value, ttl) in results]
+        unwrapped = [(self._unwrap_value(value), ttl) for (value, ttl) in results]
+        return [(value, ttl if value is not None else None) for (value, ttl) in unwrapped]
 
     @override
     def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:

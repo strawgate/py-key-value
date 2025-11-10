@@ -65,27 +65,33 @@ class BulkheadWrapper(BaseWrapper):
 
     async def _execute_with_bulkhead(self, operation: Callable[..., Coroutine[Any, Any, T]], *args: Any, **kwargs: Any) -> T:
         """Execute an operation with bulkhead resource limiting."""
-        # Check if we can accept this operation
+        # Check if we're over capacity before even trying
+        # Count the number currently executing + waiting
         async with self._waiting_lock:
-            if self._waiting_count >= self.max_waiting:
+            # _semaphore._value tells us how many slots are available
+            # max_concurrent - _value = number currently executing
+            currently_executing = self.max_concurrent - self._semaphore._value
+            total_in_system = currently_executing + self._waiting_count
+
+            if total_in_system >= self.max_concurrent + self.max_waiting:
                 raise BulkheadFullError(max_concurrent=self.max_concurrent, max_waiting=self.max_waiting)
+
+            # We're allowed in - increment waiting count
             self._waiting_count += 1
 
         try:
-            # Acquire semaphore to limit concurrency
+            # Acquire semaphore (may block)
             async with self._semaphore:
-                # Once we have the semaphore, we're no longer waiting
+                # Once we have the semaphore, we're executing (not waiting)
                 async with self._waiting_lock:
                     self._waiting_count -= 1
 
                 # Execute the operation
                 return await operation(*args, **kwargs)
-        except Exception:
-            # Make sure to decrement waiting count if we error before acquiring semaphore
+        except BaseException:
+            # Make sure to clean up waiting count if we fail before executing
             async with self._waiting_lock:
-                # Only decrement if we're still counted as waiting
-                # (might have already decremented if we got the semaphore)
-                if self._waiting_count > 0 and self._semaphore.locked():
+                if self._waiting_count > 0:
                     self._waiting_count -= 1
             raise
 
