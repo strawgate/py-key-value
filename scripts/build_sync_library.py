@@ -59,6 +59,8 @@ EXCLUDE_DIRECTORIES = [
     "key-value/key-value-aio/tests/stores/dynamodb",
     "key-value/key-value-aio/src/key_value/aio/stores/memcached",
     "key-value/key-value-aio/tests/stores/memcached",
+    "key-value/key-value-aio/src/key_value/aio/stores/filetree",
+    "key-value/key-value-aio/tests/stores/filetree",
     "key-value/key-value-aio/src/key_value/aio/wrappers/timeout",
     "key-value/key-value-aio/src/key_value/aio/wrappers/bulkhead",
     "key-value/key-value-aio/src/key_value/aio/wrappers/circuit_breaker",
