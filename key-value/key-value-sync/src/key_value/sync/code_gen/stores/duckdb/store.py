@@ -16,7 +16,7 @@ from key_value.sync.code_gen.stores.base import SEED_DATA_TYPE, BaseContextManag
 try:
     import duckdb
 except ImportError as e:
-    msg = "DuckDBStore requires the duckdb extra from py-key-value-aio or py-key-value-sync"
+    msg = "DuckDBStore requires the duckdb extra from py-key-value-sync or py-key-value-sync"
     raise ImportError(msg) from e
 
 

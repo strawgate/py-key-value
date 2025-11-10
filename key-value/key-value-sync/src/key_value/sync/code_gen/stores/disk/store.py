@@ -14,7 +14,7 @@ from key_value.sync.code_gen.stores.base import BaseContextManagerStore, BaseSto
 try:
     from diskcache import Cache
 except ImportError as e:
-    msg = "DiskStore requires py-key-value-aio[disk]"
+    msg = "DiskStore requires py-key-value-sync[disk]"
     raise ImportError(msg) from e
 
 

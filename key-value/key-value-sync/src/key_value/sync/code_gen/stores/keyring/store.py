@@ -18,7 +18,7 @@ try:
     import keyring
     from keyring.errors import PasswordDeleteError
 except ImportError as e:
-    msg = "KeyringStore requires py-key-value-aio[keyring]"
+    msg = "KeyringStore requires py-key-value-sync[keyring]"
     raise ImportError(msg) from e
 
 DEFAULT_KEYCHAIN_SERVICE = "py-key-value"

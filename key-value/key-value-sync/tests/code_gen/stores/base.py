@@ -27,7 +27,7 @@ class BaseStoreTests(ABC):
     @abstractmethod
     def store(self) -> BaseStore | Generator[BaseStore, None, None]: ...
 
-    @pytest.mark.timeout(60)
+    @pytest.mark.timeout(90)
     def test_store(self, store: BaseStore):
         """Tests that the store is a valid KeyValueProtocol."""
         assert isinstance(store, KeyValueProtocol) is True

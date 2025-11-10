@@ -16,7 +16,7 @@ try:
     from hvac.api.secrets_engines.kv_v2 import KvV2
     from hvac.exceptions import InvalidPath
 except ImportError as e:
-    msg = "VaultStore requires py-key-value-aio[vault]"
+    msg = "VaultStore requires py-key-value-sync[vault]"
     raise ImportError(msg) from e
 
 

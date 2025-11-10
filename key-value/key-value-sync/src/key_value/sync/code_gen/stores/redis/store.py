@@ -18,7 +18,7 @@ from key_value.sync.code_gen.stores.base import BaseContextManagerStore, BaseDes
 try:
     from redis import Redis
 except ImportError as e:
-    msg = "RedisStore requires py-key-value-aio[redis]"
+    msg = "RedisStore requires py-key-value-sync[redis]"
     raise ImportError(msg) from e
 
 DEFAULT_PAGE_SIZE = 10000
