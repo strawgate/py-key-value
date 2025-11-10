@@ -1,3 +1,4 @@
+from contextlib import AsyncExitStack
 from datetime import datetime, timezone
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, overload
@@ -35,11 +36,11 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     - key (sort key)
     """
 
-    _session: aioboto3.Session  # pyright: ignore[reportAny]
+    _session: aioboto3.Session | None  # pyright: ignore[reportAny]
     _table_name: str
     _endpoint_url: str | None
-    _raw_client: Any  # DynamoDB client from aioboto3
     _client: DynamoDBClient | None
+    _exit_stack: AsyncExitStack
 
     @overload
     def __init__(self, *, client: DynamoDBClient, table_name: str, default_collection: str | None = None) -> None:
@@ -99,26 +100,29 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             default_collection: The default collection to use if no collection is provided.
         """
         self._table_name = table_name
+        self._exit_stack = AsyncExitStack()
+        self._endpoint_url = endpoint_url
+
         if client:
             self._client = client
+            self._session = None
         else:
-            session: Session = aioboto3.Session(
+            self._session = aioboto3.Session(
                 region_name=region_name,
                 aws_access_key_id=aws_access_key_id,
                 aws_secret_access_key=aws_secret_access_key,
                 aws_session_token=aws_session_token,
             )
-
-            self._raw_client = session.client(service_name="dynamodb", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType]
-
             self._client = None
 
         super().__init__(default_collection=default_collection)
 
     @override
     async def __aenter__(self) -> Self:
-        if self._raw_client:
-            self._client = await self._raw_client.__aenter__()
+        if self._session and not self._client:
+            self._client = await self._exit_stack.enter_async_context(
+                self._session.client(service_name="dynamodb", endpoint_url=self._endpoint_url)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            )
         await super().__aenter__()
         return self
 
@@ -127,8 +131,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
     ) -> None:
         await super().__aexit__(exc_type, exc_value, traceback)
-        if self._client:
-            await self._client.__aexit__(exc_type, exc_value, traceback)
+        await self._exit_stack.aclose()
 
     @property
     def _connected_client(self) -> DynamoDBClient:
@@ -141,8 +144,10 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     async def _setup(self) -> None:
         """Setup the DynamoDB client and ensure table exists."""
 
-        if not self._client:
-            self._client = await self._raw_client.__aenter__()
+        if self._session and not self._client:
+            self._client = await self._exit_stack.enter_async_context(
+                self._session.client(service_name="dynamodb", endpoint_url=self._endpoint_url)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            )
 
         try:
             await self._connected_client.describe_table(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
@@ -256,5 +261,4 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _close(self) -> None:
         """Close the DynamoDB client."""
-        if self._client:
-            await self._client.__aexit__(None, None, None)  # pyright: ignore[reportUnknownMemberType]
+        await self._exit_stack.aclose()
