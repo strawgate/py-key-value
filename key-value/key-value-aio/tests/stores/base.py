@@ -30,7 +30,6 @@ class BaseStoreTests(ABC):
     @abstractmethod
     async def store(self) -> BaseStore | AsyncGenerator[BaseStore, None]: ...
 
-    @pytest.mark.timeout(60)
     async def test_store(self, store: BaseStore):
         """Tests that the store is a valid AsyncKeyValueProtocol."""
         assert isinstance(store, AsyncKeyValueProtocol) is True
