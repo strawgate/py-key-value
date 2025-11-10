@@ -135,6 +135,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
     _endpoint_url: str | None
     _raw_client: Any
     _client: S3Client | None
+    _owns_client: bool
 
     @overload
     def __init__(
@@ -147,6 +148,9 @@ class S3Store(BaseContextManagerStore, BaseStore):
         key_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
         """Initialize the S3 store with a pre-configured client.
+
+        Note: When you provide an existing client, you retain ownership and must manage
+        its lifecycle yourself. The store will not close the client when the store is closed.
 
         Args:
             client: The S3 client to use. You must have entered the context manager before passing this in.
@@ -218,6 +222,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
         if client:
             self._client = client
             self._raw_client = None
+            self._owns_client = False
         else:
             session: Session = aioboto3.Session(
                 region_name=region_name,
@@ -228,6 +233,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
 
             self._raw_client = session.client(service_name="s3", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType]
             self._client = None
+            self._owns_client = True
 
         super().__init__(
             default_collection=default_collection,
@@ -235,18 +241,10 @@ class S3Store(BaseContextManagerStore, BaseStore):
             key_sanitization_strategy=key_sanitization_strategy,
         )
 
-    async def _connect(self) -> None:
-        if self._client is None and self._raw_client:
-            self._client = await self._raw_client.__aenter__()
-
-    async def _disconnect(self) -> None:
-        if self._client is not None:
-            await self._client.__aexit__(None, None, None)
-            self._client = None
-
     @override
     async def __aenter__(self) -> Self:
-        await self._connect()
+        if self._raw_client:
+            self._client = await self._raw_client.__aenter__()
         await super().__aenter__()
         return self
 
@@ -255,7 +253,8 @@ class S3Store(BaseContextManagerStore, BaseStore):
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
     ) -> None:
         await super().__aexit__(exc_type, exc_value, traceback)
-        await self._disconnect()
+        if self._owns_client and self._client:
+            await self._client.__aexit__(exc_type, exc_value, traceback)
 
     @property
     def _connected_client(self) -> S3Client:
@@ -279,7 +278,9 @@ class S3Store(BaseContextManagerStore, BaseStore):
         This method creates the S3 bucket if it doesn't already exist. It uses the
         HeadBucket operation to check for bucket existence and creates it if not found.
         """
-        await self._connect()
+        if not self._client:
+            if self._raw_client:
+                self._client = await self._raw_client.__aenter__()
 
         from botocore.exceptions import ClientError
 
@@ -446,4 +447,5 @@ class S3Store(BaseContextManagerStore, BaseStore):
     @override
     async def _close(self) -> None:
         """Close the S3 client."""
-        await self._disconnect()
+        if self._owns_client and self._client:
+            await self._client.__aexit__(None, None, None)
