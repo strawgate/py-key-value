@@ -253,8 +253,8 @@ class S3Store(BaseContextManagerStore, BaseStore):
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
     ) -> None:
         await super().__aexit__(exc_type, exc_value, traceback)
-        if self._owns_client and self._client:
-            await self._client.__aexit__(exc_type, exc_value, traceback)
+        if self._owns_client and self._raw_client:
+            await self._raw_client.__aexit__(exc_type, exc_value, traceback)
 
     @property
     def _connected_client(self) -> S3Client:
@@ -278,10 +278,6 @@ class S3Store(BaseContextManagerStore, BaseStore):
         This method creates the S3 bucket if it doesn't already exist. It uses the
         HeadBucket operation to check for bucket existence and creates it if not found.
         """
-        if not self._client:
-            if self._raw_client:
-                self._client = await self._raw_client.__aenter__()
-
         from botocore.exceptions import ClientError
 
         try:
@@ -447,5 +443,5 @@ class S3Store(BaseContextManagerStore, BaseStore):
     @override
     async def _close(self) -> None:
         """Close the S3 client."""
-        if self._owns_client and self._client:
-            await self._client.__aexit__(None, None, None)
+        if self._owns_client and self._raw_client:
+            await self._raw_client.__aexit__(None, None, None)
