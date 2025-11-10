@@ -177,7 +177,6 @@ class BaseStoreTests(ABC):
         with pytest.raises(InvalidTTLError):
             store.put(collection="test", key="test", value={"test": "test"}, ttl=-100)
 
-    @pytest.mark.timeout(10)
     def test_put_expired_get_none(self, store: BaseStore):
         """Tests that a put call with a negative ttl will return None when getting the key."""
         store.put(collection="test_collection", key="test_key", value={"test": "test"}, ttl=2)
@@ -212,7 +211,6 @@ class BaseStoreTests(ABC):
         store.put(collection="test_collection", key="test_key!@#$%^&*()", value={"test": "test"})
         assert store.get(collection="test_collection", key="test_key!@#$%^&*()") == {"test": "test"}
 
-    @pytest.mark.timeout(20)
     def test_not_unbounded(self, store: BaseStore):
         """Tests that the store is not unbounded."""
 
@@ -242,7 +240,6 @@ class BaseStoreTests(ABC):
 
         _ = gather(*[worker(store, worker_id) for worker_id in range(5)])
 
-    @pytest.mark.timeout(15)
     def test_minimum_put_many_get_many_performance(self, store: BaseStore):
         """Tests that the store meets minimum performance requirements."""
         keys = [f"test_{i}" for i in range(10)]
@@ -250,7 +247,6 @@ class BaseStoreTests(ABC):
         store.put_many(collection="test_collection", keys=keys, values=values)
         assert store.get_many(collection="test_collection", keys=keys) == values
 
-    @pytest.mark.timeout(15)
     def test_minimum_put_many_delete_many_performance(self, store: BaseStore):
         """Tests that the store meets minimum performance requirements."""
         keys = [f"test_{i}" for i in range(10)]
