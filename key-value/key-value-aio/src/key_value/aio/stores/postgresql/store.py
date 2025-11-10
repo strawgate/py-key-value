@@ -12,8 +12,6 @@ from datetime import datetime
 from typing import Any, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitization import HybridSanitizationStrategy, SanitizationStrategy
-from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
 from typing_extensions import Self, override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseStore
@@ -34,31 +32,15 @@ DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
 
 # PostgreSQL table name length limit is 63 characters
-# Use 200 for consistency with MongoDB
-MAX_COLLECTION_LENGTH = 200
 POSTGRES_MAX_IDENTIFIER_LEN = 63
-COLLECTION_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
-
-
-class PostgreSQLV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
-    def __init__(self) -> None:
-        super().__init__(
-            replacement_character="_",
-            max_length=MAX_COLLECTION_LENGTH,
-            allowed_characters=COLLECTION_ALLOWED_CHARACTERS,
-        )
 
 
 class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
     """PostgreSQL-based key-value store using asyncpg.
 
-    This store uses a single table with columns for collection, key, value (JSONB), and metadata.
-    Collections are stored as a column value rather than separate tables.
-
-    By default, collections are not sanitized. This means that there are character and length restrictions on
-    collection names that may cause errors when trying to get and put entries.
-
-    To avoid issues, you may want to consider leveraging the `PostgreSQLV1CollectionSanitizationStrategy` strategy.
+    This store uses a single shared table with columns for collection, key, value (JSONB), and metadata.
+    Collections are stored as values in the collection column, not as separate tables or SQL identifiers,
+    so there are no character restrictions on collection names.
 
     Example:
         Basic usage with default connection:
@@ -99,7 +81,6 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         pool: asyncpg.Pool,  # type: ignore[type-arg]
         table_name: str | None = None,
         default_collection: str | None = None,
-        collection_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
         """Initialize the PostgreSQL store with an existing connection pool.
 
@@ -107,7 +88,6 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             pool: An existing asyncpg connection pool to use.
             table_name: The name of the table to use for storage (default: kv_store).
             default_collection: The default collection to use if no collection is provided.
-            collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
 
     @overload
@@ -117,7 +97,6 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         url: str,
         table_name: str | None = None,
         default_collection: str | None = None,
-        collection_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
         """Initialize the PostgreSQL store with a connection URL.
 
@@ -125,7 +104,6 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             url: PostgreSQL connection URL (e.g., postgresql://user:pass@localhost/dbname).
             table_name: The name of the table to use for storage (default: kv_store).
             default_collection: The default collection to use if no collection is provided.
-            collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
 
     @overload
@@ -139,7 +117,6 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         password: str | None = None,
         table_name: str | None = None,
         default_collection: str | None = None,
-        collection_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
         """Initialize the PostgreSQL store with connection parameters.
 
@@ -151,7 +128,6 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             password: Database password (default: None).
             table_name: The name of the table to use for storage (default: kv_store).
             default_collection: The default collection to use if no collection is provided.
-            collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
 
     def __init__(
@@ -166,7 +142,6 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         password: str | None = None,
         table_name: str | None = None,
         default_collection: str | None = None,
-        collection_sanitization_strategy: SanitizationStrategy | None = None,
     ) -> None:
         """Initialize the PostgreSQL store."""
         self._pool = pool
@@ -178,7 +153,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         self._user = user
         self._password = password
 
-        # Validate and sanitize table name to prevent SQL injection and invalid identifiers
+        # Validate table name to prevent SQL injection and invalid identifiers
         table_name = table_name or DEFAULT_TABLE
         if not table_name.replace("_", "").isalnum():
             msg = f"Table name must be alphanumeric (with underscores): {table_name}"
@@ -192,10 +167,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             raise ValueError(msg)
         self._table_name = table_name
 
-        super().__init__(
-            default_collection=default_collection,
-            collection_sanitization_strategy=collection_sanitization_strategy,
-        )
+        super().__init__(default_collection=default_collection)
 
     def _ensure_pool_initialized(self) -> asyncpg.Pool:  # type: ignore[type-arg]
         """Ensure the connection pool is initialized.
@@ -250,14 +222,12 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             await self._pool.close()
 
     @override
-    async def _setup_collection(self, *, collection: str) -> None:
+    async def _setup(self) -> None:
         """Set up the database table and indexes if they don't exist.
 
-        Args:
-            collection: The collection name (used for validation, but all collections share the same table).
+        This is called once when the store is first used. Since all collections share the same table,
+        we only need to set up the schema once.
         """
-        _ = self._sanitize_collection(collection=collection)
-
         # Create the main table if it doesn't exist
         table_sql = (
             f"CREATE TABLE IF NOT EXISTS {self._table_name} ("
@@ -295,12 +265,10 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         Returns:
             The managed entry if found and not expired, None otherwise.
         """
-        sanitized_collection = self._sanitize_collection(collection=collection)
-
         async with self._acquire_connection() as conn:
             row = await conn.fetchrow(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                 f"SELECT value, ttl, created_at, expires_at FROM {self._table_name} WHERE collection = $1 AND key = $2",
-                sanitized_collection,
+                collection,
                 key,
             )
 
@@ -318,7 +286,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             if managed_entry.is_expired:
                 await conn.execute(  # pyright: ignore[reportUnknownMemberType]
                     f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = $2",
-                    sanitized_collection,
+                    collection,
                     key,
                 )
                 return None
@@ -339,13 +307,11 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         if not keys:
             return []
 
-        sanitized_collection = self._sanitize_collection(collection=collection)
-
         async with self._acquire_connection() as conn:
             # Use ANY to query for multiple keys
             rows = await conn.fetch(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                 f"SELECT key, value, ttl, created_at, expires_at FROM {self._table_name} WHERE collection = $1 AND key = ANY($2::text[])",
-                sanitized_collection,
+                collection,
                 list(keys),
             )
 
@@ -370,7 +336,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             if expired_keys:
                 await conn.execute(  # pyright: ignore[reportUnknownMemberType]
                     f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = ANY($2::text[])",
-                    sanitized_collection,
+                    collection,
                     expired_keys,
                 )
 
@@ -391,7 +357,6 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             collection: The collection to store in.
             managed_entry: The managed entry to store.
         """
-        sanitized_collection = self._sanitize_collection(collection=collection)
 
         async with self._acquire_connection() as conn:
             upsert_sql = (
@@ -403,7 +368,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             )
             await conn.execute(  # pyright: ignore[reportUnknownMemberType]
                 upsert_sql,
-                sanitized_collection,
+                collection,
                 key,
                 managed_entry.value,
                 managed_entry.ttl,
@@ -435,12 +400,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         if not keys:
             return
 
-        sanitized_collection = self._sanitize_collection(collection=collection)
-
         # Prepare data for batch insert using method-level ttl/created_at/expires_at
-        values = [
-            (sanitized_collection, key, entry.value, ttl, created_at, expires_at) for key, entry in zip(keys, managed_entries, strict=True)
-        ]
+        values = [(collection, key, entry.value, ttl, created_at, expires_at) for key, entry in zip(keys, managed_entries, strict=True)]
 
         async with self._acquire_connection() as conn:
             # Use executemany for batch insert
@@ -467,12 +428,10 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         Returns:
             True if the entry was deleted, False if it didn't exist.
         """
-        sanitized_collection = self._sanitize_collection(collection=collection)
-
         async with self._acquire_connection() as conn:
             result = await conn.execute(  # pyright: ignore[reportUnknownMemberType]
                 f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = $2",
-                sanitized_collection,
+                collection,
                 key,
             )
             # PostgreSQL execute returns a string like "DELETE N" where N is the number of rows deleted
@@ -492,12 +451,10 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         if not keys:
             return 0
 
-        sanitized_collection = self._sanitize_collection(collection=collection)
-
         async with self._acquire_connection() as conn:
             result = await conn.execute(  # pyright: ignore[reportUnknownMemberType]
                 f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = ANY($2::text[])",
-                sanitized_collection,
+                collection,
                 list(keys),
             )
             # PostgreSQL execute returns a string like "DELETE N" where N is the number of rows deleted
@@ -535,12 +492,10 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         Returns:
             True if any entries were deleted, False otherwise.
         """
-        sanitized_collection = self._sanitize_collection(collection=collection)
-
         async with self._acquire_connection() as conn:
             result = await conn.execute(  # pyright: ignore[reportUnknownMemberType]
                 f"DELETE FROM {self._table_name} WHERE collection = $1",
-                sanitized_collection,
+                collection,
             )
             # Return True if any rows were deleted
             return result.split()[-1] != "0"

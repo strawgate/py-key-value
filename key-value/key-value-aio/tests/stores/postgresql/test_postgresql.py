@@ -7,7 +7,7 @@ import pytest
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
-from key_value.aio.stores.postgresql import PostgreSQLStore, PostgreSQLV1CollectionSanitizationStrategy
+from key_value.aio.stores.postgresql import PostgreSQLStore
 from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -104,65 +104,25 @@ class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         return store
 
-    @pytest.fixture
-    async def postgresql_store(self, store: PostgreSQLStore) -> PostgreSQLStore:
-        """Provide the PostgreSQL store fixture."""
-        return store
-
-    @pytest.fixture
-    async def sanitizing_store(self, setup_postgresql: None) -> PostgreSQLStore:
-        """Create a PostgreSQL store with collection sanitization enabled."""
-        store = PostgreSQLStore(
-            host=POSTGRESQL_HOST,
-            port=POSTGRESQL_HOST_PORT,
-            database=POSTGRESQL_TEST_DB,
-            user=POSTGRESQL_USER,
-            password=POSTGRESQL_PASSWORD,
-            table_name="kv_store_sanitizing",
-            collection_sanitization_strategy=PostgreSQLV1CollectionSanitizationStrategy(),
-        )
-
-        # Clean up the database before each test
-        async with store:
-            if store._pool is not None:  # pyright: ignore[reportPrivateUsage]
-                async with store._pool.acquire() as conn:  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportUnknownVariableType]
-                    # Drop and recreate the kv_store_sanitizing table
-                    with contextlib.suppress(Exception):
-                        await conn.execute("DROP TABLE IF EXISTS kv_store_sanitizing")  # pyright: ignore[reportUnknownMemberType]
-
-        return store
-
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
 
     @override
-    async def test_long_collection_name(self, store: PostgreSQLStore, sanitizing_store: PostgreSQLStore):  # pyright: ignore[reportIncompatibleMethodOverride]
-        """Test that long collection names fail without sanitization but work with it."""
-        with pytest.raises(Exception):  # noqa: B017, PT011
-            await store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
-
-        await sanitizing_store.put(collection="test_collection" * 100, key="test_key", value={"test": "test"})
-        assert await sanitizing_store.get(collection="test_collection" * 100, key="test_key") == {"test": "test"}
+    async def test_long_collection_name(self, store: PostgreSQLStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Test that long collection names work since they're just column values."""
+        # Long collection names should work fine since they're stored as column values, not SQL identifiers
+        long_collection = "test_collection" * 100
+        await store.put(collection=long_collection, key="test_key", value={"test": "test"})
+        assert await store.get(collection=long_collection, key="test_key") == {"test": "test"}
 
     @override
-    async def test_special_characters_in_collection_name(self, store: PostgreSQLStore, sanitizing_store: PostgreSQLStore):  # pyright: ignore[reportIncompatibleMethodOverride]
-        """Test that special characters in collection names fail without sanitization but work with it."""
-        # Without sanitization, special characters should work (PostgreSQL allows them in column values)
-        # but may cause issues with certain characters
-        await store.put(collection="test_collection", key="test_key", value={"test": "test"})
-        assert await store.get(collection="test_collection", key="test_key") == {"test": "test"}
+    async def test_special_characters_in_collection_name(self, store: PostgreSQLStore):  # pyright: ignore[reportIncompatibleMethodOverride]
+        """Test that special characters in collection names work since they're just column values."""
+        # Special characters should work fine since collection names are stored as column values
+        await store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
+        assert await store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
 
-        # With sanitization, special characters should work
-        await sanitizing_store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
-        assert await sanitizing_store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
-
-    async def test_postgresql_collection_name_sanitization(self, sanitizing_store: PostgreSQLStore):
-        """Test that the V1 sanitization strategy produces expected collection names."""
-        await sanitizing_store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
-        assert await sanitizing_store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
-
-        collections = await sanitizing_store.collections()
-        # The sanitized collection name should only contain alphanumeric characters and underscores
-        assert len(collections) == 1
-        assert all(c.isalnum() or c in "_-" for c in collections[0])
+        # Verify the collection name is stored as-is
+        collections = await store.collections()
+        assert "test_collection!@#$%^&*()" in collections
