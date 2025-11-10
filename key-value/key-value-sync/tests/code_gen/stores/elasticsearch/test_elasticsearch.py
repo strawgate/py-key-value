@@ -3,6 +3,7 @@
 # DO NOT CHANGE! Change the original file instead.
 from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from dirty_equals import IsFloat, IsStr
@@ -21,6 +22,9 @@ from key_value.sync.code_gen.stores.elasticsearch.store import (
 )
 from tests.code_gen.conftest import docker_container, should_skip_docker_tests
 from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
+
+if TYPE_CHECKING:
+    from elastic_transport._response import ObjectApiResponse
 
 TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
 ES_HOST = "localhost"
@@ -42,7 +46,12 @@ def ping_elasticsearch() -> bool:
     es_client: Elasticsearch = get_elasticsearch_client()
 
     with es_client:
-        return es_client.ping()
+        if not es_client.ping():
+            return False
+
+        status: ObjectApiResponse[dict[str, Any]] = es_client.options(ignore_status=404).cluster.health(wait_for_status="green")
+
+        return status.body.get("status") == "green"
 
 
 def cleanup_elasticsearch_indices(elasticsearch_client: Elasticsearch):
@@ -103,10 +112,7 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture
     def es_client(self) -> Generator[Elasticsearch, None, None]:
         with Elasticsearch(hosts=[ES_URL]) as es_client:
-            try:
-                yield es_client
-            finally:
-                es_client.close()
+            yield es_client
 
     @override
     @pytest.fixture
