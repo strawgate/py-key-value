@@ -138,6 +138,7 @@ test-sync-concise:
 test-shared-concise:
 	@echo "Testing key-value-shared (concise output)..."
 	@uv run pytest key-value/key-value-shared/tests -qq --tb=line --no-header
+
 # Build target - supports PROJECT parameter
 build:
 ifdef PROJECT
