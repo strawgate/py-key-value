@@ -11,12 +11,10 @@ from key_value.aio.stores.base import (
     BaseStore,
 )
 
-# HTTP status code for not found errors
 HTTP_NOT_FOUND = 404
 
 # S3 key length limit is 1024 bytes
-# We allocate space for collection, separator, and key
-# Using 500 bytes for each allows for the separator and stays well under 1024
+# Allocating 500 bytes each for collection and key stays well under the limit
 MAX_COLLECTION_LENGTH = 500
 MAX_KEY_LENGTH = 500
 
@@ -135,7 +133,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
 
     _bucket_name: str
     _endpoint_url: str | None
-    _raw_client: Any  # S3 client from aioboto3
+    _raw_client: Any
     _client: S3Client | None
 
     @overload
@@ -286,32 +284,25 @@ class S3Store(BaseContextManagerStore, BaseStore):
         from botocore.exceptions import ClientError
 
         try:
-            # Check if bucket exists
             await self._connected_client.head_bucket(Bucket=self._bucket_name)  # pyright: ignore[reportUnknownMemberType]
         except ClientError as e:
-            # Only proceed with bucket creation if it's a 404/NoSuchBucket error
             error_code = e.response.get("Error", {}).get("Code", "")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             http_status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
             if error_code in ("404", "NoSuchBucket") or http_status == HTTP_NOT_FOUND:
-                # Bucket doesn't exist, create it
                 import contextlib
 
                 with contextlib.suppress(self._connected_client.exceptions.BucketAlreadyOwnedByYou):  # pyright: ignore[reportUnknownMemberType]
-                    # Build create_bucket parameters
                     create_params: dict[str, Any] = {"Bucket": self._bucket_name}
-
-                    # Get region from client metadata
                     region_name = getattr(self._connected_client.meta, "region_name", None)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
-                    # For regions other than us-east-1, we need to specify LocationConstraint
-                    # Skip this for custom endpoints (LocalStack, MinIO) which may not support it
+                    # For regions other than us-east-1, specify LocationConstraint
+                    # Skip for custom endpoints (LocalStack, MinIO) which may not support it
                     if region_name and region_name != "us-east-1" and not self._endpoint_url:
                         create_params["CreateBucketConfiguration"] = {"LocationConstraint": region_name}
 
                     await self._connected_client.create_bucket(**create_params)  # pyright: ignore[reportUnknownMemberType]
             else:
-                # Re-raise authentication, permission, or other errors
                 raise
 
     def _get_s3_key(self, *, collection: str, key: str) -> str:
@@ -327,7 +318,6 @@ class S3Store(BaseContextManagerStore, BaseStore):
         Returns:
             The S3 object key in format: {collection}/{key}
         """
-        # Use the sanitization strategies from BaseStore
         sanitized_collection, sanitized_key = self._sanitize_collection_and_key(collection=collection, key=key)
         return f"{sanitized_collection}/{sanitized_key}"
 
@@ -354,17 +344,13 @@ class S3Store(BaseContextManagerStore, BaseStore):
                 Key=s3_key,
             )
 
-            # Read the object body and ensure the streaming body is closed
             async with response["Body"] as stream:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                 body_bytes = await stream.read()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             json_value = body_bytes.decode("utf-8")  # pyright: ignore[reportUnknownMemberType]
 
-            # Deserialize to ManagedEntry
             managed_entry = self._serialization_adapter.load_json(json_str=json_value)
 
-            # Check for client-side expiration
             if managed_entry.is_expired:
-                # Entry expired, delete it and return None
                 await self._connected_client.delete_object(  # type: ignore[reportUnknownMemberType]
                     Bucket=self._bucket_name,
                     Key=s3_key,
@@ -373,7 +359,6 @@ class S3Store(BaseContextManagerStore, BaseStore):
             return managed_entry  # noqa: TRY300
 
         except self._connected_client.exceptions.NoSuchKey:  # pyright: ignore[reportUnknownMemberType]
-            # Object doesn't exist
             return None
 
     @override
@@ -399,7 +384,6 @@ class S3Store(BaseContextManagerStore, BaseStore):
         s3_key = self._get_s3_key(collection=collection, key=key)
         json_value = self._serialization_adapter.dump_json(entry=managed_entry)
 
-        # Prepare metadata
         metadata: dict[str, str] = {}
         if managed_entry.expires_at:
             metadata["expires-at"] = managed_entry.expires_at.isoformat()
@@ -430,7 +414,6 @@ class S3Store(BaseContextManagerStore, BaseStore):
         from botocore.exceptions import ClientError
 
         try:
-            # Check if object exists before deletion
             await self._connected_client.head_object(  # pyright: ignore[reportUnknownMemberType]
                 Bucket=self._bucket_name,
                 Key=s3_key,
@@ -443,10 +426,8 @@ class S3Store(BaseContextManagerStore, BaseStore):
             http_status = metadata.get("HTTPStatusCode", 0)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
             if error_code in ("404", "NoSuchKey") or http_status == HTTP_NOT_FOUND:
-                # Object doesn't exist
                 return False
 
-            # If AccessDenied on head_object, try delete anyway (delete-only IAM role)
             if error_code in ("403", "AccessDenied"):
                 await self._connected_client.delete_object(  # pyright: ignore[reportUnknownMemberType]
                     Bucket=self._bucket_name,
@@ -454,10 +435,8 @@ class S3Store(BaseContextManagerStore, BaseStore):
                 )
                 return True
 
-            # Re-raise other errors (network, etc.)
             raise
 
-        # Object exists, delete it
         await self._connected_client.delete_object(  # pyright: ignore[reportUnknownMemberType]
             Bucket=self._bucket_name,
             Key=s3_key,
