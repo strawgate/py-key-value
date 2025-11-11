@@ -22,9 +22,8 @@ class TestDuckDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture
     async def store(self) -> AsyncGenerator[DuckDBStore, None]:
         """Test with in-memory DuckDB database."""
-        duckdb_store = DuckDBStore()
-        yield duckdb_store
-        await duckdb_store.close()
+        yield DuckDBStore()
+        # ContextManagerStoreTestMixin handles closing
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
     async def test_not_unbounded(self, store: BaseStore): ...
@@ -38,9 +37,8 @@ class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
         """Test with persistent DuckDB database file."""
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "test.db"
-            duckdb_store = DuckDBStore(database_path=db_path)
-            yield duckdb_store
-            await duckdb_store.close()
+            yield DuckDBStore(database_path=db_path)
+            # ContextManagerStoreTestMixin handles closing
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
     async def test_not_unbounded(self, store: BaseStore): ...
@@ -55,7 +53,7 @@ class TestDuckDBStoreSpecific:
         """Provide DuckDB store instance."""
         duckdb_store = DuckDBStore()
         yield duckdb_store
-        await duckdb_store.close()
+        await duckdb_store.close()  # This class doesn't use ContextManagerStoreTestMixin
 
     async def test_native_sql_queryability(self):
         """Test that users can query the database directly with SQL."""
