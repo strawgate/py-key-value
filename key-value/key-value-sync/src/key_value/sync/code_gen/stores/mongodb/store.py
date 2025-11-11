@@ -172,11 +172,9 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
             self._client_provided_by_user = True
         elif url:
             self._client = MongoClient(url)
-            self._client_provided_by_user = False
         else:
             # Defaults to localhost
             self._client = MongoClient()
-            self._client_provided_by_user = False
 
         db_name = db_name or DEFAULT_DB
         coll_name = coll_name or DEFAULT_COLLECTION
@@ -317,4 +315,5 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
     @override
     def _close(self) -> None:
-        self._client.close()
+        if not self._client_provided_by_user:
+            self._client.close()

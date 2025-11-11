@@ -76,7 +76,6 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
             credentials: ServerCredentials | None = ServerCredentials(password=password, username=username) if password else None
             self._client_config = GlideClientConfiguration(addresses=addresses, database_id=db, credentials=credentials)
             self._connected_client = None
-            self._client_provided_by_user = False
 
         self._stable_api = True
 
@@ -161,6 +160,5 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
 
     @override
     def _close(self) -> None:
-        if self._connected_client is None:
-            return
-        self._client.close()
+        if self._connected_client is not None and (not self._client_provided_by_user):
+            self._client.close()

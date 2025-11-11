@@ -77,7 +77,6 @@ class DiskStore(BaseContextManagerStore, BaseStore):
                 self._cache = Cache(directory=directory, size_limit=max_size)
             else:
                 self._cache = Cache(directory=directory, eviction_policy="none")
-            self._client_provided_by_user = False
 
         self._stable_api = True
 
@@ -125,7 +124,9 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
     @override
     async def _close(self) -> None:
-        self._cache.close()
+        if not self._client_provided_by_user:
+            self._cache.close()
 
     def __del__(self) -> None:
-        self._cache.close()
+        if not self._client_provided_by_user:
+            self._cache.close()

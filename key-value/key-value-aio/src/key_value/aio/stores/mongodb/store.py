@@ -174,11 +174,9 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
             self._client_provided_by_user = True
         elif url:
             self._client = AsyncMongoClient(url)
-            self._client_provided_by_user = False
         else:
             # Defaults to localhost
             self._client = AsyncMongoClient()
-            self._client_provided_by_user = False
 
         db_name = db_name or DEFAULT_DB
         coll_name = coll_name or DEFAULT_COLLECTION
@@ -345,4 +343,5 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
     @override
     async def _close(self) -> None:
-        await self._client.close()
+        if not self._client_provided_by_user:
+            await self._client.close()

@@ -76,7 +76,6 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
                 password=parsed_url.password or password,
                 decode_responses=True,
             )
-            self._client_provided_by_user = False
         else:
             self._client = Redis(
                 host=host,
@@ -85,7 +84,6 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
                 password=password,
                 decode_responses=True,
             )
-            self._client_provided_by_user = False
 
         self._stable_api = True
         self._adapter = BasicSerializationAdapter(date_format="isoformat", value_format="dict")
@@ -222,4 +220,5 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
     @override
     async def _close(self) -> None:
-        await self._client.aclose()
+        if not self._client_provided_by_user:
+            await self._client.aclose()

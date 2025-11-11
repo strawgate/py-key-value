@@ -73,7 +73,6 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
             self._client_provided_by_user = True
         else:
             self._client = Client(host=host, port=port)
-            self._client_provided_by_user = False
 
         super().__init__(
             default_collection=default_collection,
@@ -153,4 +152,5 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
 
     @override
     async def _close(self) -> None:
-        await self._client.close()
+        if not self._client_provided_by_user:
+            await self._client.close()

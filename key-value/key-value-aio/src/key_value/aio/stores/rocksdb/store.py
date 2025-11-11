@@ -76,7 +76,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
             opts.create_if_missing(True)
 
             self._db = Rdict(str(path), options=opts)
-            self._client_provided_by_user = False
 
         self._is_closed = False
 
@@ -84,7 +83,8 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
     @override
     async def _close(self) -> None:
-        self._close_and_flush()
+        if not self._client_provided_by_user:
+            self._close_and_flush()
 
     def _close_and_flush(self) -> None:
         if not self._is_closed:
@@ -190,4 +190,5 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         return deleted_count
 
     def __del__(self) -> None:
-        self._close_and_flush()
+        if not self._client_provided_by_user:
+            self._close_and_flush()

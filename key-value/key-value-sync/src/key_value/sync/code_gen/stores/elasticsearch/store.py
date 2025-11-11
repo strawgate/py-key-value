@@ -208,7 +208,6 @@ class ElasticsearchStore(
             self._client = Elasticsearch(
                 hosts=[url], api_key=api_key, http_compress=True, request_timeout=10, retry_on_timeout=True, max_retries=3
             )
-            self._client_provided_by_user = False
         else:
             msg = "Either elasticsearch_client or url must be provided"
             raise ValueError(msg)
@@ -479,4 +478,5 @@ class ElasticsearchStore(
 
     @override
     def _close(self) -> None:
-        self._client.close()
+        if not self._client_provided_by_user:
+            self._client.close()

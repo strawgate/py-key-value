@@ -154,7 +154,6 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
                 self._connection = duckdb.connect(":memory:")
             else:
                 self._connection = duckdb.connect(database=database_path)
-            self._client_provided_by_user = False
 
         self._is_closed = False
         self._adapter = DuckDBSerializationAdapter()

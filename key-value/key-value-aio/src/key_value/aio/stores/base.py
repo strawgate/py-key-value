@@ -434,6 +434,11 @@ class BaseContextManagerStore(BaseStore, ABC):
 
     _client_provided_by_user: bool
 
+    def __init__(self, **kwargs: Any) -> None:
+        """Initialize the context manager store with default client ownership."""
+        self._client_provided_by_user = False
+        super().__init__(**kwargs)
+
     async def __aenter__(self) -> Self:
         await self.setup()
         return self

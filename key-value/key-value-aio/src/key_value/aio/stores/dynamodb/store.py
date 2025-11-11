@@ -116,7 +116,6 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             self._raw_client = session.client(service_name="dynamodb", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType]
 
             self._client = None
-            self._client_provided_by_user = False
 
         super().__init__(default_collection=default_collection)
 
@@ -263,5 +262,5 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _close(self) -> None:
         """Close the DynamoDB client."""
-        if self._client:
+        if self._client and not self._client_provided_by_user:
             await self._client.__aexit__(None, None, None)  # pyright: ignore[reportUnknownMemberType]
