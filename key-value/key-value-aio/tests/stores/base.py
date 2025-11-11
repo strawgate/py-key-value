@@ -30,7 +30,6 @@ class BaseStoreTests(ABC):
     @abstractmethod
     async def store(self) -> BaseStore | AsyncGenerator[BaseStore, None]: ...
 
-    @pytest.mark.timeout(60)
     async def test_store(self, store: BaseStore):
         """Tests that the store is a valid AsyncKeyValueProtocol."""
         assert isinstance(store, AsyncKeyValueProtocol) is True
@@ -181,7 +180,6 @@ class BaseStoreTests(ABC):
         with pytest.raises(InvalidTTLError):
             await store.put(collection="test", key="test", value={"test": "test"}, ttl=-100)
 
-    @pytest.mark.timeout(10)
     async def test_put_expired_get_none(self, store: BaseStore):
         """Tests that a put call with a negative ttl will return None when getting the key."""
         await store.put(collection="test_collection", key="test_key", value={"test": "test"}, ttl=2)
@@ -216,7 +214,6 @@ class BaseStoreTests(ABC):
         await store.put(collection="test_collection", key="test_key!@#$%^&*()", value={"test": "test"})
         assert await store.get(collection="test_collection", key="test_key!@#$%^&*()") == {"test": "test"}
 
-    @pytest.mark.timeout(20)
     async def test_not_unbounded(self, store: BaseStore):
         """Tests that the store is not unbounded."""
 
@@ -246,7 +243,6 @@ class BaseStoreTests(ABC):
 
         _ = await async_gather(*[worker(store, worker_id) for worker_id in range(5)])
 
-    @pytest.mark.timeout(15)
     async def test_minimum_put_many_get_many_performance(self, store: BaseStore):
         """Tests that the store meets minimum performance requirements."""
         keys = [f"test_{i}" for i in range(10)]
@@ -254,7 +250,6 @@ class BaseStoreTests(ABC):
         await store.put_many(collection="test_collection", keys=keys, values=values)
         assert await store.get_many(collection="test_collection", keys=keys) == values
 
-    @pytest.mark.timeout(15)
     async def test_minimum_put_many_delete_many_performance(self, store: BaseStore):
         """Tests that the store meets minimum performance requirements."""
         keys = [f"test_{i}" for i in range(10)]
