@@ -23,10 +23,9 @@ def get_client_from_store(store: DuckDBStore) -> DuckDBPyConnection:
 class TestDuckDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
-    def store(self) -> Generator[DuckDBStore, None, None]:
+    def store(self) -> DuckDBStore:
         """Test with in-memory DuckDB database."""
         return DuckDBStore()
-        # ContextManagerStoreTestMixin handles closing
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
     def test_not_unbounded(self, store: BaseStore): ...
@@ -41,7 +40,6 @@ class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "test.db"
             yield DuckDBStore(database_path=db_path)
-            # ContextManagerStoreTestMixin handles closing
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
     def test_not_unbounded(self, store: BaseStore): ...
