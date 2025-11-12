@@ -201,9 +201,6 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
     @override
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
         super().__exit__(exc_type, exc_val, exc_tb)
-        # Only exit the client's context manager if the store created it
-        if not self._client_provided_by_user:
-            self._client.__exit__(exc_type, exc_val, exc_tb)
 
     @override
     def _setup_collection(self, *, collection: str) -> None:
@@ -320,4 +317,4 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
     @override
     def _close(self) -> None:
-        self._client.close()
+        self._client.__exit__(None, None, None)

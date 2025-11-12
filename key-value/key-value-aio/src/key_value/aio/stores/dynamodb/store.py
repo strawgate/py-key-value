@@ -135,10 +135,12 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
     ) -> None:
-        await super().__aexit__(exc_type, exc_value, traceback)
-        # Only exit the client's context manager if the store created it
+        # Exit the client's context manager before calling super().__aexit__() to avoid double-cleanup
         if not self._client_provided_by_user and self._client:
-            await self._client.__aexit__(exc_type, exc_value, traceback)
+            client = self._client
+            self._client = None
+            await client.__aexit__(exc_type, exc_value, traceback)
+        await super().__aexit__(exc_type, exc_value, traceback)
 
     @property
     def _connected_client(self) -> DynamoDBClient:
@@ -266,5 +268,4 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _close(self) -> None:
         """Close the DynamoDB client."""
-        if self._client:
-            await self._client.__aexit__(None, None, None)  # pyright: ignore[reportUnknownMemberType]
+        # Client cleanup is handled in __aexit__

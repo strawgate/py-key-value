@@ -182,4 +182,7 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
     def __del__(self) -> None:
         if not getattr(self, "_client_provided_by_user", False):
-            self._close_and_flush()
+            try:  # noqa: SIM105
+                self._close_and_flush()
+            except (AttributeError, Exception):  # noqa: S110
+                pass  # Best-effort cleanup during finalization

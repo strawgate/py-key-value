@@ -168,4 +168,5 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
     @override
     async def _close(self) -> None:
         if self._connected_client is not None:
-            await self._client.close()
+            await self._connected_client.close()
+            self._connected_client = None

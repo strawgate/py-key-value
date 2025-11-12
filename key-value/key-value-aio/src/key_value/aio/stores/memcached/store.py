@@ -70,7 +70,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         """
         client_provided = client is not None
 
-        if client:
+        if client is not None:
             self._client = client
         else:
             self._client = Client(host=host, port=port)

@@ -66,6 +66,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
             raise ValueError(msg)
 
         client_provided = disk_cache is not None
+        self._client_provided_by_user = client_provided
 
         if disk_cache:
             self._cache = disk_cache
