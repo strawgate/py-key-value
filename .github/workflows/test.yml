@@ -141,18 +141,22 @@ jobs:
       - name: "Install uv"
         uses: astral-sh/setup-uv@v6
 
+      - name: "Set pytest worker count"
+        id: pytest-workers
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            echo "count=2" >> $GITHUB_OUTPUT
+          else
+            echo "count=auto" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
       - name: "Install latest dependencies"
         run: uv sync --locked --group dev --python ${{ matrix.python-version }}
         working-directory: ${{ matrix.project }}
 
       - name: "Test with latest dependencies"
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            uv run pytest tests . -vv -n 2
-          else
-            uv run pytest tests . -vv
-          fi
-        shell: bash
+        run: uv run pytest tests . -vv -n ${{ steps.pytest-workers.outputs.count }}
         working-directory: ${{ matrix.project }}
 
       - name: "Install oldest dependencies"
@@ -160,13 +164,7 @@ jobs:
         working-directory: ${{ matrix.project }}
 
       - name: "Test with oldest dependencies"
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            uv run pytest tests . -vv -n 2
-          else
-            uv run pytest tests . -vv
-          fi
-        shell: bash
+        run: uv run pytest tests . -vv -n ${{ steps.pytest-workers.outputs.count }}
         working-directory: ${{ matrix.project }}
 
       - name: "Build"
@@ -204,18 +202,22 @@ jobs:
       - name: "Install uv"
         uses: astral-sh/setup-uv@v6
 
+      - name: "Set pytest worker count"
+        id: pytest-workers
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            echo "count=2" >> $GITHUB_OUTPUT
+          else
+            echo "count=auto" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
       - name: "Install latest dependencies"
         run: uv sync --locked --group dev --python ${{ matrix.python-version }}
         working-directory: ${{ matrix.project }}
 
       - name: "Test with latest dependencies"
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            uv run pytest tests . -vv -n 2
-          else
-            uv run pytest tests . -vv
-          fi
-        shell: bash
+        run: uv run pytest tests . -vv -n ${{ steps.pytest-workers.outputs.count }}
         working-directory: ${{ matrix.project }}
 
       - name: "Install oldest dependencies"
@@ -223,13 +225,7 @@ jobs:
         working-directory: ${{ matrix.project }}
 
       - name: "Test with oldest dependencies"
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            uv run pytest tests . -vv -n 2
-          else
-            uv run pytest tests . -vv
-          fi
-        shell: bash
+        run: uv run pytest tests . -vv -n ${{ steps.pytest-workers.outputs.count }}
         working-directory: ${{ matrix.project }}
 
       - name: "Build"
