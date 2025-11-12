@@ -268,4 +268,5 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _close(self) -> None:
         """Close the DynamoDB client."""
-        # Client cleanup is handled in __aexit__
+        if self._client:
+            await self._client.__aexit__(None, None, None)
