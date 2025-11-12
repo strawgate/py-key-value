@@ -62,9 +62,10 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
             msg = "Either db or path must be provided"
             raise ValueError(msg)
 
+        client_provided = db is not None
+
         if db:
             self._db = db
-            self._client_provided_by_user = True
         elif path:
             path = Path(path)
             path.mkdir(parents=True, exist_ok=True)
@@ -76,7 +77,7 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
         self._is_closed = False
 
-        super().__init__(default_collection=default_collection)
+        super().__init__(default_collection=default_collection, client_provided_by_user=client_provided)
 
     @override
     def _close(self) -> None:

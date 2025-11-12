@@ -68,9 +68,10 @@ class DiskStore(BaseContextManagerStore, BaseStore):
             msg = "Either disk_cache or directory must be provided"
             raise ValueError(msg)
 
+        client_provided = disk_cache is not None
+
         if disk_cache:
             self._cache = disk_cache
-            self._client_provided_by_user = True
         elif directory:
             directory = Path(directory)
 
@@ -81,9 +82,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
             else:
                 self._cache = Cache(directory=directory, eviction_policy="none")
 
-        self._stable_api = True
-
-        super().__init__(default_collection=default_collection)
+        super().__init__(default_collection=default_collection, client_provided_by_user=client_provided, stable_api=True)
 
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:

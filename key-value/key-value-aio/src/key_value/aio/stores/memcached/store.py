@@ -68,15 +68,17 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
             default_collection: The default collection to use if no collection is provided.
             key_sanitization_strategy: The sanitization strategy to use for keys.
         """
+        client_provided = client is not None
+
         if client:
             self._client = client
-            self._client_provided_by_user = True
         else:
             self._client = Client(host=host, port=port)
 
         super().__init__(
             default_collection=default_collection,
             key_sanitization_strategy=key_sanitization_strategy,
+            client_provided_by_user=client_provided,
         )
 
     @override

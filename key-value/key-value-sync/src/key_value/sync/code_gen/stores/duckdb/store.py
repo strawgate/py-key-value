@@ -144,9 +144,10 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             msg = "Provide only one of connection or database_path"
             raise ValueError(msg)
 
+        client_provided = connection is not None
+
         if connection is not None:
             self._connection = connection
-            self._client_provided_by_user = True
         else:
             # Convert Path to string if needed
             if isinstance(database_path, Path):
@@ -165,9 +166,8 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             msg = "Table name must start with a letter or underscore and contain only letters, digits, or underscores"
             raise ValueError(msg)
         self._table_name = table_name
-        self._stable_api = False
 
-        super().__init__(default_collection=default_collection, seed=seed)
+        super().__init__(default_collection=default_collection, seed=seed, client_provided_by_user=client_provided, stable_api=False)
 
     def _get_create_table_sql(self) -> str:
         """Generate SQL for creating the key-value entries table.

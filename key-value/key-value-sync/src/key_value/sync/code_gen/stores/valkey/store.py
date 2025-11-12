@@ -67,9 +67,10 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
             username: Valkey username. Defaults to None.
             password: Valkey password. Defaults to None.
         """
+        client_provided = client is not None
+
         if client is not None:
             self._connected_client = client
-            self._client_provided_by_user = True
         else:
             # redis client accepts URL
             addresses: list[NodeAddress] = [NodeAddress(host=host, port=port)]
@@ -77,9 +78,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
             self._client_config = GlideClientConfiguration(addresses=addresses, database_id=db, credentials=credentials)
             self._connected_client = None
 
-        self._stable_api = True
-
-        super().__init__(default_collection=default_collection)
+        super().__init__(default_collection=default_collection, client_provided_by_user=client_provided, stable_api=True)
 
     @override
     def _setup(self) -> None:

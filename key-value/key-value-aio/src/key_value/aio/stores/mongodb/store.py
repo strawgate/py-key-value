@@ -169,9 +169,10 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
             collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
 
+        client_provided = client is not None
+
         if client:
             self._client = client
-            self._client_provided_by_user = True
         elif url:
             self._client = AsyncMongoClient(url)
         else:
@@ -188,6 +189,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         super().__init__(
             default_collection=default_collection,
             collection_sanitization_strategy=collection_sanitization_strategy,
+            client_provided_by_user=client_provided,
         )
 
     @override

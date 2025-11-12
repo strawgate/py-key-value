@@ -102,9 +102,10 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             default_collection: The default collection to use if no collection is provided.
         """
         self._table_name = table_name
+        client_provided = client is not None
+
         if client:
             self._client = client
-            self._client_provided_by_user = True
         else:
             session: Session = aioboto3.Session(
                 region_name=region_name,
@@ -117,7 +118,10 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
 
             self._client = None
 
-        super().__init__(default_collection=default_collection)
+        super().__init__(
+            default_collection=default_collection,
+            client_provided_by_user=client_provided,
+        )
 
     @override
     async def __aenter__(self) -> Self:

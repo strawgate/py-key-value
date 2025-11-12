@@ -64,9 +64,10 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             password: Redis password. Defaults to None.
             default_collection: The default collection to use if no collection is provided.
         """
+        client_provided = client is not None
+
         if client:
             self._client = client
-            self._client_provided_by_user = True
         elif url:
             parsed_url = urlparse(url)
             self._client = Redis(
@@ -85,10 +86,13 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
                 decode_responses=True,
             )
 
-        self._stable_api = True
         self._adapter = BasicSerializationAdapter(date_format="isoformat", value_format="dict")
 
-        super().__init__(default_collection=default_collection)
+        super().__init__(
+            default_collection=default_collection,
+            client_provided_by_user=client_provided,
+            stable_api=True,
+        )
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:

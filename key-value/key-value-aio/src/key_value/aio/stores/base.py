@@ -85,6 +85,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         collection_sanitization_strategy: SanitizationStrategy | None = None,
         default_collection: str | None = None,
         seed: SEED_DATA_TYPE | None = None,
+        stable_api: bool = False,
     ) -> None:
         """Initialize the managed key-value store.
 
@@ -97,6 +98,8 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
             seed: Optional seed data to pre-populate the store. Format: {collection: {key: {field: value, ...}}}.
                 Seeding occurs once during store initialization (when the store is first entered or when the
                 first operation is performed on the store).
+            stable_api: Whether this store implementation has a stable API. If False, a warning will be issued.
+                Defaults to False.
         """
 
         self._setup_complete = False
@@ -113,8 +116,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         self._key_sanitization_strategy = key_sanitization_strategy or PassthroughStrategy()
         self._collection_sanitization_strategy = collection_sanitization_strategy or PassthroughStrategy()
 
-        if not hasattr(self, "_stable_api"):
-            self._stable_api = False
+        self._stable_api = stable_api
 
         if not self._stable_api:
             self._warn_about_stability()
@@ -427,16 +429,23 @@ class BaseEnumerateKeysStore(BaseStore, AsyncEnumerateKeysProtocol, ABC):
 class BaseContextManagerStore(BaseStore, ABC):
     """An abstract base class for context manager stores.
 
-    Stores that accept a client parameter should set `_client_provided_by_user = True` when
-    a client is provided by the user. This ensures the store does not manage the lifecycle
-    of user-provided clients (i.e., does not close them).
+    Stores that accept a client parameter should pass `client_provided_by_user=True` to
+    the constructor. This ensures the store does not manage the lifecycle of user-provided
+    clients (i.e., does not close them).
     """
 
     _client_provided_by_user: bool
 
-    def __init__(self, **kwargs: Any) -> None:
-        """Initialize the context manager store with default client ownership."""
-        self._client_provided_by_user = False
+    def __init__(self, *, client_provided_by_user: bool = False, **kwargs: Any) -> None:
+        """Initialize the context manager store with client ownership configuration.
+
+        Args:
+            client_provided_by_user: Whether the client was provided by the user. If True,
+                the store will not manage the client's lifecycle (will not close it).
+                Defaults to False.
+            **kwargs: Additional arguments to pass to the base store constructor.
+        """
+        self._client_provided_by_user = client_provided_by_user
         super().__init__(**kwargs)
 
     async def __aenter__(self) -> Self:
@@ -447,12 +456,12 @@ class BaseContextManagerStore(BaseStore, ABC):
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
     ) -> None:
         # Only close the client if the store created it
-        if not getattr(self, "_client_provided_by_user", False):
+        if not self._client_provided_by_user:
             await self._close()
 
     async def close(self) -> None:
         # Only close the client if the store created it
-        if not getattr(self, "_client_provided_by_user", False):
+        if not self._client_provided_by_user:
             await self._close()
 
     @abstractmethod
