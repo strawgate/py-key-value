@@ -404,9 +404,15 @@ class BaseContextManagerStore(BaseStore, ABC):
     Stores that accept a client parameter should pass `client_provided_by_user=True` to
     the constructor. This ensures the store does not manage the lifecycle of user-provided
     clients (i.e., does not close them).
+
+    Stores that have clients requiring context manager entry can override `_get_client_for_context()`
+    to return the client that needs to be entered. The base class will automatically enter the client's
+    context in either `__aenter__()` (when using `async with`) or in `setup()` (when called directly).
     """
 
     _client_provided_by_user: bool
+    _client_context_entered: bool
+    _entered_client_result: Any
 
     def __init__(self, *, client_provided_by_user: bool = False, **kwargs: Any) -> None:
         """Initialize the context manager store with client ownership configuration.
@@ -418,9 +424,55 @@ class BaseContextManagerStore(BaseStore, ABC):
             **kwargs: Additional arguments to pass to the base store constructor.
         """
         self._client_provided_by_user = client_provided_by_user
+        self._client_context_entered = False
+        self._entered_client_result = None
         super().__init__(**kwargs)
 
+    def _get_client_for_context(self) -> Any | None:
+        """Return the client that needs context manager entry, or None if not applicable.
+
+        Stores with clients that require context manager entry (e.g., MongoDB's MongoClient,
+        DynamoDB's aioboto3 client) should override this method to return the raw client object
+        that needs to be entered.
+
+        Returns:
+            The client object that has __aenter__/__aexit__ methods, or None if no context
+            management is needed.
+        """
+        return None
+
+    def _enter_client_context(self) -> Any:
+        """Enter the client's context manager if needed.
+
+        This is called automatically by the base class in either __aenter__() or setup(),
+        whichever happens first. Stores should not override this method directly; instead,
+        they should override _get_client_for_context() to return the client to enter.
+
+        Returns:
+            The result of entering the client's context manager (typically the client itself).
+        """
+        if self._client_provided_by_user or self._client_context_entered:
+            return None
+
+        client = self._get_client_for_context()
+        if client is not None and hasattr(client, "__aenter__"):
+            result = client.__enter__()
+            self._client_context_entered = True
+            self._entered_client_result = result
+            return result
+        return None
+
+    def _get_entered_client(self) -> Any | None:
+        """Get the result of entering the client's context manager.
+
+        Returns:
+            The entered client (typically the client itself), or None if context wasn't entered.
+        """
+        return self._entered_client_result
+
     def __enter__(self) -> Self:
+        # Enter client context before calling setup
+        self._enter_client_context()
         self.setup()
         return self
 
@@ -433,6 +485,18 @@ class BaseContextManagerStore(BaseStore, ABC):
         # Only close the client if the store created it
         if not self._client_provided_by_user:
             self._close()
+
+    def setup(self) -> None:
+        """Initialize the store if not already initialized.
+
+        This override ensures that if a client needs context manager entry, it is entered
+        before the store's _setup() method is called. This allows stores to work correctly
+        even when not used with `async with`.
+        """
+        # Enter client context if needed (before calling _setup)
+        self._enter_client_context()
+        # Call parent setup
+        super().setup()
 
     @abstractmethod
     def _close(self) -> None:

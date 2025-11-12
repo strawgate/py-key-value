@@ -1,9 +1,8 @@
 from datetime import datetime, timezone
-from types import TracebackType
 from typing import TYPE_CHECKING, Any, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from key_value.aio.stores.base import (
     BaseContextManagerStore,
@@ -40,7 +39,6 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     _endpoint_url: str | None
     _raw_client: Any  # DynamoDB client from aioboto3
     _client: DynamoDBClient | None
-    _client_context_entered: bool
 
     @overload
     def __init__(self, *, client: DynamoDBClient, table_name: str, default_collection: str | None = None) -> None:
@@ -119,35 +117,15 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
 
             self._client = None
 
-        self._client_context_entered = False
-
         super().__init__(
             default_collection=default_collection,
             client_provided_by_user=client_provided,
         )
 
     @override
-    async def __aenter__(self) -> Self:
-        # Only enter the client's context manager if the store created it
-        if not self._client_provided_by_user and self._raw_client:
-            self._client = await self._raw_client.__aenter__()
-            self._client_context_entered = True
-        await super().__aenter__()
-        return self
-
-    @override
-    async def __aexit__(
-        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
-    ) -> None:
-        try:
-            # Only exit the client's context manager if the store created it
-            if not self._client_provided_by_user and self._client_context_entered:
-                await self._client.__aexit__(exc_type, exc_value, traceback)  # type: ignore[union-attr]
-            await super().__aexit__(exc_type, exc_value, traceback)
-        finally:
-            # Reset the flag after cleanup is complete
-            if self._client_context_entered:
-                self._client_context_entered = False
+    def _get_client_for_context(self) -> Any | None:
+        """Return the raw client (context manager) for context management."""
+        return self._raw_client if hasattr(self, "_raw_client") else None
 
     @property
     def _connected_client(self) -> DynamoDBClient:
@@ -160,8 +138,11 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     async def _setup(self) -> None:
         """Setup the DynamoDB client and ensure table exists."""
 
+        # Get the entered client from the base class context management
         if not self._client:
-            self._client = await self._raw_client.__aenter__()
+            result = self._get_entered_client()
+            if result is not None:
+                self._client = result
 
         try:
             await self._connected_client.describe_table(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
@@ -275,6 +256,10 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _close(self) -> None:
         """Close the DynamoDB client."""
-        # Only close if we didn't already exit via context manager
-        if not self._client_context_entered and self._client:
+        # Exit client context if we entered it, otherwise just exit if we have a client
+        if self._client_context_entered:
+            client = self._get_client_for_context()
+            if client:
+                await client.__aexit__(None, None, None)
+        elif self._client:
             await self._client.__aexit__(None, None, None)

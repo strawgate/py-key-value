@@ -8,7 +8,7 @@ from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitization import HybridSanitizationStrategy, SanitizationStrategy
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
 from key_value.shared.utils.serialization import SerializationAdapter
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseStore
 
@@ -103,7 +103,6 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
     _db: AsyncDatabase[dict[str, Any]]
     _collections_by_name: dict[str, AsyncCollection[dict[str, Any]]]
     _adapter: SerializationAdapter
-    _client_context_entered: bool
 
     @overload
     def __init__(
@@ -186,7 +185,6 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         self._db = self._client[db_name]
         self._collections_by_name = {}
         self._adapter = MongoDBSerializationAdapter()
-        self._client_context_entered = False
 
         super().__init__(
             default_collection=default_collection,
@@ -195,25 +193,9 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         )
 
     @override
-    async def __aenter__(self) -> Self:
-        # Only enter the client's context manager if the store created it
-        if not self._client_provided_by_user:
-            _ = await self._client.__aenter__()
-            self._client_context_entered = True
-        await super().__aenter__()
-        return self
-
-    @override
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
-        try:
-            # Only exit the client's context manager if the store created it
-            if not self._client_provided_by_user and self._client_context_entered:
-                await self._client.__aexit__(exc_type, exc_val, exc_tb)
-            await super().__aexit__(exc_type, exc_val, exc_tb)
-        finally:
-            # Reset the flag after cleanup is complete
-            if self._client_context_entered:
-                self._client_context_entered = False
+    def _get_client_for_context(self) -> Any | None:
+        """Return the MongoDB client for context management."""
+        return self._client
 
     @override
     async def _setup_collection(self, *, collection: str) -> None:
@@ -353,6 +335,8 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
     @override
     async def _close(self) -> None:
-        # Only close if we didn't already exit via context manager
-        if not self._client_context_entered:
+        # Exit client context if we entered it, otherwise just close
+        if self._client_context_entered:
+            await self._client.__aexit__(None, None, None)
+        elif not self._client_provided_by_user:
             await self._client.close()
