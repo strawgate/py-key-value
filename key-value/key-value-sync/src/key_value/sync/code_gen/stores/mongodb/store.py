@@ -101,6 +101,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
     _db: Database[dict[str, Any]]
     _collections_by_name: dict[str, Collection[dict[str, Any]]]
     _adapter: SerializationAdapter
+    _client_context_entered: bool
 
     @overload
     def __init__(
@@ -183,6 +184,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         self._db = self._client[db_name]
         self._collections_by_name = {}
         self._adapter = MongoDBSerializationAdapter()
+        self._client_context_entered = False
 
         super().__init__(
             default_collection=default_collection,
@@ -195,16 +197,16 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         # Only enter the client's context manager if the store created it
         if not self._client_provided_by_user:
             _ = self._client.__enter__()
+            self._client_context_entered = True
         super().__enter__()
         return self
 
     @override
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
         # Only exit the client's context manager if the store created it
-        if not self._client_provided_by_user:
-            client = self._client
-            self._client = None  # type: ignore[assignment]
-            client.__exit__(exc_type, exc_val, exc_tb)
+        if not self._client_provided_by_user and self._client_context_entered:
+            self._client.__exit__(exc_type, exc_val, exc_tb)
+            self._client_context_entered = False
         super().__exit__(exc_type, exc_val, exc_tb)
 
     @override
@@ -322,5 +324,6 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
     @override
     def _close(self) -> None:
-        if self._client:
+        # Only close if we didn't already exit via context manager
+        if not self._client_context_entered:
             self._client.close()

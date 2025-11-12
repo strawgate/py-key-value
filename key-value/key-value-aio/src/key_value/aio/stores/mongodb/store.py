@@ -103,6 +103,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
     _db: AsyncDatabase[dict[str, Any]]
     _collections_by_name: dict[str, AsyncCollection[dict[str, Any]]]
     _adapter: SerializationAdapter
+    _client_context_entered: bool
 
     @overload
     def __init__(
@@ -185,6 +186,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         self._db = self._client[db_name]
         self._collections_by_name = {}
         self._adapter = MongoDBSerializationAdapter()
+        self._client_context_entered = False
 
         super().__init__(
             default_collection=default_collection,
@@ -197,16 +199,16 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         # Only enter the client's context manager if the store created it
         if not self._client_provided_by_user:
             _ = await self._client.__aenter__()
+            self._client_context_entered = True
         await super().__aenter__()
         return self
 
     @override
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
         # Only exit the client's context manager if the store created it
-        if not self._client_provided_by_user:
-            client = self._client
-            self._client = None  # type: ignore[assignment]
-            await client.__aexit__(exc_type, exc_val, exc_tb)
+        if not self._client_provided_by_user and self._client_context_entered:
+            await self._client.__aexit__(exc_type, exc_val, exc_tb)
+            self._client_context_entered = False
         await super().__aexit__(exc_type, exc_val, exc_tb)
 
     @override
@@ -347,5 +349,6 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
     @override
     async def _close(self) -> None:
-        if self._client:
+        # Only close if we didn't already exit via context manager
+        if not self._client_context_entered:
             await self._client.close()

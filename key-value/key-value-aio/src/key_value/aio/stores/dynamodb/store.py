@@ -40,6 +40,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     _endpoint_url: str | None
     _raw_client: Any  # DynamoDB client from aioboto3
     _client: DynamoDBClient | None
+    _client_context_entered: bool
 
     @overload
     def __init__(self, *, client: DynamoDBClient, table_name: str, default_collection: str | None = None) -> None:
@@ -118,6 +119,8 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
 
             self._client = None
 
+        self._client_context_entered = False
+
         super().__init__(
             default_collection=default_collection,
             client_provided_by_user=client_provided,
@@ -128,6 +131,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         # Only enter the client's context manager if the store created it
         if not self._client_provided_by_user and self._raw_client:
             self._client = await self._raw_client.__aenter__()
+            self._client_context_entered = True
         await super().__aenter__()
         return self
 
@@ -136,10 +140,9 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
     ) -> None:
         # Exit the client's context manager before calling super().__aexit__() to avoid double-cleanup
-        if not self._client_provided_by_user and self._client:
-            client = self._client
-            self._client = None
-            await client.__aexit__(exc_type, exc_value, traceback)
+        if not self._client_provided_by_user and self._client_context_entered:
+            await self._client.__aexit__(exc_type, exc_value, traceback)  # type: ignore[union-attr]
+            self._client_context_entered = False
         await super().__aexit__(exc_type, exc_value, traceback)
 
     @property
@@ -268,5 +271,6 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _close(self) -> None:
         """Close the DynamoDB client."""
-        if self._client:
+        # Only close if we didn't already exit via context manager
+        if not self._client_context_entered and self._client:
             await self._client.__aexit__(None, None, None)
