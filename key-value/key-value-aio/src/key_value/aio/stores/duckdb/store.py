@@ -365,14 +365,14 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _close(self) -> None:
         """Close the DuckDB connection."""
-        if not self._is_closed and not self._client_provided_by_user:
+        if not self._is_closed:
             self._connection.close()
             self._is_closed = True
 
     def __del__(self) -> None:
         """Clean up the DuckDB connection on deletion."""
         try:
-            if not self._is_closed and not self._client_provided_by_user and hasattr(self, "_connection"):
+            if not self._is_closed and not getattr(self, "_client_provided_by_user", False) and hasattr(self, "_connection"):
                 self._connection.close()
                 self._is_closed = True
         except Exception:  # noqa: S110

@@ -320,5 +320,4 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
     @override
     def _close(self) -> None:
-        if not self._client_provided_by_user:
-            self._client.close()
+        self._client.close()

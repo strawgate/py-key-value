@@ -224,5 +224,4 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
     @override
     async def _close(self) -> None:
-        if not self._client_provided_by_user:
-            await self._client.aclose()
+        await self._client.aclose()

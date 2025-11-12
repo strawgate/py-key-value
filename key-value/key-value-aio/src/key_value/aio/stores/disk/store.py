@@ -127,9 +127,8 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
     @override
     async def _close(self) -> None:
-        if not self._client_provided_by_user:
-            self._cache.close()
+        self._cache.close()
 
     def __del__(self) -> None:
-        if not self._client_provided_by_user:
+        if not getattr(self, "_client_provided_by_user", False) and hasattr(self, "_cache"):
             self._cache.close()

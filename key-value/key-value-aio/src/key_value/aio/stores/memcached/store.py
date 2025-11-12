@@ -154,5 +154,4 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
 
     @override
     async def _close(self) -> None:
-        if not self._client_provided_by_user:
-            await self._client.close()
+        await self._client.close()

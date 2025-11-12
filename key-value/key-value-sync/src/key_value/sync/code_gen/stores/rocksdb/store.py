@@ -81,8 +81,7 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
     @override
     def _close(self) -> None:
-        if not self._client_provided_by_user:
-            self._close_and_flush()
+        self._close_and_flush()
 
     def _close_and_flush(self) -> None:
         if not self._is_closed:
@@ -182,5 +181,5 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         return deleted_count
 
     def __del__(self) -> None:
-        if not self._client_provided_by_user:
+        if not getattr(self, "_client_provided_by_user", False):
             self._close_and_flush()
