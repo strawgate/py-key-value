@@ -139,11 +139,15 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
     ) -> None:
-        # Exit the client's context manager before calling super().__aexit__() to avoid double-cleanup
-        if not self._client_provided_by_user and self._client_context_entered:
-            await self._client.__aexit__(exc_type, exc_value, traceback)  # type: ignore[union-attr]
-            self._client_context_entered = False
-        await super().__aexit__(exc_type, exc_value, traceback)
+        try:
+            # Only exit the client's context manager if the store created it
+            if not self._client_provided_by_user and self._client_context_entered:
+                await self._client.__aexit__(exc_type, exc_value, traceback)  # type: ignore[union-attr]
+            await super().__aexit__(exc_type, exc_value, traceback)
+        finally:
+            # Reset the flag after cleanup is complete
+            if self._client_context_entered:
+                self._client_context_entered = False
 
     @property
     def _connected_client(self) -> DynamoDBClient:

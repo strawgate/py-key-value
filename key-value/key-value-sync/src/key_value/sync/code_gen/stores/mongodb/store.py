@@ -203,11 +203,15 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
     @override
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
-        # Only exit the client's context manager if the store created it
-        if not self._client_provided_by_user and self._client_context_entered:
-            self._client.__exit__(exc_type, exc_val, exc_tb)
-            self._client_context_entered = False
-        super().__exit__(exc_type, exc_val, exc_tb)
+        try:
+            # Only exit the client's context manager if the store created it
+            if not self._client_provided_by_user and self._client_context_entered:
+                self._client.__exit__(exc_type, exc_val, exc_tb)
+            super().__exit__(exc_type, exc_val, exc_tb)
+        finally:
+            # Reset the flag after cleanup is complete
+            if self._client_context_entered:
+                self._client_context_entered = False
 
     @override
     def _setup_collection(self, *, collection: str) -> None:
