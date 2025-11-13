@@ -259,6 +259,10 @@ class ElasticsearchStore(
 
     @override
     async def _setup(self) -> None:
+        # Register client cleanup if we own the client
+        if not self._client_provided_by_user:
+            self._exit_stack.push_async_callback(self._client.close)
+
         cluster_info = await self._client.options(ignore_status=404).info()
 
         self._is_serverless = cluster_info.get("version", {}).get("build_flavor") == "serverless"
@@ -551,6 +555,3 @@ class ElasticsearchStore(
                 },
             },
         )
-
-    async def _close(self) -> None:
-        await self._client.close()

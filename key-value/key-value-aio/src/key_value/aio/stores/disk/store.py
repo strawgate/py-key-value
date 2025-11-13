@@ -87,6 +87,12 @@ class DiskStore(BaseContextManagerStore, BaseStore):
         )
 
     @override
+    async def _setup(self) -> None:
+        """Register cache cleanup if we own the cache."""
+        if not self._client_provided_by_user:
+            self._exit_stack.callback(self._cache.close)
+
+    @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         combo_key: str = compound_key(collection=collection, key=key)
 
@@ -125,9 +131,6 @@ class DiskStore(BaseContextManagerStore, BaseStore):
         combo_key: str = compound_key(collection=collection, key=key)
 
         return self._cache.delete(key=combo_key, retry=True)
-
-    async def _close(self) -> None:
-        self._cache.close()
 
     def __del__(self) -> None:
         if not getattr(self, "_client_provided_by_user", False) and hasattr(self, "_cache"):

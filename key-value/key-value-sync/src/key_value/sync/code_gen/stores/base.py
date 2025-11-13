@@ -406,13 +406,14 @@ class BaseContextManagerStore(BaseStore, ABC):
     the constructor. This ensures the store does not manage the lifecycle of user-provided
     clients (i.e., does not close them).
 
-    Stores that have clients requiring context manager entry should override
-    `_register_cleanup_callbacks(stack)` to register their cleanup with the provided exit stack.
-    This method is only called when the store owns the client (client_provided_by_user=False).
+    The base class provides an ExitStack that stores can use to register cleanup
+    callbacks. Stores should add their cleanup operations to the exit stack as needed.
+    The base class handles entering and exiting the exit stack.
     """
 
     _client_provided_by_user: bool
-    _exit_stack: ExitStack | None
+    _exit_stack: ExitStack
+    _exit_stack_entered: bool
 
     def __init__(self, *, client_provided_by_user: bool = False, **kwargs: Any) -> None:
         """Initialize the context manager store with client ownership configuration.
@@ -424,71 +425,42 @@ class BaseContextManagerStore(BaseStore, ABC):
             **kwargs: Additional arguments to pass to the base store constructor.
         """
         self._client_provided_by_user = client_provided_by_user
-        self._exit_stack = None
+        self._exit_stack = ExitStack()
+        self._exit_stack_entered = False
         super().__init__(**kwargs)
 
-    def _register_cleanup_callbacks(self, stack: ExitStack) -> None:
-        """Register cleanup callbacks with the exit stack.
-
-        Stores should override this method to register their cleanup callbacks with the exit stack.
-        This method is only called when the store owns the client (client_provided_by_user=False).
-
-        Examples:
-            # For context manager clients:
-            await stack.enter_async_context(self._client)
-
-            # For clients with close() methods:
-            stack.push_async_callback(self._client.aclose)
-
-        Args:
-            stack: The ExitStack to register cleanup callbacks with.
-        """
-
-    def _ensure_exit_stack(self) -> ExitStack:
-        """Ensure the exit stack exists and register cleanup callbacks if needed.
-
-        Returns:
-            The exit stack instance.
-        """
-        if self._exit_stack is not None:
-            return self._exit_stack
-
-        self._exit_stack = ExitStack()
-        self._exit_stack.__enter__()
-
-        # Register cleanup callbacks if we own the client
-        if not self._client_provided_by_user:
-            self._register_cleanup_callbacks(self._exit_stack)
-
-        return self._exit_stack
+    def _ensure_exit_stack_entered(self) -> None:
+        """Ensure the exit stack has been entered."""
+        if not self._exit_stack_entered:
+            self._exit_stack.__enter__()
+            self._exit_stack_entered = True
 
     def __enter__(self) -> Self:
-        # Create exit stack and enter client context
-        self._ensure_exit_stack()
+        # Enter the exit stack
+        self._ensure_exit_stack_entered()
         self.setup()
         return self
 
     def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None) -> None:
         # Close the exit stack, which handles all cleanup
-        if self._exit_stack is not None:
-            self._exit_stack.close()
-            self._exit_stack = None
+        if self._exit_stack_entered:
+            self._exit_stack.__exit__(exc_type, exc_value, traceback)
+            self._exit_stack_entered = False
 
     def close(self) -> None:
-        # Close the exit stack if it exists
-        if self._exit_stack is not None:
+        # Close the exit stack if it has been entered
+        if self._exit_stack_entered:
             self._exit_stack.close()
-            self._exit_stack = None
+            self._exit_stack_entered = False
 
     def setup(self) -> None:
         """Initialize the store if not already initialized.
 
-        This override ensures that if a client needs context manager entry, the exit stack
-        is created and the client is entered before the store's _setup() method is called.
-        This allows stores to work correctly even when not used with `async with`.
+        This override ensures the exit stack is entered before the store's _setup()
+        method is called, allowing stores to register cleanup callbacks during setup.
         """
-        # Ensure exit stack exists and client context is entered (if needed)
-        self._ensure_exit_stack()
+        # Ensure exit stack is entered
+        self._ensure_exit_stack_entered()
         # Call parent setup
         super().setup()
 

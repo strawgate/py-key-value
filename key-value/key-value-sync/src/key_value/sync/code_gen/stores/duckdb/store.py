@@ -232,6 +232,16 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         - Metadata queries without JSON deserialization
         - Native JSON column support for rich querying capabilities
         """
+        # Register connection cleanup if we own the connection
+        if not self._client_provided_by_user:
+
+            def close_connection() -> None:
+                if not self._is_closed:
+                    self._connection.close()
+                    self._is_closed = True
+
+            self._exit_stack.callback(close_connection)
+
         # Create the main table for storing key-value entries
         self._connection.execute(self._get_create_table_sql())
 
@@ -306,12 +316,6 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         # Check if any rows were deleted by counting returned rows
         deleted_rows = result.fetchall()
         return len(deleted_rows) > 0
-
-    def _close(self) -> None:
-        """Close the DuckDB connection."""
-        if not self._is_closed:
-            self._connection.close()
-            self._is_closed = True
 
     def __del__(self) -> None:
         """Clean up the DuckDB connection on deletion."""

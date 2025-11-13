@@ -231,6 +231,10 @@ class ElasticsearchStore(
 
     @override
     def _setup(self) -> None:
+        # Register client cleanup if we own the client
+        if not self._client_provided_by_user:
+            self._exit_stack.push_async_callback(self._client.close)
+
         cluster_info = self._client.options(ignore_status=404).info()
 
         self._is_serverless = cluster_info.get("version", {}).get("build_flavor") == "serverless"
@@ -477,6 +481,3 @@ class ElasticsearchStore(
         _ = self._client.options(ignore_status=404).delete_by_query(
             index=f"{self._index_prefix}-*", body={"query": {"range": {"expires_at": {"lt": ms_epoch}}}}
         )
-
-    def _close(self) -> None:
-        self._client.close()

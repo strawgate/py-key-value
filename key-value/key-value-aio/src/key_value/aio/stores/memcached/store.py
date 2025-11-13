@@ -82,6 +82,12 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         )
 
     @override
+    async def _setup(self) -> None:
+        """Register client cleanup if we own the client."""
+        if not self._client_provided_by_user:
+            self._exit_stack.push_async_callback(self._client.close)
+
+    @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         combo_key: str = self._sanitize_key(compound_key(collection=collection, key=key))
 
@@ -151,6 +157,3 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
     async def _delete_store(self) -> bool:
         _ = await self._client.flush_all()
         return True
-
-    async def _close(self) -> None:
-        await self._client.close()

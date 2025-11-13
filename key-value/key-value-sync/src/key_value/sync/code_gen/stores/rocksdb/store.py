@@ -79,8 +79,12 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
         super().__init__(default_collection=default_collection, client_provided_by_user=client_provided)
 
-    def _close(self) -> None:
-        self._close_and_flush()
+    @override
+    def _setup(self) -> None:
+        """Register database cleanup if we own the database."""
+        if not self._client_provided_by_user:
+            # Register a callback to close and flush the database
+            self._exit_stack.callback(self._close_and_flush)
 
     def _close_and_flush(self) -> None:
         if not self._is_closed:

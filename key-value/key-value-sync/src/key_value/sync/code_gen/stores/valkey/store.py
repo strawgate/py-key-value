@@ -90,6 +90,10 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
 
             self._connected_client = GlideClient.create(config=self._client_config)
 
+        # Register client cleanup if we own the client
+        if not self._client_provided_by_user:
+            self._exit_stack.push_async_callback(self._client.close)
+
     @property
     def _client(self) -> BaseClient:
         if self._connected_client is None:
@@ -156,8 +160,3 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         deleted_count: int = self._client.delete(keys=combo_keys)  # pyright: ignore[reportArgumentType]
 
         return deleted_count
-
-    def _close(self) -> None:
-        if self._connected_client is not None:
-            self._connected_client.close()
-            self._connected_client = None

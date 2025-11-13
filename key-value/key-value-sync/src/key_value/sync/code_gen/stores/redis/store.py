@@ -206,8 +206,11 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         return get_keys_from_compound_keys(compound_keys=keys, collection=collection)
 
     @override
+    def _setup(self) -> None:
+        """Register client cleanup if we own the client."""
+        if not self._client_provided_by_user:
+            self._exit_stack.push_async_callback(self._client.close)
+
+    @override
     def _delete_store(self) -> bool:
         return self._client.flushdb()  # pyright: ignore[reportUnknownMemberType, reportAny]
-
-    def _close(self) -> None:
-        self._client.close()

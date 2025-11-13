@@ -107,6 +107,11 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
         )
 
     @override
+    async def _setup(self) -> None:
+        """Register cache cleanup."""
+        self._exit_stack.callback(self._sync_close)
+
+    @override
     async def _setup_collection(self, *, collection: str) -> None:
         self._cache[collection] = self._disk_cache_factory(collection)
 
@@ -147,9 +152,6 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
     def _sync_close(self) -> None:
         for cache in self._cache.values():
             cache.close()
-
-    async def _close(self) -> None:
-        self._sync_close()
 
     def __del__(self) -> None:
         self._sync_close()
