@@ -85,7 +85,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
             client_provided_by_user=client_provided,
         )
 
-    @override
     async def _close(self) -> None:
         self._close_and_flush()
 

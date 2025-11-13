@@ -478,6 +478,5 @@ class ElasticsearchStore(
             index=f"{self._index_prefix}-*", body={"query": {"range": {"expires_at": {"lt": ms_epoch}}}}
         )
 
-    @override
     def _close(self) -> None:
         self._client.close()

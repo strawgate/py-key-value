@@ -552,6 +552,5 @@ class ElasticsearchStore(
             },
         )
 
-    @override
     async def _close(self) -> None:
         await self._client.close()

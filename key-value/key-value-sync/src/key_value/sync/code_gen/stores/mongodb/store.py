@@ -2,6 +2,7 @@
 # from the original file 'store.py'
 # DO NOT CHANGE! Change the original file instead.
 from collections.abc import Sequence
+from contextlib import ExitStack
 from datetime import datetime, timezone
 from typing import Any, overload
 
@@ -191,9 +192,9 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         )
 
     @override
-    def _get_client_for_context(self) -> Any | None:
-        """Return the MongoDB client for context management."""
-        return self._client
+    def _register_cleanup_callbacks(self, stack: ExitStack) -> None:
+        """Register MongoDB client cleanup with the exit stack."""
+        stack.enter_context(self._client)
 
     @override
     def _setup_collection(self, *, collection: str) -> None:

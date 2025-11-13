@@ -362,7 +362,6 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         deleted_rows = result.fetchall()
         return len(deleted_rows) > 0
 
-    @override
     async def _close(self) -> None:
         """Close the DuckDB connection."""
         if not self._is_closed:

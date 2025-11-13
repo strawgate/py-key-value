@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from contextlib import AsyncExitStack
 from datetime import datetime, timezone
 from typing import Any, overload
 
@@ -193,9 +194,9 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         )
 
     @override
-    def _get_client_for_context(self) -> Any | None:
-        """Return the MongoDB client for context management."""
-        return self._client
+    async def _register_cleanup_callbacks(self, stack: AsyncExitStack) -> None:
+        """Register MongoDB client cleanup with the exit stack."""
+        await stack.enter_async_context(self._client)
 
     @override
     async def _setup_collection(self, *, collection: str) -> None:

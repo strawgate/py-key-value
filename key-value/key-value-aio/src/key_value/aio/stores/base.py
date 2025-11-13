@@ -434,14 +434,13 @@ class BaseContextManagerStore(BaseStore, ABC):
     the constructor. This ensures the store does not manage the lifecycle of user-provided
     clients (i.e., does not close them).
 
-    Stores that have clients requiring context manager entry can override `_get_client_for_context()`
-    to return the client that needs to be entered. The base class will automatically enter the client's
-    context using an exit stack, which handles cleanup automatically.
+    Stores that have clients requiring context manager entry should override
+    `_register_cleanup_callbacks(stack)` to register their cleanup with the provided exit stack.
+    This method is only called when the store owns the client (client_provided_by_user=False).
     """
 
     _client_provided_by_user: bool
     _exit_stack: AsyncExitStack | None
-    _entered_client_result: Any
 
     def __init__(self, *, client_provided_by_user: bool = False, **kwargs: Any) -> None:
         """Initialize the context manager store with client ownership configuration.
@@ -454,32 +453,27 @@ class BaseContextManagerStore(BaseStore, ABC):
         """
         self._client_provided_by_user = client_provided_by_user
         self._exit_stack = None
-        self._entered_client_result = None
         super().__init__(**kwargs)
 
-    def _get_client_for_context(self) -> Any | None:
-        """Return the client that needs context manager entry, or None if not applicable.
+    async def _register_cleanup_callbacks(self, stack: AsyncExitStack) -> None:
+        """Register cleanup callbacks with the exit stack.
 
-        Stores with clients that require context manager entry (e.g., MongoDB's AsyncMongoClient,
-        DynamoDB's aioboto3 client) should override this method to return the raw client object
-        that needs to be entered.
+        Stores should override this method to register their cleanup callbacks with the exit stack.
+        This method is only called when the store owns the client (client_provided_by_user=False).
 
-        Returns:
-            The client object that has __aenter__/__aexit__ methods, or None if no context
-            management is needed.
+        Examples:
+            # For context manager clients:
+            await stack.enter_async_context(self._client)
+
+            # For clients with close() methods:
+            stack.push_async_callback(self._client.aclose)
+
+        Args:
+            stack: The AsyncExitStack to register cleanup callbacks with.
         """
-        return None
-
-    def _get_entered_client(self) -> Any | None:
-        """Get the result of entering the client's context manager.
-
-        Returns:
-            The entered client (typically the client itself), or None if context wasn't entered.
-        """
-        return self._entered_client_result
 
     async def _ensure_exit_stack(self) -> AsyncExitStack:
-        """Ensure the exit stack exists and enter client context if needed.
+        """Ensure the exit stack exists and register cleanup callbacks if needed.
 
         Returns:
             The exit stack instance.
@@ -490,12 +484,9 @@ class BaseContextManagerStore(BaseStore, ABC):
         self._exit_stack = AsyncExitStack()
         await self._exit_stack.__aenter__()
 
-        # Enter client context if we own it
+        # Register cleanup callbacks if we own the client
         if not self._client_provided_by_user:
-            client = self._get_client_for_context()
-            if client is not None and hasattr(client, "__aenter__"):
-                result = await self._exit_stack.enter_async_context(client)
-                self._entered_client_result = result
+            await self._register_cleanup_callbacks(self._exit_stack)
 
         return self._exit_stack
 

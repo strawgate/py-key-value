@@ -1,3 +1,4 @@
+from contextlib import AsyncExitStack
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, overload
 
@@ -123,9 +124,10 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         )
 
     @override
-    def _get_client_for_context(self) -> Any | None:
-        """Return the raw client (context manager) for context management."""
-        return self._raw_client if hasattr(self, "_raw_client") else None
+    async def _register_cleanup_callbacks(self, stack: AsyncExitStack) -> None:
+        """Register DynamoDB client cleanup with the exit stack."""
+        if hasattr(self, "_raw_client"):
+            self._client = await stack.enter_async_context(self._raw_client)
 
     @property
     def _connected_client(self) -> DynamoDBClient:
@@ -137,13 +139,6 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _setup(self) -> None:
         """Setup the DynamoDB client and ensure table exists."""
-
-        # Get the entered client from the base class context management
-        if not self._client:
-            result = self._get_entered_client()
-            if result is not None:
-                self._client = result
-
         try:
             await self._connected_client.describe_table(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
         except self._connected_client.exceptions.ResourceNotFoundException:  # pyright: ignore[reportUnknownMemberType]

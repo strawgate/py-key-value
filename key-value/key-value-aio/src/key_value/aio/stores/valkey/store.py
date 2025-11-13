@@ -165,7 +165,6 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
 
         return deleted_count
 
-    @override
     async def _close(self) -> None:
         if self._connected_client is not None:
             await self._connected_client.close()

@@ -79,7 +79,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
         super().__init__(default_collection=default_collection, client_provided_by_user=client_provided)
 
-    @override
     def _close(self) -> None:
         self._close_and_flush()
 

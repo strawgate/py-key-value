@@ -119,7 +119,6 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
         return self._cache.delete(key=combo_key, retry=True)
 
-    @override
     def _close(self) -> None:
         self._cache.close()
 

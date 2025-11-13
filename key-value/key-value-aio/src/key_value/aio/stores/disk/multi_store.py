@@ -148,7 +148,6 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
         for cache in self._cache.values():
             cache.close()
 
-    @override
     async def _close(self) -> None:
         self._sync_close()
 

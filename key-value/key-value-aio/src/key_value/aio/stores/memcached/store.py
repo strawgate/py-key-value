@@ -152,6 +152,5 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         _ = await self._client.flush_all()
         return True
 
-    @override
     async def _close(self) -> None:
         await self._client.close()

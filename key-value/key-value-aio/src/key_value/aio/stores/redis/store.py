@@ -222,6 +222,5 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
     async def _delete_store(self) -> bool:
         return await self._client.flushdb()  # pyright: ignore[reportUnknownMemberType, reportAny]
 
-    @override
     async def _close(self) -> None:
         await self._client.aclose()
