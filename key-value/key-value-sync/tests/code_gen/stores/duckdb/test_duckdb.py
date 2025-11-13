@@ -23,11 +23,9 @@ def get_client_from_store(store: DuckDBStore) -> DuckDBPyConnection:
 class TestDuckDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
-    def store(self) -> Generator[DuckDBStore, None, None]:
+    def store(self) -> DuckDBStore:
         """Test with in-memory DuckDB database."""
-        duckdb_store = DuckDBStore()
-        yield duckdb_store
-        duckdb_store.close()
+        return DuckDBStore()
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
     def test_not_unbounded(self, store: BaseStore): ...
@@ -41,9 +39,7 @@ class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
         """Test with persistent DuckDB database file."""
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "test.db"
-            duckdb_store = DuckDBStore(database_path=db_path)
-            yield duckdb_store
-            duckdb_store.close()
+            yield DuckDBStore(database_path=db_path)
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
     def test_not_unbounded(self, store: BaseStore): ...
@@ -58,7 +54,7 @@ class TestDuckDBStoreSpecific:
         """Provide DuckDB store instance."""
         duckdb_store = DuckDBStore()
         yield duckdb_store
-        duckdb_store.close()
+        duckdb_store.close()  # This class doesn't use ContextManagerStoreTestMixin
 
     def test_native_sql_queryability(self):
         """Test that users can query the database directly with SQL."""
