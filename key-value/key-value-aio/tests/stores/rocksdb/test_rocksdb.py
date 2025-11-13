@@ -59,6 +59,8 @@ class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         assert result == {"test": "value"}
 
         await store.close()
+        # Close the user-provided database before cleanup
+        db.close()
         temp_dir.cleanup()
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")

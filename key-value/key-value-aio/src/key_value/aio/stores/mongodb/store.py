@@ -8,7 +8,7 @@ from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitization import HybridSanitizationStrategy, SanitizationStrategy
 from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
 from key_value.shared.utils.serialization import SerializationAdapter
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseStore
 
@@ -159,13 +159,17 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         Values are stored as native BSON dictionaries for better query support and performance.
 
         Args:
-            client: The MongoDB client to use (mutually exclusive with url).
+            client: The MongoDB client to use (mutually exclusive with url). If provided, the store
+                will not manage the client's lifecycle (will not enter/exit its context manager or
+                close it). The caller is responsible for managing the client's lifecycle.
             url: The url of the MongoDB cluster (mutually exclusive with client).
             db_name: The name of the MongoDB database.
             coll_name: The name of the MongoDB collection.
             default_collection: The default collection to use if no collection is provided.
             collection_sanitization_strategy: The sanitization strategy to use for collections.
         """
+
+        client_provided = client is not None
 
         if client:
             self._client = client
@@ -185,18 +189,14 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         super().__init__(
             default_collection=default_collection,
             collection_sanitization_strategy=collection_sanitization_strategy,
+            client_provided_by_user=client_provided,
         )
 
     @override
-    async def __aenter__(self) -> Self:
-        _ = await self._client.__aenter__()
-        await super().__aenter__()
-        return self
-
-    @override
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
-        await super().__aexit__(exc_type, exc_val, exc_tb)
-        await self._client.__aexit__(exc_type, exc_val, exc_tb)
+    async def _setup(self) -> None:
+        """Register client cleanup if we own the client."""
+        if not self._client_provided_by_user:
+            await self._exit_stack.enter_async_context(self._client)
 
     @override
     async def _setup_collection(self, *, collection: str) -> None:
@@ -334,6 +334,4 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
         return True
 
-    @override
-    async def _close(self) -> None:
-        await self._client.close()
+    # No need to override _close - the exit stack handles all cleanup automatically

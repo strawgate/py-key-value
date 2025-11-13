@@ -50,7 +50,9 @@ class DiskStore(BaseContextManagerStore, BaseStore):
         """Initialize the disk store.
 
         Args:
-            disk_cache: An existing diskcache Cache instance to use.
+            disk_cache: An existing diskcache Cache instance to use. If provided, the store will
+                not manage the cache's lifecycle (will not close it). The caller is responsible
+                for managing the cache's lifecycle.
             directory: The directory to use for the disk store.
             max_size: The maximum size of the disk store.
             default_collection: The default collection to use if no collection is provided.
@@ -62,6 +64,9 @@ class DiskStore(BaseContextManagerStore, BaseStore):
         if disk_cache is None and directory is None:
             msg = "Either disk_cache or directory must be provided"
             raise ValueError(msg)
+
+        client_provided = disk_cache is not None
+        self._client_provided_by_user = client_provided
 
         if disk_cache:
             self._cache = disk_cache
@@ -75,9 +80,17 @@ class DiskStore(BaseContextManagerStore, BaseStore):
             else:
                 self._cache = Cache(directory=directory, eviction_policy="none")
 
-        self._stable_api = True
+        super().__init__(
+            default_collection=default_collection,
+            client_provided_by_user=client_provided,
+            stable_api=True,
+        )
 
-        super().__init__(default_collection=default_collection)
+    @override
+    async def _setup(self) -> None:
+        """Register cache cleanup if we own the cache."""
+        if not self._client_provided_by_user:
+            self._exit_stack.callback(self._cache.close)
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -119,9 +132,6 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
         return self._cache.delete(key=combo_key, retry=True)
 
-    @override
-    async def _close(self) -> None:
-        self._cache.close()
-
     def __del__(self) -> None:
-        self._cache.close()
+        if not getattr(self, "_client_provided_by_user", False) and hasattr(self, "_cache"):
+            self._cache.close()

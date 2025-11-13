@@ -115,9 +115,11 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
 
         self._cache = {}
 
-        self._stable_api = True
-
-        super().__init__(default_collection=default_collection, seed=seed)
+        super().__init__(
+            default_collection=default_collection,
+            seed=seed,
+            stable_api=True,
+        )
 
     @override
     async def _setup(self) -> None:

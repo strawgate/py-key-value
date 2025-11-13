@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Any, overload
+from typing import overload
 
 from key_value.shared.errors.store import KeyValueStoreError
 from key_value.shared.utils.compound import compound_key
@@ -51,7 +51,9 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         """Initialize the RocksDB store.
 
         Args:
-            db: An existing Rdict database instance to use.
+            db: An existing Rdict database instance to use. If provided, the store will NOT
+                manage its lifecycle (will not close it). The caller is responsible for managing
+                the database's lifecycle.
             path: The path to the RocksDB database directory.
             default_collection: The default collection to use if no collection is provided.
         """
@@ -62,6 +64,8 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         if db is None and path is None:
             msg = "Either db or path must be provided"
             raise ValueError(msg)
+
+        client_provided = db is not None
 
         if db:
             self._db = db
@@ -76,16 +80,17 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
         self._is_closed = False
 
-        super().__init__(default_collection=default_collection)
+        super().__init__(
+            default_collection=default_collection,
+            client_provided_by_user=client_provided,
+        )
 
     @override
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
-        await super().__aexit__(exc_type, exc_val, exc_tb)
-        await self._close()
-
-    @override
-    async def _close(self) -> None:
-        self._close_and_flush()
+    async def _setup(self) -> None:
+        """Register database cleanup if we own the database."""
+        if not self._client_provided_by_user:
+            # Register a callback to close and flush the database
+            self._exit_stack.callback(self._close_and_flush)
 
     def _close_and_flush(self) -> None:
         if not self._is_closed:
@@ -191,4 +196,8 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         return deleted_count
 
     def __del__(self) -> None:
-        self._close_and_flush()
+        if not getattr(self, "_client_provided_by_user", False):
+            try:  # noqa: SIM105
+                self._close_and_flush()
+            except (AttributeError, Exception):  # noqa: S110
+                pass  # Best-effort cleanup during finalization
