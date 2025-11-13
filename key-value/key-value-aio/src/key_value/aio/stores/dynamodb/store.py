@@ -253,13 +253,4 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         # Return True if an item was actually deleted
         return "Attributes" in response  # pyright: ignore[reportUnknownArgumentType]
 
-    @override
-    async def _close(self) -> None:
-        """Close the DynamoDB client."""
-        # Exit client context if we entered it, otherwise just exit if we have a client
-        if self._client_context_entered:
-            client = self._get_client_for_context()
-            if client:
-                await client.__aexit__(None, None, None)
-        elif self._client:
-            await self._client.__aexit__(None, None, None)
+    # No need to override _close - the exit stack handles all cleanup automatically

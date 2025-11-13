@@ -333,10 +333,4 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
         return True
 
-    @override
-    async def _close(self) -> None:
-        # Exit client context if we entered it, otherwise just close
-        if self._client_context_entered:
-            await self._client.__aexit__(None, None, None)
-        elif not self._client_provided_by_user:
-            await self._client.close()
+    # No need to override _close - the exit stack handles all cleanup automatically

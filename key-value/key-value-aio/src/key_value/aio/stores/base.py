@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from asyncio.locks import Lock
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from contextlib import AsyncExitStack
 from datetime import datetime
 from types import MappingProxyType, TracebackType
 from typing import Any, SupportsFloat
@@ -435,11 +436,11 @@ class BaseContextManagerStore(BaseStore, ABC):
 
     Stores that have clients requiring context manager entry can override `_get_client_for_context()`
     to return the client that needs to be entered. The base class will automatically enter the client's
-    context in either `__aenter__()` (when using `async with`) or in `setup()` (when called directly).
+    context using an exit stack, which handles cleanup automatically.
     """
 
     _client_provided_by_user: bool
-    _client_context_entered: bool
+    _exit_stack: AsyncExitStack | None
     _entered_client_result: Any
 
     def __init__(self, *, client_provided_by_user: bool = False, **kwargs: Any) -> None:
@@ -452,7 +453,7 @@ class BaseContextManagerStore(BaseStore, ABC):
             **kwargs: Additional arguments to pass to the base store constructor.
         """
         self._client_provided_by_user = client_provided_by_user
-        self._client_context_entered = False
+        self._exit_stack = None
         self._entered_client_result = None
         super().__init__(**kwargs)
 
@@ -469,27 +470,6 @@ class BaseContextManagerStore(BaseStore, ABC):
         """
         return None
 
-    async def _enter_client_context(self) -> Any:
-        """Enter the client's context manager if needed.
-
-        This is called automatically by the base class in either __aenter__() or setup(),
-        whichever happens first. Stores should not override this method directly; instead,
-        they should override _get_client_for_context() to return the client to enter.
-
-        Returns:
-            The result of entering the client's context manager (typically the client itself).
-        """
-        if self._client_provided_by_user or self._client_context_entered:
-            return None
-
-        client = self._get_client_for_context()
-        if client is not None and hasattr(client, "__aenter__"):
-            result = await client.__aenter__()
-            self._client_context_entered = True
-            self._entered_client_result = result
-            return result
-        return None
-
     def _get_entered_client(self) -> Any | None:
         """Get the result of entering the client's context manager.
 
@@ -498,44 +478,58 @@ class BaseContextManagerStore(BaseStore, ABC):
         """
         return self._entered_client_result
 
+    async def _ensure_exit_stack(self) -> AsyncExitStack:
+        """Ensure the exit stack exists and enter client context if needed.
+
+        Returns:
+            The exit stack instance.
+        """
+        if self._exit_stack is not None:
+            return self._exit_stack
+
+        self._exit_stack = AsyncExitStack()
+        await self._exit_stack.__aenter__()
+
+        # Enter client context if we own it
+        if not self._client_provided_by_user:
+            client = self._get_client_for_context()
+            if client is not None and hasattr(client, "__aenter__"):
+                result = await self._exit_stack.enter_async_context(client)
+                self._entered_client_result = result
+
+        return self._exit_stack
+
     async def __aenter__(self) -> Self:
-        # Enter client context before calling setup
-        await self._enter_client_context()
+        # Create exit stack and enter client context
+        await self._ensure_exit_stack()
         await self.setup()
         return self
 
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
     ) -> None:
-        # Only close the client if the store created it
-        if not self._client_provided_by_user:
-            await self._close()
+        # Close the exit stack, which handles all cleanup
+        if self._exit_stack is not None:
+            await self._exit_stack.aclose()
+            self._exit_stack = None
 
     async def close(self) -> None:
-        # Only close the client if the store created it
-        if not self._client_provided_by_user:
-            await self._close()
+        # Close the exit stack if it exists
+        if self._exit_stack is not None:
+            await self._exit_stack.aclose()
+            self._exit_stack = None
 
     async def setup(self) -> None:
         """Initialize the store if not already initialized.
 
-        This override ensures that if a client needs context manager entry, it is entered
-        before the store's _setup() method is called. This allows stores to work correctly
-        even when not used with `async with`.
+        This override ensures that if a client needs context manager entry, the exit stack
+        is created and the client is entered before the store's _setup() method is called.
+        This allows stores to work correctly even when not used with `async with`.
         """
-        # Enter client context if needed (before calling _setup)
-        await self._enter_client_context()
+        # Ensure exit stack exists and client context is entered (if needed)
+        await self._ensure_exit_stack()
         # Call parent setup
         await super().setup()
-
-    @abstractmethod
-    async def _close(self) -> None:
-        """Close the store and its underlying client.
-
-        This method is only called if the store created the client itself.
-        If a client was provided by the user, this method will not be called.
-        """
-        ...
 
 
 class BaseEnumerateCollectionsStore(BaseStore, AsyncEnumerateCollectionsProtocol, ABC):
