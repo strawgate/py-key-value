@@ -34,6 +34,7 @@ Local stores are stored in memory or on disk, local to the application.
 | Memory | N/A | ✅ | ✅ | Fast in-memory storage for development and caching |
 | Disk | Stable | ☑️ | ✅ | Persistent file-based storage in a single file |
 | Disk (Per-Collection) | Stable | ☑️ | ✅ | Persistent storage with separate files per collection |
+| DuckDB | Unstable | ☑️ | ✅ | In-process SQL OLAP database with native JSON storage |
 | FileTree (test) | Unstable | ☑️ | ✅ | Directory-based storage with JSON files for visual inspection |
 | Null (test) | N/A | ✅ | ✅ | No-op store for testing without side effects |
 | RocksDB | Unstable | ☑️ | ✅ | High-performance embedded database |
@@ -400,6 +401,7 @@ Distributed stores provide network-based storage for multi-node applications.
 | Elasticsearch | Unstable | ✅ | ✅ | Full-text search with key-value capabilities |
 | Memcached | Unstable | ✅ | ✖️ | High-performance distributed memory cache |
 | MongoDB | Unstable | ✅ | ✅ | Document database used as key-value store |
+| PostgreSQL | Unstable | ✅ | ✖️ | PostgreSQL database with JSONB storage |
 | Redis | Stable | ✅ | ✅ | Popular in-memory data structure store |
 | Valkey | Stable | ✅ | ✅ | Open-source Redis fork |
 
@@ -565,6 +567,55 @@ pip install py-key-value-aio[mongodb]
 - Document storage
 - Rich querying
 - Horizontal scaling
+- Stable storage format: **Unstable**
+
+---
+
+### PostgreSQLStore
+
+PostgreSQL database with JSONB storage for flexible key-value data.
+
+**Note:** PostgreSQL is async-only. This store uses `asyncpg` which provides native async/await operations.
+
+```python
+from key_value.aio.stores.postgresql import PostgreSQLStore
+
+# Using connection URL
+store = PostgreSQLStore(url="postgresql://localhost:5432/mydb")
+
+# Using connection parameters
+store = PostgreSQLStore(
+    host="localhost",
+    port=5432,
+    database="mydb",
+    user="myuser",
+    password="mypass"
+)
+
+async with store:
+    await store.put(key="user_1", value={"name": "Alice"}, collection="users")
+    user = await store.get(key="user_1", collection="users")
+```
+
+**Installation:**
+
+```bash
+pip install py-key-value-aio[postgresql]
+```
+
+**Use Cases:**
+
+- Applications already using PostgreSQL
+- Need for SQL querying on stored data
+- ACID transaction requirements
+- Complex data relationships
+
+**Characteristics:**
+
+- JSONB storage for efficient querying
+- TTL support via expiration timestamps
+- Single table design (collections as column values)
+- Async-only (uses asyncpg)
 - Stable storage format: **Unstable**
 
 ---
