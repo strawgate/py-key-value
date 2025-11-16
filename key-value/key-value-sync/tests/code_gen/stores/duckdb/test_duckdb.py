@@ -39,7 +39,6 @@ class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
     def duckdb_path(self) -> Generator[Path, None, None]:
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "test.db"
-            db_path.mkdir(parents=True, exist_ok=True)
             yield db_path
 
     @override
