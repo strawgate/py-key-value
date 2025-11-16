@@ -474,8 +474,11 @@ class BaseContextManagerStore(BaseStore, ABC):
     ) -> None:
         # Close the exit stack, which handles all cleanup
         if self._exit_stack_entered:
-            await self._exit_stack.__aexit__(exc_type, exc_value, traceback)
+            result = await self._exit_stack.__aexit__(exc_type, exc_value, traceback)
             self._exit_stack_entered = False
+
+            return result
+        return None
 
     async def close(self) -> None:
         # Close the exit stack if it has been entered
