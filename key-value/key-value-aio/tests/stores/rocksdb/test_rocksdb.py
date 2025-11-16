@@ -23,6 +23,7 @@ class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         # Create a temporary directory for the RocksDB database
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "test_db"
+            db_path.mkdir(parents=True, exist_ok=True)
             rocksdb_store = RocksDBStore(path=db_path)
             yield rocksdb_store
 
