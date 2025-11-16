@@ -43,8 +43,12 @@ class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
     async def store(self, duckdb_path: Path) -> AsyncGenerator[DuckDBStore, None]:
         """Test with persistent DuckDB database file."""
         duckdb_store = DuckDBStore(database_path=duckdb_path)
+
         yield duckdb_store
+
         await duckdb_store.close()
+
+        duckdb_path.unlink()
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
     async def test_not_unbounded(self, store: BaseStore): ...
