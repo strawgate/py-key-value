@@ -26,6 +26,11 @@ class BaseStoreTests(ABC):
         "Subclasses can override this to wait for eventually consistent operations."
 
     @pytest.fixture
+    def per_test_temp_dir(self) -> Generator[Path, None, None]:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            yield Path(temp_dir)
+
+    @pytest.fixture
     @abstractmethod
     def store(self) -> BaseStore | Generator[BaseStore, None, None]: ...
 
@@ -258,11 +263,6 @@ class BaseStoreTests(ABC):
 
 
 class ContextManagerStoreTestMixin:
-    @pytest.fixture
-    def per_test_temp_dir(self) -> Generator[Path, None, None]:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            yield Path(temp_dir)
-
     @pytest.fixture(params=[True, False], ids=["with_ctx_manager", "no_ctx_manager"], autouse=True)
     def enter_exit_store(
         self, request: pytest.FixtureRequest, store: BaseContextManagerStore, per_test_temp_dir: Path

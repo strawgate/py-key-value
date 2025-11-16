@@ -29,6 +29,11 @@ class BaseStoreTests(ABC):
         """Subclasses can override this to wait for eventually consistent operations."""
 
     @pytest.fixture
+    async def per_test_temp_dir(self) -> AsyncGenerator[Path, None]:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            yield Path(temp_dir)
+
+    @pytest.fixture
     @abstractmethod
     async def store(self) -> BaseStore | AsyncGenerator[BaseStore, None]: ...
 
@@ -261,11 +266,6 @@ class BaseStoreTests(ABC):
 
 
 class ContextManagerStoreTestMixin:
-    @pytest.fixture
-    async def per_test_temp_dir(self) -> AsyncGenerator[Path, None]:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            yield Path(temp_dir)
-
     @pytest.fixture(params=[True, False], ids=["with_ctx_manager", "no_ctx_manager"], autouse=True)
     async def enter_exit_store(
         self, request: pytest.FixtureRequest, store: BaseContextManagerStore, per_test_temp_dir: Path
