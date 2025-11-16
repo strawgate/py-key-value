@@ -32,9 +32,8 @@ class TestDuckDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(scope="session")
     async def duckdb_path(self) -> AsyncGenerator[Path, None]:
-        with TemporaryDirectory() as temp_dir:
+        with TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             db_path = Path(temp_dir) / "test.db"
             yield db_path
 
@@ -47,8 +46,6 @@ class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
         yield duckdb_store
 
         await duckdb_store.close()
-
-        duckdb_path.unlink()
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
     async def test_not_unbounded(self, store: BaseStore): ...
