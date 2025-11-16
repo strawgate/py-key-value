@@ -1,5 +1,4 @@
 import json
-import tempfile
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -19,15 +18,10 @@ TEST_SIZE_LIMIT = 100 * 1024  # 100KB
 
 
 class TestMultiDiskStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture
-    async def multi_disk_path(self) -> AsyncGenerator[Path, None]:
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
-            yield Path(temp_dir)
-
     @override
     @pytest.fixture
-    async def store(self, multi_disk_path: Path) -> AsyncGenerator[MultiDiskStore, None]:
-        store = MultiDiskStore(base_directory=multi_disk_path, max_size=TEST_SIZE_LIMIT)
+    async def store(self, per_test_temp_dir: Path) -> AsyncGenerator[MultiDiskStore, None]:
+        store = MultiDiskStore(base_directory=per_test_temp_dir, max_size=TEST_SIZE_LIMIT)
 
         yield store
 

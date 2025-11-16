@@ -1,6 +1,4 @@
 import json
-import tempfile
-from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import pytest
@@ -16,15 +14,10 @@ TEST_SIZE_LIMIT = 100 * 1024  # 100KB
 
 
 class TestDiskStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(scope="class")
-    async def disk_path(self) -> AsyncGenerator[Path, None]:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            yield Path(temp_dir)
-
     @override
     @pytest.fixture
-    async def store(self, disk_path: Path) -> DiskStore:
-        disk_store = DiskStore(directory=disk_path, max_size=TEST_SIZE_LIMIT)
+    async def store(self, per_test_temp_dir: Path) -> DiskStore:
+        disk_store = DiskStore(directory=per_test_temp_dir, max_size=TEST_SIZE_LIMIT)
 
         disk_store._cache.clear()  # pyright: ignore[reportPrivateUsage]
 

@@ -32,17 +32,11 @@ class TestDuckDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture
-    async def duckdb_path(self) -> AsyncGenerator[Path, None]:
-        with TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
-            db_path = Path(temp_dir) / "test.db"
-            yield db_path
-
     @override
     @pytest.fixture
-    async def store(self, duckdb_path: Path) -> AsyncGenerator[DuckDBStore, None]:
+    async def store(self, per_test_temp_dir: Path) -> AsyncGenerator[DuckDBStore, None]:
         """Test with persistent DuckDB database file."""
-        duckdb_store = DuckDBStore(database_path=duckdb_path)
+        duckdb_store = DuckDBStore(database_path=per_test_temp_dir / "test.db")
 
         yield duckdb_store
 

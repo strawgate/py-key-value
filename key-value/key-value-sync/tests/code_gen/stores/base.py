@@ -2,8 +2,10 @@
 # from the original file 'base.py'
 # DO NOT CHANGE! Change the original file instead.
 import hashlib
+import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import Generator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -256,9 +258,14 @@ class BaseStoreTests(ABC):
 
 
 class ContextManagerStoreTestMixin:
+    @pytest.fixture
+    def per_test_temp_dir(self) -> Generator[Path, None, None]:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            yield Path(temp_dir)
+
     @pytest.fixture(params=[True, False], ids=["with_ctx_manager", "no_ctx_manager"], autouse=True)
     def enter_exit_store(
-        self, request: pytest.FixtureRequest, store: BaseContextManagerStore
+        self, request: pytest.FixtureRequest, store: BaseContextManagerStore, per_test_temp_dir: Path
     ) -> Generator[BaseContextManagerStore, None, None]:
         context_manager = request.param  # pyright: ignore[reportAny]
 

@@ -2,7 +2,6 @@
 # from the original file 'test_multi_disk.py'
 # DO NOT CHANGE! Change the original file instead.
 import json
-import tempfile
 from collections.abc import Generator
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -22,15 +21,10 @@ TEST_SIZE_LIMIT = 100 * 1024  # 100KB
 
 
 class TestMultiDiskStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture
-    def multi_disk_path(self) -> Generator[Path, None, None]:
-        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
-            yield Path(temp_dir)
-
     @override
     @pytest.fixture
-    def store(self, multi_disk_path: Path) -> Generator[MultiDiskStore, None, None]:
-        store = MultiDiskStore(base_directory=multi_disk_path, max_size=TEST_SIZE_LIMIT)
+    def store(self, per_test_temp_dir: Path) -> Generator[MultiDiskStore, None, None]:
+        store = MultiDiskStore(base_directory=per_test_temp_dir, max_size=TEST_SIZE_LIMIT)
 
         yield store
 
