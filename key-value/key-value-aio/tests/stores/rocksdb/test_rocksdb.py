@@ -1,4 +1,5 @@
 import json
+from collections.abc import AsyncGenerator
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -16,11 +17,11 @@ from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(scope="session")
-    def rocksdb_path(self) -> Path:
+    async def rocksdb_path(self) -> AsyncGenerator[Path, None]:
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "test_db"
             db_path.mkdir(parents=True, exist_ok=True)
-            return db_path
+            yield db_path
 
     @override
     @pytest.fixture
