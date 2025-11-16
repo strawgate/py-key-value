@@ -19,7 +19,7 @@ from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMi
 
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="class")
     def rocksdb_path(self) -> Generator[Path, None, None]:
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "test_db"

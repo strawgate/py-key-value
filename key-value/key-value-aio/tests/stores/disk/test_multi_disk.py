@@ -19,18 +19,21 @@ TEST_SIZE_LIMIT = 100 * 1024  # 100KB
 
 
 class TestMultiDiskStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(scope="session")
-    async def multi_disk_store(self) -> AsyncGenerator[MultiDiskStore, None]:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            yield MultiDiskStore(base_directory=Path(temp_dir), max_size=TEST_SIZE_LIMIT)
+    @pytest.fixture
+    async def multi_disk_path(self) -> AsyncGenerator[Path, None]:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            yield Path(temp_dir)
 
     @override
     @pytest.fixture
-    async def store(self, multi_disk_store: MultiDiskStore) -> MultiDiskStore:
-        for collection in multi_disk_store._cache:  # pyright: ignore[reportPrivateUsage]
-            multi_disk_store._cache[collection].clear()  # pyright: ignore[reportPrivateUsage]
+    async def store(self, multi_disk_path: Path) -> AsyncGenerator[MultiDiskStore, None]:
+        store = MultiDiskStore(base_directory=multi_disk_path, max_size=TEST_SIZE_LIMIT)
 
-        return multi_disk_store
+        yield store
+
+        # Wipe the store after returning it
+        for collection in store._cache:  # pyright: ignore[reportPrivateUsage]
+            store._cache[collection].clear()  # pyright: ignore[reportPrivateUsage]
 
     async def test_value_stored(self, store: MultiDiskStore):
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
