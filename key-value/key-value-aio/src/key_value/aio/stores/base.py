@@ -471,7 +471,7 @@ class BaseContextManagerStore(BaseStore, ABC):
 
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
-    ) -> None:
+    ) -> bool | None:
         # Close the exit stack, which handles all cleanup
         if self._exit_stack_entered:
             result = await self._exit_stack.__aexit__(exc_type, exc_value, traceback)

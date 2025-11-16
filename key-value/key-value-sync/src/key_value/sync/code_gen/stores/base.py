@@ -441,7 +441,9 @@ class BaseContextManagerStore(BaseStore, ABC):
         self.setup()
         return self
 
-    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None) -> None:
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
+    ) -> bool | None:
         # Close the exit stack, which handles all cleanup
         if self._exit_stack_entered:
             result = self._exit_stack.__exit__(exc_type, exc_value, traceback)
