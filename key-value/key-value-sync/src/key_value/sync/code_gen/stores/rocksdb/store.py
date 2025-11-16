@@ -6,7 +6,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import overload
 
-from key_value.shared.errors.store import KeyValueStoreError
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
@@ -24,7 +23,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
     """A RocksDB-based key-value store."""
 
     _db: Rdict
-    _is_closed: bool
 
     @overload
     def __init__(self, *, db: Rdict, default_collection: str | None = None) -> None:
@@ -75,8 +73,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
             self._db = Rdict(str(path), options=opts)
 
-        self._is_closed = False
-
         super().__init__(default_collection=default_collection, client_provided_by_user=client_provided)
 
     @override
@@ -87,19 +83,11 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
             self._exit_stack.callback(self._close_and_flush)
 
     def _close_and_flush(self) -> None:
-        if not self._is_closed:
-            self._db.flush()
-            self._db.close()
-            self._is_closed = True
-
-    def _fail_on_closed_store(self) -> None:
-        if self._is_closed:
-            raise KeyValueStoreError(message="Operation attempted on closed store")
+        self._db.flush()
+        self._db.close()
 
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        self._fail_on_closed_store()
-
         combo_key: str = compound_key(collection=collection, key=key)
 
         value: bytes | None = self._db.get(combo_key)
@@ -114,8 +102,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
     @override
     def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
-        self._fail_on_closed_store()
-
         combo_key: str = compound_key(collection=collection, key=key)
         json_value: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
@@ -132,8 +118,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         created_at: datetime,
         expires_at: datetime | None,
     ) -> None:
-        self._fail_on_closed_store()
-
         if not keys:
             return
 
@@ -147,8 +131,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        self._fail_on_closed_store()
-
         combo_key: str = compound_key(collection=collection, key=key)
 
         # Check if key exists before deleting, this is only used for tracking deleted count
@@ -160,8 +142,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
     @override
     def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
-        self._fail_on_closed_store()
-
         if not keys:
             return 0
 
@@ -182,10 +162,3 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
             self._db.write(batch)
 
         return deleted_count
-
-    def __del__(self) -> None:
-        if not getattr(self, "_client_provided_by_user", False):
-            try:  # noqa: SIM105
-                self._close_and_flush()
-            except (AttributeError, Exception):  # noqa: S110
-                pass  # Best-effort cleanup during finalization

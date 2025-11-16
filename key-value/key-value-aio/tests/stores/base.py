@@ -1,4 +1,5 @@
 import hashlib
+import sys
 import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
@@ -30,7 +31,13 @@ class BaseStoreTests(ABC):
 
     @pytest.fixture
     async def per_test_temp_dir(self) -> AsyncGenerator[Path, None]:
-        with tempfile.TemporaryDirectory() as temp_dir:
+        # ignore cleanup errors on Windows
+        if sys.platform == "win32":
+            ignore_cleanup_errors = True
+        else:
+            ignore_cleanup_errors = False
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=ignore_cleanup_errors) as temp_dir:
             yield Path(temp_dir)
 
     @pytest.fixture
