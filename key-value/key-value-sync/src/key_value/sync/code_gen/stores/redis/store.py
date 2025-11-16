@@ -209,7 +209,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
     def _setup(self) -> None:
         """Register client cleanup if we own the client."""
         if not self._client_provided_by_user:
-            self._exit_stack.push_async_callback(self._client.close)
+            self._exit_stack.callback(self._client.close)
 
     @override
     def _delete_store(self) -> bool:

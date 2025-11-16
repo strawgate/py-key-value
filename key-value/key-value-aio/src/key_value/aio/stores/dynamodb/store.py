@@ -105,6 +105,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
 
         if client:
             self._client = client
+            self._raw_client = None
         else:
             session: Session = aioboto3.Session(
                 region_name=region_name,
@@ -133,7 +134,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     async def _setup(self) -> None:
         """Setup the DynamoDB client and ensure table exists."""
         # Register client cleanup if we own the client
-        if not self._client_provided_by_user and hasattr(self, "_raw_client"):
+        if not self._client_provided_by_user and self._raw_client is not None:
             self._client = await self._exit_stack.enter_async_context(self._raw_client)
         try:
             await self._connected_client.describe_table(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]

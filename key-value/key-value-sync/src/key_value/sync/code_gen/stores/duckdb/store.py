@@ -77,7 +77,6 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
     """
 
     _connection: duckdb.DuckDBPyConnection
-    _is_closed: bool
     _adapter: SerializationAdapter
     _table_name: str
 
@@ -158,7 +157,6 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             else:
                 self._connection = duckdb.connect(database=database_path)
 
-        self._is_closed = False
         self._adapter = DuckDBSerializationAdapter()
 
         # Validate table name to prevent SQL injection
@@ -234,13 +232,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         """
         # Register connection cleanup if we own the connection
         if not self._client_provided_by_user:
-
-            def close_connection() -> None:
-                if not self._is_closed:
-                    self._connection.close()
-                    self._is_closed = True
-
-            self._exit_stack.callback(close_connection)
+            self._exit_stack.callback(self._connection.close)
 
         # Create the main table for storing key-value entries
         self._connection.execute(self._get_create_table_sql())
@@ -258,10 +250,6 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         Reconstructs the ManagedEntry from value column and metadata columns
         using the serialization adapter.
         """
-        if self._is_closed:
-            msg = "Cannot operate on closed DuckDBStore"
-            raise RuntimeError(msg)
-
         result = self._connection.execute(self._get_select_sql(), [collection, key]).fetchone()
 
         if result is None:
@@ -288,10 +276,6 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         Uses the serialization adapter to convert the ManagedEntry to the
         appropriate storage format.
         """
-        if self._is_closed:
-            msg = "Cannot operate on closed DuckDBStore"
-            raise RuntimeError(msg)
-
         # Ensure that the value is serializable to JSON
         _ = managed_entry.value_as_json
 
@@ -307,26 +291,8 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         """Delete a managed entry by key from the specified collection."""
-        if self._is_closed:
-            msg = "Cannot operate on closed DuckDBStore"
-            raise RuntimeError(msg)
-
         result = self._connection.execute(self._get_delete_sql(), [collection, key])
 
         # Check if any rows were deleted by counting returned rows
         deleted_rows = result.fetchall()
         return len(deleted_rows) > 0
-
-    def __del__(self) -> None:
-        """Clean up the DuckDB connection on deletion."""
-        try:
-            if (
-                not getattr(self, "_is_closed", False)
-                and (not getattr(self, "_client_provided_by_user", False))
-                and hasattr(self, "_connection")
-            ):
-                self._connection.close()
-                self._is_closed = True
-        except Exception:  # noqa: S110
-            # Suppress errors during cleanup to avoid issues during interpreter shutdown
-            pass

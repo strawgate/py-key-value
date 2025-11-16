@@ -246,6 +246,7 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
         "async_wait_for_true": "wait_for_true",
         "async_retry_operation": "retry_operation",
         "async_gather": "gather",
+        "push_async_callback": "callback",
     }
     _skip_imports: ClassVar[dict[str, set[str]]] = {
         "acompat": {"alist", "anext"},
