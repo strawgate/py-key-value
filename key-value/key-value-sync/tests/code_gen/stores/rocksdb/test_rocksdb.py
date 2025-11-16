@@ -2,7 +2,6 @@
 # from the original file 'test_rocksdb.py'
 # DO NOT CHANGE! Change the original file instead.
 import json
-from collections.abc import Generator
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -19,16 +18,25 @@ from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMi
 
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @override
-    @pytest.fixture
-    def store(self) -> Generator[RocksDBStore, None, None]:
-        """Create a RocksDB store for testing."""
-        # Create a temporary directory for the RocksDB database
+    @pytest.fixture(scope="session")
+    def rocksdb_path(self) -> Path:
         with TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "test_db"
             db_path.mkdir(parents=True, exist_ok=True)
-            rocksdb_store = RocksDBStore(path=db_path)
-            yield rocksdb_store
+            return db_path
+
+    @override
+    @pytest.fixture
+    def store(self, rocksdb_path: Path) -> RocksDBStore:
+        """Create a RocksDB store for testing."""
+        store = RocksDBStore(path=rocksdb_path)
+
+        # Wipe the store before returning it
+        client = store._db
+        for key in client.keys(backwards=True):
+            client.delete(key=key)
+
+        return store
 
     def test_rocksdb_path_connection(self):
         """Test RocksDB store creation with path."""
