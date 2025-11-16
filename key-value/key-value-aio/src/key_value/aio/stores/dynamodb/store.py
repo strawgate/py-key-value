@@ -40,6 +40,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     _endpoint_url: str | None
     _raw_client: Any  # DynamoDB client from aioboto3
     _client: DynamoDBClient | None
+    _owns_client: bool
 
     @overload
     def __init__(self, *, client: DynamoDBClient, table_name: str, default_collection: str | None = None) -> None:
@@ -101,6 +102,8 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         self._table_name = table_name
         if client:
             self._client = client
+            self._raw_client = None
+            self._owns_client = False
         else:
             session: Session = aioboto3.Session(
                 region_name=region_name,
@@ -112,6 +115,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             self._raw_client = session.client(service_name="dynamodb", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType]
 
             self._client = None
+            self._owns_client = True
 
         super().__init__(default_collection=default_collection)
 
@@ -127,8 +131,8 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
     ) -> None:
         await super().__aexit__(exc_type, exc_value, traceback)
-        if self._client:
-            await self._client.__aexit__(exc_type, exc_value, traceback)
+        if self._owns_client and self._raw_client:
+            await self._raw_client.__aexit__(exc_type, exc_value, traceback)
 
     @property
     def _connected_client(self) -> DynamoDBClient:
@@ -256,5 +260,5 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _close(self) -> None:
         """Close the DynamoDB client."""
-        if self._client:
-            await self._client.__aexit__(None, None, None)  # pyright: ignore[reportUnknownMemberType]
+        if self._owns_client and self._raw_client:
+            await self._raw_client.__aexit__(None, None, None)  # pyright: ignore[reportUnknownMemberType]
