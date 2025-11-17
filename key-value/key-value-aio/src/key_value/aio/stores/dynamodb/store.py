@@ -245,4 +245,20 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         # Return True if an item was actually deleted
         return "Attributes" in response  # pyright: ignore[reportUnknownArgumentType]
 
-    # No need to override _close - the exit stack handles all cleanup automatically
+    @override
+    async def close(self) -> None:
+        """Close the DynamoDB store and clean up resources.
+
+        If the store was never used (no operations performed), _raw_client exists but was never
+        entered into the exit stack. We need to enter and immediately exit it to properly clean
+        up the aioboto3 client context manager.
+        """
+        # If we have an unentered raw client, we need to enter and exit it to avoid resource warnings
+        if self._raw_client is not None and self._client is None and not self._client_provided_by_user:
+            # The client was never entered (no operations were performed), so we need to
+            # enter and immediately exit it to properly clean up the async context manager
+            async with self._raw_client:
+                pass  # Just enter and exit to clean up
+
+        # Call parent close to handle exit stack cleanup
+        await super().close()
