@@ -224,6 +224,7 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
         "AsyncDatabase": "Database",
         "AsyncCollection": "Collection",
         "AsyncMongoClient": "MongoClient",
+        "AsyncExitStack": "ExitStack",
         "redis.asyncio": "redis",
         "redis.asyncio.client": "redis.client",
         "glide_shared.config": "glide_sync.config",
@@ -238,12 +239,14 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
         "AsyncKeyValue": "KeyValue",
         "AsyncGenerator": "Generator",
         "aclose": "close",
+        "enter_async_context": "enter_context",
         "asyncio.sleep": "time.sleep",
         "async_running_in_event_loop": "running_in_event_loop",
         "asleep": "sleep",
         "async_wait_for_true": "wait_for_true",
         "async_retry_operation": "retry_operation",
         "async_gather": "gather",
+        "push_async_callback": "callback",
     }
     _skip_imports: ClassVar[dict[str, set[str]]] = {
         "acompat": {"alist", "anext"},

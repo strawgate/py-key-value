@@ -1,9 +1,8 @@
 from datetime import datetime, timezone
-from types import TracebackType
 from typing import TYPE_CHECKING, Any, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from key_value.aio.stores.base import (
     BaseContextManagerStore,
@@ -90,6 +89,9 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         """Initialize the DynamoDB store.
 
         Args:
+            client: The DynamoDB client to use. If provided, the store will not manage the client's
+                lifecycle (will not enter/exit its context manager). The caller is responsible for
+                managing the client's lifecycle and must ensure the client is already entered.
             table_name: The name of the DynamoDB table to use.
             region_name: AWS region name. Defaults to None (uses AWS default).
             endpoint_url: Custom endpoint URL (useful for local DynamoDB). Defaults to None.
@@ -99,8 +101,11 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             default_collection: The default collection to use if no collection is provided.
         """
         self._table_name = table_name
+        client_provided = client is not None
+
         if client:
             self._client = client
+            self._raw_client = None
         else:
             session: Session = aioboto3.Session(
                 region_name=region_name,
@@ -113,22 +118,10 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
 
             self._client = None
 
-        super().__init__(default_collection=default_collection)
-
-    @override
-    async def __aenter__(self) -> Self:
-        if self._raw_client:
-            self._client = await self._raw_client.__aenter__()
-        await super().__aenter__()
-        return self
-
-    @override
-    async def __aexit__(
-        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
-    ) -> None:
-        await super().__aexit__(exc_type, exc_value, traceback)
-        if self._client:
-            await self._client.__aexit__(exc_type, exc_value, traceback)
+        super().__init__(
+            default_collection=default_collection,
+            client_provided_by_user=client_provided,
+        )
 
     @property
     def _connected_client(self) -> DynamoDBClient:
@@ -140,10 +133,9 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _setup(self) -> None:
         """Setup the DynamoDB client and ensure table exists."""
-
-        if not self._client:
-            self._client = await self._raw_client.__aenter__()
-
+        # Register client cleanup if we own the client
+        if not self._client_provided_by_user and self._raw_client is not None:
+            self._client = await self._exit_stack.enter_async_context(self._raw_client)
         try:
             await self._connected_client.describe_table(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
         except self._connected_client.exceptions.ResourceNotFoundException:  # pyright: ignore[reportUnknownMemberType]
@@ -253,8 +245,4 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         # Return True if an item was actually deleted
         return "Attributes" in response  # pyright: ignore[reportUnknownArgumentType]
 
-    @override
-    async def _close(self) -> None:
-        """Close the DynamoDB client."""
-        if self._client:
-            await self._client.__aexit__(None, None, None)  # pyright: ignore[reportUnknownMemberType]
+    # No need to override _close - the exit stack handles all cleanup automatically

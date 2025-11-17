@@ -1,6 +1,9 @@
 import hashlib
+import sys
+import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -25,6 +28,17 @@ from tests.conftest import async_running_in_event_loop
 class BaseStoreTests(ABC):
     async def eventually_consistent(self) -> None:  # noqa: B027
         """Subclasses can override this to wait for eventually consistent operations."""
+
+    @pytest.fixture
+    async def per_test_temp_dir(self) -> AsyncGenerator[Path, None]:
+        # ignore cleanup errors on Windows
+        if sys.platform == "win32":
+            ignore_cleanup_errors = True
+        else:
+            ignore_cleanup_errors = False
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=ignore_cleanup_errors) as temp_dir:
+            yield Path(temp_dir)
 
     @pytest.fixture
     @abstractmethod
@@ -261,7 +275,7 @@ class BaseStoreTests(ABC):
 class ContextManagerStoreTestMixin:
     @pytest.fixture(params=[True, False], ids=["with_ctx_manager", "no_ctx_manager"], autouse=True)
     async def enter_exit_store(
-        self, request: pytest.FixtureRequest, store: BaseContextManagerStore
+        self, request: pytest.FixtureRequest, store: BaseContextManagerStore, per_test_temp_dir: Path
     ) -> AsyncGenerator[BaseContextManagerStore, None]:
         context_manager = request.param  # pyright: ignore[reportAny]
 

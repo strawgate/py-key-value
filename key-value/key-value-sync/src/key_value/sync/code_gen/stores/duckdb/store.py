@@ -74,15 +74,9 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
 
     Values are stored in a JSON column as native dicts, allowing direct SQL queries
     on the stored data for analytics and reporting.
-
-    Note on connection ownership: When you provide an existing connection, the store
-    will take ownership and close it when the store is closed or garbage collected.
-    If you need to reuse a connection, create separate DuckDB connections for each store.
     """
 
     _connection: duckdb.DuckDBPyConnection
-    _is_closed: bool
-    _owns_connection: bool
     _adapter: SerializationAdapter
     _table_name: str
 
@@ -97,9 +91,8 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
     ) -> None:
         """Initialize the DuckDB store with an existing connection.
 
-        Warning: The store will take ownership of the connection and close it
-        when the store is closed or garbage collected. If you need to reuse
-        a connection, create separate DuckDB connections for each store.
+        Note: If you provide a connection, the store will NOT manage its lifecycle (will not
+        close it). The caller is responsible for managing the connection's lifecycle.
 
         Args:
             connection: An existing DuckDB connection to use.
@@ -138,7 +131,9 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         """Initialize the DuckDB store.
 
         Args:
-            connection: An existing DuckDB connection to use.
+            connection: An existing DuckDB connection to use. If provided, the store will NOT
+                manage its lifecycle (will not close it). The caller is responsible for managing
+                the connection's lifecycle.
             database_path: Path to the database file. If None or ':memory:', uses in-memory database.
             table_name: Name of the table to store key-value entries. Defaults to "kv_entries".
             default_collection: The default collection to use if no collection is provided.
@@ -148,9 +143,10 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             msg = "Provide only one of connection or database_path"
             raise ValueError(msg)
 
+        client_provided = connection is not None
+
         if connection is not None:
             self._connection = connection
-            self._owns_connection = True  # We take ownership even of provided connections
         else:
             # Convert Path to string if needed
             if isinstance(database_path, Path):
@@ -160,9 +156,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
                 self._connection = duckdb.connect(":memory:")
             else:
                 self._connection = duckdb.connect(database=database_path)
-            self._owns_connection = True
 
-        self._is_closed = False
         self._adapter = DuckDBSerializationAdapter()
 
         # Validate table name to prevent SQL injection
@@ -170,9 +164,8 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             msg = "Table name must start with a letter or underscore and contain only letters, digits, or underscores"
             raise ValueError(msg)
         self._table_name = table_name
-        self._stable_api = False
 
-        super().__init__(default_collection=default_collection, seed=seed)
+        super().__init__(default_collection=default_collection, seed=seed, client_provided_by_user=client_provided, stable_api=False)
 
     def _get_create_table_sql(self) -> str:
         """Generate SQL for creating the key-value entries table.
@@ -237,6 +230,10 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         - Metadata queries without JSON deserialization
         - Native JSON column support for rich querying capabilities
         """
+        # Register connection cleanup if we own the connection
+        if not self._client_provided_by_user:
+            self._exit_stack.callback(self._connection.close)
+
         # Create the main table for storing key-value entries
         self._connection.execute(self._get_create_table_sql())
 
@@ -253,10 +250,6 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         Reconstructs the ManagedEntry from value column and metadata columns
         using the serialization adapter.
         """
-        if self._is_closed:
-            msg = "Cannot operate on closed DuckDBStore"
-            raise RuntimeError(msg)
-
         result = self._connection.execute(self._get_select_sql(), [collection, key]).fetchone()
 
         if result is None:
@@ -283,10 +276,6 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         Uses the serialization adapter to convert the ManagedEntry to the
         appropriate storage format.
         """
-        if self._is_closed:
-            msg = "Cannot operate on closed DuckDBStore"
-            raise RuntimeError(msg)
-
         # Ensure that the value is serializable to JSON
         _ = managed_entry.value_as_json
 
@@ -302,29 +291,8 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         """Delete a managed entry by key from the specified collection."""
-        if self._is_closed:
-            msg = "Cannot operate on closed DuckDBStore"
-            raise RuntimeError(msg)
-
         result = self._connection.execute(self._get_delete_sql(), [collection, key])
 
         # Check if any rows were deleted by counting returned rows
         deleted_rows = result.fetchall()
         return len(deleted_rows) > 0
-
-    @override
-    def _close(self) -> None:
-        """Close the DuckDB connection."""
-        if not self._is_closed and self._owns_connection:
-            self._connection.close()
-            self._is_closed = True
-
-    def __del__(self) -> None:
-        """Clean up the DuckDB connection on deletion."""
-        try:
-            if not self._is_closed and self._owns_connection and hasattr(self, "_connection"):
-                self._connection.close()
-                self._is_closed = True
-        except Exception:  # noqa: S110
-            # Suppress errors during cleanup to avoid issues during interpreter shutdown
-            pass
