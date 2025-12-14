@@ -1,0 +1,130 @@
+from typing import Any
+
+import pytest
+from typing_extensions import override
+
+from key_value.aio.stores.base import BaseStore
+
+try:
+    from google.cloud import firestore
+
+    from key_value.aio.stores.firestore import FirestoreStore
+except ImportError:  # pragma: no cover
+    pytest.skip("Firestore dependencies not installed. Install with `py-key-value-aio[firestore]`.", allow_module_level=True)
+
+from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
+
+
+class _InMemoryAsyncFirestoreDocument:
+    def __init__(self, storage: dict[tuple[str, str], dict[str, Any]], collection: str, key: str) -> None:
+        self._storage = storage
+        self._collection = collection
+        self._key = key
+
+    async def get(self) -> "_InMemoryAsyncFirestoreDocumentSnapshot":
+        return _InMemoryAsyncFirestoreDocumentSnapshot(self._storage.get((self._collection, self._key)))
+
+    async def set(self, data: dict[str, Any]) -> None:
+        self._storage[(self._collection, self._key)] = data
+
+    async def delete(self) -> None:
+        self._storage.pop((self._collection, self._key), None)
+
+
+class _InMemoryAsyncFirestoreDocumentSnapshot:
+    def __init__(self, data: dict[str, Any] | None) -> None:
+        self._data = data
+
+    @property
+    def exists(self) -> bool:
+        return self._data is not None
+
+    def to_dict(self) -> dict[str, Any] | None:
+        if self._data is None:
+            return None
+        return dict(self._data)
+
+
+class _InMemoryAsyncFirestoreCollection:
+    def __init__(self, storage: dict[tuple[str, str], dict[str, Any]], name: str) -> None:
+        self._storage = storage
+        self._name = name
+
+    def document(self, key: str) -> _InMemoryAsyncFirestoreDocument:
+        return _InMemoryAsyncFirestoreDocument(storage=self._storage, collection=self._name, key=key)
+
+
+class InMemoryAsyncFirestoreClient(firestore.AsyncClient):
+    """Minimal in-memory Firestore AsyncClient replacement for tests.
+
+    This client mimics the subset of the Firestore AsyncClient API that
+    FirestoreStore relies on: `collection().document().get/set/delete()`.
+    """
+
+    __slots__ = ("_storage", "closed")
+
+    def __init__(self) -> None:
+        self._storage: dict[tuple[str, str], dict[str, Any]] = {}
+        self.closed = False
+
+    def collection(self, name: str) -> _InMemoryAsyncFirestoreCollection:
+        return _InMemoryAsyncFirestoreCollection(storage=self._storage, name=name)
+
+    def close(self) -> None:
+        self.closed = True
+
+
+@pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
+class TestFirestoreStore(ContextManagerStoreTestMixin, BaseStoreTests):
+    @override
+    @pytest.fixture
+    async def store(self) -> FirestoreStore:
+        client = InMemoryAsyncFirestoreClient()
+        return FirestoreStore(client=client, default_collection="test")
+
+    @override
+    @pytest.mark.skip(reason="Distributed cloud stores are unbounded")
+    async def test_not_unbounded(self, store: BaseStore): ...
+
+    @override
+    async def test_delete(self, store: BaseStore):
+        # Firestore deletes are idempotent and do not fail for missing keys.
+        assert await store.delete(collection="test", key="test") is True
+
+    @override
+    async def test_put_delete_delete(self, store: BaseStore):
+        # Firestore deletes are idempotent and do not fail for missing keys.
+        await store.put(collection="test", key="test", value={"test": "test"})
+        assert await store.delete(collection="test", key="test") is True
+        assert await store.delete(collection="test", key="test") is True
+
+    @override
+    async def test_delete_many(self, store: BaseStore):
+        # Firestore deletes are idempotent and do not fail for missing keys.
+        assert await store.delete_many(collection="test", keys=["test", "test_2"]) == 2
+
+    @override
+    async def test_put_delete_many(self, store: BaseStore):
+        # Firestore deletes are idempotent and do not fail for missing keys.
+        await store.put(collection="test", key="test", value={"test": "test"})
+        assert await store.delete_many(collection="test", keys=["test", "test_2"]) == 2
+
+    @override
+    async def test_delete_many_delete_many(self, store: BaseStore):
+        # Firestore deletes are idempotent and do not fail for missing keys.
+        await store.put(collection="test", key="test", value={"test": "test"})
+        assert await store.delete_many(collection="test", keys=["test", "test_2"]) == 2
+        assert await store.delete_many(collection="test", keys=["test", "test_2"]) == 2
+
+    async def test_default_collection_used_when_collection_missing(self, store: FirestoreStore):
+        # When no collection is provided, the store should use the default collection
+        await store.put(key="test_key", value={"value": "from_default"}, collection=None)
+        assert await store.get(key="test_key", collection=None) == {"value": "from_default"}
+
+    async def test_delete_returns_true_when_document_deleted(self, store: FirestoreStore):
+        await store.put(collection="test", key="test_key", value={"test": "value"})
+        assert await store.get(collection="test", key="test_key") == {"test": "value"}
+
+        deleted = await store.delete(collection="test", key="test_key")
+        assert deleted is True
+        assert await store.get(collection="test", key="test_key") is None
