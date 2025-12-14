@@ -221,6 +221,7 @@ class RenameAsyncToSync(ast.NodeTransformer):  # type: ignore
         "__aiter__": "__iter__",
         "asyncio.locks": "threading",
         "AsyncElasticsearch": "Elasticsearch",
+        "AsyncClient": "Client",
         "AsyncDatabase": "Database",
         "AsyncCollection": "Collection",
         "AsyncMongoClient": "MongoClient",

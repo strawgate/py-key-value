@@ -49,7 +49,30 @@ rocksdb = [
     "rocksdict>=0.3.2 ; python_version < '3.12'"
 ]
 duckdb = ["duckdb>=1.1.1", "pytz>=2025.2"]
+firestore = ["google-cloud-firestore>=2.13.0", "google-auth>=2.24.0"]
 wrappers-encryption = ["cryptography>=45.0.0"]
+all = [
+    "cachetools>=5.0.0",
+    "diskcache>=5.0.0",
+    "pathvalidate>=3.3.1",
+    "anyio>=4.4.0",
+    "redis>=4.3.0",
+    "pymongo>=4.0.0",
+    "valkey-glide-sync>=2.1.0",
+    "hvac>=2.3.0",
+    "types-hvac>=2.3.0",
+    "aiomcache>=0.8.0",
+    "elasticsearch>=8.0.0",
+    "aiohttp>=3.12",
+    "keyring>=25.6.0",
+    "pydantic>=2.11.9",
+    "rocksdict>=0.3.24 ; python_version >= '3.12'",
+    "rocksdict>=0.3.2 ; python_version < '3.12'",
+    "duckdb>=1.1.1",
+    "pytz>=2025.2",
+    "google-cloud-firestore>=2.13.0",
+    "google-auth>=2.24.0",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -69,7 +92,7 @@ env_files = [".env"]
 
 [dependency-groups]
 dev = [
-    "py-key-value-sync[memory,disk,filetree,redis,elasticsearch,memcached,mongodb,vault,rocksdb,duckdb]",
+    "py-key-value-sync[memory,disk,filetree,redis,elasticsearch,memcached,mongodb,vault,rocksdb,duckdb,firestore]",
     "py-key-value-sync[valkey]; platform_system != 'Windows'",
     "py-key-value-sync[pydantic]",
     "py-key-value-sync[keyring]",
