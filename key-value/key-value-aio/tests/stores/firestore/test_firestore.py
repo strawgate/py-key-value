@@ -1,3 +1,5 @@
+# pyright: reportIncompatibleMethodOverride=false
+
 from typing import Any
 
 import pytest

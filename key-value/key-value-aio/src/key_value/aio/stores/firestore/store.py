@@ -11,7 +11,7 @@ from key_value.aio.stores.base import (
 
 try:
     from google.cloud import firestore
-    from google.oauth2.credentials import Credentials
+    from google.oauth2.service_account import Credentials
 except ImportError as e:
     msg = "FirestoreStore requires py-key-value-aio[firestore]"
     raise ImportError(msg) from e
@@ -95,7 +95,7 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
     async def _get_managed_entry(self, *, key: str, collection: str | None = None) -> ManagedEntry | None:
         """Get a managed entry from Firestore."""
         collection = collection or self.default_collection
-        response = await self._connected_client.collection(collection).document(key).get()
+        response = await self._connected_client.collection(collection).document(key).get()  # pyright: ignore[reportUnknownMemberType]
         doc = response.to_dict()
         if doc is None:
             return None
@@ -106,7 +106,7 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
         """Store a managed entry in Firestore."""
         collection = collection or self.default_collection
         item = self._serialization_adapter.dump_dict(entry=managed_entry)
-        await self._connected_client.collection(collection).document(key).set(item)
+        await self._connected_client.collection(collection).document(key).set(item)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str | None = None) -> bool:
@@ -115,7 +115,6 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
         await self._connected_client.collection(collection).document(key).delete()
         return True
 
-    @override
     async def _close(self) -> None:
         """Close the Firestore client."""
         if self._client and not self._client_provided_by_user:
