@@ -124,6 +124,12 @@ class TestPydanticAdapter:
         assert product_list_adapter.delete(collection=TEST_COLLECTION, key=TEST_KEY)
         assert product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
 
+    def test_adapter_with_list_int(self, store: MemoryStore):
+        adapter = PydanticAdapter[list[int]](key_value=store, pydantic_model=list[int])
+        adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=[1, 2, 3])
+        result: list[int] | None = adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+        assert result == [1, 2, 3]
+
     def test_simple_adapter_with_validation_error_ignore(
         self, user_adapter: PydanticAdapter[User], updated_user_adapter: PydanticAdapter[UpdatedUser]
     ):
@@ -220,3 +226,40 @@ class TestPydanticAdapter:
         assert model_type_from_log_record(record) == "Pydantic model"
         error = error_from_log_record(record)
         assert "missing 'items' wrapper" in str(error)
+
+    def test_adapter_with_tuple(self, store: MemoryStore):
+        """Test that tuple types are supported."""
+        adapter = PydanticAdapter[tuple[int, str, float]](key_value=store, pydantic_model=tuple[int, str, float])
+        adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=(1, "hello", 3.14))
+        result = adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+        assert result == (1, "hello", 3.14)
+
+    def test_adapter_with_set(self, store: MemoryStore):
+        """Test that set types are supported."""
+        adapter = PydanticAdapter[set[int]](key_value=store, pydantic_model=set[int])
+        adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value={1, 2, 3})
+        result = adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+        assert result == {1, 2, 3}
+
+    def test_adapter_with_datetime(self, store: MemoryStore):
+        """Test that datetime types are supported."""
+        adapter = PydanticAdapter[datetime](key_value=store, pydantic_model=datetime)
+        test_dt = FIXED_CREATED_AT
+        adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=test_dt)
+        result = adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+        assert result == test_dt
+
+    def test_adapter_with_dict(self, store: MemoryStore):
+        """Test that dict types are supported and stored without wrapping."""
+        adapter = PydanticAdapter[dict[str, int]](key_value=store, pydantic_model=dict[str, int])
+        test_data = {"a": 1, "b": 2, "c": 3}
+        adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=test_data)
+        result = adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+        assert result == test_data
+
+        # Verify dict is stored directly (not wrapped)
+        raw_collection = store._cache.get(TEST_COLLECTION)  # pyright: ignore[reportPrivateUsage]
+        assert raw_collection is not None
+        raw_entry = raw_collection.get(TEST_KEY)
+        assert raw_entry is not None
+        assert raw_entry.value == {"a": 1, "b": 2, "c": 3}  # No "items" wrapper
