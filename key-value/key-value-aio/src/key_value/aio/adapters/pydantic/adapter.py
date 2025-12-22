@@ -1,3 +1,4 @@
+import contextlib
 from collections.abc import Mapping
 from dataclasses import is_dataclass
 from typing import Annotated, Any, TypeVar, get_args, get_origin, is_typeddict
@@ -67,32 +68,28 @@ class PydanticAdapter(BasePydanticAdapter[T]):
         if origin is Annotated:
             return self._check_needs_wrapping(get_args(pydantic_model)[0])
 
+        # Check if this type serializes to a dict naturally
+        return not self._serializes_to_dict(pydantic_model, origin)
+
+    def _serializes_to_dict(self, pydantic_model: Any, origin: type | None) -> bool:
+        """Check if a type serializes to a dict naturally."""
         # No generic origin - simple types like BaseModel, int, datetime, etc.
         if origin is None:
             if isinstance(pydantic_model, type):
-                # BaseModel subclasses serialize to dict
                 if issubclass(pydantic_model, BaseModel):
-                    return False
-                # dataclasses serialize to dict
+                    return True
                 if is_dataclass(pydantic_model):  # pyright: ignore[reportUnknownArgumentType]
-                    return False
-            # TypedDict also serializes to dict
-            if is_typeddict(pydantic_model):  # pyright: ignore[reportUnknownArgumentType]
-                return False
-            # Everything else: int, str, datetime, UUID, Enum, etc.
-            return True
+                    return True
+            return is_typeddict(pydantic_model)  # pyright: ignore[reportUnknownArgumentType]
 
         # dict and Mapping subclasses serialize to dict
         if origin is dict:
-            return False
-        try:
-            if isinstance(origin, type) and issubclass(origin, Mapping):
-                return False
-        except TypeError:
-            pass
+            return True
+        with contextlib.suppress(TypeError):
+            if issubclass(origin, Mapping):  # pyright: ignore[reportArgumentType]
+                return True
 
-        # Everything else: list, tuple, set, Union, etc.
-        return True
+        return False
 
     def _get_model_type_name(self) -> str:
         """Return the model type name for error messages."""
