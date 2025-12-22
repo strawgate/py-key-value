@@ -1,26 +1,39 @@
-from collections.abc import Sequence
-from typing import TypeVar, get_origin
+from collections.abc import Mapping
+from dataclasses import is_dataclass
+from typing import Annotated, Any, TypeVar, get_args, get_origin, is_typeddict
 
 from key_value.shared.type_checking.bear_spray import bear_spray
 from pydantic import BaseModel
 from pydantic.type_adapter import TypeAdapter
+from typing_extensions import TypeForm
 
 from key_value.aio.adapters.pydantic.base import BasePydanticAdapter
 from key_value.aio.protocols.key_value import AsyncKeyValue
 
-T = TypeVar("T", bound=BaseModel | Sequence[BaseModel])
+T = TypeVar("T")
 
 
 class PydanticAdapter(BasePydanticAdapter[T]):
-    """Adapter around a KVStore-compliant Store that allows type-safe persistence of Pydantic models."""
+    """Adapter around a KVStore-compliant Store that allows type-safe persistence of any pydantic-serializable type.
 
-    # Beartype cannot handle the parameterized type annotation (type[T]) used here for this generic adapter.
-    # Using @bear_spray to bypass beartype's runtime checks for this specific method.
+    Supports:
+    - Pydantic models (BaseModel subclasses)
+    - Dataclasses and TypedDicts
+    - Dict types (dict[K, V])
+    - Sequences (list[T], tuple[T, ...], set[T])
+    - Primitives and other types (int, str, datetime, UUID, etc.)
+
+    Types that serialize to dicts (BaseModel, dataclass, TypedDict, dict) are stored directly.
+    All other types are wrapped in {"items": <value>} for consistent dict-based storage.
+    """
+
+    # Beartype cannot handle the parameterized type annotation used here.
+    # Using @bear_spray to bypass beartype's runtime checks for this method.
     @bear_spray
     def __init__(
         self,
         key_value: AsyncKeyValue,
-        pydantic_model: type[T],
+        pydantic_model: TypeForm[T],
         default_collection: str | None = None,
         raise_on_validation_error: bool = False,
     ) -> None:
@@ -28,27 +41,58 @@ class PydanticAdapter(BasePydanticAdapter[T]):
 
         Args:
             key_value: The KVStore to use.
-            pydantic_model: The Pydantic model to use. Can be a single Pydantic model or list[Pydantic model].
+            pydantic_model: The type to use for serialization/deserialization. Can be any
+                           pydantic-serializable type: BaseModel, dataclass, TypedDict, dict[K, V],
+                           list[T], tuple[T, ...], set[T], or primitives like int, str, datetime, etc.
             default_collection: The default collection to use.
-            raise_on_validation_error: Whether to raise a DeserializationError if validation fails during reads. Otherwise,
-                                       calls will return None if validation fails.
-
-        Raises:
-            TypeError: If pydantic_model is a sequence type other than list (e.g., tuple is not supported).
+            raise_on_validation_error: Whether to raise a DeserializationError if validation fails during reads.
+                                       Otherwise, calls will return None if validation fails.
         """
         self._key_value = key_value
-
-        origin = get_origin(pydantic_model)
-        self._is_list_model = origin is list
-
-        # Validate that if it's a generic type, it must be a list (not tuple, etc.)
-        if origin is not None and origin is not list:
-            msg = f"Only list[BaseModel] is supported for sequence types, got {pydantic_model}"
-            raise TypeError(msg)
-
         self._type_adapter = TypeAdapter[T](pydantic_model)
+        self._needs_wrapping = self._check_needs_wrapping(pydantic_model)
         self._default_collection = default_collection
         self._raise_on_validation_error = raise_on_validation_error
+
+    def _check_needs_wrapping(self, pydantic_model: Any) -> bool:
+        """Determine if this type serializes to a non-dict and needs wrapping.
+
+        Types that serialize to dicts (BaseModel, dataclass, TypedDict, dict) don't need wrapping.
+        All other types (list, tuple, set, primitives, datetime, etc.) need to be wrapped in
+        {"items": <value>} to ensure consistent dict-based storage.
+        """
+        origin = get_origin(pydantic_model)
+
+        # Handle Annotated[T, ...] by unwrapping to T
+        if origin is Annotated:
+            return self._check_needs_wrapping(get_args(pydantic_model)[0])
+
+        # No generic origin - simple types like BaseModel, int, datetime, etc.
+        if origin is None:
+            if isinstance(pydantic_model, type):
+                # BaseModel subclasses serialize to dict
+                if issubclass(pydantic_model, BaseModel):
+                    return False
+                # dataclasses serialize to dict
+                if is_dataclass(pydantic_model):  # pyright: ignore[reportUnknownArgumentType]
+                    return False
+            # TypedDict also serializes to dict
+            if is_typeddict(pydantic_model):  # pyright: ignore[reportUnknownArgumentType]
+                return False
+            # Everything else: int, str, datetime, UUID, Enum, etc.
+            return True
+
+        # dict and Mapping subclasses serialize to dict
+        if origin is dict:
+            return False
+        try:
+            if isinstance(origin, type) and issubclass(origin, Mapping):
+                return False
+        except TypeError:
+            pass
+
+        # Everything else: list, tuple, set, Union, etc.
+        return True
 
     def _get_model_type_name(self) -> str:
         """Return the model type name for error messages."""

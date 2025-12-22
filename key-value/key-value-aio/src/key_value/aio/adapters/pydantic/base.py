@@ -24,7 +24,7 @@ class BasePydanticAdapter(Generic[T], ABC):
     """
 
     _key_value: AsyncKeyValue
-    _is_list_model: bool
+    _needs_wrapping: bool
     _type_adapter: TypeAdapter[T]
     _default_collection: str | None
     _raise_on_validation_error: bool
@@ -41,8 +41,9 @@ class BasePydanticAdapter(Generic[T], ABC):
     def _validate_model(self, value: dict[str, Any]) -> T | None:
         """Validate and deserialize a dict into the configured model type.
 
-        This method handles both single models and list models. For list models, it expects the value
-        to contain an "items" key with the list data, following the convention used by `_serialize_model`.
+        This method handles both dict-serializing types (like BaseModel) and wrapped types
+        (like list, tuple, primitives). For wrapped types, it expects the value to contain
+        an "items" key with the data, following the convention used by `_serialize_model`.
         If validation fails and `raise_on_validation_error` is False, returns None instead of raising.
 
         Args:
@@ -55,7 +56,7 @@ class BasePydanticAdapter(Generic[T], ABC):
             DeserializationError: If validation fails and `raise_on_validation_error` is True.
         """
         try:
-            if self._is_list_model:
+            if self._needs_wrapping:
                 if "items" not in value:
                     if self._raise_on_validation_error:
                         msg = f"Invalid {self._get_model_type_name()} payload: missing 'items' wrapper"
@@ -63,7 +64,7 @@ class BasePydanticAdapter(Generic[T], ABC):
 
                     # Log the missing 'items' wrapper when not raising
                     logger.error(
-                        "Missing 'items' wrapper for list %s",
+                        "Missing 'items' wrapper for %s",
                         self._get_model_type_name(),
                         extra={
                             "model_type": self._get_model_type_name(),
@@ -98,10 +99,10 @@ class BasePydanticAdapter(Generic[T], ABC):
     def _serialize_model(self, value: T) -> dict[str, Any]:
         """Serialize a model to a dict for storage.
 
-        This method handles both single models and list models. For list models, it wraps the serialized
-        list in a dict with an "items" key (e.g., {"items": [...]}) to ensure consistent dict-based storage
-        format across all value types. This wrapping convention is expected by `_validate_model` during
-        deserialization.
+        This method handles both dict-serializing types (like BaseModel) and types that serialize
+        to non-dict values (like list, tuple, primitives). For non-dict types, it wraps the serialized
+        value in a dict with an "items" key (e.g., {"items": [...]}) to ensure consistent dict-based
+        storage format. This wrapping convention is expected by `_validate_model` during deserialization.
 
         Args:
             value: The model instance to serialize.
@@ -113,7 +114,7 @@ class BasePydanticAdapter(Generic[T], ABC):
             SerializationError: If the model cannot be serialized.
         """
         try:
-            if self._is_list_model:
+            if self._needs_wrapping:
                 return {"items": self._type_adapter.dump_python(value, mode="json")}
 
             return self._type_adapter.dump_python(value, mode="json")  # pyright: ignore[reportAny]
