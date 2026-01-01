@@ -187,7 +187,9 @@ class ElasticsearchStore(
         """Initialize the elasticsearch store.
 
         Args:
-            elasticsearch_client: The elasticsearch client to use.
+            elasticsearch_client: The elasticsearch client to use. If provided, the store will not
+                manage the client's lifecycle (will not close it). The caller is responsible for
+                managing the client's lifecycle.
             url: The url of the elasticsearch cluster.
             api_key: The api key to use.
             index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
@@ -198,6 +200,8 @@ class ElasticsearchStore(
         if elasticsearch_client is None and url is None:
             msg = "Either elasticsearch_client or url must be provided"
             raise ValueError(msg)
+
+        client_provided = elasticsearch_client is not None
 
         if elasticsearch_client:
             self._client = elasticsearch_client
@@ -222,10 +226,15 @@ class ElasticsearchStore(
             default_collection=default_collection,
             collection_sanitization_strategy=collection_sanitization_strategy,
             key_sanitization_strategy=key_sanitization_strategy,
+            client_provided_by_user=client_provided,
         )
 
     @override
     def _setup(self) -> None:
+        # Register client cleanup if we own the client
+        if not self._client_provided_by_user:
+            self._exit_stack.callback(self._client.close)
+
         cluster_info = self._client.options(ignore_status=404).info()
 
         self._is_serverless = cluster_info.get("version", {}).get("build_flavor") == "serverless"
@@ -472,7 +481,3 @@ class ElasticsearchStore(
         _ = self._client.options(ignore_status=404).delete_by_query(
             index=f"{self._index_prefix}-*", body={"query": {"range": {"expires_at": {"lt": ms_epoch}}}}
         )
-
-    @override
-    def _close(self) -> None:
-        self._client.close()

@@ -1,6 +1,6 @@
 [project]
 name = "py-key-value-shared"
-version = "0.2.8"
+version = "0.3.0"
 description = "Shared Key-Value"
 readme = "README.md"
 requires-python = ">=3.10"
