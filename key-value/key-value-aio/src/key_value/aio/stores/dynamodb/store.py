@@ -39,15 +39,24 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     _endpoint_url: str | None
     _raw_client: Any  # DynamoDB client from aioboto3
     _client: DynamoDBClient | None
+    _table_config: dict[str, Any]
 
     @overload
-    def __init__(self, *, client: DynamoDBClient, table_name: str, default_collection: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        client: DynamoDBClient,
+        table_name: str,
+        default_collection: str | None = None,
+        table_config: dict[str, Any] | None = None,
+    ) -> None:
         """Initialize the DynamoDB store.
 
         Args:
             client: The DynamoDB client to use. You must have entered the context manager before passing this in.
             table_name: The name of the DynamoDB table to use.
             default_collection: The default collection to use if no collection is provided.
+            table_config: Additional configuration to pass to create_table(). Merged with defaults.
         """
 
     @overload
@@ -61,6 +70,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         aws_secret_access_key: str | None = None,
         aws_session_token: str | None = None,
         default_collection: str | None = None,
+        table_config: dict[str, Any] | None = None,
     ) -> None:
         """Initialize the DynamoDB store.
 
@@ -72,6 +82,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             aws_secret_access_key: AWS secret access key. Defaults to None (uses AWS default credentials).
             aws_session_token: AWS session token. Defaults to None (uses AWS default credentials).
             default_collection: The default collection to use if no collection is provided.
+            table_config: Additional configuration to pass to create_table(). Merged with defaults.
         """
 
     def __init__(
@@ -85,6 +96,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         aws_secret_access_key: str | None = None,
         aws_session_token: str | None = None,
         default_collection: str | None = None,
+        table_config: dict[str, Any] | None = None,
     ) -> None:
         """Initialize the DynamoDB store.
 
@@ -99,8 +111,11 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             aws_secret_access_key: AWS secret access key. Defaults to None (uses AWS default credentials).
             aws_session_token: AWS session token. Defaults to None (uses AWS default credentials).
             default_collection: The default collection to use if no collection is provided.
+            table_config: Additional configuration to pass to create_table(). Merged with defaults.
+                Examples: SSESpecification, Tags, StreamSpecification, etc.
         """
         self._table_name = table_name
+        self._table_config = table_config or {}
         client_provided = client is not None
 
         if client:
@@ -140,18 +155,24 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             await self._connected_client.describe_table(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
         except self._connected_client.exceptions.ResourceNotFoundException:  # pyright: ignore[reportUnknownMemberType]
             # Create the table with composite primary key
-            await self._connected_client.create_table(  # pyright: ignore[reportUnknownMemberType]
-                TableName=self._table_name,
-                KeySchema=[
+            # Start with default configuration
+            create_table_params: dict[str, Any] = {
+                "TableName": self._table_name,
+                "KeySchema": [
                     {"AttributeName": "collection", "KeyType": "HASH"},  # Partition key
                     {"AttributeName": "key", "KeyType": "RANGE"},  # Sort key
                 ],
-                AttributeDefinitions=[
+                "AttributeDefinitions": [
                     {"AttributeName": "collection", "AttributeType": "S"},
                     {"AttributeName": "key", "AttributeType": "S"},
                 ],
-                BillingMode="PAY_PER_REQUEST",  # On-demand billing
-            )
+                "BillingMode": "PAY_PER_REQUEST",  # On-demand billing
+            }
+
+            # Merge with user-provided table configuration
+            create_table_params.update(self._table_config)
+
+            await self._connected_client.create_table(**create_table_params)  # pyright: ignore[reportUnknownMemberType]
 
             # Wait for table to be active
             waiter = self._connected_client.get_waiter("table_exists")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
