@@ -175,3 +175,70 @@ def test_key_generation():
     assert key_str_one != key_str_two
     assert key_str_one != key_str_three
     assert key_str_two != key_str_three
+
+
+def test_fernet_with_source_material_and_salt(memory_store: MemoryStore):
+    """Test that FernetEncryptionWrapper works with source_material and salt."""
+    wrapper = FernetEncryptionWrapper(
+        key_value=memory_store,
+        source_material="my-secret-key",
+        salt="my-unique-salt",
+    )
+    assert wrapper is not None
+
+
+def test_fernet_cannot_provide_fernet_with_source_material(memory_store: MemoryStore):
+    """Test that providing both fernet and source_material raises ValueError."""
+    fernet = Fernet(key=Fernet.generate_key())
+    with pytest.raises(ValueError, match="Cannot provide fernet together with source_material or salt"):
+        FernetEncryptionWrapper(
+            key_value=memory_store,
+            fernet=fernet,
+            source_material="test",
+        )
+
+
+def test_fernet_cannot_provide_fernet_with_salt(memory_store: MemoryStore):
+    """Test that providing both fernet and salt raises ValueError."""
+    fernet = Fernet(key=Fernet.generate_key())
+    with pytest.raises(ValueError, match="Cannot provide fernet together with source_material or salt"):
+        FernetEncryptionWrapper(
+            key_value=memory_store,
+            fernet=fernet,
+            salt="test",
+        )
+
+
+def test_fernet_must_provide_source_material(memory_store: MemoryStore):
+    """Test that not providing fernet or source_material raises ValueError."""
+    with pytest.raises(ValueError, match="Must provide either fernet or source_material"):
+        FernetEncryptionWrapper(key_value=memory_store)
+
+
+def test_fernet_must_provide_salt_with_source_material(memory_store: MemoryStore):
+    """Test that providing source_material without salt raises ValueError."""
+    with pytest.raises(ValueError, match="Must provide a salt"):
+        FernetEncryptionWrapper(
+            key_value=memory_store,
+            source_material="test-source",
+        )
+
+
+def test_fernet_empty_source_material(memory_store: MemoryStore):
+    """Test that empty source_material raises ValueError."""
+    with pytest.raises(ValueError, match="Must provide either fernet or source_material"):
+        FernetEncryptionWrapper(
+            key_value=memory_store,
+            source_material="   ",
+            salt="test",
+        )
+
+
+def test_fernet_empty_salt(memory_store: MemoryStore):
+    """Test that empty salt raises ValueError."""
+    with pytest.raises(ValueError, match="Must provide a salt"):
+        FernetEncryptionWrapper(
+            key_value=memory_store,
+            source_material="test-source",
+            salt="   ",
+        )
