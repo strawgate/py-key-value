@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, overload
 
-from key_value.shared.utils.managed_entry import ManagedEntry
+from key_value.shared.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
 from typing_extensions import Self, override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseStore
@@ -169,36 +169,16 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
 
         super().__init__(default_collection=default_collection)
 
-    def _ensure_pool_initialized(self) -> asyncpg.Pool:  # type: ignore[type-arg]
+    async def _ensure_pool_initialized(self) -> asyncpg.Pool:  # type: ignore[type-arg]
         """Ensure the connection pool is initialized.
+
+        This method creates the pool lazily if it doesn't exist, allowing the store
+        to be used even if the context manager hasn't been entered yet. This is useful
+        for frameworks that may call store methods before entering the async context.
 
         Returns:
             The initialized connection pool.
-
-        Raises:
-            RuntimeError: If the pool is not initialized.
         """
-        if self._pool is None:
-            msg = "Pool is not initialized. Use async with or call __aenter__() first."
-            raise RuntimeError(msg)
-        return self._pool
-
-    @asynccontextmanager
-    async def _acquire_connection(self) -> AsyncIterator[asyncpg.Connection]:  # type: ignore[type-arg]
-        """Acquire a connection from the pool.
-
-        Yields:
-            A connection from the pool.
-
-        Raises:
-            RuntimeError: If the pool is not initialized.
-        """
-        pool = self._ensure_pool_initialized()
-        async with pool.acquire() as conn:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            yield conn
-
-    @override
-    async def __aenter__(self) -> Self:
         if self._pool is None:
             if self._url:
                 self._pool = await asyncpg.create_pool(self._url)  # pyright: ignore[reportUnknownMemberType]
@@ -211,7 +191,23 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
                     password=self._password,
                 )
             self._owns_pool = True
+        return self._pool
 
+    @asynccontextmanager
+    async def _acquire_connection(self) -> AsyncIterator[asyncpg.Connection]:  # type: ignore[type-arg]
+        """Acquire a connection from the pool.
+
+        Yields:
+            A connection from the pool.
+        """
+        pool = await self._ensure_pool_initialized()
+        async with pool.acquire() as conn:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            yield conn
+
+    @override
+    async def __aenter__(self) -> Self:
+        # Ensure pool is initialized (will be created lazily if needed)
+        await self._ensure_pool_initialized()
         await super().__aenter__()
         return self
 
@@ -275,9 +271,12 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             if row is None:
                 return None
 
-            # Parse the managed entry
+            # Parse the managed entry - deserialize JSONB value if it's a string
+            value_data = row["value"]  # pyright: ignore[reportUnknownVariableType]
+            value = load_from_json(value_data) if isinstance(value_data, str) else value_data  # pyright: ignore[reportUnknownVariableType]
+
             managed_entry = ManagedEntry(
-                value=row["value"],  # pyright: ignore[reportUnknownArgumentType]
+                value=value,  # pyright: ignore[reportUnknownArgumentType]
                 created_at=row["created_at"],  # pyright: ignore[reportUnknownArgumentType]
                 expires_at=row["expires_at"],  # pyright: ignore[reportUnknownArgumentType]
             )
@@ -320,8 +319,12 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             expired_keys: list[str] = []
 
             for row in rows:  # pyright: ignore[reportUnknownVariableType]
+                # Deserialize JSONB value if it's a string
+                value_data = row["value"]  # pyright: ignore[reportUnknownVariableType]
+                value = load_from_json(value_data) if isinstance(value_data, str) else value_data  # pyright: ignore[reportUnknownVariableType]
+
                 managed_entry = ManagedEntry(
-                    value=row["value"],  # pyright: ignore[reportUnknownArgumentType]
+                    value=value,  # pyright: ignore[reportUnknownArgumentType]
                     created_at=row["created_at"],  # pyright: ignore[reportUnknownArgumentType]
                     expires_at=row["expires_at"],  # pyright: ignore[reportUnknownArgumentType]
                 )
@@ -359,6 +362,9 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         """
 
         async with self._acquire_connection() as conn:
+            # Serialize value to JSON string for JSONB column
+            value_json = dump_to_json(managed_entry.value_as_dict)
+
             upsert_sql = (
                 f"INSERT INTO {self._table_name} "
                 "(collection, key, value, ttl, created_at, expires_at) "
@@ -370,7 +376,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
                 upsert_sql,
                 collection,
                 key,
-                managed_entry.value,
+                value_json,
                 managed_entry.ttl,
                 managed_entry.created_at,
                 managed_entry.expires_at,
@@ -401,7 +407,11 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             return
 
         # Prepare data for batch insert using method-level ttl/created_at/expires_at
-        values = [(collection, key, entry.value, ttl, created_at, expires_at) for key, entry in zip(keys, managed_entries, strict=True)]
+        # Serialize each value to JSON string for JSONB column
+        values = [
+            (collection, key, dump_to_json(entry.value_as_dict), ttl, created_at, expires_at)
+            for key, entry in zip(keys, managed_entries, strict=True)
+        ]
 
         async with self._acquire_connection() as conn:
             # Use executemany for batch insert
