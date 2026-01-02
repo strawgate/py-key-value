@@ -46,11 +46,6 @@ class RetryWrapper(BaseWrapper):
 
         super().__init__()
 
-    def _calculate_delay(self, attempt: int) -> float:
-        """Calculate the delay for a given attempt using exponential backoff."""
-        delay = self.initial_delay * (self.exponential_base**attempt)
-        return min(delay, self.max_delay)
-
     @override
     async def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
         return await async_retry_operation(
