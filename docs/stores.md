@@ -575,7 +575,8 @@ pip install py-key-value-aio[mongodb]
 
 PostgreSQL database with JSONB storage for flexible key-value data.
 
-**Note:** PostgreSQL is async-only. This store uses `asyncpg` which provides native async/await operations.
+**Note:** PostgreSQL is async-only. This store uses `asyncpg` which
+provides native async/await operations.
 
 ```python
 from key_value.aio.stores.postgresql import PostgreSQLStore

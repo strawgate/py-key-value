@@ -509,8 +509,3 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             )
             # Return True if any rows were deleted
             return result.split()[-1] != "0"
-
-    @override
-    async def _close(self) -> None:
-        """Close the connection pool."""
-        # Connection pool is closed in __aexit__
