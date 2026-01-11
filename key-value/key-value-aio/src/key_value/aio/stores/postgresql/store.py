@@ -6,9 +6,6 @@ This is safe because table names are validated in __init__ to be alphanumeric pl
 
 # ruff: noqa: S608
 
-from collections.abc import AsyncIterator, Sequence
-from contextlib import asynccontextmanager
-from datetime import datetime
 from typing import Any, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
@@ -193,17 +190,6 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             self._owns_pool = True
         return self._pool
 
-    @asynccontextmanager
-    async def _acquire_connection(self) -> AsyncIterator[asyncpg.Connection]:  # type: ignore[type-arg]
-        """Acquire a connection from the pool.
-
-        Yields:
-            A connection from the pool.
-        """
-        pool = await self._ensure_pool_initialized()
-        async with pool.acquire() as conn:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            yield conn
-
     @override
     async def __aenter__(self) -> Self:
         # Ensure pool is initialized (will be created lazily if needed)
@@ -224,6 +210,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         This is called once when the store is first used. Since all collections share the same table,
         we only need to set up the schema once.
         """
+        pool = await self._ensure_pool_initialized()
+
         # Create the main table if it doesn't exist
         table_sql = (
             f"CREATE TABLE IF NOT EXISTS {self._table_name} ("
@@ -246,9 +234,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
 
         index_sql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {self._table_name}(expires_at) WHERE expires_at IS NOT NULL"
 
-        async with self._acquire_connection() as conn:
-            await conn.execute(table_sql)  # pyright: ignore[reportUnknownMemberType]
-            await conn.execute(index_sql)  # pyright: ignore[reportUnknownMemberType]
+        await pool.execute(table_sql)  # pyright: ignore[reportUnknownMemberType]
+        await pool.execute(index_sql)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -261,89 +248,37 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         Returns:
             The managed entry if found and not expired, None otherwise.
         """
-        async with self._acquire_connection() as conn:
-            row = await conn.fetchrow(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                f"SELECT value, ttl, created_at, expires_at FROM {self._table_name} WHERE collection = $1 AND key = $2",
+        pool = await self._ensure_pool_initialized()
+
+        row = await pool.fetchrow(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            f"SELECT value, ttl, created_at, expires_at FROM {self._table_name} WHERE collection = $1 AND key = $2",
+            collection,
+            key,
+        )
+
+        if row is None:
+            return None
+
+        # Parse the managed entry - deserialize JSONB value if it's a string
+        value_data = row["value"]  # pyright: ignore[reportUnknownVariableType]
+        value = load_from_json(value_data) if isinstance(value_data, str) else value_data  # pyright: ignore[reportUnknownVariableType]
+
+        managed_entry = ManagedEntry(
+            value=value,  # pyright: ignore[reportUnknownArgumentType]
+            created_at=row["created_at"],  # pyright: ignore[reportUnknownArgumentType]
+            expires_at=row["expires_at"],  # pyright: ignore[reportUnknownArgumentType]
+        )
+
+        # Check if expired and delete if so
+        if managed_entry.is_expired:
+            await pool.execute(  # pyright: ignore[reportUnknownMemberType]
+                f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = $2",
                 collection,
                 key,
             )
+            return None
 
-            if row is None:
-                return None
-
-            # Parse the managed entry - deserialize JSONB value if it's a string
-            value_data = row["value"]  # pyright: ignore[reportUnknownVariableType]
-            value = load_from_json(value_data) if isinstance(value_data, str) else value_data  # pyright: ignore[reportUnknownVariableType]
-
-            managed_entry = ManagedEntry(
-                value=value,  # pyright: ignore[reportUnknownArgumentType]
-                created_at=row["created_at"],  # pyright: ignore[reportUnknownArgumentType]
-                expires_at=row["expires_at"],  # pyright: ignore[reportUnknownArgumentType]
-            )
-
-            # Check if expired and delete if so
-            if managed_entry.is_expired:
-                await conn.execute(  # pyright: ignore[reportUnknownMemberType]
-                    f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = $2",
-                    collection,
-                    key,
-                )
-                return None
-
-            return managed_entry
-
-    @override
-    async def _get_managed_entries(self, *, collection: str, keys: Sequence[str]) -> list[ManagedEntry | None]:
-        """Retrieve multiple managed entries by key from the specified collection.
-
-        Args:
-            collection: The collection to retrieve from.
-            keys: The keys to retrieve.
-
-        Returns:
-            A list of managed entries in the same order as keys, with None for missing/expired entries.
-        """
-        if not keys:
-            return []
-
-        async with self._acquire_connection() as conn:
-            # Use ANY to query for multiple keys
-            rows = await conn.fetch(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                f"SELECT key, value, ttl, created_at, expires_at FROM {self._table_name} WHERE collection = $1 AND key = ANY($2::text[])",
-                collection,
-                list(keys),
-            )
-
-            # Build a map of key -> managed entry
-            entries_by_key: dict[str, ManagedEntry | None] = dict.fromkeys(keys)
-            expired_keys: list[str] = []
-
-            for row in rows:  # pyright: ignore[reportUnknownVariableType]
-                # Deserialize JSONB value if it's a string
-                value_data = row["value"]  # pyright: ignore[reportUnknownVariableType]
-                value = load_from_json(value_data) if isinstance(value_data, str) else value_data  # pyright: ignore[reportUnknownVariableType]
-
-                managed_entry = ManagedEntry(
-                    value=value,  # pyright: ignore[reportUnknownArgumentType]
-                    created_at=row["created_at"],  # pyright: ignore[reportUnknownArgumentType]
-                    expires_at=row["expires_at"],  # pyright: ignore[reportUnknownArgumentType]
-                )
-
-                if managed_entry.is_expired:
-                    expired_keys.append(row["key"])  # pyright: ignore[reportUnknownArgumentType]
-                    entries_by_key[row["key"]] = None
-                else:
-                    entries_by_key[row["key"]] = managed_entry
-
-            # Delete expired entries in batch
-            if expired_keys:
-                await conn.execute(  # pyright: ignore[reportUnknownMemberType]
-                    f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = ANY($2::text[])",
-                    collection,
-                    expired_keys,
-                )
-
-            return [entries_by_key[key] for key in keys]
+        return managed_entry
 
     @override
     async def _put_managed_entry(
@@ -360,72 +295,27 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             collection: The collection to store in.
             managed_entry: The managed entry to store.
         """
+        pool = await self._ensure_pool_initialized()
 
-        async with self._acquire_connection() as conn:
-            # Serialize value to JSON string for JSONB column
-            value_json = dump_to_json(managed_entry.value_as_dict)
+        # Serialize value to JSON string for JSONB column
+        value_json = dump_to_json(managed_entry.value_as_dict)
 
-            upsert_sql = (
-                f"INSERT INTO {self._table_name} "
-                "(collection, key, value, ttl, created_at, expires_at) "
-                "VALUES ($1, $2, $3, $4, $5, $6) "
-                "ON CONFLICT (collection, key) "
-                "DO UPDATE SET value = EXCLUDED.value, ttl = EXCLUDED.ttl, expires_at = EXCLUDED.expires_at"
-            )
-            await conn.execute(  # pyright: ignore[reportUnknownMemberType]
-                upsert_sql,
-                collection,
-                key,
-                value_json,
-                managed_entry.ttl,
-                managed_entry.created_at,
-                managed_entry.expires_at,
-            )
-
-    @override
-    async def _put_managed_entries(
-        self,
-        *,
-        collection: str,
-        keys: Sequence[str],
-        managed_entries: Sequence[ManagedEntry],
-        ttl: float | None,
-        created_at: datetime,
-        expires_at: datetime | None,
-    ) -> None:
-        """Store multiple managed entries by key in the specified collection.
-
-        Args:
-            collection: The collection to store in.
-            keys: The keys to store.
-            managed_entries: The managed entries to store.
-            ttl: The TTL in seconds (None for no expiration).
-            created_at: The creation timestamp for all entries.
-            expires_at: The expiration timestamp for all entries (None if no TTL).
-        """
-        if not keys:
-            return
-
-        # Prepare data for batch insert using method-level ttl/created_at/expires_at
-        # Serialize each value to JSON string for JSONB column
-        values = [
-            (collection, key, dump_to_json(entry.value_as_dict), ttl, created_at, expires_at)
-            for key, entry in zip(keys, managed_entries, strict=True)
-        ]
-
-        async with self._acquire_connection() as conn:
-            # Use executemany for batch insert
-            batch_upsert_sql = (
-                f"INSERT INTO {self._table_name} "
-                "(collection, key, value, ttl, created_at, expires_at) "
-                "VALUES ($1, $2, $3, $4, $5, $6) "
-                "ON CONFLICT (collection, key) "
-                "DO UPDATE SET value = EXCLUDED.value, ttl = EXCLUDED.ttl, expires_at = EXCLUDED.expires_at"
-            )
-            await conn.executemany(  # pyright: ignore[reportUnknownMemberType]
-                batch_upsert_sql,
-                values,
-            )
+        upsert_sql = (
+            f"INSERT INTO {self._table_name} "
+            "(collection, key, value, ttl, created_at, expires_at) "
+            "VALUES ($1, $2, $3, $4, $5, $6) "
+            "ON CONFLICT (collection, key) "
+            "DO UPDATE SET value = EXCLUDED.value, ttl = EXCLUDED.ttl, expires_at = EXCLUDED.expires_at"
+        )
+        await pool.execute(  # pyright: ignore[reportUnknownMemberType]
+            upsert_sql,
+            collection,
+            key,
+            value_json,
+            managed_entry.ttl,
+            managed_entry.created_at,
+            managed_entry.expires_at,
+        )
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
@@ -438,37 +328,15 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         Returns:
             True if the entry was deleted, False if it didn't exist.
         """
-        async with self._acquire_connection() as conn:
-            result = await conn.execute(  # pyright: ignore[reportUnknownMemberType]
-                f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = $2",
-                collection,
-                key,
-            )
-            # PostgreSQL execute returns a string like "DELETE N" where N is the number of rows deleted
-            return result.split()[-1] != "0"
+        pool = await self._ensure_pool_initialized()
 
-    @override
-    async def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
-        """Delete multiple managed entries by key from the specified collection.
-
-        Args:
-            keys: The keys to delete.
-            collection: The collection to delete from.
-
-        Returns:
-            The number of entries that were deleted.
-        """
-        if not keys:
-            return 0
-
-        async with self._acquire_connection() as conn:
-            result = await conn.execute(  # pyright: ignore[reportUnknownMemberType]
-                f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = ANY($2::text[])",
-                collection,
-                list(keys),
-            )
-            # PostgreSQL execute returns a string like "DELETE N" where N is the number of rows deleted
-            return int(result.split()[-1])
+        result = await pool.execute(  # pyright: ignore[reportUnknownMemberType]
+            f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = $2",
+            collection,
+            key,
+        )
+        # PostgreSQL execute returns a string like "DELETE N" where N is the number of rows deleted
+        return result.split()[-1] != "0"
 
     @override
     async def _get_collection_names(self, *, limit: int | None = None) -> list[str]:
@@ -484,13 +352,14 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             limit = DEFAULT_PAGE_SIZE
         limit = min(limit, PAGE_LIMIT)
 
-        async with self._acquire_connection() as conn:
-            rows = await conn.fetch(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                f"SELECT DISTINCT collection FROM {self._table_name} ORDER BY collection LIMIT $1",
-                limit,
-            )
+        pool = await self._ensure_pool_initialized()
 
-            return [row["collection"] for row in rows]  # pyright: ignore[reportUnknownVariableType]
+        rows = await pool.fetch(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            f"SELECT DISTINCT collection FROM {self._table_name} ORDER BY collection LIMIT $1",
+            limit,
+        )
+
+        return [row["collection"] for row in rows]  # pyright: ignore[reportUnknownVariableType]
 
     @override
     async def _delete_collection(self, *, collection: str) -> bool:
@@ -502,10 +371,11 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         Returns:
             True if any entries were deleted, False otherwise.
         """
-        async with self._acquire_connection() as conn:
-            result = await conn.execute(  # pyright: ignore[reportUnknownMemberType]
-                f"DELETE FROM {self._table_name} WHERE collection = $1",
-                collection,
-            )
-            # Return True if any rows were deleted
-            return result.split()[-1] != "0"
+        pool = await self._ensure_pool_initialized()
+
+        result = await pool.execute(  # pyright: ignore[reportUnknownMemberType]
+            f"DELETE FROM {self._table_name} WHERE collection = $1",
+            collection,
+        )
+        # Return True if any rows were deleted
+        return result.split()[-1] != "0"
