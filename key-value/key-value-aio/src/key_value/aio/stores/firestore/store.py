@@ -10,8 +10,8 @@ from key_value.aio.stores.base import (
 )
 
 try:
+    from google.auth.credentials import Credentials
     from google.cloud import firestore
-    from google.oauth2.service_account import Credentials
 except ImportError as e:
     msg = "FirestoreStore requires the `firestore` extra"
     raise ImportError(msg) from e
@@ -84,18 +84,11 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
             serialization_adapter=serialization_adapter,
         )
 
-    @property
-    def _connected_client(self) -> firestore.AsyncClient:
-        if not self._client:
-            msg = "Client not connected"
-            raise ValueError(msg)
-        return self._client
-
     @override
     async def _get_managed_entry(self, *, key: str, collection: str | None = None) -> ManagedEntry | None:
         """Get a managed entry from Firestore."""
         collection = collection or self.default_collection
-        response = await self._connected_client.collection(collection).document(key).get()  # pyright: ignore[reportUnknownMemberType]
+        response = await self._client.collection(collection).document(key).get()  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
         doc = response.to_dict()
         if doc is None:
             return None
@@ -106,13 +99,13 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
         """Store a managed entry in Firestore."""
         collection = collection or self.default_collection
         item = self._serialization_adapter.dump_dict(entry=managed_entry)
-        await self._connected_client.collection(collection).document(key).set(item)  # pyright: ignore[reportUnknownMemberType]
+        await self._client.collection(collection).document(key).set(item)  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str | None = None) -> bool:
         """Delete a managed entry from Firestore."""
         collection = collection or self.default_collection
-        await self._connected_client.collection(collection).document(key).delete()
+        await self._client.collection(collection).document(key).delete()  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
         return True
 
     async def _close(self) -> None:
