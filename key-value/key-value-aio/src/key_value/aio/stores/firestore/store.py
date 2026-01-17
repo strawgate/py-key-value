@@ -13,7 +13,7 @@ try:
     from google.cloud import firestore
     from google.oauth2.service_account import Credentials
 except ImportError as e:
-    msg = "FirestoreStore requires py-key-value-aio[firestore]"
+    msg = "FirestoreStore requires the `firestore` extra"
     raise ImportError(msg) from e
 
 
