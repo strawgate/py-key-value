@@ -9,10 +9,10 @@ from typing_extensions import override
 from key_value.sync.code_gen.stores.base import BaseContextManagerStore, BaseStore, BasicSerializationAdapter
 
 try:
+    from google.auth.credentials import Credentials
     from google.cloud import firestore
-    from google.oauth2.service_account import Credentials
 except ImportError as e:
-    msg = "FirestoreStore requires py-key-value-aio[firestore]"
+    msg = "FirestoreStore requires the `firestore` extra"
     raise ImportError(msg) from e
 
 
@@ -83,18 +83,11 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
             serialization_adapter=serialization_adapter,
         )
 
-    @property
-    def _connected_client(self) -> firestore.Client:
-        if not self._client:
-            msg = "Client not connected"
-            raise ValueError(msg)
-        return self._client
-
     @override
     def _get_managed_entry(self, *, key: str, collection: str | None = None) -> ManagedEntry | None:
         """Get a managed entry from Firestore."""
         collection = collection or self.default_collection
-        response = self._connected_client.collection(collection).document(key).get()  # pyright: ignore[reportUnknownMemberType]
+        response = self._client.collection(collection).document(key).get()  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
         doc = response.to_dict()
         if doc is None:
             return None
@@ -105,13 +98,13 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
         """Store a managed entry in Firestore."""
         collection = collection or self.default_collection
         item = self._serialization_adapter.dump_dict(entry=managed_entry)
-        self._connected_client.collection(collection).document(key).set(item)  # pyright: ignore[reportUnknownMemberType]
+        self._client.collection(collection).document(key).set(item)  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str | None = None) -> bool:
         """Delete a managed entry from Firestore."""
         collection = collection or self.default_collection
-        self._connected_client.collection(collection).document(key).delete()
+        self._client.collection(collection).document(key).delete()  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
         return True
 
     def _close(self) -> None:
