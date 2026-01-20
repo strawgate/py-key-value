@@ -259,9 +259,9 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         if row is None:
             return None
 
-        # Parse the managed entry - deserialize JSONB value if it's a string
+        # Parse the managed entry - asyncpg returns JSONB as JSON strings by default
         value_data = row["value"]  # pyright: ignore[reportUnknownVariableType]
-        value = load_from_json(value_data) if isinstance(value_data, str) else value_data  # pyright: ignore[reportUnknownVariableType]
+        value = load_from_json(value_data)  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
 
         managed_entry = ManagedEntry(
             value=value,  # pyright: ignore[reportUnknownArgumentType]
