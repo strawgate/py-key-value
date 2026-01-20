@@ -1,7 +1,6 @@
-from typing import Any, TypeVar, get_origin
+from typing import TypeVar
 
 from key_value.shared.type_checking.bear_spray import bear_spray
-from pydantic import BaseModel
 from pydantic.type_adapter import TypeAdapter
 from typing_extensions import TypeForm
 
@@ -52,66 +51,32 @@ class PydanticAdapter(BasePydanticAdapter[T]):
         self._raise_on_validation_error = raise_on_validation_error
 
         # Determine if this type needs wrapping
-        self._needs_wrapping = self._check_needs_wrapping(pydantic_model)
+        self._needs_wrapping = self._check_needs_wrapping()
 
     @bear_spray
-    def _check_needs_wrapping(self, type_form: TypeForm[T]) -> bool:
+    def _check_needs_wrapping(self) -> bool:
         """Check if a type needs to be wrapped in {"items": ...} for storage.
 
         Types that serialize to dicts don't need wrapping. Other types do.
 
-        Args:
-            type_form: The type to check.
-
         Returns:
             True if the type needs wrapping, False otherwise.
         """
-        # If it serializes to a dict, no wrapping needed
-        if self._serializes_to_dict(type_form):
-            return False
-
-        # Everything else needs wrapping (lists, primitives, etc.)
-        return True
+        # Return the negated condition directly (fixes SIM103)
+        return not self._serializes_to_dict()
 
     @bear_spray
-    def _serializes_to_dict(self, type_form: TypeForm[T]) -> bool:
-        """Check if a type serializes to a dict.
+    def _serializes_to_dict(self) -> bool:
+        """Check if a type serializes to a dict by inspecting the TypeAdapter's JSON schema.
 
-        Args:
-            type_form: The type to check.
+        This uses Pydantic's TypeAdapter.json_schema() to reliably determine the output structure.
+        Types that produce a JSON object (schema type "object") are dict-serializable.
 
         Returns:
-            True if the type serializes to a dict, False otherwise.
+            True if the type serializes to a dict (JSON object), False otherwise.
         """
-        # Handle generic types (list[...], dict[...], etc.)
-        origin = get_origin(type_form)
-
-        # dict and dict[K, V] serialize to dict
-        if origin is dict or type_form is dict:
-            return True
-
-        # If it's a BaseModel subclass, it serializes to dict
-        if isinstance(type_form, type) and issubclass(type_form, BaseModel):
-            return True
-
-        # TypedDict is handled by Pydantic and serializes to dict
-        # Dataclasses serialize to dict
-        # Both are detected via TypeAdapter's core schema, but we can't easily check that here
-        # So we use a heuristic: if it's not a known non-dict type, assume it might be dict-serializable
-
-        # Known non-dict types
-        non_dict_origins = (list, set, tuple)
-        if origin in non_dict_origins:
-            return False
-
-        # Primitive types don't serialize to dict
-        primitive_types = (int, str, float, bool, bytes, type(None))
-        if type_form in primitive_types:
-            return False
-
-        # For other types (dataclass, TypedDict, etc.), we assume they serialize to dict
-        # This is a heuristic that works for most common cases
-        return True
+        schema = self._type_adapter.json_schema()
+        return schema.get("type") == "object"
 
     def _get_model_type_name(self) -> str:
         """Return the model type name for error messages."""
