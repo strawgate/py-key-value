@@ -7,7 +7,7 @@ provide alternative APIs tailored for specific use cases.
 ## Available Adapters
 
 | Adapter | Description |
-|---------|-------------|
+| ------- | ----------- |
 | [DataclassAdapter](#dataclassadapter) | Type-safe storage/retrieval of dataclass models with transparent serialization |
 | [PydanticAdapter](#pydanticadapter) | Type-safe storage/retrieval of Pydantic models with transparent serialization |
 | [RaiseOnMissingAdapter](#raiseonmissingadapter) | Optional raise-on-missing behavior for get operations |
