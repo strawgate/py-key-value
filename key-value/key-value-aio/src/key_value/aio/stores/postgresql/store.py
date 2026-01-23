@@ -32,6 +32,31 @@ PAGE_LIMIT = 10000
 POSTGRES_MAX_IDENTIFIER_LEN = 63
 
 
+def _validate_table_name(table_name: str) -> None:
+    """Validate a PostgreSQL table name.
+
+    Ensures the table name:
+    - Contains only alphanumeric characters and underscores
+    - Does not start with a digit
+    - Does not exceed PostgreSQL's 63-character identifier limit
+
+    Args:
+        table_name: The table name to validate.
+
+    Raises:
+        ValueError: If the table name is invalid.
+    """
+    if not table_name.replace("_", "").isalnum():
+        msg = f"Table name must be alphanumeric (with underscores): {table_name}"
+        raise ValueError(msg)
+    if table_name[0].isdigit():
+        msg = f"Table name must not start with a digit: {table_name}"
+        raise ValueError(msg)
+    if len(table_name) > POSTGRES_MAX_IDENTIFIER_LEN:
+        msg = f"Table name too long (>{POSTGRES_MAX_IDENTIFIER_LEN}): {table_name}"
+        raise ValueError(msg)
+
+
 class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
     """PostgreSQL-based key-value store using asyncpg.
 
@@ -152,16 +177,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
 
         # Validate table name to prevent SQL injection and invalid identifiers
         table_name = table_name or DEFAULT_TABLE
-        if not table_name.replace("_", "").isalnum():
-            msg = f"Table name must be alphanumeric (with underscores): {table_name}"
-            raise ValueError(msg)
-        if table_name[0].isdigit():
-            msg = f"Table name must not start with a digit: {table_name}"
-            raise ValueError(msg)
-        # PostgreSQL identifier limit is 63 bytes
-        if len(table_name) > POSTGRES_MAX_IDENTIFIER_LEN:
-            msg = f"Table name too long (>{POSTGRES_MAX_IDENTIFIER_LEN}): {table_name}"
-            raise ValueError(msg)
+        _validate_table_name(table_name)
         self._table_name = table_name
 
         super().__init__(default_collection=default_collection)
@@ -263,22 +279,11 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         value_data = row["value"]  # pyright: ignore[reportUnknownVariableType]
         value = load_from_json(value_data)  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
 
-        managed_entry = ManagedEntry(
+        return ManagedEntry(
             value=value,  # pyright: ignore[reportUnknownArgumentType]
             created_at=row["created_at"],  # pyright: ignore[reportUnknownArgumentType]
             expires_at=row["expires_at"],  # pyright: ignore[reportUnknownArgumentType]
         )
-
-        # Check if expired and delete if so
-        if managed_entry.is_expired:
-            await pool.execute(  # pyright: ignore[reportUnknownMemberType]
-                f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = $2",
-                collection,
-                key,
-            )
-            return None
-
-        return managed_entry
 
     @override
     async def _put_managed_entry(

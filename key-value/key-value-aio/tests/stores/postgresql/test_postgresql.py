@@ -107,22 +107,3 @@ class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
-
-    @override
-    async def test_long_collection_name(self, store: PostgreSQLStore):  # pyright: ignore[reportIncompatibleMethodOverride]
-        """Test that long collection names work since they're just column values."""
-        # Long collection names should work fine since they're stored as column values, not SQL identifiers
-        long_collection = "test_collection" * 100
-        await store.put(collection=long_collection, key="test_key", value={"test": "test"})
-        assert await store.get(collection=long_collection, key="test_key") == {"test": "test"}
-
-    @override
-    async def test_special_characters_in_collection_name(self, store: PostgreSQLStore):  # pyright: ignore[reportIncompatibleMethodOverride]
-        """Test that special characters in collection names work since they're just column values."""
-        # Special characters should work fine since collection names are stored as column values
-        await store.put(collection="test_collection!@#$%^&*()", key="test_key", value={"test": "test"})
-        assert await store.get(collection="test_collection!@#$%^&*()", key="test_key") == {"test": "test"}
-
-        # Verify the collection name is stored as-is
-        collections = await store.collections()
-        assert "test_collection!@#$%^&*()" in collections
