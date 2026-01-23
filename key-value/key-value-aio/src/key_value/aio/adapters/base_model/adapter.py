@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import TypeVar, get_origin
+from typing import TypeVar, get_args, get_origin
 
 from key_value.shared.type_checking.bear_spray import bear_spray
 from pydantic import BaseModel
@@ -48,6 +48,21 @@ class BaseModelAdapter(BasePydanticAdapter[T]):
         # Validate that if it's a generic type, it must be a list (not tuple, etc.)
         if origin is not None and origin is not list:
             msg = f"Only list[BaseModel] is supported for sequence types, got {pydantic_model}"
+            raise TypeError(msg)
+
+        # Validate that the inner type is a BaseModel subclass
+        if origin is list:
+            args = get_args(pydantic_model)
+            if not args:
+                msg = f"List type must have a type argument, got {pydantic_model}"
+                raise TypeError(msg)
+            inner = args[0]
+            if not (isinstance(inner, type) and issubclass(inner, BaseModel)):
+                msg = f"List element type must be a BaseModel subclass, got {inner}"
+                raise TypeError(msg)
+        # Validate single model type
+        elif not issubclass(pydantic_model, BaseModel):  # type: ignore[arg-type]
+            msg = f"pydantic_model must be a BaseModel subclass, got {pydantic_model}"
             raise TypeError(msg)
 
         self._type_adapter = TypeAdapter[T](pydantic_model)

@@ -41,7 +41,7 @@ FIXED_UPDATED_AT: datetime = datetime(year=2021, month=1, day=1, hour=15, minute
 SAMPLE_USER: User = User(name="John Doe", email="john.doe@example.com", age=30)
 SAMPLE_USER_2: User = User(name="Jane Doe", email="jane.doe@example.com", age=25)
 SAMPLE_PRODUCT: Product = Product(name="Widget", price=29.99, quantity=10, url=AnyHttpUrl(url="https://example.com"))
-SAMPLE_ORDER: Order = Order(created_at=datetime.now(), updated_at=datetime.now(), user=SAMPLE_USER, product=SAMPLE_PRODUCT, paid=False)
+SAMPLE_ORDER: Order = Order(created_at=FIXED_CREATED_AT, updated_at=FIXED_UPDATED_AT, user=SAMPLE_USER, product=SAMPLE_PRODUCT, paid=False)
 
 TEST_COLLECTION: str = "test_collection"
 TEST_KEY: str = "test_key"
@@ -81,6 +81,10 @@ class TestBaseModelAdapter:
     @pytest.fixture
     async def updated_user_adapter(self, store: MemoryStore) -> BaseModelAdapter[UpdatedUser]:
         return BaseModelAdapter[UpdatedUser](key_value=store, pydantic_model=UpdatedUser)
+
+    @pytest.fixture
+    async def updated_user_adapter_raising(self, store: MemoryStore) -> BaseModelAdapter[UpdatedUser]:
+        return BaseModelAdapter[UpdatedUser](key_value=store, pydantic_model=UpdatedUser, raise_on_validation_error=True)
 
     @pytest.fixture
     async def product_adapter(self, store: MemoryStore) -> BaseModelAdapter[Product]:
@@ -130,12 +134,11 @@ class TestBaseModelAdapter:
         assert updated_user is None
 
     async def test_simple_adapter_with_validation_error_raise(
-        self, user_adapter: BaseModelAdapter[User], updated_user_adapter: BaseModelAdapter[UpdatedUser]
+        self, user_adapter: BaseModelAdapter[User], updated_user_adapter_raising: BaseModelAdapter[UpdatedUser]
     ):
         await user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER)
-        updated_user_adapter._raise_on_validation_error = True  # pyright: ignore[reportPrivateUsage]
         with pytest.raises(DeserializationError):
-            await updated_user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+            await updated_user_adapter_raising.get(collection=TEST_COLLECTION, key=TEST_KEY)
 
     async def test_complex_adapter(self, order_adapter: BaseModelAdapter[Order]):
         await order_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_ORDER, ttl=10)
