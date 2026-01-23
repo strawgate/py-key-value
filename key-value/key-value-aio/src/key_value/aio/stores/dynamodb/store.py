@@ -40,6 +40,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     _raw_client: Any  # DynamoDB client from aioboto3
     _client: DynamoDBClient | None
     _table_config: dict[str, Any]
+    _auto_create: bool
 
     @overload
     def __init__(
@@ -49,6 +50,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         table_name: str,
         default_collection: str | None = None,
         table_config: dict[str, Any] | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the DynamoDB store.
 
@@ -57,6 +59,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             table_name: The name of the DynamoDB table to use.
             default_collection: The default collection to use if no collection is provided.
             table_config: Additional configuration to pass to create_table(). Merged with defaults.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
         """
 
     @overload
@@ -71,6 +74,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         aws_session_token: str | None = None,
         default_collection: str | None = None,
         table_config: dict[str, Any] | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the DynamoDB store.
 
@@ -83,6 +87,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             aws_session_token: AWS session token. Defaults to None (uses AWS default credentials).
             default_collection: The default collection to use if no collection is provided.
             table_config: Additional configuration to pass to create_table(). Merged with defaults.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
         """
 
     def __init__(
@@ -97,6 +102,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         aws_session_token: str | None = None,
         default_collection: str | None = None,
         table_config: dict[str, Any] | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the DynamoDB store.
 
@@ -113,9 +119,14 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             default_collection: The default collection to use if no collection is provided.
             table_config: Additional configuration to pass to create_table(). Merged with defaults.
                 Examples: SSESpecification, Tags, StreamSpecification, etc.
+                Note: Critical parameters (TableName, KeySchema, AttributeDefinitions, BillingMode)
+                cannot be overridden as they are required for store operation.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
+                When False, raises ValueError if the table doesn't exist.
         """
         self._table_name = table_name
         self._table_config = table_config or {}
+        self._auto_create = auto_create
         client_provided = client is not None
 
         if client:
@@ -154,23 +165,29 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         try:
             await self._connected_client.describe_table(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
         except self._connected_client.exceptions.ResourceNotFoundException:  # pyright: ignore[reportUnknownMemberType]
-            # Create the table with composite primary key
-            # Start with default configuration
-            create_table_params: dict[str, Any] = {
-                "TableName": self._table_name,
-                "KeySchema": [
-                    {"AttributeName": "collection", "KeyType": "HASH"},  # Partition key
-                    {"AttributeName": "key", "KeyType": "RANGE"},  # Sort key
-                ],
-                "AttributeDefinitions": [
-                    {"AttributeName": "collection", "AttributeType": "S"},
-                    {"AttributeName": "key", "AttributeType": "S"},
-                ],
-                "BillingMode": "PAY_PER_REQUEST",  # On-demand billing
-            }
+            if not self._auto_create:
+                msg = f"Table '{self._table_name}' does not exist. Either create the table manually or set auto_create=True."
+                raise ValueError(msg) from None
 
-            # Merge with user-provided table configuration
-            create_table_params.update(self._table_config)
+            # Create the table with composite primary key
+            # Start with user-provided configuration, then overlay required parameters
+            create_table_params: dict[str, Any] = {**self._table_config}
+
+            # Override with required configuration that cannot be changed
+            create_table_params.update(
+                {
+                    "TableName": self._table_name,
+                    "KeySchema": [
+                        {"AttributeName": "collection", "KeyType": "HASH"},  # Partition key
+                        {"AttributeName": "key", "KeyType": "RANGE"},  # Sort key
+                    ],
+                    "AttributeDefinitions": [
+                        {"AttributeName": "collection", "AttributeType": "S"},
+                        {"AttributeName": "key", "AttributeType": "S"},
+                    ],
+                    "BillingMode": "PAY_PER_REQUEST",  # On-demand billing
+                }
+            )
 
             await self._connected_client.create_table(**create_table_params)  # pyright: ignore[reportUnknownMemberType]
 

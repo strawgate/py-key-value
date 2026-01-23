@@ -281,6 +281,7 @@ class FileTreeStore(BaseStore):
     _metadata_directory: AsyncPath
 
     _collection_infos: dict[str, DiskCollectionInfo]
+    _auto_create: bool
 
     def __init__(
         self,
@@ -291,6 +292,7 @@ class FileTreeStore(BaseStore):
         serialization_adapter: SerializationAdapter | None = None,
         key_sanitization_strategy: SanitizationStrategy | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the file-tree store.
 
@@ -301,20 +303,33 @@ class FileTreeStore(BaseStore):
             serialization_adapter: The serialization adapter to use for the store.
             key_sanitization_strategy: The sanitization strategy to use for keys.
             collection_sanitization_strategy: The sanitization strategy to use for collections.
+            auto_create: Whether to automatically create directories if they don't exist. Defaults to True.
+                When False, raises ValueError if a directory doesn't exist.
         """
         data_directory = Path(data_directory).resolve()
-        data_directory.mkdir(parents=True, exist_ok=True)
+
+        if not data_directory.exists():
+            if not auto_create:
+                msg = f"Directory '{data_directory}' does not exist. Either create the directory manually or set auto_create=True."
+                raise ValueError(msg)
+            data_directory.mkdir(parents=True, exist_ok=True)
 
         if metadata_directory is None:
             metadata_directory = data_directory
 
         metadata_directory = Path(metadata_directory).resolve()
-        metadata_directory.mkdir(parents=True, exist_ok=True)
+
+        if not metadata_directory.exists():
+            if not auto_create:
+                msg = f"Directory '{metadata_directory}' does not exist. Either create the directory manually or set auto_create=True."
+                raise ValueError(msg)
+            metadata_directory.mkdir(parents=True, exist_ok=True)
 
         self._data_directory = AsyncPath(data_directory)
         self._metadata_directory = AsyncPath(metadata_directory)
 
         self._collection_infos = {}
+        self._auto_create = auto_create
 
         self._stable_api = False
 
@@ -359,7 +374,12 @@ class FileTreeStore(BaseStore):
 
         # Create the collection directory under the data directory
         data_directory: AsyncPath = AsyncPath(self._data_directory / sanitized_collection)
-        await data_directory.mkdir(parents=True, exist_ok=True)
+
+        if not await data_directory.exists():
+            if not self._auto_create:
+                msg = f"Directory '{data_directory}' does not exist. Either create the directory manually or set auto_create=True."
+                raise ValueError(msg)
+            await data_directory.mkdir(parents=True, exist_ok=True)
 
         self._collection_infos[collection] = await DiskCollectionInfo.create_or_get_info(
             data_directory=data_directory,
