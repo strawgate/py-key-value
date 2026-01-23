@@ -74,6 +74,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
                 host=parsed_url.hostname or "localhost",
                 port=parsed_url.port or 6379,
                 db=int(parsed_url.path.lstrip("/")) if parsed_url.path and parsed_url.path != "/" else 0,
+                username=parsed_url.username,
                 password=parsed_url.password or password,
                 decode_responses=True,
             )

@@ -7,7 +7,7 @@ protocol, so they can be used anywhere a store can be used.
 ## Available Wrappers
 
 | Wrapper | Description |
-|---------|-------------|
+| ------- | ----------- |
 | [CompressionWrapper](#compressionwrapper) | Compress values before storing and decompress on retrieval |
 | [FernetEncryptionWrapper](#fernetencryptionwrapper) | Encrypt values before storing and decrypt on retrieval |
 | [FallbackWrapper](#fallbackwrapper) | Fallback to a secondary store when the primary store fails |
