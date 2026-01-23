@@ -95,12 +95,13 @@ class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
         )
 
         # Clean up the database before each test
-        async with store:
-            if store._pool is not None:  # pyright: ignore[reportPrivateUsage]
-                async with store._pool.acquire() as conn:  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportUnknownVariableType]
-                    # Drop and recreate the kv_store table
-                    with contextlib.suppress(Exception):
-                        await conn.execute("DROP TABLE IF EXISTS kv_store")  # pyright: ignore[reportUnknownMemberType]
+        # Initialize the pool without entering context manager to avoid closing it
+        await store._ensure_pool_initialized()  # pyright: ignore[reportPrivateUsage]
+        if store._pool is not None:  # pyright: ignore[reportPrivateUsage]
+            async with store._pool.acquire() as conn:  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportUnknownVariableType]
+                # Drop and recreate the kv_store table
+                with contextlib.suppress(Exception):
+                    await conn.execute("DROP TABLE IF EXISTS kv_store")  # pyright: ignore[reportUnknownMemberType]
 
         return store
 
