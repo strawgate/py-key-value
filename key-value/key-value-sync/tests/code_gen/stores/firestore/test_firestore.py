@@ -3,6 +3,7 @@
 # DO NOT CHANGE! Change the original file instead.
 import os
 import uuid
+import warnings
 from collections.abc import Generator
 from typing import Any
 
@@ -13,22 +14,28 @@ from key_value.shared.stores.wait import wait_for_true
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
+from tests.code_gen.conftest import docker_container
 from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
+
+warnings.filterwarnings("ignore", message="You are using a Python version .* google\\.api_core", category=FutureWarning)
 
 try:
     from google.auth.credentials import AnonymousCredentials
-    from google.cloud import firestore
+    from google.cloud.firestore import Client
 
     from key_value.sync.code_gen.stores.firestore import FirestoreStore
 except ImportError:  # pragma: no cover
     pytest.skip("Firestore dependencies not installed. Install with `py-key-value-aio[firestore]`.", allow_module_level=True)
 
-FIRESTORE_EMULATOR_HOST = os.getenv("FIRESTORE_EMULATOR_HOST")
-FIRESTORE_PROJECT_PREFIX = "kv-firestore-emulator"
+FIRESTORE_HOST = "localhost"
+FIRESTORE_PORT = 8080
+FIRESTORE_EMULATOR_HOST = f"{FIRESTORE_HOST}:{FIRESTORE_PORT}"
 FIRESTORE_WAIT_TIMEOUT = 30
+FIRESTORE_IMAGE = "gcr.io/google.com/cloudsdktool/cloud-sdk:emulators"
+FIRESTORE_COMMAND = f"gcloud emulators firestore start --host-port=0.0.0.0:{FIRESTORE_PORT} --quiet"
+FIRESTORE_ENV = {"CLOUDSDK_CORE_DISABLE_PROMPTS": "1"}
 
-if not FIRESTORE_EMULATOR_HOST:
-    pytest.skip("Firestore emulator not configured. Set FIRESTORE_EMULATOR_HOST to run emulator tests.", allow_module_level=True)
+os.environ.setdefault("FIRESTORE_EMULATOR_HOST", FIRESTORE_EMULATOR_HOST)
 
 
 class FirestoreEmulatorFailedToStartError(Exception):
@@ -36,7 +43,7 @@ class FirestoreEmulatorFailedToStartError(Exception):
 
 
 def ping_firestore_emulator() -> bool:
-    client = firestore.Client(project=f"{FIRESTORE_PROJECT_PREFIX}-ping", credentials=AnonymousCredentials())
+    client = Client(credentials=AnonymousCredentials())
     try:
         client.collection("ping").document("ping").get()  # pyright: ignore[reportUnknownMemberType]
     except Exception:
@@ -47,7 +54,7 @@ def ping_firestore_emulator() -> bool:
 
 
 def get_raw_document(*, project: str, collection: str, key: str) -> dict[str, Any] | None:
-    client = firestore.Client(project=project, credentials=AnonymousCredentials())
+    client = Client(project=project, credentials=AnonymousCredentials())
     try:
         snapshot = client.collection(collection).document(key).get()  # pyright: ignore[reportUnknownMemberType]
         return snapshot.to_dict()
@@ -56,20 +63,45 @@ def get_raw_document(*, project: str, collection: str, key: str) -> dict[str, An
 
 
 @pytest.fixture(autouse=True, scope="session")
-def ensure_emulator() -> Generator[None, None, None] | None:
-    if not wait_for_true(bool_fn=ping_firestore_emulator, tries=FIRESTORE_WAIT_TIMEOUT, wait_time=1):
-        msg = "Firestore emulator failed to start"
-        raise FirestoreEmulatorFailedToStartError(msg)
-    return
+def setup_firestore_emulator() -> Generator[None, None, None]:
+    with docker_container(
+        "firestore-emulator-test",
+        FIRESTORE_IMAGE,
+        {str(FIRESTORE_PORT): FIRESTORE_PORT},
+        environment=FIRESTORE_ENV,
+        command=FIRESTORE_COMMAND,
+    ):
+        if not wait_for_true(bool_fn=ping_firestore_emulator, tries=FIRESTORE_WAIT_TIMEOUT, wait_time=1):
+            msg = "Firestore emulator failed to start"
+            raise FirestoreEmulatorFailedToStartError(msg)
+
+        yield
+
+
+@pytest.fixture
+def ensure_emulator(setup_firestore_emulator: None) -> None:
+    return None
 
 
 @pytest.fixture
 def firestore_project() -> str:
-    return f"{FIRESTORE_PROJECT_PREFIX}-{uuid.uuid4().hex}"
+    return f"firestore-project-{uuid.uuid4().hex}"
 
 
+def should_skip_docker_sdk_tests() -> bool:
+    try:
+        from docker import DockerClient
+
+        DockerClient.from_env().ping()  # pyright: ignore[reportUnknownMemberType]
+    except Exception:
+        return True
+
+    return False
+
+
+@pytest.mark.skipif(should_skip_docker_sdk_tests(), reason="Docker is not available")
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
-class TestFirestoreEmulatorStore(ContextManagerStoreTestMixin, BaseStoreTests):
+class TestFirestoreEmulatorDockerStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
     def store(self, ensure_emulator: None, firestore_project: str) -> FirestoreStore:
