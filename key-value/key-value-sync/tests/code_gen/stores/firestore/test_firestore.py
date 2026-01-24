@@ -14,7 +14,7 @@ from key_value.shared.stores.wait import wait_for_true
 from typing_extensions import override
 
 from key_value.sync.code_gen.stores.base import BaseStore
-from tests.code_gen.conftest import docker_container
+from tests.code_gen.conftest import docker_container, should_skip_docker_tests
 from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 warnings.filterwarnings("ignore", message="You are using a Python version .* google\\.api_core", category=FutureWarning)
@@ -88,18 +88,7 @@ def firestore_project() -> str:
     return f"firestore-project-{uuid.uuid4().hex}"
 
 
-def should_skip_docker_sdk_tests() -> bool:
-    try:
-        from docker import DockerClient
-
-        DockerClient.from_env().ping()  # pyright: ignore[reportUnknownMemberType]
-    except Exception:
-        return True
-
-    return False
-
-
-@pytest.mark.skipif(should_skip_docker_sdk_tests(), reason="Docker is not available")
+@pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestFirestoreEmulatorDockerStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
