@@ -109,7 +109,7 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
             raise ElasticsearchFailedToStartError(msg)
 
     @pytest.fixture
-    async def es_client(self, es_url: str) -> AsyncGenerator[AsyncElasticsearch, None]:
+    async def es_client(self, setup_elasticsearch: None, es_url: str) -> AsyncGenerator[AsyncElasticsearch, None]:
         async with AsyncElasticsearch(hosts=[es_url]) as es_client:
             yield es_client
 

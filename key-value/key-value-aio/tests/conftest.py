@@ -71,5 +71,3 @@ def should_run_docker_tests() -> bool:
 
 def should_skip_docker_tests() -> bool:
     return not should_run_docker_tests()
-
-

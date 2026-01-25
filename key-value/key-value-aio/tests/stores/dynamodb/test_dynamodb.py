@@ -69,12 +69,14 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         version = request.param
         container = DockerContainer(image=f"amazon/dynamodb-local:{version}")
         container.with_exposed_ports(DYNAMODB_CONTAINER_PORT)
-        container.start()
+        try:
+            container.start()
 
-        # Wait for DynamoDB to be ready
-        wait_for_logs(container, "Initializing DynamoDB Local", timeout=60)
-        yield container
-        container.stop()
+            # Wait for DynamoDB to be ready
+            wait_for_logs(container, "Initializing DynamoDB Local", timeout=60)
+            yield container
+        finally:
+            container.stop()
 
     @pytest.fixture(scope="session")
     def dynamodb_host(self, dynamodb_container: DockerContainer) -> str:

@@ -1,5 +1,6 @@
 import contextlib
 import json
+from collections.abc import Generator
 
 import pytest
 from aiomcache import Client
@@ -46,7 +47,7 @@ class MemcachedFailedToStartError(Exception):
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=MEMCACHED_VERSIONS_TO_TEST)
-    def memcached_container(self, request: pytest.FixtureRequest):
+    def memcached_container(self, request: pytest.FixtureRequest) -> Generator[MemcachedContainer, None, None]:
         version = request.param
         container = MemcachedContainer(image=f"memcached:{version}")
         container.start()
@@ -63,7 +64,9 @@ class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @pytest.fixture(autouse=True, scope="session")
     async def setup_memcached(self, memcached_container: MemcachedContainer, memcached_host: str, memcached_port: int) -> None:
-        if not await async_wait_for_true(bool_fn=lambda: ping_memcached(memcached_host, memcached_port), tries=WAIT_FOR_MEMCACHED_TIMEOUT, wait_time=1):
+        if not await async_wait_for_true(
+            bool_fn=lambda: ping_memcached(memcached_host, memcached_port), tries=WAIT_FOR_MEMCACHED_TIMEOUT, wait_time=1
+        ):
             msg = "Memcached failed to start"
             raise MemcachedFailedToStartError(msg)
 

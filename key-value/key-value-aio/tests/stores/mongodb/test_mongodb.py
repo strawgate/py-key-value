@@ -104,7 +104,9 @@ class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @pytest.fixture(autouse=True, scope="session")
     async def setup_mongodb(self, mongodb_container: MongoDbContainer, mongodb_host: str, mongodb_port: int) -> None:
-        if not await async_wait_for_true(bool_fn=lambda: ping_mongodb(mongodb_host, mongodb_port), tries=WAIT_FOR_MONGODB_TIMEOUT, wait_time=1):
+        if not await async_wait_for_true(
+            bool_fn=lambda: ping_mongodb(mongodb_host, mongodb_port), tries=WAIT_FOR_MONGODB_TIMEOUT, wait_time=1
+        ):
             msg = "MongoDB failed to start"
             raise MongoDBFailedToStartError(msg)
 

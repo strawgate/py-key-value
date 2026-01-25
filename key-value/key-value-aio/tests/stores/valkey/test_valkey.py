@@ -77,7 +77,12 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @pytest.fixture(scope="session")
     async def setup_valkey(self, valkey_container: DockerContainer, valkey_host: str, valkey_port: int) -> None:
-        if not await async_wait_for_true(bool_fn=lambda: self.ping_valkey(valkey_host, valkey_port), tries=WAIT_FOR_VALKEY_TIMEOUT, wait_time=1):
+        ready = await async_wait_for_true(
+            bool_fn=lambda: self.ping_valkey(valkey_host, valkey_port),
+            tries=WAIT_FOR_VALKEY_TIMEOUT,
+            wait_time=1,
+        )
+        if not ready:
             msg = "Valkey failed to start"
             raise ValkeyFailedToStartError(msg)
 
@@ -98,7 +103,7 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
 
-    async def test_value_stored(self, store: BaseStore, valkey_host: str, valkey_port: int):
+    async def test_value_stored(self, store: BaseStore):
         from key_value.aio.stores.valkey import ValkeyStore
 
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
