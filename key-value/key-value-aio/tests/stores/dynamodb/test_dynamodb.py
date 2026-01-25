@@ -1,6 +1,5 @@
 import contextlib
 import json
-from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 from typing import Any
 
@@ -8,19 +7,18 @@ import pytest
 from dirty_equals import IsDatetime
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.waiting_utils import wait_for_logs
 from types_aiobotocore_dynamodb.client import DynamoDBClient
 from types_aiobotocore_dynamodb.type_defs import GetItemOutputTypeDef
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.dynamodb import DynamoDBStore
-from tests.conftest import docker_container, should_skip_docker_tests
+from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # DynamoDB test configuration
-DYNAMODB_HOST = "localhost"
-DYNAMODB_HOST_PORT = 8000
-DYNAMODB_ENDPOINT = f"http://{DYNAMODB_HOST}:{DYNAMODB_HOST_PORT}"
 DYNAMODB_TEST_TABLE = "kv-store-test"
 
 WAIT_FOR_DYNAMODB_TIMEOUT = 30
@@ -33,7 +31,7 @@ DYNAMODB_VERSIONS_TO_TEST = [
 DYNAMODB_CONTAINER_PORT = 8000
 
 
-async def ping_dynamodb() -> bool:
+async def ping_dynamodb(endpoint_url: str) -> bool:
     """Check if DynamoDB Local is running."""
     try:
         import aioboto3
@@ -43,7 +41,7 @@ async def ping_dynamodb() -> bool:
             aws_secret_access_key="test",  # noqa: S106
             region_name="us-east-1",
         )
-        async with session.client(service_name="dynamodb", endpoint_url=DYNAMODB_ENDPOINT) as client:  # type: ignore
+        async with session.client(service_name="dynamodb", endpoint_url=endpoint_url) as client:  # type: ignore
             await client.list_tables()  # type: ignore
     except Exception:
         return False
@@ -67,27 +65,41 @@ def get_dynamo_client_from_store(store: DynamoDBStore) -> DynamoDBClient:
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=DYNAMODB_VERSIONS_TO_TEST)
-    async def setup_dynamodb(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+    def dynamodb_container(self, request: pytest.FixtureRequest):
         version = request.param
+        container = DockerContainer(image=f"amazon/dynamodb-local:{version}")
+        container.with_exposed_ports(DYNAMODB_CONTAINER_PORT)
+        container.start()
 
-        # DynamoDB Local container
-        with docker_container(
-            f"dynamodb-test-{version}",
-            f"amazon/dynamodb-local:{version}",
-            {str(DYNAMODB_CONTAINER_PORT): DYNAMODB_HOST_PORT},
-        ):
-            if not await async_wait_for_true(bool_fn=ping_dynamodb, tries=WAIT_FOR_DYNAMODB_TIMEOUT, wait_time=1):
-                msg = f"DynamoDB {version} failed to start"
-                raise DynamoDBFailedToStartError(msg)
+        # Wait for DynamoDB to be ready
+        wait_for_logs(container, "Initializing DynamoDB Local", timeout=60)
+        yield container
+        container.stop()
 
-            yield
+    @pytest.fixture(scope="session")
+    def dynamodb_host(self, dynamodb_container: DockerContainer) -> str:
+        return dynamodb_container.get_container_host_ip()
+
+    @pytest.fixture(scope="session")
+    def dynamodb_port(self, dynamodb_container: DockerContainer) -> int:
+        return int(dynamodb_container.get_exposed_port(DYNAMODB_CONTAINER_PORT))
+
+    @pytest.fixture(scope="session")
+    def dynamodb_endpoint(self, dynamodb_host: str, dynamodb_port: int) -> str:
+        return f"http://{dynamodb_host}:{dynamodb_port}"
+
+    @pytest.fixture(autouse=True, scope="session")
+    async def setup_dynamodb(self, dynamodb_container: DockerContainer, dynamodb_endpoint: str) -> None:
+        if not await async_wait_for_true(bool_fn=lambda: ping_dynamodb(dynamodb_endpoint), tries=WAIT_FOR_DYNAMODB_TIMEOUT, wait_time=1):
+            msg = "DynamoDB failed to start"
+            raise DynamoDBFailedToStartError(msg)
 
     @override
     @pytest.fixture
-    async def store(self, setup_dynamodb: None) -> DynamoDBStore:
+    async def store(self, setup_dynamodb: None, dynamodb_endpoint: str) -> DynamoDBStore:
         store = DynamoDBStore(
             table_name=DYNAMODB_TEST_TABLE,
-            endpoint_url=DYNAMODB_ENDPOINT,
+            endpoint_url=dynamodb_endpoint,
             aws_access_key_id="test",
             aws_secret_access_key="test",  # noqa: S106
             region_name="us-east-1",
@@ -101,7 +113,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
             aws_secret_access_key="test",  # noqa: S106
             region_name="us-east-1",
         )
-        async with session.client(service_name="dynamodb", endpoint_url=DYNAMODB_ENDPOINT) as client:  # type: ignore
+        async with session.client(service_name="dynamodb", endpoint_url=dynamodb_endpoint) as client:  # type: ignore
             with contextlib.suppress(Exception):
                 await client.delete_table(TableName=DYNAMODB_TEST_TABLE)  # type: ignore
                 # Wait for table to be deleted

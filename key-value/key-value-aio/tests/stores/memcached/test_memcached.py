@@ -1,22 +1,20 @@
 import contextlib
 import json
-from collections.abc import AsyncGenerator
 
 import pytest
 from aiomcache import Client
 from dirty_equals import IsDatetime
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
+from testcontainers.memcached import MemcachedContainer
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.memcached import MemcachedStore, MemcachedV1KeySanitizationStrategy
-from tests.conftest import docker_container, should_skip_docker_tests
+from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # Memcached test configuration
-MEMCACHED_HOST = "localhost"
-MEMCACHED_PORT = 11211
 MEMCACHED_CONTAINER_PORT = 11211
 
 WAIT_FOR_MEMCACHED_TIMEOUT = 30
@@ -27,8 +25,8 @@ MEMCACHED_VERSIONS_TO_TEST = [
 ]
 
 
-async def ping_memcached() -> bool:
-    client = Client(host=MEMCACHED_HOST, port=MEMCACHED_PORT)
+async def ping_memcached(host: str, port: int) -> bool:
+    client = Client(host=host, port=port)
     try:
         await client.stats()
     except Exception:
@@ -48,28 +46,39 @@ class MemcachedFailedToStartError(Exception):
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=MEMCACHED_VERSIONS_TO_TEST)
-    async def setup_memcached(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+    def memcached_container(self, request: pytest.FixtureRequest):
         version = request.param
+        container = MemcachedContainer(image=f"memcached:{version}")
+        container.start()
+        yield container
+        container.stop()
 
-        with docker_container(f"memcached-test-{version}", f"memcached:{version}", {str(MEMCACHED_CONTAINER_PORT): MEMCACHED_PORT}):
-            if not await async_wait_for_true(bool_fn=ping_memcached, tries=WAIT_FOR_MEMCACHED_TIMEOUT, wait_time=1):
-                msg = f"Memcached {version} failed to start"
-                raise MemcachedFailedToStartError(msg)
+    @pytest.fixture(scope="session")
+    def memcached_host(self, memcached_container: MemcachedContainer) -> str:
+        return memcached_container.get_container_host_ip()
 
-            yield
+    @pytest.fixture(scope="session")
+    def memcached_port(self, memcached_container: MemcachedContainer) -> int:
+        return int(memcached_container.get_exposed_port(MEMCACHED_CONTAINER_PORT))
+
+    @pytest.fixture(autouse=True, scope="session")
+    async def setup_memcached(self, memcached_container: MemcachedContainer, memcached_host: str, memcached_port: int) -> None:
+        if not await async_wait_for_true(bool_fn=lambda: ping_memcached(memcached_host, memcached_port), tries=WAIT_FOR_MEMCACHED_TIMEOUT, wait_time=1):
+            msg = "Memcached failed to start"
+            raise MemcachedFailedToStartError(msg)
 
     @override
     @pytest.fixture
-    async def store(self, setup_memcached: None) -> MemcachedStore:
-        store = MemcachedStore(host=MEMCACHED_HOST, port=MEMCACHED_PORT)
+    async def store(self, setup_memcached: None, memcached_host: str, memcached_port: int) -> MemcachedStore:
+        store = MemcachedStore(host=memcached_host, port=memcached_port)
         _ = await store._client.flush_all()  # pyright: ignore[reportPrivateUsage]
         return store
 
     @pytest.fixture
-    async def sanitizing_store(self, setup_memcached: None) -> MemcachedStore:
+    async def sanitizing_store(self, setup_memcached: None, memcached_host: str, memcached_port: int) -> MemcachedStore:
         store = MemcachedStore(
-            host=MEMCACHED_HOST,
-            port=MEMCACHED_PORT,
+            host=memcached_host,
+            port=memcached_port,
             key_sanitization_strategy=MemcachedV1KeySanitizationStrategy(),
         )
         _ = await store._client.flush_all()  # pyright: ignore[reportPrivateUsage]

@@ -8,6 +8,7 @@ from elasticsearch import AsyncElasticsearch
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
 from key_value.shared.utils.managed_entry import ManagedEntry
+from testcontainers.elasticsearch import ElasticSearchContainer
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -17,17 +18,13 @@ from key_value.aio.stores.elasticsearch.store import (
     ElasticsearchV1CollectionSanitizationStrategy,
     ElasticsearchV1KeySanitizationStrategy,
 )
-from tests.conftest import docker_container, should_skip_docker_tests
+from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 if TYPE_CHECKING:
     from elastic_transport._response import ObjectApiResponse
 
 TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
-ES_HOST = "localhost"
-ES_PORT = 9200
-ES_URL = f"http://{ES_HOST}:{ES_PORT}"
-ES_CONTAINER_PORT = 9200
 
 WAIT_FOR_ELASTICSEARCH_TIMEOUT = 30
 
@@ -37,12 +34,8 @@ ELASTICSEARCH_VERSIONS_TO_TEST = [
 ]
 
 
-def get_elasticsearch_client() -> AsyncElasticsearch:
-    return AsyncElasticsearch(hosts=[ES_URL])
-
-
-async def ping_elasticsearch() -> bool:
-    es_client: AsyncElasticsearch = get_elasticsearch_client()
+async def ping_elasticsearch(es_url: str) -> bool:
+    es_client: AsyncElasticsearch = AsyncElasticsearch(hosts=[es_url])
 
     async with es_client:
         if not await es_client.ping():
@@ -92,36 +85,43 @@ def test_managed_entry_document_conversion():
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=ELASTICSEARCH_VERSIONS_TO_TEST)
-    async def setup_elasticsearch(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+    def elasticsearch_container(self, request: pytest.FixtureRequest):
         version = request.param
         es_image = f"docker.elastic.co/elasticsearch/elasticsearch:{version}"
+        container = ElasticSearchContainer(image=es_image, mem_limit="2g")
+        # Configure single-node discovery and disable security
+        container.with_env("discovery.type", "single-node")
+        container.with_env("xpack.security.enabled", "false")
+        container.start()
+        yield container
+        container.stop()
 
-        with docker_container(
-            f"elasticsearch-test-{version}",
-            es_image,
-            {str(ES_CONTAINER_PORT): ES_PORT},
-            {"discovery.type": "single-node", "xpack.security.enabled": "false"},
-        ):
-            if not await async_wait_for_true(bool_fn=ping_elasticsearch, tries=WAIT_FOR_ELASTICSEARCH_TIMEOUT, wait_time=2):
-                msg = f"Elasticsearch {version} failed to start"
-                raise ElasticsearchFailedToStartError(msg)
+    @pytest.fixture(scope="session")
+    def es_url(self, elasticsearch_container: ElasticSearchContainer) -> str:
+        host = elasticsearch_container.get_container_host_ip()
+        port = elasticsearch_container.get_exposed_port(9200)
+        return f"http://{host}:{port}"
 
-            yield
+    @pytest.fixture(scope="session")
+    async def setup_elasticsearch(self, elasticsearch_container: ElasticSearchContainer, es_url: str) -> None:
+        if not await async_wait_for_true(bool_fn=lambda: ping_elasticsearch(es_url), tries=WAIT_FOR_ELASTICSEARCH_TIMEOUT, wait_time=2):
+            msg = "Elasticsearch failed to start"
+            raise ElasticsearchFailedToStartError(msg)
 
     @pytest.fixture
-    async def es_client(self) -> AsyncGenerator[AsyncElasticsearch, None]:
-        async with AsyncElasticsearch(hosts=[ES_URL]) as es_client:
+    async def es_client(self, es_url: str) -> AsyncGenerator[AsyncElasticsearch, None]:
+        async with AsyncElasticsearch(hosts=[es_url]) as es_client:
             yield es_client
 
     @override
     @pytest.fixture
-    async def store(self) -> ElasticsearchStore:
-        return ElasticsearchStore(url=ES_URL, index_prefix="kv-store-e2e-test")
+    async def store(self, setup_elasticsearch: None, es_url: str) -> ElasticsearchStore:
+        return ElasticsearchStore(url=es_url, index_prefix="kv-store-e2e-test")
 
     @pytest.fixture
-    async def sanitizing_store(self) -> ElasticsearchStore:
+    async def sanitizing_store(self, setup_elasticsearch: None, es_url: str) -> ElasticsearchStore:
         return ElasticsearchStore(
-            url=ES_URL,
+            url=es_url,
             index_prefix="kv-store-e2e-test",
             key_sanitization_strategy=ElasticsearchV1KeySanitizationStrategy(),
             collection_sanitization_strategy=ElasticsearchV1CollectionSanitizationStrategy(),
