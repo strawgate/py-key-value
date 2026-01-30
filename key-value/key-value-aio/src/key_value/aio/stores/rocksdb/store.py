@@ -89,8 +89,25 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
             self._exit_stack.callback(self._close_and_flush)
 
     def _close_and_flush(self) -> None:
-        self._db.flush()
-        self._db.close()
+        import contextlib
+
+        # Flush the memtable to disk before closing to ensure data is persisted.
+        # We explicitly call flush() with wait=True to ensure all data is
+        # written to disk before close() is called. This is important because
+        # the close() call may have timing issues on some platforms (e.g., macOS)
+        # if there's unflushed data in the memtable.
+        # We use contextlib.suppress to ignore any exceptions during cleanup,
+        # as we still want to attempt to close the database even if flush fails.
+        with contextlib.suppress(Exception):
+            self._db.flush(wait=True)
+
+        # Close the database. According to rocksdict docs, close() does its own
+        # flush, but we do an explicit flush above for safety.
+        # We suppress exceptions here because if close fails during cleanup,
+        # we don't want to propagate the error as the database is being torn
+        # down anyway. This can happen in some edge cases on certain platforms.
+        with contextlib.suppress(Exception):
+            self._db.close()
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
