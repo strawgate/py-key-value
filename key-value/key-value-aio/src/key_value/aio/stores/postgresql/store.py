@@ -6,10 +6,10 @@ This is safe because table names are validated in __init__ to be alphanumeric pl
 
 # ruff: noqa: S608
 
-from typing import Any, overload
+from typing import overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseStore
 
@@ -87,7 +87,6 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
     """
 
     _pool: asyncpg.Pool | None  # type: ignore[type-arg]
-    _owns_pool: bool
     _url: str | None
     _host: str
     _port: int
@@ -166,8 +165,9 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         default_collection: str | None = None,
     ) -> None:
         """Initialize the PostgreSQL store."""
+        pool_provided = pool is not None
+
         self._pool = pool
-        self._owns_pool = pool is None  # Only own the pool if we create it
         self._url = url
         self._host = host
         self._port = port
@@ -180,53 +180,56 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         _validate_table_name(table_name)
         self._table_name = table_name
 
-        super().__init__(default_collection=default_collection)
+        super().__init__(default_collection=default_collection, client_provided_by_user=pool_provided)
 
-    async def _ensure_pool_initialized(self) -> asyncpg.Pool:  # type: ignore[type-arg]
-        """Ensure the connection pool is initialized.
-
-        This method creates the pool lazily if it doesn't exist, allowing the store
-        to be used even if the context manager hasn't been entered yet. This is useful
-        for frameworks that may call store methods before entering the async context.
+    @property
+    def _initialized_pool(self) -> asyncpg.Pool:  # type: ignore[type-arg]
+        """Get the initialized connection pool.
 
         Returns:
-            The initialized connection pool.
+            The connection pool.
+
+        Raises:
+            RuntimeError: If the pool has not been initialized (setup() not called).
         """
-        if self._pool is None:
-            if self._url:
-                self._pool = await asyncpg.create_pool(self._url)  # pyright: ignore[reportUnknownMemberType]
-            else:
-                self._pool = await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType]
-                    host=self._host,
-                    port=self._port,
-                    database=self._database,
-                    user=self._user,
-                    password=self._password,
-                )
-            self._owns_pool = True
-        return self._pool
+        if self._pool is None:  # pyright: ignore[reportUnknownMemberType]
+            msg = "Pool not initialized. Did you forget to use the context manager or call setup()?"
+            raise RuntimeError(msg)
+        return self._pool  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
-    @override
-    async def __aenter__(self) -> Self:
-        # Ensure pool is initialized (will be created lazily if needed)
-        await self._ensure_pool_initialized()
-        await super().__aenter__()
-        return self
+    async def _create_pool(self) -> asyncpg.Pool:  # type: ignore[type-arg]
+        """Create a new connection pool.
 
-    @override
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
-        await super().__aexit__(exc_type, exc_val, exc_tb)
-        if self._pool is not None and self._owns_pool:
-            await self._pool.close()
+        Returns:
+            The newly created connection pool.
+        """
+        if self._url:
+            return await asyncpg.create_pool(self._url)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        return await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            host=self._host,
+            port=self._port,
+            database=self._database,
+            user=self._user,
+            password=self._password,
+        )
 
     @override
     async def _setup(self) -> None:
-        """Set up the database table and indexes if they don't exist.
+        """Set up the connection pool, database table and indexes.
 
-        This is called once when the store is first used. Since all collections share the same table,
-        we only need to set up the schema once.
+        This is called once when the store is first used (protected by the base class's setup lock).
+        The pool is created here if not provided by the user, and cleanup is registered with the
+        exit stack. Since all collections share the same table, we only need to set up the schema once.
         """
-        pool = await self._ensure_pool_initialized()
+        # Create pool if not provided by user
+        if self._pool is None:  # pyright: ignore[reportUnknownMemberType]
+            self._pool = await self._create_pool()  # pyright: ignore[reportUnknownMemberType]
+
+        # Register pool cleanup if we own it (created it ourselves)
+        if not self._client_provided_by_user:
+            self._exit_stack.push_async_callback(self._pool.close)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+
+        pool = self._pool  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
         # Create the main table if it doesn't exist
         table_sql = (
@@ -264,7 +267,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         Returns:
             The managed entry if found and not expired, None otherwise.
         """
-        pool = await self._ensure_pool_initialized()
+        pool = self._initialized_pool
 
         row = await pool.fetchrow(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             f"SELECT value, ttl, created_at, expires_at FROM {self._table_name} WHERE collection = $1 AND key = $2",
@@ -300,7 +303,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             collection: The collection to store in.
             managed_entry: The managed entry to store.
         """
-        pool = await self._ensure_pool_initialized()
+        pool = self._initialized_pool
 
         # Serialize value to JSON string for JSONB column
         value_json = dump_to_json(managed_entry.value_as_dict)
@@ -333,7 +336,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         Returns:
             True if the entry was deleted, False if it didn't exist.
         """
-        pool = await self._ensure_pool_initialized()
+        pool = self._initialized_pool
 
         result = await pool.execute(  # pyright: ignore[reportUnknownMemberType]
             f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = $2",
@@ -357,7 +360,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             limit = DEFAULT_PAGE_SIZE
         limit = min(limit, PAGE_LIMIT)
 
-        pool = await self._ensure_pool_initialized()
+        pool = self._initialized_pool
 
         rows = await pool.fetch(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             f"SELECT DISTINCT collection FROM {self._table_name} ORDER BY collection LIMIT $1",
@@ -376,7 +379,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         Returns:
             True if any entries were deleted, False otherwise.
         """
-        pool = await self._ensure_pool_initialized()
+        pool = self._initialized_pool
 
         result = await pool.execute(  # pyright: ignore[reportUnknownMemberType]
             f"DELETE FROM {self._table_name} WHERE collection = $1",
