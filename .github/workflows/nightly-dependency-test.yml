@@ -67,19 +67,11 @@ jobs:
     if: failure() && github.event_name == 'schedule'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       issues: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Create issue for failure
-        uses: JasonEtco/create-an-issue@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      - name: Create or update failure issue
+        uses: jayqi/failed-build-issue-action@v1
         with:
-          filename: .github/NIGHTLY_FAILURE_TEMPLATE.md
-          update_existing: true
-          search_existing: open
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          label-name: nightly-failure
