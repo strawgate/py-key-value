@@ -1,5 +1,6 @@
 import contextlib
 import json
+from collections.abc import Generator
 from datetime import datetime, timezone
 from typing import Any
 
@@ -65,7 +66,7 @@ def get_dynamo_client_from_store(store: DynamoDBStore) -> DynamoDBClient:
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session", params=DYNAMODB_VERSIONS_TO_TEST)
-    def dynamodb_container(self, request: pytest.FixtureRequest):
+    def dynamodb_container(self, request: pytest.FixtureRequest) -> Generator[DockerContainer, None, None]:
         version = request.param
         container = DockerContainer(image=f"amazon/dynamodb-local:{version}")
         container.with_exposed_ports(DYNAMODB_CONTAINER_PORT)

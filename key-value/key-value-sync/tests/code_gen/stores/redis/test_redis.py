@@ -59,8 +59,10 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 return client.ping()  # pyright: ignore[reportUnknownMemberType, reportAny, reportReturnType, reportUnknownVariableType, reportGeneralTypeIssues]
             except Exception:
                 return False
+            finally:
+                client.close()  # pyright: ignore[reportUnknownMemberType]
 
-        if not wait_for_true(bool_fn=ping_redis, tries=30, wait_time=1):
+        if not wait_for_true(bool_fn=ping_redis, tries=WAIT_FOR_REDIS_TIMEOUT, wait_time=1):
             msg = "Redis failed to start"
             raise RedisFailedToStartError(msg)
 

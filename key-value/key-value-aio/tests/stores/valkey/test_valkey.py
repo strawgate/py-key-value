@@ -95,7 +95,11 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         # This is a syncronous client
         client = await self.get_valkey_client(valkey_host, valkey_port)
-        _ = await client.flushdb()
+        try:
+            _ = await client.flushdb()
+        finally:
+            with contextlib.suppress(Exception):
+                await client.close()
 
         return store
 

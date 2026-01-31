@@ -89,7 +89,11 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         # This is a syncronous client
         client = self.get_valkey_client(valkey_host, valkey_port)
-        _ = client.flushdb()
+        try:
+            _ = client.flushdb()
+        finally:
+            with contextlib.suppress(Exception):
+                client.close()
 
         return store
 

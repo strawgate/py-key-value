@@ -2,6 +2,7 @@
 # from the original file 'test_mongodb.py'
 # DO NOT CHANGE! Change the original file instead.
 import contextlib
+from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -34,6 +35,7 @@ def ping_mongodb(host: str, port: int) -> bool:
     try:
         client: MongoClient[Any] = MongoClient[Any](host=host, port=port)
         _ = client.list_database_names()
+        client.close()
     except Exception:
         return False
 
@@ -81,7 +83,7 @@ class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
     """Base class for MongoDB store tests."""
 
     @pytest.fixture(autouse=True, scope="session", params=MONGODB_VERSIONS_TO_TEST)
-    def mongodb_container(self, request: pytest.FixtureRequest):
+    def mongodb_container(self, request: pytest.FixtureRequest) -> Generator[MongoDbContainer, None, None]:
         version = request.param
         container = MongoDbContainer(image=f"mongo:{version}")
         container.start()

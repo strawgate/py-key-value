@@ -1,4 +1,5 @@
 import contextlib
+from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -36,6 +37,7 @@ async def ping_mongodb(host: str, port: int) -> bool:
     try:
         client: AsyncMongoClient[Any] = AsyncMongoClient[Any](host=host, port=port)
         _ = await client.list_database_names()
+        await client.close()
     except Exception:
         return False
 
@@ -83,7 +85,7 @@ class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
     """Base class for MongoDB store tests."""
 
     @pytest.fixture(autouse=True, scope="session", params=MONGODB_VERSIONS_TO_TEST)
-    def mongodb_container(self, request: pytest.FixtureRequest):
+    def mongodb_container(self, request: pytest.FixtureRequest) -> Generator[MongoDbContainer, None, None]:
         version = request.param
         container = MongoDbContainer(image=f"mongo:{version}")
         container.start()
