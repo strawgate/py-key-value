@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from dirty_equals import IsStr
 from inline_snapshot import snapshot
+from key_value.shared.errors.store import StoreSetupError
 from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
 
@@ -100,6 +101,29 @@ class TestFirestoreStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.mark.skip(reason="Distributed cloud stores are unbounded")
     async def test_not_unbounded(self, store: BaseStore): ...
+
+    async def test_auto_create_false_raises_on_nonexistent_collection(self, ensure_emulator: None, firestore_project: str):
+        """Test that auto_create=False raises StoreSetupError when collection doesn't exist."""
+        store = FirestoreStore(credentials=AnonymousCredentials(), project=firestore_project, default_collection="test", auto_create=False)
+
+        # Attempting to use the store should raise StoreSetupError (which wraps the ValueError)
+        with pytest.raises(StoreSetupError, match="Collection 'nonexistent' does not exist"):
+            async with store:
+                await store.put(collection="nonexistent", key="test", value={"test": "value"})
+
+    async def test_auto_create_false_works_with_existing_collection(self, ensure_emulator: None, firestore_project: str):
+        """Test that auto_create=False works when collection already exists."""
+        # First create a collection with auto_create=True
+        store_creator = FirestoreStore(credentials=AnonymousCredentials(), project=firestore_project, default_collection="test")
+        async with store_creator:
+            await store_creator.put(collection="existing", key="test", value={"test": "value"})
+
+        # Now use auto_create=False with the existing collection
+        store = FirestoreStore(credentials=AnonymousCredentials(), project=firestore_project, default_collection="test", auto_create=False)
+        async with store:
+            # Should work fine since collection exists
+            result = await store.get(collection="existing", key="test")
+            assert result == {"test": "value"}
 
     async def test_firestore_document_format(self, store: FirestoreStore, firestore_project: str):
         await store.put(collection="test", key="document_format_test_1", value={"name": "Alice", "age": 30})
