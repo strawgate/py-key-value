@@ -32,7 +32,7 @@ from key_value.aio.stores.opensearch.utils import LessCapableJsonSerializer
 
 try:
     from opensearchpy import AsyncOpenSearch
-    from opensearchpy.exceptions import RequestError
+    from opensearchpy.exceptions import NotFoundError, RequestError
     from opensearchpy.exceptions import SerializationError as OpenSearchSerializationError
 
     from key_value.aio.stores.opensearch.utils import (
@@ -137,13 +137,16 @@ class OpenSearchStore(
 ):
     """An OpenSearch-based store.
 
-    Stores collections in their own indices and stores values in Flattened fields.
+    Stores collections in their own indices and stores values in flat_object fields.
 
     This store has specific restrictions on what is allowed in keys and collections. Keys and collections are not sanitized
     by default which may result in errors when using the store.
 
     To avoid issues, you may want to consider leveraging the `OpenSearchV1KeySanitizationStrategy` and
     `OpenSearchV1CollectionSanitizationStrategy` strategies.
+
+    The `auto_create` parameter controls whether indices are automatically created. When set to False, indices must be
+    created manually before use, otherwise ValueError will be raised.
     """
 
     _client: AsyncOpenSearch
@@ -253,9 +256,6 @@ class OpenSearchStore(
                 client_kwargs["api_key"] = api_key
 
             self._client = AsyncOpenSearch(**client_kwargs)
-        else:
-            msg = "Either opensearch_client or url must be provided"
-            raise ValueError(msg)
 
         LessCapableJsonSerializer.install_serializer(client=self._client)
 
@@ -297,8 +297,8 @@ class OpenSearchStore(
 
     def _get_index_name(self, collection: str) -> str:
         # The Sanitization Strategy ensures that we do not have conflicts between upper and lower case
-        # but it does not lowercase the collection name, which conveniently also prevents errors when using
-        # PassthroughStrategy.
+        # but it does not lowercase the collection name, so we do that here, which conveniently also
+        # prevents errors when using PassthroughStrategy.
         return (self._index_prefix + "-" + self._sanitize_collection(collection=collection)).lower()
 
     def _get_document_id(self, key: str) -> str:
@@ -316,7 +316,8 @@ class OpenSearchStore(
 
         try:
             opensearch_response = await self._client.get(index=index_name, id=document_id)
-        except Exception:
+        except NotFoundError:
+            # Document not found is not an error for get operations
             return None
 
         body: dict[str, Any] = get_body_from_response(response=opensearch_response)
@@ -339,10 +340,7 @@ class OpenSearchStore(
         document_ids = [self._get_document_id(key=key) for key in keys]
         docs = [{"_id": document_id} for document_id in document_ids]
 
-        try:
-            opensearch_response = await self._client.mget(index=index_name, body={"docs": docs})
-        except Exception:
-            return [None] * len(keys)
+        opensearch_response = await self._client.mget(index=index_name, body={"docs": docs})
 
         body: dict[str, Any] = get_body_from_response(response=opensearch_response)
         docs_result = body.get("docs", [])
@@ -388,11 +386,7 @@ class OpenSearchStore(
         index_name: str = self._get_index_name(collection=collection)
         document_id: str = self._get_document_id(key=key)
 
-        try:
-            document: dict[str, Any] = self._serializer.dump_dict(entry=managed_entry, key=key, collection=collection)
-        except Exception as e:
-            msg = f"Failed to serialize document: {e}"
-            raise SerializationError(message=msg) from e
+        document: dict[str, Any] = self._serializer.dump_dict(entry=managed_entry, key=key, collection=collection)
 
         try:
             _ = await self._client.index(  # type: ignore[reportUnknownVariableType]
@@ -404,6 +398,8 @@ class OpenSearchStore(
         except OpenSearchSerializationError as e:
             msg = f"Failed to serialize document: {e}"
             raise SerializationError(message=msg) from e
+        except Exception:
+            raise
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
@@ -412,7 +408,8 @@ class OpenSearchStore(
 
         try:
             opensearch_response = await self._client.delete(index=index_name, id=document_id)
-        except Exception:
+        except NotFoundError:
+            # Document not found is not an error for delete operations
             return False
 
         body: dict[str, Any] = get_body_from_response(response=opensearch_response)
@@ -428,22 +425,19 @@ class OpenSearchStore(
 
         limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
 
-        try:
-            result = await self._client.search(
-                index=self._get_index_name(collection=collection),
-                body={
-                    "query": {
-                        "term": {
-                            "collection": collection,
-                        },
+        result = await self._client.search(
+            index=self._get_index_name(collection=collection),
+            body={
+                "query": {
+                    "term": {
+                        "collection": collection,
                     },
-                    "_source": False,
-                    "fields": ["key"],
-                    "size": limit,
                 },
-            )
-        except Exception:
-            return []
+                "_source": False,
+                "fields": ["key"],
+                "size": limit,
+            },
+        )
 
         if not (hits := get_hits_from_response(response=result)):
             return []
@@ -451,9 +445,7 @@ class OpenSearchStore(
         all_keys: list[str] = []
 
         for hit in hits:
-            try:
-                key = get_first_value_from_field_in_hit(hit=hit, field="key", value_type=str)
-            except TypeError:
+            if not (key := get_first_value_from_field_in_hit(hit=hit, field="key", value_type=str)):
                 continue
 
             all_keys.append(key)
@@ -466,49 +458,40 @@ class OpenSearchStore(
 
         limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
 
-        try:
-            search_response = await self._client.search(
-                index=f"{self._index_prefix}-*",
-                body={
-                    "aggs": {
-                        "collections": {
-                            "terms": {
-                                "field": "collection",
-                                "size": limit,
-                            },
+        search_response = await self._client.search(
+            index=f"{self._index_prefix}-*",
+            body={
+                "aggs": {
+                    "collections": {
+                        "terms": {
+                            "field": "collection",
+                            "size": limit,
                         },
                     },
-                    "size": 0,
                 },
-            )
-        except Exception:
-            return []
+                "size": 0,
+            },
+        )
 
         body: dict[str, Any] = get_body_from_response(response=search_response)
         aggregations: dict[str, Any] = get_aggregations_from_body(body=body)
 
-        if not aggregations or "collections" not in aggregations:
-            return []
+        buckets: list[Any] = aggregations["collections"]["buckets"]  # pyright: ignore[reportAny]
 
-        buckets: list[Any] = aggregations["collections"].get("buckets", [])
-
-        return [bucket["key"] for bucket in buckets if isinstance(bucket, dict) and "key" in bucket]
+        return [bucket["key"] for bucket in buckets]  # pyright: ignore[reportAny]
 
     @override
     async def _delete_collection(self, *, collection: str) -> bool:
-        try:
-            result = await self._client.delete_by_query(
-                index=self._get_index_name(collection=collection),
-                body={
-                    "query": {
-                        "term": {
-                            "collection": collection,
-                        },
+        result = await self._client.delete_by_query(
+            index=self._get_index_name(collection=collection),
+            body={
+                "query": {
+                    "term": {
+                        "collection": collection,
                     },
                 },
-            )
-        except Exception:
-            return False
+            },
+        )
 
         body: dict[str, Any] = get_body_from_response(response=result)
 
