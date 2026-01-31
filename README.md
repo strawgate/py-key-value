@@ -133,7 +133,6 @@ pip install py-key-value-aio[disk]
 pip install py-key-value-aio[dynamodb]
 pip install py-key-value-aio[s3]
 pip install py-key-value-aio[elasticsearch]
-# Firestore support
 pip install py-key-value-aio[firestore]
 # or: redis, mongodb, memcached, valkey, vault, registry, rocksdb, see below for all options
 ```
