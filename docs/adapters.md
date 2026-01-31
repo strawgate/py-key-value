@@ -17,11 +17,15 @@ provide alternative APIs tailored for specific use cases.
 
 The three primary adapters offer different levels of type safety:
 
-- **DataclassAdapter**: Use when working with Python dataclasses. Provides compile-time and runtime type safety for dataclass types only.
+- **DataclassAdapter**: Use when working with Python dataclasses. Provides
+  compile-time and runtime type safety for dataclass types only.
 
-- **BaseModelAdapter**: Use when working with Pydantic BaseModel subclasses. Provides compile-time and runtime type safety for BaseModel types only.
+- **BaseModelAdapter**: Use when working with Pydantic BaseModel subclasses.
+  Provides compile-time and runtime type safety for BaseModel types only.
 
-- **PydanticAdapter**: Use when you need maximum flexibility to store any pydantic-serializable type (primitives, datetime, UUID, lists of primitives, etc.). Less type-safe but more flexible.
+- **PydanticAdapter**: Use when you need maximum flexibility to store any
+  pydantic-serializable type (primitives, datetime, UUID, lists of primitives,
+  etc.). Less type-safe but more flexible.
 
 ## Adapters vs Wrappers
 
@@ -88,7 +92,9 @@ if retrieved_user:
 
 ### BaseModelAdapter
 
-The `BaseModelAdapter` provides type-safe storage and retrieval of Pydantic BaseModel instances. It's the recommended adapter for Pydantic models because it enforces type safety at both compile-time and runtime.
+The `BaseModelAdapter` provides type-safe storage and retrieval of Pydantic
+BaseModel instances. It's the recommended adapter for Pydantic models because
+it enforces type safety at both compile-time and runtime.
 
 ::: key_value.aio.adapters.base_model.BaseModelAdapter
     options:
@@ -192,7 +198,9 @@ adapter = BaseModelAdapter(pydantic_model=list[int], key_value=store)  # TypeErr
 
 ### PydanticAdapter
 
-The `PydanticAdapter` provides storage and retrieval of **any pydantic-serializable type**. Unlike `BaseModelAdapter`, it accepts primitives, collections, datetime objects, and more—not just BaseModel subclasses.
+The `PydanticAdapter` provides storage and retrieval of **any
+pydantic-serializable type**. Unlike `BaseModelAdapter`, it accepts primitives,
+collections, datetime objects, and more—not just BaseModel subclasses.
 
 ::: key_value.aio.adapters.pydantic.PydanticAdapter
     options:
@@ -430,13 +438,14 @@ list_adapter = PydanticAdapter(key_value=store, pydantic_model=list[int])
 await list_adapter.put(key="scores", value=[10, 20, 30], collection="game")
 ```
 
-**Note**: `BaseModelAdapter` would reject all of these types because they're not BaseModel subclasses.
+**Note**: `BaseModelAdapter` would reject all of these types because they're
+not BaseModel subclasses.
 
 ---
 
 ## BaseModelAdapter vs PydanticAdapter: When to Use Each
 
-### Use BaseModelAdapter When:
+### Use BaseModelAdapter When
 
 ✅ You're working exclusively with Pydantic BaseModel subclasses
 ✅ You want compile-time type safety
@@ -478,7 +487,7 @@ await user_adapter.put(key="user:1", value=User(id=1, name="Alice", email="alice
 # await user_adapter.put(key="user:1", value="not a user")
 ```
 
-### Use PydanticAdapter When:
+### Use PydanticAdapter When
 
 ✅ You need to store primitive types (int, str, datetime, UUID, etc.)
 ✅ You need to store lists of primitives (`list[int]`, `list[str]`)
@@ -550,7 +559,7 @@ await price_adapter.put(key="price:product:1", value=29.99)
 ### Key Differences
 
 | Feature | BaseModelAdapter | PydanticAdapter |
-|---------|------------------|-----------------|
+| ------- | ---------------- | --------------- |
 | **Accepted Types** | Only `BaseModel` or `list[BaseModel]` | Any pydantic-serializable type |
 | **Type Safety** | Compile-time + runtime validation | Runtime serialization only |
 | **Primitives** | ❌ No (int, str, float, etc.) | ✅ Yes |
