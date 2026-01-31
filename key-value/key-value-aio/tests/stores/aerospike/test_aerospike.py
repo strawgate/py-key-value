@@ -1,14 +1,20 @@
 import contextlib
+import sys
 from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 
 import pytest
 from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
 
-from key_value.aio.stores.aerospike import AerospikeStore
 from key_value.aio.stores.base import BaseStore
 from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
+
+if TYPE_CHECKING:
+    from key_value.aio.stores.aerospike import AerospikeStore
+
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="Aerospike is not supported on Windows")
 
 # Aerospike test configuration
 AEROSPIKE_HOST = "localhost"
@@ -52,8 +58,10 @@ class TestAerospikeStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @override
     @pytest.fixture
-    async def store(self, setup_aerospike: None) -> AerospikeStore:
+    async def store(self, setup_aerospike: None) -> "AerospikeStore":
         import aerospike  # pyright: ignore[reportMissingImports]
+
+        from key_value.aio.stores.aerospike import AerospikeStore
 
         config = {"hosts": [(AEROSPIKE_HOST, AEROSPIKE_PORT)]}
         client = aerospike.client(config)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
@@ -68,7 +76,7 @@ class TestAerospikeStore(ContextManagerStoreTestMixin, BaseStoreTests):
         return store
 
     @pytest.fixture
-    async def aerospike_store(self, store: AerospikeStore) -> AerospikeStore:
+    async def aerospike_store(self, store: "AerospikeStore") -> "AerospikeStore":
         return store
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
