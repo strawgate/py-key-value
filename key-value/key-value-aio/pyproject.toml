@@ -53,6 +53,7 @@ rocksdb = [
     "rocksdict>=0.3.2 ; python_version < '3.12'"
 ]
 duckdb = ["duckdb>=1.1.1", "pytz>=2025.2"]
+postgresql = ["asyncpg>=0.30.0"]
 wrappers-encryption = ["cryptography>=45.0.0"]
 
 [tool.pytest.ini_options]
@@ -73,7 +74,7 @@ env_files = [".env"]
 
 [dependency-groups]
 dev = [
-    "py-key-value-aio[memory,disk,filetree,redis,elasticsearch,opensearch,memcached,mongodb,vault,dynamodb,s3,rocksdb,duckdb]",
+    "py-key-value-aio[memory,disk,filetree,redis,elasticsearch,opensearch,memcached,mongodb,vault,dynamodb,s3,rocksdb,duckdb,postgresql]",
     "py-key-value-aio[valkey]; platform_system != 'Windows'",
     "py-key-value-aio[keyring]",
     "py-key-value-aio[pydantic]",
