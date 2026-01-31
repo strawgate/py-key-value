@@ -79,6 +79,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
     _connection: duckdb.DuckDBPyConnection
     _adapter: SerializationAdapter
     _table_name: str
+    _auto_create: bool
 
     @overload
     def __init__(
@@ -88,6 +89,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         table_name: str = "kv_entries",
         default_collection: str | None = None,
         seed: SEED_DATA_TYPE | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the DuckDB store with an existing connection.
 
@@ -99,6 +101,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             table_name: Name of the table to store key-value entries. Defaults to "kv_entries".
             default_collection: The default collection to use if no collection is provided.
             seed: Optional seed data to pre-populate the store.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
         """
 
     @overload
@@ -109,6 +112,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         table_name: str = "kv_entries",
         default_collection: str | None = None,
         seed: SEED_DATA_TYPE | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the DuckDB store with a database path.
 
@@ -117,6 +121,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             table_name: Name of the table to store key-value entries. Defaults to "kv_entries".
             default_collection: The default collection to use if no collection is provided.
             seed: Optional seed data to pre-populate the store.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
         """
 
     def __init__(
@@ -127,6 +132,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         table_name: str = "kv_entries",
         default_collection: str | None = None,
         seed: SEED_DATA_TYPE | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the DuckDB store.
 
@@ -138,6 +144,8 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             table_name: Name of the table to store key-value entries. Defaults to "kv_entries".
             default_collection: The default collection to use if no collection is provided.
             seed: Optional seed data to pre-populate the store.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
+                When False, raises ValueError if the table doesn't exist.
         """
         if connection is not None and database_path is not None:
             msg = "Provide only one of connection or database_path"
@@ -164,6 +172,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             msg = "Table name must start with a letter or underscore and contain only letters, digits, or underscores"
             raise ValueError(msg)
         self._table_name = table_name
+        self._auto_create = auto_create
 
         super().__init__(default_collection=default_collection, seed=seed, client_provided_by_user=client_provided, stable_api=False)
 
@@ -234,14 +243,26 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         if not self._client_provided_by_user:
             self._exit_stack.callback(self._connection.close)
 
-        # Create the main table for storing key-value entries
-        self._connection.execute(self._get_create_table_sql())
+        # Check if the table exists
+        table_exists_sql = (
+            f"\n            SELECT COUNT(*) FROM information_schema.tables\n            WHERE table_name = '{self._table_name}'\n        "  # noqa: S608
+        )
+        result = self._connection.execute(table_exists_sql).fetchone()
+        table_exists = result[0] > 0 if result else False
 
-        # Create index for efficient collection queries
-        self._connection.execute(self._get_create_collection_index_sql())
+        if not table_exists:
+            if not self._auto_create:
+                msg = f"Table '{self._table_name}' does not exist. Either create the table manually or set auto_create=True."
+                raise ValueError(msg)
 
-        # Create index for expiration-based queries
-        self._connection.execute(self._get_create_expires_index_sql())
+            # Create the main table for storing key-value entries
+            self._connection.execute(self._get_create_table_sql())
+
+            # Create index for efficient collection queries
+            self._connection.execute(self._get_create_collection_index_sql())
+
+            # Create index for expiration-based queries
+            self._connection.execute(self._get_create_expires_index_sql())
 
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
