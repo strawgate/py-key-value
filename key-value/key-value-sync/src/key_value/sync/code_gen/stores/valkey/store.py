@@ -12,8 +12,8 @@ from key_value.sync.code_gen.stores.base import BaseContextManagerStore, BaseSto
 
 try:
     from glide_shared.commands.core_options import ExpirySet, ExpiryType
-    from glide_sync.config import GlideClientConfiguration, NodeAddress, ServerCredentials
-    from glide_sync.glide_client import BaseClient, GlideClient
+    from glide_sync.config import GlideClientConfiguration, GlideClusterClientConfiguration, NodeAddress, ServerCredentials
+    from glide_sync.glide_client import BaseClient, GlideClient, GlideClusterClient
 except ImportError as e:
     msg = "ValkeyStore requires py-key-value-aio[valkey]"
     raise ImportError(msg) from e
@@ -23,13 +23,19 @@ PAGE_LIMIT = 10000
 
 
 class ValkeyStore(BaseContextManagerStore, BaseStore):
-    """Valkey-based key-value store (Redis protocol compatible)."""
+    """Valkey-based key-value store (Redis protocol compatible).
+
+    Supports both standalone (GlideClient) and cluster (GlideClusterClient) deployments.
+    """
 
     _connected_client: BaseClient | None
-    _client_config: GlideClientConfiguration | None
+    _client_config: GlideClientConfiguration | GlideClusterClientConfiguration | None
 
     @overload
-    def __init__(self, *, client: BaseClient, default_collection: str | None = None) -> None: ...
+    def __init__(self, *, client: GlideClient, default_collection: str | None = None) -> None: ...
+
+    @overload
+    def __init__(self, *, client: GlideClusterClient, default_collection: str | None = None) -> None: ...
 
     @overload
     def __init__(
@@ -57,15 +63,19 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         """Initialize the Valkey store.
 
         Args:
-            client: An existing Valkey client to use. If provided, the store will not manage
-                the client's lifecycle (will not close it). The caller is responsible for
-                managing the client's lifecycle.
+            client: An existing Valkey client to use (GlideClient or GlideClusterClient).
+                If provided, the store will not manage the client's lifecycle (will not
+                close it). The caller is responsible for managing the client's lifecycle.
             default_collection: The default collection to use if no collection is provided.
             host: Valkey host. Defaults to localhost.
             port: Valkey port. Defaults to 6379.
             db: Valkey database number. Defaults to 0.
             username: Valkey username. Defaults to None.
             password: Valkey password. Defaults to None.
+
+        Note:
+            When using a cluster client, the host/port/db parameters are ignored.
+            You must provide a pre-configured GlideClusterClient instance.
         """
         client_provided = client is not None
 
