@@ -60,6 +60,8 @@ EXCLUDE_DIRECTORIES = [
     "key-value/key-value-aio/tests/stores/firestore",
     "key-value/key-value-aio/src/key_value/aio/stores/memcached",
     "key-value/key-value-aio/tests/stores/memcached",
+    "key-value/key-value-aio/src/key_value/aio/stores/postgresql",
+    "key-value/key-value-aio/tests/stores/postgresql",
     "key-value/key-value-aio/src/key_value/aio/stores/s3",
     "key-value/key-value-aio/tests/stores/s3",
     "key-value/key-value-aio/src/key_value/aio/wrappers/timeout",
