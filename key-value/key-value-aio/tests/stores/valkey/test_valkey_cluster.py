@@ -9,6 +9,7 @@ import pytest
 
 pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="Valkey is not supported on Windows")
 
+
 class TestValkeyClusterClientSupport:
     """Tests for GlideClusterClient type compatibility with ValkeyStore."""
 

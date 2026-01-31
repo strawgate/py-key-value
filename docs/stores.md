@@ -29,23 +29,17 @@ long-term storage, prefer stable stores.
 
 Local stores are stored in memory or on disk, local to the application.
 
-| Store | Stability | Async | Sync | Description |
-| ----- | :-------: | :---: | :--: | :---------- |
-| Memory | N/A | ✅ | ✅ | Fast in-memory storage for development and caching |
-| Disk | Stable | ☑️ | ✅ | Persistent file-based storage in a single file |
-| Disk (Per-Collection) | Stable | ☑️ | ✅ | Persistent storage with separate files per collection |
-| DuckDB | Unstable | ☑️ | ✅ | In-process SQL OLAP database with native JSON storage |
-| FileTree (test) | Unstable | ☑️ | ✅ | Directory-based storage with JSON files for visual inspection |
-| Null (test) | N/A | ✅ | ✅ | No-op store for testing without side effects |
-| RocksDB | Unstable | ☑️ | ✅ | High-performance embedded database |
-| Simple (test) | N/A | ✅ | ✅ | Simple in-memory store for testing |
-| Windows Registry | Unstable | ☑️ | ✅ | Windows Registry-based storage |
-
-**Legend:**
-
-- ✅ = Fully async implementation available
-- ☑️ = Available but uses synchronous underlying implementation
-- ✖️ = Not available
+| Store | Stability | Description |
+| ----- | :-------: | :---------- |
+| Memory | N/A | Fast in-memory storage for development and caching |
+| Disk | Stable | Persistent file-based storage in a single file |
+| Disk (Per-Collection) | Stable | Persistent storage with separate files per collection |
+| DuckDB | Unstable | In-process SQL OLAP database with native JSON storage |
+| FileTree (test) | Unstable | Directory-based storage with JSON files for visual inspection |
+| Null (test) | N/A | No-op store for testing without side effects |
+| RocksDB | Unstable | High-performance embedded database |
+| Simple (test) | N/A | Simple in-memory store for testing |
+| Windows Registry | Unstable | Windows Registry-based storage |
 
 ### MemoryStore
 
@@ -315,10 +309,10 @@ store = SimpleStore()
 Secret stores provide secure storage for sensitive data, typically using
 operating system secret management facilities.
 
-| Store | Stability | Async | Sync | Description |
-| ----- | :-------: | :---: | :--: | :---------- |
-| Keyring | Stable | ✅ | ✅ | OS-level secure storage (Keychain, Credential Manager, etc.) |
-| Vault | Unstable | ✅ | ✅ | HashiCorp Vault integration for enterprise secrets |
+| Store | Stability | Description |
+| ----- | :-------: | :---------- |
+| Keyring | Stable | OS-level secure storage (Keychain, Credential Manager, etc.) |
+| Vault | Unstable | HashiCorp Vault integration for enterprise secrets |
 
 ### KeyringStore
 
@@ -395,17 +389,63 @@ pip install py-key-value-aio[vault]
 
 Distributed stores provide network-based storage for multi-node applications.
 
-| Store | Stability | Async | Sync | Description |
-| ----- | :-------: | :---: | :--: | :---------- |
-| DynamoDB | Unstable | ✅ | ✖️ | AWS DynamoDB key-value storage |
-| S3 | Unstable | ✅ | ✖️ | AWS S3 object storage |
-| Elasticsearch | Unstable | ✅ | ✅ | Full-text search with key-value capabilities |
-| Firestore | Unstable | ✅ | ✅ | Google Cloud Firestore key-value storage |
-| Memcached | Unstable | ✅ | ✖️ | High-performance distributed memory cache |
-| MongoDB | Unstable | ✅ | ✅ | Document database used as key-value store |
-| PostgreSQL | Unstable | ✅ | ✖️ | PostgreSQL database with JSONB storage |
-| Redis | Stable | ✅ | ✅ | Popular in-memory data structure store |
-| Valkey | Stable | ✅ | ✅ | Open-source Redis fork |
+| Store | Stability | Description |
+| ----- | :-------: | :---------- |
+| Aerospike | Unstable | High-performance distributed NoSQL database |
+| DynamoDB | Unstable | AWS DynamoDB key-value storage |
+| S3 | Unstable | AWS S3 object storage |
+| Elasticsearch | Unstable | Full-text search with key-value capabilities |
+| Firestore | Unstable | Google Cloud Firestore key-value storage |
+| Memcached | Unstable | High-performance distributed memory cache |
+| MongoDB | Unstable | Document database used as key-value store |
+| PostgreSQL | Unstable | PostgreSQL database with JSONB storage |
+| Redis | Stable | Popular in-memory data structure store |
+| Valkey | Stable | Open-source Redis fork |
+
+### AerospikeStore
+
+High-performance distributed NoSQL database optimized for speed and scale.
+
+```python
+from key_value.aio.stores.aerospike import AerospikeStore
+
+# Using host list
+store = AerospikeStore(
+    hosts=[("localhost", 3000)],
+    namespace="test",
+    set_name="kv-store"
+)
+
+# Or with an existing client
+import aerospike
+client = aerospike.client({"hosts": [("localhost", 3000)]})
+client.connect()
+store = AerospikeStore(client=client, namespace="test")
+```
+
+**Installation:**
+
+```bash
+pip install py-key-value-aio[aerospike]
+```
+
+**Use Cases:**
+
+- High-throughput applications
+- Real-time data processing
+- Large-scale distributed systems
+- Low-latency caching
+
+**Characteristics:**
+
+- Sub-millisecond latency
+- Horizontal scaling
+- Native TTL support
+- Namespaces must be pre-configured on server
+- Sets created automatically
+- Stable storage format: **Unstable**
+
+---
 
 ### RedisStore
 
