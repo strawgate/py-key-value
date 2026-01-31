@@ -14,6 +14,7 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.dynamodb import DynamoDBStore
+from key_value.shared.errors.store import StoreSetupError
 from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -233,8 +234,8 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
             auto_create=False,
         )
 
-        # Attempting to use the store should raise ValueError
-        with pytest.raises(ValueError, match=f"Table '{table_name}' does not exist"):
+        # Attempting to use the store should raise StoreSetupError (which wraps the ValueError)
+        with pytest.raises(StoreSetupError, match=f"Table '{table_name}' does not exist"):
             async with store:
                 await store.put(collection="test", key="test_key", value={"message": "test"})
 
