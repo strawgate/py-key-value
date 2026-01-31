@@ -6,7 +6,7 @@ from collections.abc import Generator
 import pytest
 from key_value.shared.stores.wait import async_wait_for_true
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.waiting_utils import wait_for_logs
+from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -62,7 +62,7 @@ class PostgreSQLFailedToStartError(Exception):
 class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
     """Test suite for PostgreSQL store."""
 
-    @pytest.fixture(autouse=True, scope="session", params=POSTGRESQL_VERSIONS_TO_TEST)
+    @pytest.fixture(autouse=True, scope="module", params=POSTGRESQL_VERSIONS_TO_TEST)
     def postgresql_container(self, request: pytest.FixtureRequest) -> Generator[DockerContainer, None, None]:
         """Set up PostgreSQL container for testing."""
         version = request.param
@@ -70,23 +70,19 @@ class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
         container.with_exposed_ports(POSTGRESQL_CONTAINER_PORT)
         container.with_env("POSTGRES_PASSWORD", POSTGRESQL_PASSWORD)
         container.with_env("POSTGRES_DB", POSTGRESQL_TEST_DB)
-        try:
-            container.start()
-            # Wait for PostgreSQL to be ready
-            wait_for_logs(container, "database system is ready to accept connections", timeout=60)
+        container.waiting_for(LogMessageWaitStrategy("database system is ready to accept connections"))
+        with container:
             yield container
-        finally:
-            container.stop()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def postgresql_host(self, postgresql_container: DockerContainer) -> str:
         return postgresql_container.get_container_host_ip()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def postgresql_port(self, postgresql_container: DockerContainer) -> int:
         return int(postgresql_container.get_exposed_port(POSTGRESQL_CONTAINER_PORT))
 
-    @pytest.fixture(autouse=True, scope="session")
+    @pytest.fixture(autouse=True, scope="module")
     async def setup_postgresql(self, postgresql_container: DockerContainer, postgresql_host: str, postgresql_port: int) -> None:
         """Wait for PostgreSQL to be ready."""
 

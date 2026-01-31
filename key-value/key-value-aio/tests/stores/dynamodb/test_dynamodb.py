@@ -10,7 +10,7 @@ from inline_snapshot import snapshot
 from key_value.shared.errors.store import StoreSetupError
 from key_value.shared.stores.wait import async_wait_for_true
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.waiting_utils import wait_for_logs
+from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from types_aiobotocore_dynamodb.client import DynamoDBClient
 from types_aiobotocore_dynamodb.type_defs import GetItemOutputTypeDef
 from typing_extensions import override
@@ -66,33 +66,28 @@ def get_dynamo_client_from_store(store: DynamoDBStore) -> DynamoDBClient:
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session", params=DYNAMODB_VERSIONS_TO_TEST)
+    @pytest.fixture(autouse=True, scope="module", params=DYNAMODB_VERSIONS_TO_TEST)
     def dynamodb_container(self, request: pytest.FixtureRequest) -> Generator[DockerContainer, None, None]:
         version = request.param
         container = DockerContainer(image=f"amazon/dynamodb-local:{version}")
         container.with_exposed_ports(DYNAMODB_CONTAINER_PORT)
-        try:
-            container.start()
-
-            # Wait for DynamoDB to be ready
-            wait_for_logs(container, "Initializing DynamoDB Local", timeout=60)
+        container.waiting_for(LogMessageWaitStrategy("Initializing DynamoDB Local"))
+        with container:
             yield container
-        finally:
-            container.stop()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def dynamodb_host(self, dynamodb_container: DockerContainer) -> str:
         return dynamodb_container.get_container_host_ip()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def dynamodb_port(self, dynamodb_container: DockerContainer) -> int:
         return int(dynamodb_container.get_exposed_port(DYNAMODB_CONTAINER_PORT))
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def dynamodb_endpoint(self, dynamodb_host: str, dynamodb_port: int) -> str:
         return f"http://{dynamodb_host}:{dynamodb_port}"
 
-    @pytest.fixture(autouse=True, scope="session")
+    @pytest.fixture(autouse=True, scope="module")
     async def setup_dynamodb(self, dynamodb_container: DockerContainer, dynamodb_endpoint: str) -> None:
         if not await async_wait_for_true(bool_fn=lambda: ping_dynamodb(dynamodb_endpoint), tries=WAIT_FOR_DYNAMODB_TIMEOUT, wait_time=1):
             msg = "DynamoDB failed to start"

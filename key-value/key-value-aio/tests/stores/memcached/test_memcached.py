@@ -46,23 +46,21 @@ class MemcachedFailedToStartError(Exception):
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session", params=MEMCACHED_VERSIONS_TO_TEST)
+    @pytest.fixture(autouse=True, scope="module", params=MEMCACHED_VERSIONS_TO_TEST)
     def memcached_container(self, request: pytest.FixtureRequest) -> Generator[MemcachedContainer, None, None]:
         version = request.param
-        container = MemcachedContainer(image=f"memcached:{version}")
-        container.start()
-        yield container
-        container.stop()
+        with MemcachedContainer(image=f"memcached:{version}") as container:
+            yield container
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def memcached_host(self, memcached_container: MemcachedContainer) -> str:
         return memcached_container.get_container_host_ip()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def memcached_port(self, memcached_container: MemcachedContainer) -> int:
         return int(memcached_container.get_exposed_port(MEMCACHED_CONTAINER_PORT))
 
-    @pytest.fixture(autouse=True, scope="session")
+    @pytest.fixture(autouse=True, scope="module")
     async def setup_memcached(self, memcached_container: MemcachedContainer, memcached_host: str, memcached_port: int) -> None:
         if not await async_wait_for_true(
             bool_fn=lambda: ping_memcached(memcached_host, memcached_port), tries=WAIT_FOR_MEMCACHED_TIMEOUT, wait_time=1

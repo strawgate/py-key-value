@@ -25,7 +25,7 @@ from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 # MongoDB test configuration
 MONGODB_TEST_DB = "kv-store-adapter-tests"
 
-WAIT_FOR_MONGODB_TIMEOUT = 30
+WAIT_FOR_MONGODB_TIMEOUT = 60
 
 MONGODB_VERSIONS_TO_TEST = [
     "5.0",  # Older supported version
@@ -84,27 +84,25 @@ async def clean_mongodb_database(store: MongoDBStore) -> None:
 class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
     """Base class for MongoDB store tests."""
 
-    @pytest.fixture(autouse=True, scope="session", params=MONGODB_VERSIONS_TO_TEST)
+    @pytest.fixture(autouse=True, scope="module", params=MONGODB_VERSIONS_TO_TEST)
     def mongodb_container(self, request: pytest.FixtureRequest) -> Generator[MongoDbContainer, None, None]:
         version = request.param
-        container = MongoDbContainer(image=f"mongo:{version}")
-        container.start()
-        yield container
-        container.stop()
+        with MongoDbContainer(image=f"mongo:{version}") as container:
+            yield container
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def mongodb_host(self, mongodb_container: MongoDbContainer) -> str:
         return mongodb_container.get_container_host_ip()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def mongodb_port(self, mongodb_container: MongoDbContainer) -> int:
         return int(mongodb_container.get_exposed_port(27017))
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def mongodb_url(self, mongodb_host: str, mongodb_port: int) -> str:
         return f"mongodb://{mongodb_host}:{mongodb_port}"
 
-    @pytest.fixture(autouse=True, scope="session")
+    @pytest.fixture(autouse=True, scope="module")
     async def setup_mongodb(self, mongodb_container: MongoDbContainer, mongodb_host: str, mongodb_port: int) -> None:
         if not await async_wait_for_true(
             bool_fn=lambda: ping_mongodb(mongodb_host, mongodb_port), tries=WAIT_FOR_MONGODB_TIMEOUT, wait_time=1

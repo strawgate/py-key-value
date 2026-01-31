@@ -58,24 +58,23 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 with contextlib.suppress(Exception):
                     await client.close()
 
-    @pytest.fixture(scope="session", params=VALKEY_VERSIONS_TO_TEST)
+    @pytest.fixture(autouse=True, scope="module", params=VALKEY_VERSIONS_TO_TEST)
     def valkey_container(self, request: pytest.FixtureRequest):
         version = request.param
         container = DockerContainer(image=f"valkey/valkey:{version}")
         container.with_exposed_ports(VALKEY_CONTAINER_PORT)
-        container.start()
-        yield container
-        container.stop()
+        with container:
+            yield container
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def valkey_host(self, valkey_container: DockerContainer) -> str:
         return valkey_container.get_container_host_ip()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def valkey_port(self, valkey_container: DockerContainer) -> int:
         return int(valkey_container.get_exposed_port(VALKEY_CONTAINER_PORT))
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(autouse=True, scope="module")
     async def setup_valkey(self, valkey_container: DockerContainer, valkey_host: str, valkey_port: int) -> None:
         ready = await async_wait_for_true(
             bool_fn=lambda: self.ping_valkey(valkey_host, valkey_port),

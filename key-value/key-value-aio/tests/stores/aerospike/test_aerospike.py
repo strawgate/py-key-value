@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 from key_value.shared.stores.wait import async_wait_for_true
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.waiting_utils import wait_for_logs
+from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -47,27 +47,27 @@ class AerospikeFailedToStartError(Exception):
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 class TestAerospikeStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session")
+    @pytest.fixture(autouse=True, scope="module")
     def aerospike_container(self) -> Generator[DockerContainer, None, None]:
         container = DockerContainer(image="aerospike/aerospike-server:latest")
         container.with_exposed_ports(AEROSPIKE_CONTAINER_PORT)
-        try:
-            container.start()
-            # Wait for Aerospike to be ready
-            wait_for_logs(container, "service ready: soon there will be cake!", timeout=60)
+        # DEFAULT_TTL must be non-zero to allow TTL writes (0 rejects TTL writes with FORBIDDEN error)
+        # NSUP_PERIOD enables TTL expiration (namespace supervisor runs every N seconds)
+        container.with_env("DEFAULT_TTL", "86400")
+        container.with_env("NSUP_PERIOD", "1")
+        container.waiting_for(LogMessageWaitStrategy("service ready: soon there will be cake!"))
+        with container:
             yield container
-        finally:
-            container.stop()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def aerospike_host(self, aerospike_container: DockerContainer) -> str:
         return aerospike_container.get_container_host_ip()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def aerospike_port(self, aerospike_container: DockerContainer) -> int:
         return int(aerospike_container.get_exposed_port(AEROSPIKE_CONTAINER_PORT))
 
-    @pytest.fixture(autouse=True, scope="session")
+    @pytest.fixture(autouse=True, scope="module")
     async def setup_aerospike(self, aerospike_container: DockerContainer, aerospike_host: str, aerospike_port: int) -> None:
         async def _ping() -> bool:
             return await ping_aerospike(aerospike_host, aerospike_port)

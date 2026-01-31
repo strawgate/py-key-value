@@ -41,29 +41,28 @@ class TestVaultStore(BaseStoreTests):
         except Exception:
             return False
 
-    @pytest.fixture(scope="session", params=VAULT_VERSIONS_TO_TEST)
+    @pytest.fixture(autouse=True, scope="module", params=VAULT_VERSIONS_TO_TEST)
     def vault_container(self, request: pytest.FixtureRequest):
         version = request.param
         container = VaultContainer(image=f"hashicorp/vault:{version}")
         container.with_env("VAULT_DEV_ROOT_TOKEN_ID", VAULT_TOKEN)
         container.with_env("VAULT_DEV_LISTEN_ADDRESS", "0.0.0.0:8200")
-        container.start()
-        yield container
-        container.stop()
+        with container:
+            yield container
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def vault_host(self, vault_container: VaultContainer) -> str:
         return vault_container.get_container_host_ip()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def vault_port(self, vault_container: VaultContainer) -> int:
         return int(vault_container.get_exposed_port(VAULT_CONTAINER_PORT))
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def vault_url(self, vault_host: str, vault_port: int) -> str:
         return f"http://{vault_host}:{vault_port}"
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(autouse=True, scope="module")
     async def setup_vault(self, vault_container: VaultContainer, vault_url: str) -> None:
         if not await async_wait_for_true(bool_fn=lambda: self.ping_vault(vault_url), tries=WAIT_FOR_VAULT_TIMEOUT, wait_time=1):
             msg = "Vault failed to start"

@@ -35,23 +35,21 @@ def get_client_from_store(store: RedisStore) -> Redis:
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
 class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session", params=REDIS_VERSIONS_TO_TEST)
+    @pytest.fixture(autouse=True, scope="module", params=REDIS_VERSIONS_TO_TEST)
     def redis_container(self, request: pytest.FixtureRequest):
         version = request.param
-        container = RedisContainer(image=f"redis:{version}")
-        container.start()
-        yield container
-        container.stop()
+        with RedisContainer(image=f"redis:{version}") as container:
+            yield container
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def redis_host(self, redis_container: RedisContainer) -> str:
         return redis_container.get_container_host_ip()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def redis_port(self, redis_container: RedisContainer) -> int:
         return int(redis_container.get_exposed_port(6379))
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(autouse=True, scope="module")
     async def setup_redis(self, redis_container: RedisContainer, redis_host: str, redis_port: int) -> None:
         async def ping_redis() -> bool:
             client: Redis = Redis(host=redis_host, port=redis_port, db=REDIS_DB, decode_responses=True)

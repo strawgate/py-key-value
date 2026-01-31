@@ -4,7 +4,7 @@ from collections.abc import Generator
 import pytest
 from key_value.shared.stores.wait import async_wait_for_true
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.waiting_utils import wait_for_logs
+from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -49,34 +49,29 @@ class S3FailedToStartError(Exception):
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session", params=LOCALSTACK_VERSIONS_TO_TEST)
+    @pytest.fixture(autouse=True, scope="module", params=LOCALSTACK_VERSIONS_TO_TEST)
     def localstack_container(self, request: pytest.FixtureRequest) -> Generator[DockerContainer, None, None]:
         version = request.param
         container = DockerContainer(image=f"localstack/localstack:{version}")
         container.with_exposed_ports(LOCALSTACK_CONTAINER_PORT)
         container.with_env("SERVICES", "s3")
-        try:
-            container.start()
-
-            # Wait for LocalStack to be ready
-            wait_for_logs(container, "Ready.", timeout=60)
+        container.waiting_for(LogMessageWaitStrategy("Ready."))
+        with container:
             yield container
-        finally:
-            container.stop()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def s3_host(self, localstack_container: DockerContainer) -> str:
         return localstack_container.get_container_host_ip()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def s3_port(self, localstack_container: DockerContainer) -> int:
         return int(localstack_container.get_exposed_port(LOCALSTACK_CONTAINER_PORT))
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def s3_endpoint(self, s3_host: str, s3_port: int) -> str:
         return f"http://{s3_host}:{s3_port}"
 
-    @pytest.fixture(autouse=True, scope="session")
+    @pytest.fixture(autouse=True, scope="module")
     async def setup_s3(self, localstack_container: DockerContainer, s3_endpoint: str) -> None:
         if not await async_wait_for_true(bool_fn=lambda: ping_s3(s3_endpoint), tries=WAIT_FOR_S3_TIMEOUT, wait_time=1):
             msg = "LocalStack S3 failed to start"

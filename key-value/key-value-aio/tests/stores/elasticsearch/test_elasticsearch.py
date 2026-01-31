@@ -9,7 +9,7 @@ from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
 from key_value.shared.utils.managed_entry import ManagedEntry
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.waiting_utils import wait_for_logs
+from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -88,7 +88,7 @@ ELASTICSEARCH_CONTAINER_PORT = 9200
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session", params=ELASTICSEARCH_VERSIONS_TO_TEST)
+    @pytest.fixture(autouse=True, scope="module", params=ELASTICSEARCH_VERSIONS_TO_TEST)
     def elasticsearch_container(self, request: pytest.FixtureRequest) -> Generator[DockerContainer, None, None]:
         version = request.param
         es_image = f"docker.elastic.co/elasticsearch/elasticsearch:{version}"
@@ -99,21 +99,17 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         container.with_env("xpack.security.enabled", "false")
         # Set memory limits via JVM options
         container.with_env("ES_JAVA_OPTS", "-Xms1g -Xmx1g")
-        try:
-            container.start()
-            # Wait for Elasticsearch to be ready
-            wait_for_logs(container, "started", timeout=60)
+        container.waiting_for(LogMessageWaitStrategy("started").with_startup_timeout(120))
+        with container:
             yield container
-        finally:
-            container.stop()
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     def es_url(self, elasticsearch_container: DockerContainer) -> str:
         host = elasticsearch_container.get_container_host_ip()
         port = elasticsearch_container.get_exposed_port(ELASTICSEARCH_CONTAINER_PORT)
         return f"http://{host}:{port}"
 
-    @pytest.fixture(scope="session")
+    @pytest.fixture(autouse=True, scope="module")
     async def setup_elasticsearch(self, elasticsearch_container: DockerContainer, es_url: str) -> None:
         if not await async_wait_for_true(bool_fn=lambda: ping_elasticsearch(es_url), tries=WAIT_FOR_ELASTICSEARCH_TIMEOUT, wait_time=2):
             msg = "Elasticsearch failed to start"
