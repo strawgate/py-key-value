@@ -42,12 +42,13 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
     def __init__(
         self,
         *,
-        client: aerospike.Client,
+        client: aerospike.Client,  # pyright: ignore[reportUnknownMemberType, reportUnknownParameterType]
         namespace: str = DEFAULT_NAMESPACE,
         set_name: str = DEFAULT_SET,
         default_collection: str | None = None,
         auto_create: bool = True,
     ) -> None:  # pyright: ignore[reportUnknownMemberType, reportUnknownParameterType]
+        # pyright: ignore[reportUnknownMemberType, reportUnknownParameterType]
         """Initialize the Aerospike store.
 
         Args:
@@ -83,13 +84,14 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
     def __init__(
         self,
         *,
-        client: aerospike.Client | None = None,
+        client: aerospike.Client | None = None,  # pyright: ignore[reportUnknownMemberType, reportUnknownParameterType]
         hosts: list[tuple[str, int]] | None = None,
         namespace: str = DEFAULT_NAMESPACE,
         set_name: str = DEFAULT_SET,
         default_collection: str | None = None,
         auto_create: bool = True,
     ) -> None:  # pyright: ignore[reportUnknownMemberType, reportUnknownParameterType]
+        # pyright: ignore[reportUnknownMemberType, reportUnknownParameterType]
         """Initialize the Aerospike store.
 
         Args:

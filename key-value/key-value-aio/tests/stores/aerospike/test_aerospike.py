@@ -21,7 +21,7 @@ WAIT_FOR_AEROSPIKE_TIMEOUT = 30
 AEROSPIKE_CONTAINER_PORT = 3000
 
 
-def ping_aerospike(host: str, port: int) -> bool:
+async def ping_aerospike(host: str, port: int) -> bool:
     try:
         import aerospike  # pyright: ignore[reportMissingImports]
 
@@ -63,8 +63,11 @@ class TestAerospikeStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @pytest.fixture(autouse=True, scope="session")
     async def setup_aerospike(self, aerospike_container: DockerContainer, aerospike_host: str, aerospike_port: int) -> None:
+        async def _ping() -> bool:
+            return await ping_aerospike(aerospike_host, aerospike_port)
+
         ready = await async_wait_for_true(
-            bool_fn=lambda: ping_aerospike(aerospike_host, aerospike_port),
+            bool_fn=_ping,
             tries=WAIT_FOR_AEROSPIKE_TIMEOUT,
             wait_time=1,
         )

@@ -66,7 +66,10 @@ class TestAerospikeStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @pytest.fixture(autouse=True, scope="session")
     def setup_aerospike(self, aerospike_container: DockerContainer, aerospike_host: str, aerospike_port: int) -> None:
-        ready = wait_for_true(bool_fn=lambda: ping_aerospike(aerospike_host, aerospike_port), tries=WAIT_FOR_AEROSPIKE_TIMEOUT, wait_time=1)
+        def _ping() -> bool:
+            return ping_aerospike(aerospike_host, aerospike_port)
+
+        ready = wait_for_true(bool_fn=_ping, tries=WAIT_FOR_AEROSPIKE_TIMEOUT, wait_time=1)
         if not ready:
             msg = "Aerospike failed to start"
             raise AerospikeFailedToStartError(msg)

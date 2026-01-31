@@ -1,14 +1,17 @@
 """Tests for PostgreSQL store."""
 
 import contextlib
-from collections.abc import AsyncGenerator
+from collections.abc import Generator
 
 import pytest
+from key_value.shared.stores.wait import async_wait_for_true
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.waiting_utils import wait_for_logs
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.postgresql import PostgreSQLStore
-from tests.conftest import docker_container, should_skip_docker_tests
+from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 try:
@@ -17,8 +20,6 @@ except ImportError:
     asyncpg = None  # type: ignore[assignment]
 
 # PostgreSQL test configuration
-POSTGRESQL_HOST = "localhost"
-POSTGRESQL_HOST_PORT = 5432
 POSTGRESQL_USER = "postgres"
 POSTGRESQL_PASSWORD = "test"
 POSTGRESQL_TEST_DB = "kv_store_test"
@@ -30,16 +31,18 @@ POSTGRESQL_VERSIONS_TO_TEST = [
     "17",  # Latest stable version
 ]
 
+POSTGRESQL_CONTAINER_PORT = 5432
 
-async def ping_postgresql() -> bool:
+
+async def ping_postgresql(host: str, port: int) -> bool:
     """Check if PostgreSQL is available and responsive."""
     if asyncpg is None:
         return False
 
     try:
         conn = await asyncpg.connect(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            host=POSTGRESQL_HOST,
-            port=POSTGRESQL_HOST_PORT,
+            host=host,
+            port=port,
             user=POSTGRESQL_USER,
             password=POSTGRESQL_PASSWORD,
             database="postgres",
@@ -60,37 +63,49 @@ class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
     """Test suite for PostgreSQL store."""
 
     @pytest.fixture(autouse=True, scope="session", params=POSTGRESQL_VERSIONS_TO_TEST)
-    async def setup_postgresql(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+    def postgresql_container(self, request: pytest.FixtureRequest) -> Generator[DockerContainer, None, None]:
         """Set up PostgreSQL container for testing."""
         version = request.param
+        container = DockerContainer(image=f"postgres:{version}-alpine")
+        container.with_exposed_ports(POSTGRESQL_CONTAINER_PORT)
+        container.with_env("POSTGRES_PASSWORD", POSTGRESQL_PASSWORD)
+        container.with_env("POSTGRES_DB", POSTGRESQL_TEST_DB)
+        try:
+            container.start()
+            # Wait for PostgreSQL to be ready
+            wait_for_logs(container, "database system is ready to accept connections", timeout=60)
+            yield container
+        finally:
+            container.stop()
 
-        with docker_container(
-            f"postgresql-test-{version}",
-            f"postgres:{version}-alpine",
-            {str(POSTGRESQL_HOST_PORT): POSTGRESQL_HOST_PORT},
-            environment={
-                "POSTGRES_PASSWORD": POSTGRESQL_PASSWORD,
-                "POSTGRES_DB": POSTGRESQL_TEST_DB,
-            },
-        ):
-            # Import here to avoid issues when asyncpg is not installed
-            from key_value.shared.stores.wait import async_wait_for_true
+    @pytest.fixture(scope="session")
+    def postgresql_host(self, postgresql_container: DockerContainer) -> str:
+        return postgresql_container.get_container_host_ip()
 
-            if not await async_wait_for_true(bool_fn=ping_postgresql, tries=WAIT_FOR_POSTGRESQL_TIMEOUT, wait_time=1):
-                msg = f"PostgreSQL {version} failed to start"
-                raise PostgreSQLFailedToStartError(msg)
+    @pytest.fixture(scope="session")
+    def postgresql_port(self, postgresql_container: DockerContainer) -> int:
+        return int(postgresql_container.get_exposed_port(POSTGRESQL_CONTAINER_PORT))
 
-            yield
+    @pytest.fixture(autouse=True, scope="session")
+    async def setup_postgresql(self, postgresql_container: DockerContainer, postgresql_host: str, postgresql_port: int) -> None:
+        """Wait for PostgreSQL to be ready."""
+
+        async def _ping() -> bool:
+            return await ping_postgresql(postgresql_host, postgresql_port)
+
+        if not await async_wait_for_true(bool_fn=_ping, tries=WAIT_FOR_POSTGRESQL_TIMEOUT, wait_time=1):
+            msg = "PostgreSQL failed to start"
+            raise PostgreSQLFailedToStartError(msg)
 
     @override
     @pytest.fixture
-    async def store(self, setup_postgresql: None) -> PostgreSQLStore:
+    async def store(self, setup_postgresql: None, postgresql_host: str, postgresql_port: int) -> PostgreSQLStore:
         """Create a PostgreSQL store for testing."""
         # Clean up the database before each test by dropping the table
         # The table will be recreated when the store is used via _setup()
         pool = await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportOptionalMemberAccess]
-            host=POSTGRESQL_HOST,
-            port=POSTGRESQL_HOST_PORT,
+            host=postgresql_host,
+            port=postgresql_port,
             user=POSTGRESQL_USER,
             password=POSTGRESQL_PASSWORD,
             database=POSTGRESQL_TEST_DB,
@@ -101,8 +116,8 @@ class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
         await pool.close()  # pyright: ignore[reportUnknownMemberType]
 
         return PostgreSQLStore(
-            host=POSTGRESQL_HOST,
-            port=POSTGRESQL_HOST_PORT,
+            host=postgresql_host,
+            port=postgresql_port,
             database=POSTGRESQL_TEST_DB,
             user=POSTGRESQL_USER,
             password=POSTGRESQL_PASSWORD,
