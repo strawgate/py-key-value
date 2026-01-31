@@ -1,8 +1,6 @@
 # Developing
 
-This monorepo contains the Python package:
-
-- `py-key-value-aio` (async)
+This repository contains the `py-key-value-aio` async key-value library.
 
 ## Prerequisites
 
@@ -26,17 +24,13 @@ make sync
 
 ## Common Commands
 
-Run `make help` to see all available targets. The Makefile supports both
-whole-repo and per-project operations.
+Run `make help` to see all available targets.
 
 ### Lint and Format
 
 ```bash
 # Lint everything (Python + Markdown)
 make lint
-
-# Lint a specific project
-make lint PROJECT=key-value/key-value-aio
 ```
 
 ### Type Checking
@@ -44,9 +38,6 @@ make lint PROJECT=key-value/key-value-aio
 ```bash
 # Type check everything
 make typecheck
-
-# Type check a specific project
-make typecheck PROJECT=key-value/key-value-aio
 ```
 
 ### Testing
@@ -55,22 +46,15 @@ make typecheck PROJECT=key-value/key-value-aio
 # Run all tests
 make test
 
-# Run tests for a specific project
-make test PROJECT=key-value/key-value-aio
-
-# Convenience targets for specific packages
-make test-aio      # async package
-make test-shared   # shared package
+# Run tests with concise output (for AI agents)
+make test-concise
 ```
 
 ### Building
 
 ```bash
-# Build all packages
+# Build package
 make build
-
-# Build a specific project
-make build PROJECT=key-value/key-value-aio
 ```
 
 ## Pre-commit Checks
@@ -83,28 +67,15 @@ make precommit
 
 This runs linting and type checking.
 
-## Using Makefile in CI
-
-The Makefile targets support per-project operations, making them
-suitable for CI workflows:
-
-```yaml
-# Example: CI workflow step
-- name: "Lint"
-  run: make lint PROJECT=${{ matrix.project }}
-
-- name: "Type Check"
-  run: make typecheck PROJECT=${{ matrix.project }}
-
-- name: "Test"
-  run: make test PROJECT=${{ matrix.project }}
-```
-
 ## Project Layout
 
-- Async package: `key-value/key-value-aio/`
-- Shared utilities: `key-value/key-value-shared/`
-- Makefile: Root directory
+```text
+src/
+└── key_value/
+    └── aio/           # Async key-value library
+tests/                 # Test suite
+scripts/               # Development scripts
+```
 
 ## Releasing
 

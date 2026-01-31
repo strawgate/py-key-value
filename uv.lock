@@ -8,14 +8,6 @@ resolution-markers = [
     "python_full_version < '3.12' and sys_platform == 'win32'",
 ]
 
-[manifest]
-members = [
-    "py-key-value",
-    "py-key-value-aio",
-    "py-key-value-shared",
-    "py-key-value-shared-test",
-]
-
 [[package]]
 name = "aerospike"
 version = "18.1.0"
@@ -1121,6 +1113,43 @@ wheels = [
 ]
 
 [[package]]
+name = "h11"
+version = "0.16.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/ee/02a2c011bdab74c6fb3c75474d40b3052059d95df7e73351460c8588d963/h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1", size = 101250, upload-time = "2025-04-24T03:35:25.427Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86", size = 37515, upload-time = "2025-04-24T03:35:24.344Z" },
+]
+
+[[package]]
+name = "httpcore"
+version = "1.0.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "h11" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/06/94/82699a10bca87a5556c9c59b5963f2d039dbd239f25bc2a63907a05a14cb/httpcore-1.0.9.tar.gz", hash = "sha256:6e34463af53fd2ab5d807f399a9b45ea31c3dfa2276f15a2c3f00afff6e176e8", size = 85484, upload-time = "2025-04-24T22:06:22.219Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl", hash = "sha256:2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55", size = 78784, upload-time = "2025-04-24T22:06:20.566Z" },
+]
+
+[[package]]
+name = "httpx"
+version = "0.28.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "certifi" },
+    { name = "httpcore" },
+    { name = "idna" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b1/df/48c586a5fe32a0f01324ee087459e112ebb7224f646c0b5023f5e79e9956/httpx-0.28.1.tar.gz", hash = "sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc", size = 141406, upload-time = "2024-12-06T15:37:23.222Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl", hash = "sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad", size = 73517, upload-time = "2024-12-06T15:37:21.509Z" },
+]
+
+[[package]]
 name = "hvac"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1887,64 +1916,12 @@ wheels = [
 ]
 
 [[package]]
-name = "py-key-value"
-version = "0.3.0"
-source = { virtual = "." }
-
-[package.optional-dependencies]
-dev = [
-    { name = "ast-comments" },
-    { name = "basedpyright" },
-    { name = "dirty-equals" },
-    { name = "diskcache-stubs" },
-    { name = "docker" },
-    { name = "inline-snapshot" },
-    { name = "py-key-value-shared-test" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-dotenv" },
-    { name = "pytest-mock" },
-    { name = "pytest-timeout" },
-    { name = "pytest-xdist" },
-    { name = "ruff" },
-]
-docs = [
-    { name = "mkdocs" },
-    { name = "mkdocs-material" },
-    { name = "mkdocstrings", extra = ["python"] },
-    { name = "mkdocstrings-python" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "ast-comments", marker = "extra == 'dev'", specifier = ">=1.2.3" },
-    { name = "basedpyright", marker = "extra == 'dev'", specifier = ">=1.32.1" },
-    { name = "dirty-equals", marker = "extra == 'dev'", specifier = ">=0.10.0" },
-    { name = "diskcache-stubs", marker = "extra == 'dev'", specifier = ">=5.6.3.6.20240818" },
-    { name = "docker", marker = "extra == 'dev'", specifier = ">=7.1.0" },
-    { name = "inline-snapshot", marker = "extra == 'dev'", specifier = ">=0.30.1" },
-    { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.0" },
-    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
-    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.30.0" },
-    { name = "mkdocstrings-python", marker = "extra == 'docs'", specifier = ">=1.10.0" },
-    { name = "py-key-value-shared-test", marker = "extra == 'dev'", editable = "key-value/key-value-shared-test" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.2" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.2.0" },
-    { name = "pytest-dotenv", marker = "extra == 'dev'", specifier = ">=0.5.2" },
-    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.15.1" },
-    { name = "pytest-timeout", marker = "extra == 'dev'", specifier = ">=2.4.0" },
-    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.8.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.2" },
-]
-provides-extras = ["dev", "docs"]
-
-[[package]]
 name = "py-key-value-aio"
 version = "0.3.0"
-source = { editable = "key-value/key-value-aio" }
+source = { editable = "." }
 dependencies = [
     { name = "beartype" },
-    { name = "py-key-value-shared" },
+    { name = "typing-extensions" },
 ]
 
 [package.optional-dependencies]
@@ -1954,6 +1931,12 @@ aerospike = [
 disk = [
     { name = "diskcache" },
     { name = "pathvalidate" },
+]
+docs = [
+    { name = "mkdocs" },
+    { name = "mkdocs-material" },
+    { name = "mkdocstrings", extra = ["python"] },
+    { name = "mkdocstrings-python" },
 ]
 duckdb = [
     { name = "duckdb" },
@@ -2019,9 +2002,22 @@ wrappers-encryption = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "py-key-value", extra = ["dev"] },
+    { name = "ast-comments" },
+    { name = "basedpyright" },
+    { name = "dirty-equals" },
+    { name = "diskcache-stubs" },
+    { name = "docker" },
+    { name = "inline-snapshot" },
     { name = "py-key-value-aio", extra = ["aerospike", "valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extra = ["disk", "duckdb", "dynamodb", "elasticsearch", "filetree", "keyring", "memcached", "memory", "mongodb", "opensearch", "postgresql", "pydantic", "redis", "rocksdb", "s3", "vault", "wrappers-encryption"] },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-dotenv" },
+    { name = "pytest-mock" },
+    { name = "pytest-timeout" },
+    { name = "pytest-xdist" },
+    { name = "ruff" },
+    { name = "testcontainers", extra = ["generic", "mongodb", "redis"] },
 ]
 
 [package.metadata]
@@ -2044,9 +2040,12 @@ requires-dist = [
     { name = "hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "keyring", marker = "extra == 'keyring'", specifier = ">=25.6.0" },
     { name = "keyring", marker = "extra == 'keyring-linux'", specifier = ">=25.6.0" },
+    { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.6.0" },
+    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
+    { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.30.0" },
+    { name = "mkdocstrings-python", marker = "extra == 'docs'", specifier = ">=1.10.0" },
     { name = "opensearch-py", extras = ["async"], marker = "extra == 'opensearch'", specifier = ">=2.0.0" },
     { name = "pathvalidate", marker = "extra == 'disk'", specifier = ">=3.3.1" },
-    { name = "py-key-value-shared", editable = "key-value/key-value-shared" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
     { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.0.0" },
     { name = "pytz", marker = "extra == 'duckdb'", specifier = ">=2025.2" },
@@ -2056,72 +2055,25 @@ requires-dist = [
     { name = "types-aiobotocore-dynamodb", marker = "extra == 'dynamodb'", specifier = ">=2.16.0" },
     { name = "types-aiobotocore-s3", marker = "extra == 's3'", specifier = ">=2.16.0" },
     { name = "types-hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
+    { name = "typing-extensions", specifier = ">=4.15.0" },
     { name = "valkey-glide", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-provides-extras = ["memory", "disk", "filetree", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "opensearch", "dynamodb", "s3", "keyring", "keyring-linux", "pydantic", "aerospike", "rocksdb", "duckdb", "postgresql", "wrappers-encryption"]
+provides-extras = ["memory", "disk", "filetree", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "opensearch", "dynamodb", "s3", "keyring", "keyring-linux", "pydantic", "aerospike", "rocksdb", "duckdb", "postgresql", "wrappers-encryption", "docs"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "py-key-value", extras = ["dev"], virtual = "." },
+    { name = "ast-comments", specifier = ">=1.2.3" },
+    { name = "basedpyright", specifier = ">=1.32.1" },
+    { name = "dirty-equals", specifier = ">=0.10.0" },
+    { name = "diskcache-stubs", specifier = ">=5.6.3.6.20240818" },
+    { name = "docker", specifier = ">=7.1.0" },
+    { name = "inline-snapshot", specifier = ">=0.30.1" },
     { name = "py-key-value-aio", extras = ["aerospike"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extras = ["keyring"] },
     { name = "py-key-value-aio", extras = ["memory", "disk", "filetree", "redis", "elasticsearch", "opensearch", "memcached", "mongodb", "vault", "dynamodb", "s3", "rocksdb", "duckdb", "postgresql"] },
     { name = "py-key-value-aio", extras = ["pydantic"] },
     { name = "py-key-value-aio", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extras = ["wrappers-encryption"] },
-]
-
-[[package]]
-name = "py-key-value-shared"
-version = "0.3.0"
-source = { editable = "key-value/key-value-shared" }
-dependencies = [
-    { name = "beartype" },
-    { name = "typing-extensions" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "py-key-value", extra = ["dev"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "beartype", specifier = ">=0.20.0" },
-    { name = "typing-extensions", specifier = ">=4.15.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "py-key-value", extras = ["dev"], virtual = "." }]
-
-[[package]]
-name = "py-key-value-shared-test"
-version = "0.3.0"
-source = { editable = "key-value/key-value-shared-test" }
-
-[package.dev-dependencies]
-dev = [
-    { name = "basedpyright" },
-    { name = "dirty-equals" },
-    { name = "docker" },
-    { name = "inline-snapshot" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-dotenv" },
-    { name = "pytest-mock" },
-    { name = "pytest-timeout" },
-    { name = "pytest-xdist" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "basedpyright", specifier = ">=1.32.1" },
-    { name = "dirty-equals", specifier = ">=0.10.0" },
-    { name = "docker", specifier = ">=7.1.0" },
-    { name = "inline-snapshot", specifier = ">=0.30.1" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-asyncio", specifier = ">=1.2.0" },
     { name = "pytest-dotenv", specifier = ">=0.5.2" },
@@ -2129,6 +2081,7 @@ dev = [
     { name = "pytest-timeout", specifier = ">=2.4.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
     { name = "ruff", specifier = ">=0.14.2" },
+    { name = "testcontainers", extras = ["redis", "mongodb", "elasticsearch", "memcached", "vault", "generic"], specifier = ">=4.10.0" },
 ]
 
 [[package]]
@@ -2740,6 +2693,34 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e041b6ae58d80074f81b7d5121207425c964ddf5cfdbd/sniffio-1.3.1.tar.gz", hash = "sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc", size = 20372, upload-time = "2024-02-25T23:20:04.057Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl", hash = "sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2", size = 10235, upload-time = "2024-02-25T23:20:01.196Z" },
+]
+
+[[package]]
+name = "testcontainers"
+version = "4.14.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "docker" },
+    { name = "python-dotenv" },
+    { name = "typing-extensions" },
+    { name = "urllib3" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ad/5a/d24f5c7ef787fc152b1e4e4cfb84ef9364dbf165b3c7f7817e2f2583f749/testcontainers-4.14.0.tar.gz", hash = "sha256:3b2d4fa487af23024f00fcaa2d1cf4a5c6ad0c22e638a49799813cb49b3176c7", size = 79885, upload-time = "2026-01-07T23:35:22.825Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ea/c4/53efc88d890d7dd38337424a83bbff32007d9d3390a79a4b53bfddaa64e8/testcontainers-4.14.0-py3-none-any.whl", hash = "sha256:64e79b6b1e6d2b9b9e125539d35056caab4be739f7b7158c816d717f3596fa59", size = 125385, upload-time = "2026-01-07T23:35:21.343Z" },
+]
+
+[package.optional-dependencies]
+generic = [
+    { name = "httpx" },
+    { name = "redis" },
+]
+mongodb = [
+    { name = "pymongo" },
+]
+redis = [
+    { name = "redis" },
 ]
 
 [[package]]
