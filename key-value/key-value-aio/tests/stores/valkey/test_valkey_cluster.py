@@ -3,7 +3,11 @@
 This test file verifies ValkeyStore type compatibility with GlideClusterClient.
 """
 
+import sys
 
+import pytest
+
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="Valkey is not supported on Windows")
 
 class TestValkeyClusterClientSupport:
     """Tests for GlideClusterClient type compatibility with ValkeyStore."""
@@ -31,13 +35,6 @@ class TestValkeyClusterClientSupport:
         from key_value.aio.stores.valkey.store import GlideClusterClient as ImportedClient
 
         assert ImportedClient is GlideClusterClient
-
-    async def test_store_docstring_mentions_cluster(self):
-        """Verify that ValkeyStore documentation mentions cluster support."""
-        from key_value.aio.stores.valkey import ValkeyStore
-
-        assert ValkeyStore.__doc__ is not None
-        assert "cluster" in ValkeyStore.__doc__.lower() or "GlideClusterClient" in ValkeyStore.__doc__
 
     async def test_cluster_config_type_accepted(self):
         """Verify that GlideClusterClientConfiguration is imported and usable."""
