@@ -1,5 +1,5 @@
 import contextlib
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -9,6 +9,8 @@ from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
 from key_value.shared.utils.managed_entry import ManagedEntry
 from opensearchpy import AsyncOpenSearch
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -18,17 +20,12 @@ from key_value.aio.stores.opensearch.store import (
     OpenSearchV1CollectionSanitizationStrategy,
     OpenSearchV1KeySanitizationStrategy,
 )
-from tests.conftest import docker_container, should_skip_docker_tests
+from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
-LOCALHOST = "localhost"
 
-CONTAINER_PORT = 9200
-HOST_PORT = 19201
-
-OPENSEARCH_URL = f"http://{LOCALHOST}:{HOST_PORT}"
-
+OPENSEARCH_CONTAINER_PORT = 9200
 
 WAIT_FOR_OPENSEARCH_TIMEOUT = 30
 
@@ -38,12 +35,12 @@ OPENSEARCH_VERSIONS_TO_TEST = [
 ]
 
 
-def get_opensearch_client() -> AsyncOpenSearch:
-    return AsyncOpenSearch(hosts=[OPENSEARCH_URL], use_ssl=False, verify_certs=False)
+def get_opensearch_client(opensearch_url: str) -> AsyncOpenSearch:
+    return AsyncOpenSearch(hosts=[opensearch_url], use_ssl=False, verify_certs=False)
 
 
-async def ping_opensearch() -> bool:
-    opensearch_client: AsyncOpenSearch = get_opensearch_client()
+async def ping_opensearch(opensearch_url: str) -> bool:
+    opensearch_client: AsyncOpenSearch = get_opensearch_client(opensearch_url)
 
     async with opensearch_client:
         try:
@@ -91,30 +88,34 @@ def test_managed_entry_document_conversion():
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(autouse=True, scope="session", params=OPENSEARCH_VERSIONS_TO_TEST)
-    async def setup_opensearch(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+    @pytest.fixture(autouse=True, scope="module", params=OPENSEARCH_VERSIONS_TO_TEST)
+    def opensearch_container(self, request: pytest.FixtureRequest) -> Generator[DockerContainer, None, None]:
         version = request.param
         os_image = f"opensearchproject/opensearch:{version}"
+        container = DockerContainer(image=os_image)
+        container.with_exposed_ports(OPENSEARCH_CONTAINER_PORT)
+        container.with_env("discovery.type", "single-node")
+        container.with_env("DISABLE_SECURITY_PLUGIN", "true")
+        container.with_env("OPENSEARCH_INITIAL_ADMIN_PASSWORD", "TestPassword123!")
+        container.waiting_for(LogMessageWaitStrategy("started").with_startup_timeout(120))
+        with container:
+            yield container
 
-        with docker_container(
-            f"opensearch-test-{version}",
-            os_image,
-            {str(CONTAINER_PORT): HOST_PORT},
-            {
-                "discovery.type": "single-node",
-                "DISABLE_SECURITY_PLUGIN": "true",
-                "OPENSEARCH_INITIAL_ADMIN_PASSWORD": "TestPassword123!",
-            },
-        ):
-            if not await async_wait_for_true(bool_fn=ping_opensearch, tries=WAIT_FOR_OPENSEARCH_TIMEOUT, wait_time=2):
-                msg = f"OpenSearch {version} failed to start"
-                raise OpenSearchFailedToStartError(msg)
+    @pytest.fixture(scope="module")
+    def opensearch_url(self, opensearch_container: DockerContainer) -> str:
+        host = opensearch_container.get_container_host_ip()
+        port = opensearch_container.get_exposed_port(OPENSEARCH_CONTAINER_PORT)
+        return f"http://{host}:{port}"
 
-            yield
+    @pytest.fixture(autouse=True, scope="module")
+    async def setup_opensearch(self, opensearch_container: DockerContainer, opensearch_url: str) -> None:
+        if not await async_wait_for_true(bool_fn=lambda: ping_opensearch(opensearch_url), tries=WAIT_FOR_OPENSEARCH_TIMEOUT, wait_time=2):
+            msg = "OpenSearch failed to start"
+            raise OpenSearchFailedToStartError(msg)
 
     @pytest.fixture
-    async def opensearch_client(self, setup_opensearch: None) -> AsyncGenerator[AsyncOpenSearch, None]:
-        opensearch_client = get_opensearch_client()
+    async def opensearch_client(self, setup_opensearch: None, opensearch_url: str) -> AsyncGenerator[AsyncOpenSearch, None]:
+        opensearch_client = get_opensearch_client(opensearch_url)
 
         async with opensearch_client:
             await cleanup_opensearch_indices(opensearch_client=opensearch_client)
