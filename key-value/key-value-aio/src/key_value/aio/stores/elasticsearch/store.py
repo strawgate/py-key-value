@@ -133,11 +133,6 @@ class ElasticsearchV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
             hash_fragment_mode=HashFragmentMode.ALWAYS,
         )
 
-    @override
-    def sanitize(self, value: str) -> str:
-        # Elasticsearch index names must be lowercase
-        return super().sanitize(value).lower()
-
 
 class ElasticsearchStore(
     BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCullStore, BaseContextManagerStore, BaseStore
@@ -300,7 +295,10 @@ class ElasticsearchStore(
             raise
 
     def _get_index_name(self, collection: str) -> str:
-        return self._index_prefix + "-" + self._sanitize_collection(collection=collection)
+        # The Sanitization Strategy ensures that we do not have conflicts between upper and lower case
+        # but it does not lowercase the collection name, which conveniently also prevents errors when using
+        # PassthroughStrategy.
+        return (self._index_prefix + "-" + self._sanitize_collection(collection=collection)).lower()
 
     def _get_document_id(self, key: str) -> str:
         return self._sanitize_key(key=key)
