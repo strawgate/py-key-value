@@ -1,23 +1,21 @@
 import contextlib
 import json
-from collections.abc import AsyncGenerator
 
 import pytest
 from dirty_equals import IsDatetime
 from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
+from testcontainers.core.container import DockerContainer
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
-from tests.conftest import detect_on_windows, docker_container, should_skip_docker_tests
+from tests.conftest import detect_on_windows, should_skip_docker_tests
 from tests.stores.base import (
     BaseStoreTests,
     ContextManagerStoreTestMixin,
 )
 
 # Valkey test configuration
-VALKEY_HOST = "localhost"
-VALKEY_PORT = 6380  # normally 6379, avoid clashing with Redis tests
 VALKEY_DB = 15
 VALKEY_CONTAINER_PORT = 6379
 
@@ -37,19 +35,19 @@ class ValkeyFailedToStartError(Exception):
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
 @pytest.mark.skipif(detect_on_windows(), reason="Valkey is not supported on Windows")
 class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
-    async def get_valkey_client(self):
+    async def get_valkey_client(self, host: str, port: int):
         from glide.glide_client import GlideClient
         from glide_shared.config import GlideClientConfiguration, NodeAddress
 
         client_config: GlideClientConfiguration = GlideClientConfiguration(
-            addresses=[NodeAddress(host=VALKEY_HOST, port=VALKEY_PORT)], database_id=VALKEY_DB
+            addresses=[NodeAddress(host=host, port=port)], database_id=VALKEY_DB
         )
         return await GlideClient.create(config=client_config)
 
-    async def ping_valkey(self) -> bool:
+    async def ping_valkey(self, host: str, port: int) -> bool:
         client = None
         try:
-            client = await self.get_valkey_client()
+            client = await self.get_valkey_client(host, port)
             await client.ping()
         except Exception:
             return False
@@ -60,27 +58,47 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 with contextlib.suppress(Exception):
                     await client.close()
 
-    @pytest.fixture(scope="session", params=VALKEY_VERSIONS_TO_TEST)
-    async def setup_valkey(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+    @pytest.fixture(autouse=True, scope="module", params=VALKEY_VERSIONS_TO_TEST)
+    def valkey_container(self, request: pytest.FixtureRequest):
         version = request.param
+        container = DockerContainer(image=f"valkey/valkey:{version}")
+        container.with_exposed_ports(VALKEY_CONTAINER_PORT)
+        with container:
+            yield container
 
-        with docker_container(f"valkey-test-{version}", f"valkey/valkey:{version}", {str(VALKEY_CONTAINER_PORT): VALKEY_PORT}):
-            if not await async_wait_for_true(bool_fn=self.ping_valkey, tries=WAIT_FOR_VALKEY_TIMEOUT, wait_time=1):
-                msg = f"Valkey {version} failed to start"
-                raise ValkeyFailedToStartError(msg)
+    @pytest.fixture(scope="module")
+    def valkey_host(self, valkey_container: DockerContainer) -> str:
+        return valkey_container.get_container_host_ip()
 
-            yield
+    @pytest.fixture(scope="module")
+    def valkey_port(self, valkey_container: DockerContainer) -> int:
+        return int(valkey_container.get_exposed_port(VALKEY_CONTAINER_PORT))
+
+    @pytest.fixture(autouse=True, scope="module")
+    async def setup_valkey(self, valkey_container: DockerContainer, valkey_host: str, valkey_port: int) -> None:
+        ready = await async_wait_for_true(
+            bool_fn=lambda: self.ping_valkey(valkey_host, valkey_port),
+            tries=WAIT_FOR_VALKEY_TIMEOUT,
+            wait_time=1,
+        )
+        if not ready:
+            msg = "Valkey failed to start"
+            raise ValkeyFailedToStartError(msg)
 
     @override
     @pytest.fixture
-    async def store(self, setup_valkey: None):
+    async def store(self, setup_valkey: None, valkey_host: str, valkey_port: int):
         from key_value.aio.stores.valkey import ValkeyStore
 
-        store: ValkeyStore = ValkeyStore(host=VALKEY_HOST, port=VALKEY_PORT, db=VALKEY_DB)
+        store: ValkeyStore = ValkeyStore(host=valkey_host, port=valkey_port, db=VALKEY_DB)
 
         # This is a syncronous client
-        client = await self.get_valkey_client()
-        _ = await client.flushdb()
+        client = await self.get_valkey_client(valkey_host, valkey_port)
+        try:
+            _ = await client.flushdb()
+        finally:
+            with contextlib.suppress(Exception):
+                await client.close()
 
         return store
 

@@ -1,5 +1,5 @@
 import contextlib
-from collections.abc import AsyncGenerator
+from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -10,6 +10,7 @@ from inline_snapshot import snapshot
 from key_value.shared.stores.wait import async_wait_for_true
 from key_value.shared.utils.managed_entry import ManagedEntry
 from pymongo import AsyncMongoClient
+from testcontainers.mongodb import MongoDbContainer
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
@@ -18,15 +19,13 @@ from key_value.aio.stores.mongodb.store import (
     MongoDBSerializationAdapter,
     MongoDBV1CollectionSanitizationStrategy,
 )
-from tests.conftest import docker_container, should_skip_docker_tests
+from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # MongoDB test configuration
-MONGODB_HOST = "localhost"
-MONGODB_HOST_PORT = 27017
 MONGODB_TEST_DB = "kv-store-adapter-tests"
 
-WAIT_FOR_MONGODB_TIMEOUT = 30
+WAIT_FOR_MONGODB_TIMEOUT = 60
 
 MONGODB_VERSIONS_TO_TEST = [
     "5.0",  # Older supported version
@@ -34,10 +33,11 @@ MONGODB_VERSIONS_TO_TEST = [
 ]
 
 
-async def ping_mongodb() -> bool:
+async def ping_mongodb(mongodb_url: str) -> bool:
     try:
-        client: AsyncMongoClient[Any] = AsyncMongoClient[Any](host=MONGODB_HOST, port=MONGODB_HOST_PORT)
+        client: AsyncMongoClient[Any] = AsyncMongoClient[Any](mongodb_url)
         _ = await client.list_database_names()
+        await client.close()
     except Exception:
         return False
 
@@ -84,16 +84,21 @@ async def clean_mongodb_database(store: MongoDBStore) -> None:
 class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
     """Base class for MongoDB store tests."""
 
-    @pytest.fixture(autouse=True, scope="session", params=MONGODB_VERSIONS_TO_TEST)
-    async def setup_mongodb(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+    @pytest.fixture(autouse=True, scope="module", params=MONGODB_VERSIONS_TO_TEST)
+    def mongodb_container(self, request: pytest.FixtureRequest) -> Generator[MongoDbContainer, None, None]:
         version = request.param
+        with MongoDbContainer(image=f"mongo:{version}") as container:
+            yield container
 
-        with docker_container(f"mongodb-test-{version}", f"mongo:{version}", {str(MONGODB_HOST_PORT): MONGODB_HOST_PORT}):
-            if not await async_wait_for_true(bool_fn=ping_mongodb, tries=WAIT_FOR_MONGODB_TIMEOUT, wait_time=1):
-                msg = f"MongoDB {version} failed to start"
-                raise MongoDBFailedToStartError(msg)
+    @pytest.fixture(scope="module")
+    def mongodb_url(self, mongodb_container: MongoDbContainer) -> str:
+        return mongodb_container.get_connection_url()
 
-            yield
+    @pytest.fixture(autouse=True, scope="module")
+    async def setup_mongodb(self, mongodb_container: MongoDbContainer, mongodb_url: str) -> None:
+        if not await async_wait_for_true(bool_fn=lambda: ping_mongodb(mongodb_url), tries=WAIT_FOR_MONGODB_TIMEOUT, wait_time=1):
+            msg = "MongoDB failed to start"
+            raise MongoDBFailedToStartError(msg)
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
@@ -132,17 +137,17 @@ class TestMongoDBStore(BaseMongoDBStoreTests):
 
     @override
     @pytest.fixture
-    async def store(self, setup_mongodb: None) -> MongoDBStore:
-        store = MongoDBStore(url=f"mongodb://{MONGODB_HOST}:{MONGODB_HOST_PORT}", db_name=MONGODB_TEST_DB)
+    async def store(self, setup_mongodb: None, mongodb_url: str) -> MongoDBStore:
+        store = MongoDBStore(url=mongodb_url, db_name=MONGODB_TEST_DB)
 
         await clean_mongodb_database(store=store)
 
         return store
 
     @pytest.fixture
-    async def sanitizing_store(self, setup_mongodb: None) -> MongoDBStore:
+    async def sanitizing_store(self, setup_mongodb: None, mongodb_url: str) -> MongoDBStore:
         store = MongoDBStore(
-            url=f"mongodb://{MONGODB_HOST}:{MONGODB_HOST_PORT}",
+            url=mongodb_url,
             db_name=f"{MONGODB_TEST_DB}-sanitizing",
             collection_sanitization_strategy=MongoDBV1CollectionSanitizationStrategy(),
         )
