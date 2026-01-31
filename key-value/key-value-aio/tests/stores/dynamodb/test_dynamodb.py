@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from dirty_equals import IsDatetime
 from inline_snapshot import snapshot
+from key_value.shared.errors.store import StoreSetupError
 from key_value.shared.stores.wait import async_wait_for_true
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.waiting_utils import wait_for_logs
@@ -39,7 +40,7 @@ async def ping_dynamodb(endpoint_url: str) -> bool:
 
         session = aioboto3.Session(
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
         )
         async with session.client(service_name="dynamodb", endpoint_url=endpoint_url) as client:  # type: ignore
@@ -104,7 +105,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
             table_name=DYNAMODB_TEST_TABLE,
             endpoint_url=dynamodb_endpoint,
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
         )
 
@@ -113,7 +114,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         session = aioboto3.Session(
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
         )
         async with session.client(service_name="dynamodb", endpoint_url=dynamodb_endpoint) as client:  # type: ignore
@@ -172,3 +173,122 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         now = datetime.now(timezone.utc)
         assert ttl_value > now.timestamp(), "TTL timestamp should be a positive integer"
         assert ttl_value < now.timestamp() + 10, "TTL timestamp should be less than the expected expiration time"
+
+    async def test_table_config_sse_specification(self, setup_dynamodb: None, dynamodb_endpoint: str):
+        """Test that SSESpecification can be passed via table_config."""
+        table_name = "kv-store-test-sse"
+
+        # Clean up table if it exists
+        import aioboto3
+
+        session = aioboto3.Session(
+            aws_access_key_id="test",
+            aws_secret_access_key="test",
+            region_name="us-east-1",
+        )
+        async with session.client(service_name="dynamodb", endpoint_url=dynamodb_endpoint) as client:  # type: ignore
+            with contextlib.suppress(Exception):
+                await client.delete_table(TableName=table_name)  # type: ignore
+                waiter = client.get_waiter("table_not_exists")  # type: ignore
+                await waiter.wait(TableName=table_name)  # type: ignore
+
+        # Create store with SSE configuration
+        store = DynamoDBStore(
+            table_name=table_name,
+            endpoint_url=dynamodb_endpoint,
+            aws_access_key_id="test",
+            aws_secret_access_key="test",
+            region_name="us-east-1",
+            table_config={
+                "SSESpecification": {
+                    "Enabled": True,
+                    "SSEType": "AES256",
+                }
+            },
+        )
+
+        async with store:
+            # Verify table was created successfully
+            async with session.client(service_name="dynamodb", endpoint_url=dynamodb_endpoint) as client:  # type: ignore
+                table_description = await client.describe_table(TableName=table_name)  # type: ignore
+
+                # DynamoDB Local might not fully support SSE, but we can verify the store accepts the config
+                # The important thing is that the store doesn't error when table_config is provided
+                assert table_description is not None
+
+            # Verify basic operations still work
+            await store.put(collection="test", key="test_key", value={"message": "SSE test"})
+            result = await store.get(collection="test", key="test_key")
+            assert result == {"message": "SSE test"}
+
+    async def test_auto_create_false_raises_error(self, setup_dynamodb: None, dynamodb_endpoint: str):
+        """Test that auto_create=False raises error when table doesn't exist."""
+        table_name = "kv-store-test-nonexistent"
+
+        # Clean up table if it exists to ensure it doesn't exist
+        import aioboto3
+
+        session = aioboto3.Session(
+            aws_access_key_id="test",
+            aws_secret_access_key="test",
+            region_name="us-east-1",
+        )
+        async with session.client(service_name="dynamodb", endpoint_url=dynamodb_endpoint) as client:  # type: ignore
+            with contextlib.suppress(Exception):
+                await client.delete_table(TableName=table_name)  # type: ignore
+                waiter = client.get_waiter("table_not_exists")  # type: ignore
+                await waiter.wait(TableName=table_name)  # type: ignore
+
+        # Create store with auto_create=False
+        store = DynamoDBStore(
+            table_name=table_name,
+            endpoint_url=dynamodb_endpoint,
+            aws_access_key_id="test",
+            aws_secret_access_key="test",
+            region_name="us-east-1",
+            auto_create=False,
+        )
+
+        # Attempting to use the store should raise StoreSetupError (which wraps the ValueError)
+        with pytest.raises(StoreSetupError, match=f"Table '{table_name}' does not exist"):
+            async with store:
+                await store.put(collection="test", key="test_key", value={"message": "test"})
+
+    async def test_auto_create_true_creates_table(self, setup_dynamodb: None, dynamodb_endpoint: str):
+        """Test that auto_create=True (default) creates table when it doesn't exist."""
+        table_name = "kv-store-test-autocreate"
+
+        # Clean up table if it exists to ensure it doesn't exist
+        import aioboto3
+
+        session = aioboto3.Session(
+            aws_access_key_id="test",
+            aws_secret_access_key="test",
+            region_name="us-east-1",
+        )
+        async with session.client(service_name="dynamodb", endpoint_url=dynamodb_endpoint) as client:  # type: ignore
+            with contextlib.suppress(Exception):
+                await client.delete_table(TableName=table_name)  # type: ignore
+                waiter = client.get_waiter("table_not_exists")  # type: ignore
+                await waiter.wait(TableName=table_name)  # type: ignore
+
+        # Create store with auto_create=True (default)
+        store = DynamoDBStore(
+            table_name=table_name,
+            endpoint_url=dynamodb_endpoint,
+            aws_access_key_id="test",
+            aws_secret_access_key="test",
+            region_name="us-east-1",
+            auto_create=True,
+        )
+
+        # Store should work and create table automatically
+        async with store:
+            await store.put(collection="test", key="test_key", value={"message": "autocreate test"})
+            result = await store.get(collection="test", key="test_key")
+            assert result == {"message": "autocreate test"}
+
+            # Verify table was actually created
+            async with session.client(service_name="dynamodb", endpoint_url=dynamodb_endpoint) as client:  # type: ignore
+                table_description = await client.describe_table(TableName=table_name)  # type: ignore
+                assert table_description is not None

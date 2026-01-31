@@ -6,7 +6,7 @@ from inline_snapshot import snapshot
 from key_value.shared.errors import DeserializationError
 from pydantic import AnyHttpUrl, BaseModel
 
-from key_value.aio.adapters.pydantic import PydanticAdapter
+from key_value.aio.adapters.base_model import BaseModelAdapter
 from key_value.aio.stores.memory.store import MemoryStore
 
 
@@ -41,7 +41,7 @@ FIXED_UPDATED_AT: datetime = datetime(year=2021, month=1, day=1, hour=15, minute
 SAMPLE_USER: User = User(name="John Doe", email="john.doe@example.com", age=30)
 SAMPLE_USER_2: User = User(name="Jane Doe", email="jane.doe@example.com", age=25)
 SAMPLE_PRODUCT: Product = Product(name="Widget", price=29.99, quantity=10, url=AnyHttpUrl(url="https://example.com"))
-SAMPLE_ORDER: Order = Order(created_at=datetime.now(), updated_at=datetime.now(), user=SAMPLE_USER, product=SAMPLE_PRODUCT, paid=False)
+SAMPLE_ORDER: Order = Order(created_at=FIXED_CREATED_AT, updated_at=FIXED_UPDATED_AT, user=SAMPLE_USER, product=SAMPLE_PRODUCT, paid=False)
 
 TEST_COLLECTION: str = "test_collection"
 TEST_KEY: str = "test_key"
@@ -69,32 +69,36 @@ def errors_from_log_record(record: LogRecord) -> list[str]:
     return record.errors  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
 
 
-class TestPydanticAdapter:
+class TestBaseModelAdapter:
     @pytest.fixture
     async def store(self) -> MemoryStore:
         return MemoryStore()
 
     @pytest.fixture
-    async def user_adapter(self, store: MemoryStore) -> PydanticAdapter[User]:
-        return PydanticAdapter[User](key_value=store, pydantic_model=User)
+    async def user_adapter(self, store: MemoryStore) -> BaseModelAdapter[User]:
+        return BaseModelAdapter[User](key_value=store, pydantic_model=User)
 
     @pytest.fixture
-    async def updated_user_adapter(self, store: MemoryStore) -> PydanticAdapter[UpdatedUser]:
-        return PydanticAdapter[UpdatedUser](key_value=store, pydantic_model=UpdatedUser)
+    async def updated_user_adapter(self, store: MemoryStore) -> BaseModelAdapter[UpdatedUser]:
+        return BaseModelAdapter[UpdatedUser](key_value=store, pydantic_model=UpdatedUser)
 
     @pytest.fixture
-    async def product_adapter(self, store: MemoryStore) -> PydanticAdapter[Product]:
-        return PydanticAdapter[Product](key_value=store, pydantic_model=Product)
+    async def updated_user_adapter_raising(self, store: MemoryStore) -> BaseModelAdapter[UpdatedUser]:
+        return BaseModelAdapter[UpdatedUser](key_value=store, pydantic_model=UpdatedUser, raise_on_validation_error=True)
 
     @pytest.fixture
-    async def product_list_adapter(self, store: MemoryStore) -> PydanticAdapter[list[Product]]:
-        return PydanticAdapter[list[Product]](key_value=store, pydantic_model=list[Product])
+    async def product_adapter(self, store: MemoryStore) -> BaseModelAdapter[Product]:
+        return BaseModelAdapter[Product](key_value=store, pydantic_model=Product)
 
     @pytest.fixture
-    async def order_adapter(self, store: MemoryStore) -> PydanticAdapter[Order]:
-        return PydanticAdapter[Order](key_value=store, pydantic_model=Order)
+    async def product_list_adapter(self, store: MemoryStore) -> BaseModelAdapter[list[Product]]:
+        return BaseModelAdapter[list[Product]](key_value=store, pydantic_model=list[Product])
 
-    async def test_simple_adapter(self, user_adapter: PydanticAdapter[User]):
+    @pytest.fixture
+    async def order_adapter(self, store: MemoryStore) -> BaseModelAdapter[Order]:
+        return BaseModelAdapter[Order](key_value=store, pydantic_model=Order)
+
+    async def test_simple_adapter(self, user_adapter: BaseModelAdapter[User]):
         await user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER)
         cached_user: User | None = await user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
         assert cached_user == SAMPLE_USER
@@ -103,7 +107,7 @@ class TestPydanticAdapter:
 
         assert await user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
 
-    async def test_simple_adapter_with_default(self, user_adapter: PydanticAdapter[User]):
+    async def test_simple_adapter_with_default(self, user_adapter: BaseModelAdapter[User]):
         assert await user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY, default=SAMPLE_USER) == SAMPLE_USER
 
         await user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER_2)
@@ -113,7 +117,7 @@ class TestPydanticAdapter:
             [SAMPLE_USER_2, SAMPLE_USER]
         )
 
-    async def test_simple_adapter_with_list(self, product_list_adapter: PydanticAdapter[list[Product]]):
+    async def test_simple_adapter_with_list(self, product_list_adapter: BaseModelAdapter[list[Product]]):
         await product_list_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=[SAMPLE_PRODUCT, SAMPLE_PRODUCT])
         cached_products: list[Product] | None = await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
         assert cached_products == [SAMPLE_PRODUCT, SAMPLE_PRODUCT]
@@ -122,7 +126,7 @@ class TestPydanticAdapter:
         assert await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
 
     async def test_simple_adapter_with_validation_error_ignore(
-        self, user_adapter: PydanticAdapter[User], updated_user_adapter: PydanticAdapter[UpdatedUser]
+        self, user_adapter: BaseModelAdapter[User], updated_user_adapter: BaseModelAdapter[UpdatedUser]
     ):
         await user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER)
 
@@ -130,21 +134,20 @@ class TestPydanticAdapter:
         assert updated_user is None
 
     async def test_simple_adapter_with_validation_error_raise(
-        self, user_adapter: PydanticAdapter[User], updated_user_adapter: PydanticAdapter[UpdatedUser]
+        self, user_adapter: BaseModelAdapter[User], updated_user_adapter_raising: BaseModelAdapter[UpdatedUser]
     ):
         await user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER)
-        updated_user_adapter._raise_on_validation_error = True  # pyright: ignore[reportPrivateUsage]
         with pytest.raises(DeserializationError):
-            await updated_user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+            await updated_user_adapter_raising.get(collection=TEST_COLLECTION, key=TEST_KEY)
 
-    async def test_complex_adapter(self, order_adapter: PydanticAdapter[Order]):
+    async def test_complex_adapter(self, order_adapter: BaseModelAdapter[Order]):
         await order_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_ORDER, ttl=10)
         assert await order_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) == SAMPLE_ORDER
 
         assert await order_adapter.delete(collection=TEST_COLLECTION, key=TEST_KEY)
         assert await order_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
 
-    async def test_complex_adapter_with_list(self, product_list_adapter: PydanticAdapter[list[Product]], store: MemoryStore):
+    async def test_complex_adapter_with_list(self, product_list_adapter: BaseModelAdapter[list[Product]], store: MemoryStore):
         await product_list_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=[SAMPLE_PRODUCT, SAMPLE_PRODUCT], ttl=10)
         cached_products: list[Product] | None = await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
         assert cached_products == [SAMPLE_PRODUCT, SAMPLE_PRODUCT]
@@ -169,7 +172,7 @@ class TestPydanticAdapter:
         assert await product_list_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY) is None
 
     async def test_validation_error_logging(
-        self, user_adapter: PydanticAdapter[User], updated_user_adapter: PydanticAdapter[UpdatedUser], caplog: pytest.LogCaptureFixture
+        self, user_adapter: BaseModelAdapter[User], updated_user_adapter: BaseModelAdapter[UpdatedUser], caplog: pytest.LogCaptureFixture
     ):
         """Test that validation errors are logged when raise_on_validation_error=False."""
         import logging
@@ -188,14 +191,14 @@ class TestPydanticAdapter:
         record = caplog.records[0]
         assert record.levelname == "ERROR"
         assert "Validation failed" in record.message
-        assert model_type_from_log_record(record) == "pydantic-serializable value"
+        assert model_type_from_log_record(record) == "BaseModel"
 
         errors = errors_from_log_record(record)
         assert len(errors) == 1
         assert "is_admin" in str(errors[0])
 
     async def test_list_validation_error_logging(
-        self, product_list_adapter: PydanticAdapter[list[Product]], store: MemoryStore, caplog: pytest.LogCaptureFixture
+        self, product_list_adapter: BaseModelAdapter[list[Product]], store: MemoryStore, caplog: pytest.LogCaptureFixture
     ):
         """Test that missing 'items' wrapper is logged for list models."""
         import logging
@@ -214,6 +217,6 @@ class TestPydanticAdapter:
         record = caplog.records[0]
         assert record.levelname == "ERROR"
         assert "Missing 'items' wrapper" in record.message
-        assert model_type_from_log_record(record) == "pydantic-serializable value"
+        assert model_type_from_log_record(record) == "BaseModel"
         error = error_from_log_record(record)
         assert "missing 'items' wrapper" in str(error)

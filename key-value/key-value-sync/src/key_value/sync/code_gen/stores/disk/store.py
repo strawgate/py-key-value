@@ -22,24 +22,29 @@ class DiskStore(BaseContextManagerStore, BaseStore):
     """A disk-based store that uses the diskcache library to store data."""
 
     _cache: Cache
+    _auto_create: bool
 
     @overload
-    def __init__(self, *, disk_cache: Cache, default_collection: str | None = None) -> None:
+    def __init__(self, *, disk_cache: Cache, default_collection: str | None = None, auto_create: bool = True) -> None:
         """Initialize the disk store.
 
         Args:
             disk_cache: An existing diskcache Cache instance to use.
             default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to automatically create the directory if it doesn't exist. Defaults to True.
         """
 
     @overload
-    def __init__(self, *, directory: Path | str, max_size: int | None = None, default_collection: str | None = None) -> None:
+    def __init__(
+        self, *, directory: Path | str, max_size: int | None = None, default_collection: str | None = None, auto_create: bool = True
+    ) -> None:
         """Initialize the disk store.
 
         Args:
             directory: The directory to use for the disk store.
             max_size: The maximum size of the disk store. Defaults to an unlimited size disk store
             default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to automatically create the directory if it doesn't exist. Defaults to True.
         """
 
     def __init__(
@@ -49,6 +54,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
         directory: Path | str | None = None,
         max_size: int | None = None,
         default_collection: str | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the disk store.
 
@@ -59,6 +65,8 @@ class DiskStore(BaseContextManagerStore, BaseStore):
             directory: The directory to use for the disk store.
             max_size: The maximum size of the disk store.
             default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to automatically create the directory if it doesn't exist. Defaults to True.
+                When False, raises ValueError if the directory doesn't exist.
         """
         if disk_cache is not None and directory is not None:
             msg = "Provide only one of disk_cache or directory"
@@ -70,13 +78,18 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
         client_provided = disk_cache is not None
         self._client_provided_by_user = client_provided
+        self._auto_create = auto_create
 
         if disk_cache:
             self._cache = disk_cache
         elif directory:
             directory = Path(directory)
 
-            directory.mkdir(parents=True, exist_ok=True)
+            if not directory.exists():
+                if not self._auto_create:
+                    msg = f"Directory '{directory}' does not exist. Either create the directory manually or set auto_create=True."
+                    raise ValueError(msg)
+                directory.mkdir(parents=True, exist_ok=True)
 
             if max_size is not None and max_size > 0:
                 self._cache = Cache(directory=directory, size_limit=max_size)

@@ -11,7 +11,7 @@ from tests.code_gen.conftest import should_skip_docker_tests
 from tests.code_gen.stores.base import BaseStoreTests
 
 # Vault test configuration
-VAULT_TOKEN = "dev-root-token"  # noqa: S105
+VAULT_TOKEN = "dev-root-token"
 VAULT_MOUNT_POINT = "secret"
 VAULT_CONTAINER_PORT = 8200
 
