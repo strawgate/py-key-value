@@ -1,18 +1,15 @@
-from collections.abc import AsyncGenerator
-
 import pytest
+from testcontainers.vault import VaultContainer
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.utils.wait import async_wait_for_true
-from tests.conftest import docker_container, should_skip_docker_tests
+from tests.conftest import should_skip_docker_tests
 from tests.stores.base import (
     BaseStoreTests,
 )
 
 # Vault test configuration
-VAULT_HOST = "localhost"
-VAULT_PORT = 8200
 VAULT_TOKEN = "dev-root-token"
 VAULT_MOUNT_POINT = "secret"
 VAULT_CONTAINER_PORT = 8200
@@ -32,50 +29,58 @@ class VaultFailedToStartError(Exception):
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestVaultStore(BaseStoreTests):
-    def get_vault_client(self):
+    def get_vault_client(self, vault_url: str):
         import hvac
 
-        return hvac.Client(url=f"http://{VAULT_HOST}:{VAULT_PORT}", token=VAULT_TOKEN)
+        return hvac.Client(url=vault_url, token=VAULT_TOKEN)
 
-    async def ping_vault(self) -> bool:
+    async def ping_vault(self, vault_url: str) -> bool:
         try:
-            client = self.get_vault_client()
+            client = self.get_vault_client(vault_url)
             return client.sys.is_initialized()  # pyright: ignore[reportUnknownMemberType,reportUnknownReturnType,reportUnknownVariableType]
         except Exception:
             return False
 
-    @pytest.fixture(scope="session", params=VAULT_VERSIONS_TO_TEST)
-    async def setup_vault(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+    @pytest.fixture(autouse=True, scope="module", params=VAULT_VERSIONS_TO_TEST)
+    def vault_container(self, request: pytest.FixtureRequest):
         version = request.param
+        container = VaultContainer(image=f"hashicorp/vault:{version}")
+        container.with_env("VAULT_DEV_ROOT_TOKEN_ID", VAULT_TOKEN)
+        container.with_env("VAULT_DEV_LISTEN_ADDRESS", "0.0.0.0:8200")
+        with container:
+            yield container
 
-        with docker_container(
-            f"vault-test-{version}",
-            f"hashicorp/vault:{version}",
-            {str(VAULT_CONTAINER_PORT): VAULT_PORT},
-            environment={
-                "VAULT_DEV_ROOT_TOKEN_ID": VAULT_TOKEN,
-                "VAULT_DEV_LISTEN_ADDRESS": "0.0.0.0:8200",
-            },
-        ):
-            if not await async_wait_for_true(bool_fn=self.ping_vault, tries=WAIT_FOR_VAULT_TIMEOUT, wait_time=1):
-                msg = f"Vault {version} failed to start"
-                raise VaultFailedToStartError(msg)
+    @pytest.fixture(scope="module")
+    def vault_host(self, vault_container: VaultContainer) -> str:
+        return vault_container.get_container_host_ip()
 
-            yield
+    @pytest.fixture(scope="module")
+    def vault_port(self, vault_container: VaultContainer) -> int:
+        return int(vault_container.get_exposed_port(VAULT_CONTAINER_PORT))
+
+    @pytest.fixture(scope="module")
+    def vault_url(self, vault_host: str, vault_port: int) -> str:
+        return f"http://{vault_host}:{vault_port}"
+
+    @pytest.fixture(autouse=True, scope="module")
+    async def setup_vault(self, vault_container: VaultContainer, vault_url: str) -> None:
+        if not await async_wait_for_true(bool_fn=lambda: self.ping_vault(vault_url), tries=WAIT_FOR_VAULT_TIMEOUT, wait_time=1):
+            msg = "Vault failed to start"
+            raise VaultFailedToStartError(msg)
 
     @override
     @pytest.fixture
-    async def store(self, setup_vault: None):
+    async def store(self, setup_vault: None, vault_url: str):
         from key_value.aio.stores.vault import VaultStore
 
         store: VaultStore = VaultStore(
-            url=f"http://{VAULT_HOST}:{VAULT_PORT}",
+            url=vault_url,
             token=VAULT_TOKEN,
             mount_point=VAULT_MOUNT_POINT,
         )
 
         # Clean up any existing data - best effort, ignore errors
-        client = self.get_vault_client()
+        client = self.get_vault_client(vault_url)
         try:
             # List all secrets and delete them
             secrets_list = client.secrets.kv.v2.list_secrets(path="", mount_point=VAULT_MOUNT_POINT)  # pyright: ignore[reportUnknownMemberType,reportUnknownReturnType,reportUnknownVariableType]

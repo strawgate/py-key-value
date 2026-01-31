@@ -13,7 +13,7 @@ DISK_STORE_SIZE_LIMIT = 100 * 1024  # 100KB
 
 
 class TestPassthroughCacheWrapper(BaseStoreTests):
-    @pytest.fixture(scope="session")
+    @pytest.fixture(scope="module")
     async def primary_store(self) -> AsyncGenerator[DiskStore, None]:
         with tempfile.TemporaryDirectory() as temp_dir:
             async with DiskStore(directory=temp_dir, max_size=DISK_STORE_SIZE_LIMIT) as disk_store:

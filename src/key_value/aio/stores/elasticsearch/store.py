@@ -295,9 +295,10 @@ class ElasticsearchStore(
             raise
 
     def _get_index_name(self, collection: str) -> str:
-        # Apply lowercase before sanitization to prevent index collisions
-        # when collections differ only by case
-        return self._index_prefix + "-" + self._sanitize_collection(collection=collection.lower())
+        # The Sanitization Strategy ensures that we do not have conflicts between upper and lower case
+        # but it does not lowercase the collection name, so we do that here, which conveniently also
+        # prevents errors when using PassthroughStrategy.
+        return (self._index_prefix + "-" + self._sanitize_collection(collection=collection)).lower()
 
     def _get_document_id(self, key: str) -> str:
         return self._sanitize_key(key=key)
