@@ -69,7 +69,7 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
         self._credentials = credentials
         self._project = project
         self._database = database
-        serialization_adapter = BasicSerializationAdapter(value_format="dict", date_format="datetime")
+        serialization_adapter = BasicSerializationAdapter(value_format="string")
 
         if client:
             self._client = client
