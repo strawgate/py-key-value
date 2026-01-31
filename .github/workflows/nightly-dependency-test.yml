@@ -1,0 +1,85 @@
+name: Nightly Dependency Test
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    # Allow manual triggering
+
+jobs:
+  test_latest_dependencies:
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        platform:
+          [
+            ubuntu-22.04,
+            ubuntu-latest,
+            macos-14,
+            macos-latest,
+            windows-2022,
+            windows-latest,
+          ]
+        project:
+          - "key-value/key-value-aio"
+          - "key-value/key-value-shared"
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@v6
+
+      - name: "Set pytest worker count"
+        id: pytest-workers
+        run: |
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            echo "count=2" >> $GITHUB_OUTPUT
+          else
+            echo "count=auto" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      - name: "Install latest dependencies (unpinned)"
+        run: uv sync --group dev --python ${{ matrix.python-version }}
+        working-directory: ${{ matrix.project }}
+
+      - name: "Show installed versions"
+        run: uv pip list
+        working-directory: ${{ matrix.project }}
+
+      - name: "Test with latest dependencies"
+        run: uv run pytest tests . -vv -n ${{ steps.pytest-workers.outputs.count }}
+        working-directory: ${{ matrix.project }}
+
+      - name: "Build"
+        run: uv build .
+        working-directory: ${{ matrix.project }}
+
+  create_issue_on_failure:
+    needs: test_latest_dependencies
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create issue for failure
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          filename: .github/NIGHTLY_FAILURE_TEMPLATE.md
+          update_existing: true
+          search_existing: open
