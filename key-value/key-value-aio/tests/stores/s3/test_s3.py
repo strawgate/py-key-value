@@ -1,19 +1,18 @@
 import contextlib
-from collections.abc import AsyncGenerator
+from collections.abc import Generator
 
 import pytest
 from key_value.shared.stores.wait import async_wait_for_true
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.s3 import S3Store
-from tests.conftest import docker_container, should_skip_docker_tests
+from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # S3 test configuration (using LocalStack)
-S3_HOST = "localhost"
-S3_HOST_PORT = 4566
-S3_ENDPOINT = f"http://{S3_HOST}:{S3_HOST_PORT}"
 S3_TEST_BUCKET = "kv-store-test"
 
 WAIT_FOR_S3_TIMEOUT = 30
@@ -26,7 +25,7 @@ LOCALSTACK_VERSIONS_TO_TEST = [
 LOCALSTACK_CONTAINER_PORT = 4566
 
 
-async def ping_s3() -> bool:
+async def ping_s3(endpoint_url: str) -> bool:
     """Check if LocalStack S3 is running."""
     try:
         import aioboto3
@@ -36,7 +35,7 @@ async def ping_s3() -> bool:
             aws_secret_access_key="test",
             region_name="us-east-1",
         )
-        async with session.client(service_name="s3", endpoint_url=S3_ENDPOINT) as client:  # type: ignore
+        async with session.client(service_name="s3", endpoint_url=endpoint_url) as client:  # type: ignore
             await client.list_buckets()  # type: ignore
     except Exception:
         return False
@@ -50,31 +49,42 @@ class S3FailedToStartError(Exception):
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
-    @pytest.fixture(scope="session", params=LOCALSTACK_VERSIONS_TO_TEST)
-    async def setup_s3(self, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+    @pytest.fixture(autouse=True, scope="module", params=LOCALSTACK_VERSIONS_TO_TEST)
+    def localstack_container(self, request: pytest.FixtureRequest) -> Generator[DockerContainer, None, None]:
         version = request.param
+        container = DockerContainer(image=f"localstack/localstack:{version}")
+        container.with_exposed_ports(LOCALSTACK_CONTAINER_PORT)
+        container.with_env("SERVICES", "s3")
+        container.waiting_for(LogMessageWaitStrategy("Ready."))
+        with container:
+            yield container
 
-        # LocalStack container for S3
-        with docker_container(
-            f"s3-test-{version}",
-            f"localstack/localstack:{version}",
-            {str(LOCALSTACK_CONTAINER_PORT): S3_HOST_PORT},
-            environment={"SERVICES": "s3"},
-        ):
-            if not await async_wait_for_true(bool_fn=ping_s3, tries=WAIT_FOR_S3_TIMEOUT, wait_time=2):
-                msg = f"LocalStack S3 {version} failed to start"
-                raise S3FailedToStartError(msg)
+    @pytest.fixture(scope="module")
+    def s3_host(self, localstack_container: DockerContainer) -> str:
+        return localstack_container.get_container_host_ip()
 
-            yield
+    @pytest.fixture(scope="module")
+    def s3_port(self, localstack_container: DockerContainer) -> int:
+        return int(localstack_container.get_exposed_port(LOCALSTACK_CONTAINER_PORT))
+
+    @pytest.fixture(scope="module")
+    def s3_endpoint(self, s3_host: str, s3_port: int) -> str:
+        return f"http://{s3_host}:{s3_port}"
+
+    @pytest.fixture(autouse=True, scope="module")
+    async def setup_s3(self, localstack_container: DockerContainer, s3_endpoint: str) -> None:
+        if not await async_wait_for_true(bool_fn=lambda: ping_s3(s3_endpoint), tries=WAIT_FOR_S3_TIMEOUT, wait_time=1):
+            msg = "LocalStack S3 failed to start"
+            raise S3FailedToStartError(msg)
 
     @override
     @pytest.fixture
-    async def store(self, setup_s3: None) -> S3Store:
+    async def store(self, setup_s3: None, s3_endpoint: str) -> S3Store:
         from key_value.aio.stores.s3 import S3CollectionSanitizationStrategy, S3KeySanitizationStrategy
 
         store = S3Store(
             bucket_name=S3_TEST_BUCKET,
-            endpoint_url=S3_ENDPOINT,
+            endpoint_url=s3_endpoint,
             aws_access_key_id="test",
             aws_secret_access_key="test",
             region_name="us-east-1",
@@ -91,7 +101,7 @@ class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
             aws_secret_access_key="test",
             region_name="us-east-1",
         )
-        async with session.client(service_name="s3", endpoint_url=S3_ENDPOINT) as client:  # type: ignore
+        async with session.client(service_name="s3", endpoint_url=s3_endpoint) as client:  # type: ignore
             with contextlib.suppress(Exception):
                 # Delete all objects in the bucket (handle pagination)
                 continuation_token: str | None = None
