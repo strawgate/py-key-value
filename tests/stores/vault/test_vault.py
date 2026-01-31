@@ -30,9 +30,9 @@ class VaultFailedToStartError(Exception):
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestVaultStore(BaseStoreTests):
     def get_vault_client(self, vault_url: str):
-        import hvac
+        from key_value.aio.stores.vault.store import _create_vault_client
 
-        return hvac.Client(url=vault_url, token=VAULT_TOKEN)
+        return _create_vault_client(url=vault_url, token=VAULT_TOKEN)
 
     async def ping_vault(self, vault_url: str) -> bool:
         try:
@@ -72,6 +72,7 @@ class TestVaultStore(BaseStoreTests):
     @pytest.fixture
     async def store(self, setup_vault: None, vault_url: str):
         from key_value.aio.stores.vault import VaultStore
+        from key_value.aio.stores.vault.store import _get_vault_kv_v2
 
         store: VaultStore = VaultStore(
             url=vault_url,
@@ -81,13 +82,14 @@ class TestVaultStore(BaseStoreTests):
 
         # Clean up any existing data - best effort, ignore errors
         client = self.get_vault_client(vault_url)
+        kv_v2 = _get_vault_kv_v2(client)
         try:
             # List all secrets and delete them
-            secrets_list = client.secrets.kv.v2.list_secrets(path="", mount_point=VAULT_MOUNT_POINT)  # pyright: ignore[reportUnknownMemberType,reportUnknownReturnType,reportUnknownVariableType]
+            secrets_list = kv_v2.list_secrets(path="", mount_point=VAULT_MOUNT_POINT)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
             if secrets_list and "data" in secrets_list and "keys" in secrets_list["data"]:
                 for key in secrets_list["data"]["keys"]:  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
                     # Best effort cleanup - ignore individual deletion failures
-                    client.secrets.kv.v2.delete_metadata_and_all_versions(path=key.rstrip("/"), mount_point=VAULT_MOUNT_POINT)  # pyright: ignore[reportUnknownMemberType,reportUnknownReturnType,reportUnknownVariableType]
+                    kv_v2.delete_metadata_and_all_versions(path=key.rstrip("/"), mount_point=VAULT_MOUNT_POINT)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
         except Exception:  # noqa: S110
             # Cleanup is best-effort, ignore all errors
             pass

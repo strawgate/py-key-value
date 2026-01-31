@@ -27,16 +27,16 @@ LOCALSTACK_CONTAINER_PORT = 4566
 
 async def ping_s3(endpoint_url: str) -> bool:
     """Check if LocalStack S3 is running."""
-    try:
-        import aioboto3
+    from key_value.aio.stores.s3.store import _create_s3_client_context, _create_s3_session
 
-        session = aioboto3.Session(
+    try:
+        session = _create_s3_session(
             aws_access_key_id="test",
             aws_secret_access_key="test",
             region_name="us-east-1",
         )
-        async with session.client(service_name="s3", endpoint_url=endpoint_url) as client:  # type: ignore
-            await client.list_buckets()  # type: ignore
+        async with _create_s3_client_context(session, endpoint_url=endpoint_url) as client:
+            await client.list_buckets()  # type: ignore[union-attr]
     except Exception:
         return False
     else:
@@ -81,6 +81,7 @@ class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture
     async def store(self, setup_s3: None, s3_endpoint: str) -> S3Store:
         from key_value.aio.stores.s3 import S3CollectionSanitizationStrategy, S3KeySanitizationStrategy
+        from key_value.aio.stores.s3.store import _create_s3_client_context, _create_s3_session
 
         store = S3Store(
             bucket_name=S3_TEST_BUCKET,
@@ -94,14 +95,12 @@ class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
         )
 
         # Clean up test bucket if it exists
-        import aioboto3
-
-        session = aioboto3.Session(
+        session = _create_s3_session(
             aws_access_key_id="test",
             aws_secret_access_key="test",
             region_name="us-east-1",
         )
-        async with session.client(service_name="s3", endpoint_url=s3_endpoint) as client:  # type: ignore
+        async with _create_s3_client_context(session, endpoint_url=s3_endpoint) as client:
             with contextlib.suppress(Exception):
                 # Delete all objects in the bucket (handle pagination)
                 continuation_token: str | None = None
@@ -109,19 +108,19 @@ class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
                     list_kwargs = {"Bucket": S3_TEST_BUCKET}
                     if continuation_token:
                         list_kwargs["ContinuationToken"] = continuation_token
-                    response = await client.list_objects_v2(**list_kwargs)  # type: ignore
+                    response = await client.list_objects_v2(**list_kwargs)  # type: ignore[union-attr]
 
                     # Delete objects from this page
-                    for obj in response.get("Contents", []):  # type: ignore
-                        await client.delete_object(Bucket=S3_TEST_BUCKET, Key=obj["Key"])  # type: ignore
+                    for obj in response.get("Contents", []):  # type: ignore[union-attr]
+                        await client.delete_object(Bucket=S3_TEST_BUCKET, Key=obj["Key"])  # type: ignore[union-attr]
 
                     # Check if there are more pages
-                    continuation_token = response.get("NextContinuationToken")  # type: ignore
+                    continuation_token = response.get("NextContinuationToken")  # type: ignore[union-attr]
                     if not continuation_token:
                         break
 
                 # Delete the bucket
-                await client.delete_bucket(Bucket=S3_TEST_BUCKET)  # type: ignore
+                await client.delete_bucket(Bucket=S3_TEST_BUCKET)  # type: ignore[union-attr]
 
         return store
 

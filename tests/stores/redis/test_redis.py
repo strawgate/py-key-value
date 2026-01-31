@@ -51,14 +51,16 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @pytest.fixture(autouse=True, scope="module")
     async def setup_redis(self, redis_container: RedisContainer, redis_host: str, redis_port: int) -> None:
+        from key_value.aio.stores.redis.store import _create_redis_client
+
         async def ping_redis() -> bool:
-            client: Redis = Redis(host=redis_host, port=redis_port, db=REDIS_DB, decode_responses=True)
+            client = _create_redis_client(host=redis_host, port=redis_port, db=REDIS_DB)
             try:
                 return await client.ping()  # pyright: ignore[reportUnknownMemberType, reportAny, reportReturnType, reportUnknownVariableType, reportGeneralTypeIssues]
             except Exception:
                 return False
             finally:
-                await client.aclose()  # pyright: ignore[reportUnknownMemberType]
+                await client.aclose()
 
         if not await async_wait_for_true(bool_fn=ping_redis, tries=WAIT_FOR_REDIS_TIMEOUT, wait_time=1):
             msg = "Redis failed to start"
@@ -88,9 +90,9 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     async def test_redis_client_connection(self, setup_redis: None, redis_host: str, redis_port: int):
         """Test Redis store creation with existing client."""
-        from redis.asyncio import Redis
+        from key_value.aio.stores.redis.store import _create_redis_client
 
-        client = Redis(host=redis_host, port=redis_port, db=REDIS_DB, decode_responses=True)
+        client = _create_redis_client(host=redis_host, port=redis_port, db=REDIS_DB)
         store = RedisStore(client=client)
 
         _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
