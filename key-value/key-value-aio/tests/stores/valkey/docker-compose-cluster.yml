@@ -1,0 +1,116 @@
+# Valkey Cluster Docker Compose for Testing
+# This sets up a 6-node Valkey cluster (3 primaries + 3 replicas)
+# Based on Bitnami's valkey-cluster Docker image
+
+services:
+  valkey-node-0:
+    image: docker.io/bitnami/valkey-cluster:${VALKEY_VERSION:-9.0}
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - VALKEY_NODES=valkey-node-0 valkey-node-1 valkey-node-2 valkey-node-3 valkey-node-4 valkey-node-5
+    ports:
+      - "${VALKEY_CLUSTER_PORT_0:-7000}:6379"
+    volumes:
+      - valkey-cluster_data-0:/bitnami/valkey/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  valkey-node-1:
+    image: docker.io/bitnami/valkey-cluster:${VALKEY_VERSION:-9.0}
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - VALKEY_NODES=valkey-node-0 valkey-node-1 valkey-node-2 valkey-node-3 valkey-node-4 valkey-node-5
+    ports:
+      - "${VALKEY_CLUSTER_PORT_1:-7001}:6379"
+    volumes:
+      - valkey-cluster_data-1:/bitnami/valkey/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  valkey-node-2:
+    image: docker.io/bitnami/valkey-cluster:${VALKEY_VERSION:-9.0}
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - VALKEY_NODES=valkey-node-0 valkey-node-1 valkey-node-2 valkey-node-3 valkey-node-4 valkey-node-5
+    ports:
+      - "${VALKEY_CLUSTER_PORT_2:-7002}:6379"
+    volumes:
+      - valkey-cluster_data-2:/bitnami/valkey/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  valkey-node-3:
+    image: docker.io/bitnami/valkey-cluster:${VALKEY_VERSION:-9.0}
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - VALKEY_NODES=valkey-node-0 valkey-node-1 valkey-node-2 valkey-node-3 valkey-node-4 valkey-node-5
+    ports:
+      - "${VALKEY_CLUSTER_PORT_3:-7003}:6379"
+    volumes:
+      - valkey-cluster_data-3:/bitnami/valkey/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  valkey-node-4:
+    image: docker.io/bitnami/valkey-cluster:${VALKEY_VERSION:-9.0}
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - VALKEY_NODES=valkey-node-0 valkey-node-1 valkey-node-2 valkey-node-3 valkey-node-4 valkey-node-5
+    ports:
+      - "${VALKEY_CLUSTER_PORT_4:-7004}:6379"
+    volumes:
+      - valkey-cluster_data-4:/bitnami/valkey/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  valkey-node-5:
+    image: docker.io/bitnami/valkey-cluster:${VALKEY_VERSION:-9.0}
+    depends_on:
+      valkey-node-0:
+        condition: service_healthy
+      valkey-node-1:
+        condition: service_healthy
+      valkey-node-2:
+        condition: service_healthy
+      valkey-node-3:
+        condition: service_healthy
+      valkey-node-4:
+        condition: service_healthy
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+      - VALKEY_NODES=valkey-node-0 valkey-node-1 valkey-node-2 valkey-node-3 valkey-node-4 valkey-node-5
+      - VALKEY_CLUSTER_REPLICAS=1
+      - VALKEY_CLUSTER_CREATOR=yes
+    ports:
+      - "${VALKEY_CLUSTER_PORT_5:-7005}:6379"
+    volumes:
+      - valkey-cluster_data-5:/bitnami/valkey/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "cluster", "info"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+
+volumes:
+  valkey-cluster_data-0:
+  valkey-cluster_data-1:
+  valkey-cluster_data-2:
+  valkey-cluster_data-3:
+  valkey-cluster_data-4:
+  valkey-cluster_data-5:

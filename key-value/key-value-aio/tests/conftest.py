@@ -5,6 +5,7 @@ import platform
 import subprocess
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 from docker import DockerClient
@@ -219,3 +220,94 @@ def should_run_docker_tests() -> bool:
 
 def should_skip_docker_tests() -> bool:
     return not should_run_docker_tests()
+
+
+def detect_docker_compose() -> bool:
+    """Check if docker compose (v2) is available."""
+    try:
+        result = subprocess.run(["docker", "compose", "version"], check=False, capture_output=True, text=True)  # noqa: S607
+    except Exception:
+        return False
+    else:
+        return result.returncode == 0
+
+
+def should_skip_docker_compose_tests() -> bool:
+    """Check if docker compose tests should be skipped."""
+    return not (should_run_docker_tests() and detect_docker_compose())
+
+
+@contextmanager
+def docker_compose_cluster(
+    compose_file: Path,
+    project_name: str,
+    environment: dict[str, str] | None = None,
+    timeout: int = 120,
+) -> Iterator[None]:
+    """Context manager that starts a docker-compose cluster and tears it down after.
+
+    Args:
+        compose_file: Path to the docker-compose.yml file
+        project_name: Unique project name for docker compose
+        environment: Additional environment variables to pass to docker-compose
+        timeout: Timeout in seconds to wait for the cluster to be ready
+    """
+    logger.info(f"Starting docker compose cluster from {compose_file} with project {project_name}")
+
+    env = {**os.environ, **(environment or {})}
+
+    try:
+        # Pull images first
+        logger.info("Pulling docker compose images...")
+        pull_result = subprocess.run(  # noqa: S603
+            ["docker", "compose", "-f", str(compose_file), "-p", project_name, "pull"],  # noqa: S607
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        if pull_result.returncode != 0:
+            logger.warning(f"Failed to pull images: {pull_result.stderr}")
+
+        # Start the cluster
+        logger.info("Starting docker compose cluster...")
+        up_result = subprocess.run(  # noqa: S603
+            ["docker", "compose", "-f", str(compose_file), "-p", project_name, "up", "-d", "--wait", f"--wait-timeout={timeout}"],  # noqa: S607
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        if up_result.returncode != 0:
+            logger.error(f"Failed to start cluster: {up_result.stderr}")
+            # Try to get logs for debugging
+            subprocess.run(  # noqa: S603
+                ["docker", "compose", "-f", str(compose_file), "-p", project_name, "logs"],  # noqa: S607
+                check=False,
+                env=env,
+            )
+            msg = f"Failed to start docker compose cluster: {up_result.stderr}"
+            raise RuntimeError(msg)
+
+        logger.info("Docker compose cluster started successfully")
+        yield
+
+    finally:
+        # Print logs for debugging
+        logger.info("Printing docker compose logs...")
+        subprocess.run(  # noqa: S603
+            ["docker", "compose", "-f", str(compose_file), "-p", project_name, "logs"],  # noqa: S607
+            check=False,
+            env=env,
+        )
+
+        # Tear down the cluster
+        logger.info("Stopping docker compose cluster...")
+        subprocess.run(  # noqa: S603
+            ["docker", "compose", "-f", str(compose_file), "-p", project_name, "down", "-v", "--remove-orphans"],  # noqa: S607
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        logger.info("Docker compose cluster stopped and removed")
