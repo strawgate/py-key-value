@@ -3,8 +3,12 @@
 This test file verifies ValkeyStore type compatibility with GlideClusterClient.
 """
 
+import pytest
+
+from tests.conftest import detect_on_windows
 
 
+@pytest.mark.skipif(detect_on_windows(), reason="Valkey is not supported on Windows")
 class TestValkeyClusterClientSupport:
     """Tests for GlideClusterClient type compatibility with ValkeyStore."""
 
