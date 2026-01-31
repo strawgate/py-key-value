@@ -130,6 +130,11 @@ class OpenSearchV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
             hash_fragment_mode=HashFragmentMode.ALWAYS,
         )
 
+    @override
+    def sanitize(self, value: str) -> str:
+        # OpenSearch index names must be lowercase
+        return super().sanitize(value).lower()
+
 
 class OpenSearchStore(
     BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseCullStore, BaseContextManagerStore, BaseStore
@@ -297,7 +302,7 @@ class OpenSearchStore(
     def _get_index_name(self, collection: str) -> str:
         # Apply lowercase before sanitization to prevent index collisions
         # when collections differ only by case
-        return self._index_prefix + "-" + self._sanitize_collection(collection=collection.lower())
+        return self._index_prefix + "-" + self._sanitize_collection(collection=collection)
 
     def _get_document_id(self, key: str) -> str:
         return self._sanitize_key(key=key)

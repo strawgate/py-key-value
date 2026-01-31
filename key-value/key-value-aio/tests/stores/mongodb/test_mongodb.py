@@ -33,9 +33,9 @@ MONGODB_VERSIONS_TO_TEST = [
 ]
 
 
-async def ping_mongodb(host: str, port: int) -> bool:
+async def ping_mongodb(mongodb_url: str) -> bool:
     try:
-        client: AsyncMongoClient[Any] = AsyncMongoClient[Any](host=host, port=port)
+        client: AsyncMongoClient[Any] = AsyncMongoClient[Any](mongodb_url)
         _ = await client.list_database_names()
         await client.close()
     except Exception:
@@ -91,22 +91,12 @@ class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
             yield container
 
     @pytest.fixture(scope="module")
-    def mongodb_host(self, mongodb_container: MongoDbContainer) -> str:
-        return mongodb_container.get_container_host_ip()
-
-    @pytest.fixture(scope="module")
-    def mongodb_port(self, mongodb_container: MongoDbContainer) -> int:
-        return int(mongodb_container.get_exposed_port(27017))
-
-    @pytest.fixture(scope="module")
-    def mongodb_url(self, mongodb_host: str, mongodb_port: int) -> str:
-        return f"mongodb://{mongodb_host}:{mongodb_port}"
+    def mongodb_url(self, mongodb_container: MongoDbContainer) -> str:
+        return mongodb_container.get_connection_url()
 
     @pytest.fixture(autouse=True, scope="module")
-    async def setup_mongodb(self, mongodb_container: MongoDbContainer, mongodb_host: str, mongodb_port: int) -> None:
-        if not await async_wait_for_true(
-            bool_fn=lambda: ping_mongodb(mongodb_host, mongodb_port), tries=WAIT_FOR_MONGODB_TIMEOUT, wait_time=1
-        ):
+    async def setup_mongodb(self, mongodb_container: MongoDbContainer, mongodb_url: str) -> None:
+        if not await async_wait_for_true(bool_fn=lambda: ping_mongodb(mongodb_url), tries=WAIT_FOR_MONGODB_TIMEOUT, wait_time=1):
             msg = "MongoDB failed to start"
             raise MongoDBFailedToStartError(msg)
 
