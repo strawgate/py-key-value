@@ -1,6 +1,6 @@
 [project]
 name = "py-key-value"
-version = "0.2.8"
+version = "0.3.0"
 description = "Key-Value Store Project"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -64,6 +64,8 @@ line-length = 140
 [tool.ruff.lint.extend-per-file-ignores]
 "**/tests/*.py" = [
     "S101", # Ignore asserts
+    "S105", # Ignore hardcoded password string (test credentials)
+    "S106", # Ignore hardcoded password function argument (test credentials)
     "DTZ005", # Ignore datetime.UTC
     "PLR2004", # Ignore magic values
     "E501", # Ignore line length

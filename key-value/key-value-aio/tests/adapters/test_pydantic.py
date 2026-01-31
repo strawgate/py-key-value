@@ -188,7 +188,7 @@ class TestPydanticAdapter:
         record = caplog.records[0]
         assert record.levelname == "ERROR"
         assert "Validation failed" in record.message
-        assert model_type_from_log_record(record) == "Pydantic model"
+        assert model_type_from_log_record(record) == "pydantic-serializable value"
 
         errors = errors_from_log_record(record)
         assert len(errors) == 1
@@ -214,6 +214,6 @@ class TestPydanticAdapter:
         record = caplog.records[0]
         assert record.levelname == "ERROR"
         assert "Missing 'items' wrapper" in record.message
-        assert model_type_from_log_record(record) == "Pydantic model"
+        assert model_type_from_log_record(record) == "pydantic-serializable value"
         error = error_from_log_record(record)
         assert "missing 'items' wrapper" in str(error)

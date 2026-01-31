@@ -160,6 +160,7 @@ class ElasticsearchStore(
 
     _key_sanitization_strategy: SanitizationStrategy
     _collection_sanitization_strategy: SanitizationStrategy
+    _auto_create: bool
 
     @overload
     def __init__(
@@ -170,6 +171,7 @@ class ElasticsearchStore(
         default_collection: str | None = None,
         key_sanitization_strategy: SanitizationStrategy | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the elasticsearch store.
 
@@ -179,6 +181,7 @@ class ElasticsearchStore(
             default_collection: The default collection to use if no collection is provided.
             key_sanitization_strategy: The sanitization strategy to use for keys.
             collection_sanitization_strategy: The sanitization strategy to use for collections.
+            auto_create: Whether to automatically create indices if they don't exist. Defaults to True.
         """
 
     @overload
@@ -191,6 +194,7 @@ class ElasticsearchStore(
         default_collection: str | None = None,
         key_sanitization_strategy: SanitizationStrategy | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the elasticsearch store.
 
@@ -199,6 +203,7 @@ class ElasticsearchStore(
             api_key: The api key to use.
             index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
             default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to automatically create indices if they don't exist. Defaults to True.
         """
 
     def __init__(
@@ -211,21 +216,28 @@ class ElasticsearchStore(
         default_collection: str | None = None,
         key_sanitization_strategy: SanitizationStrategy | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the elasticsearch store.
 
         Args:
-            elasticsearch_client: The elasticsearch client to use.
+            elasticsearch_client: The elasticsearch client to use. If provided, the store will not
+                manage the client's lifecycle (will not close it). The caller is responsible for
+                managing the client's lifecycle.
             url: The url of the elasticsearch cluster.
             api_key: The api key to use.
             index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
             default_collection: The default collection to use if no collection is provided.
             key_sanitization_strategy: The sanitization strategy to use for keys.
             collection_sanitization_strategy: The sanitization strategy to use for collections.
+            auto_create: Whether to automatically create indices if they don't exist. Defaults to True.
+                When False, raises ValueError if an index doesn't exist.
         """
         if elasticsearch_client is None and url is None:
             msg = "Either elasticsearch_client or url must be provided"
             raise ValueError(msg)
+
+        client_provided = elasticsearch_client is not None
 
         if elasticsearch_client:
             self._client = elasticsearch_client
@@ -245,15 +257,21 @@ class ElasticsearchStore(
         self._is_serverless = False
 
         self._serializer = ElasticsearchSerializationAdapter()
+        self._auto_create = auto_create
 
         super().__init__(
             default_collection=default_collection,
             collection_sanitization_strategy=collection_sanitization_strategy,
             key_sanitization_strategy=key_sanitization_strategy,
+            client_provided_by_user=client_provided,
         )
 
     @override
     async def _setup(self) -> None:
+        # Register client cleanup if we own the client
+        if not self._client_provided_by_user:
+            self._exit_stack.push_async_callback(self._client.close)
+
         cluster_info = await self._client.options(ignore_status=404).info()
 
         self._is_serverless = cluster_info.get("version", {}).get("build_flavor") == "serverless"
@@ -264,6 +282,10 @@ class ElasticsearchStore(
 
         if await self._client.options(ignore_status=404).indices.exists(index=index_name):
             return
+
+        if not self._auto_create:
+            msg = f"Index '{index_name}' does not exist. Either create the index manually or set auto_create=True."
+            raise ValueError(msg)
 
         try:
             _ = await self._client.options(ignore_status=404).indices.create(index=index_name, mappings=DEFAULT_MAPPING, settings={})
@@ -546,7 +568,3 @@ class ElasticsearchStore(
                 },
             },
         )
-
-    @override
-    async def _close(self) -> None:
-        await self._client.close()

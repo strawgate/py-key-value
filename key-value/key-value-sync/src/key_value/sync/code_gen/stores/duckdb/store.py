@@ -16,7 +16,7 @@ from key_value.sync.code_gen.stores.base import SEED_DATA_TYPE, BaseContextManag
 try:
     import duckdb
 except ImportError as e:
-    msg = "DuckDBStore requires the duckdb extra from py-key-value-sync or py-key-value-sync"
+    msg = "DuckDBStore requires the duckdb extra. Install with: pip install 'py-key-value-sync[duckdb]'"
     raise ImportError(msg) from e
 
 
@@ -74,17 +74,12 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
 
     Values are stored in a JSON column as native dicts, allowing direct SQL queries
     on the stored data for analytics and reporting.
-
-    Note on connection ownership: When you provide an existing connection, the store
-    will take ownership and close it when the store is closed or garbage collected.
-    If you need to reuse a connection, create separate DuckDB connections for each store.
     """
 
     _connection: duckdb.DuckDBPyConnection
-    _is_closed: bool
-    _owns_connection: bool
     _adapter: SerializationAdapter
     _table_name: str
+    _auto_create: bool
 
     @overload
     def __init__(
@@ -94,18 +89,19 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         table_name: str = "kv_entries",
         default_collection: str | None = None,
         seed: SEED_DATA_TYPE | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the DuckDB store with an existing connection.
 
-        Warning: The store will take ownership of the connection and close it
-        when the store is closed or garbage collected. If you need to reuse
-        a connection, create separate DuckDB connections for each store.
+        Note: If you provide a connection, the store will NOT manage its lifecycle (will not
+        close it). The caller is responsible for managing the connection's lifecycle.
 
         Args:
             connection: An existing DuckDB connection to use.
             table_name: Name of the table to store key-value entries. Defaults to "kv_entries".
             default_collection: The default collection to use if no collection is provided.
             seed: Optional seed data to pre-populate the store.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
         """
 
     @overload
@@ -116,6 +112,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         table_name: str = "kv_entries",
         default_collection: str | None = None,
         seed: SEED_DATA_TYPE | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the DuckDB store with a database path.
 
@@ -124,6 +121,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             table_name: Name of the table to store key-value entries. Defaults to "kv_entries".
             default_collection: The default collection to use if no collection is provided.
             seed: Optional seed data to pre-populate the store.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
         """
 
     def __init__(
@@ -134,23 +132,29 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         table_name: str = "kv_entries",
         default_collection: str | None = None,
         seed: SEED_DATA_TYPE | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the DuckDB store.
 
         Args:
-            connection: An existing DuckDB connection to use.
+            connection: An existing DuckDB connection to use. If provided, the store will NOT
+                manage its lifecycle (will not close it). The caller is responsible for managing
+                the connection's lifecycle.
             database_path: Path to the database file. If None or ':memory:', uses in-memory database.
             table_name: Name of the table to store key-value entries. Defaults to "kv_entries".
             default_collection: The default collection to use if no collection is provided.
             seed: Optional seed data to pre-populate the store.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
+                When False, raises ValueError if the table doesn't exist.
         """
         if connection is not None and database_path is not None:
             msg = "Provide only one of connection or database_path"
             raise ValueError(msg)
 
+        client_provided = connection is not None
+
         if connection is not None:
             self._connection = connection
-            self._owns_connection = True  # We take ownership even of provided connections
         else:
             # Convert Path to string if needed
             if isinstance(database_path, Path):
@@ -160,9 +164,7 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
                 self._connection = duckdb.connect(":memory:")
             else:
                 self._connection = duckdb.connect(database=database_path)
-            self._owns_connection = True
 
-        self._is_closed = False
         self._adapter = DuckDBSerializationAdapter()
 
         # Validate table name to prevent SQL injection
@@ -170,9 +172,9 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             msg = "Table name must start with a letter or underscore and contain only letters, digits, or underscores"
             raise ValueError(msg)
         self._table_name = table_name
-        self._stable_api = False
+        self._auto_create = auto_create
 
-        super().__init__(default_collection=default_collection, seed=seed)
+        super().__init__(default_collection=default_collection, seed=seed, client_provided_by_user=client_provided, stable_api=False)
 
     def _get_create_table_sql(self) -> str:
         """Generate SQL for creating the key-value entries table.
@@ -237,14 +239,30 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         - Metadata queries without JSON deserialization
         - Native JSON column support for rich querying capabilities
         """
-        # Create the main table for storing key-value entries
-        self._connection.execute(self._get_create_table_sql())
+        # Register connection cleanup if we own the connection
+        if not self._client_provided_by_user:
+            self._exit_stack.callback(self._connection.close)
 
-        # Create index for efficient collection queries
-        self._connection.execute(self._get_create_collection_index_sql())
+        # Check if the table exists
+        table_exists_sql = (
+            f"\n            SELECT COUNT(*) FROM information_schema.tables\n            WHERE table_name = '{self._table_name}'\n        "  # noqa: S608
+        )
+        result = self._connection.execute(table_exists_sql).fetchone()
+        table_exists = result[0] > 0 if result else False
 
-        # Create index for expiration-based queries
-        self._connection.execute(self._get_create_expires_index_sql())
+        if not table_exists:
+            if not self._auto_create:
+                msg = f"Table '{self._table_name}' does not exist. Either create the table manually or set auto_create=True."
+                raise ValueError(msg)
+
+            # Create the main table for storing key-value entries
+            self._connection.execute(self._get_create_table_sql())
+
+            # Create index for efficient collection queries
+            self._connection.execute(self._get_create_collection_index_sql())
+
+            # Create index for expiration-based queries
+            self._connection.execute(self._get_create_expires_index_sql())
 
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -253,10 +271,6 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         Reconstructs the ManagedEntry from value column and metadata columns
         using the serialization adapter.
         """
-        if self._is_closed:
-            msg = "Cannot operate on closed DuckDBStore"
-            raise RuntimeError(msg)
-
         result = self._connection.execute(self._get_select_sql(), [collection, key]).fetchone()
 
         if result is None:
@@ -283,10 +297,6 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
         Uses the serialization adapter to convert the ManagedEntry to the
         appropriate storage format.
         """
-        if self._is_closed:
-            msg = "Cannot operate on closed DuckDBStore"
-            raise RuntimeError(msg)
-
         # Ensure that the value is serializable to JSON
         _ = managed_entry.value_as_json
 
@@ -302,29 +312,8 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
     @override
     def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         """Delete a managed entry by key from the specified collection."""
-        if self._is_closed:
-            msg = "Cannot operate on closed DuckDBStore"
-            raise RuntimeError(msg)
-
         result = self._connection.execute(self._get_delete_sql(), [collection, key])
 
         # Check if any rows were deleted by counting returned rows
         deleted_rows = result.fetchall()
         return len(deleted_rows) > 0
-
-    @override
-    def _close(self) -> None:
-        """Close the DuckDB connection."""
-        if not self._is_closed and self._owns_connection:
-            self._connection.close()
-            self._is_closed = True
-
-    def __del__(self) -> None:
-        """Clean up the DuckDB connection on deletion."""
-        try:
-            if not self._is_closed and self._owns_connection and hasattr(self, "_connection"):
-                self._connection.close()
-                self._is_closed = True
-        except Exception:  # noqa: S110
-            # Suppress errors during cleanup to avoid issues during interpreter shutdown
-            pass

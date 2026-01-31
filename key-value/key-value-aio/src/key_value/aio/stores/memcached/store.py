@@ -60,18 +60,32 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         """Initialize the Memcached store.
 
         Args:
-            client: An existing aiomcache client to use.
+            client: An existing aiomcache client to use. If provided, the store will not manage
+                the client's lifecycle (will not close it). The caller is responsible for
+                managing the client's lifecycle.
             host: Memcached host. Defaults to 127.0.0.1.
             port: Memcached port. Defaults to 11211.
             default_collection: The default collection to use if no collection is provided.
             key_sanitization_strategy: The sanitization strategy to use for keys.
         """
-        self._client = client or Client(host=host, port=port)
+        client_provided = client is not None
+
+        if client is not None:
+            self._client = client
+        else:
+            self._client = Client(host=host, port=port)
 
         super().__init__(
             default_collection=default_collection,
             key_sanitization_strategy=key_sanitization_strategy,
+            client_provided_by_user=client_provided,
         )
+
+    @override
+    async def _setup(self) -> None:
+        """Register client cleanup if we own the client."""
+        if not self._client_provided_by_user:
+            self._exit_stack.push_async_callback(self._client.close)
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -143,7 +157,3 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
     async def _delete_store(self) -> bool:
         _ = await self._client.flush_all()
         return True
-
-    @override
-    async def _close(self) -> None:
-        await self._client.close()

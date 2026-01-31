@@ -1,9 +1,8 @@
 from datetime import datetime, timezone
-from types import TracebackType
 from typing import TYPE_CHECKING, Any, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from key_value.aio.stores.base import (
     BaseContextManagerStore,
@@ -40,15 +39,27 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     _endpoint_url: str | None
     _raw_client: Any  # DynamoDB client from aioboto3
     _client: DynamoDBClient | None
+    _table_config: dict[str, Any]
+    _auto_create: bool
 
     @overload
-    def __init__(self, *, client: DynamoDBClient, table_name: str, default_collection: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        client: DynamoDBClient,
+        table_name: str,
+        default_collection: str | None = None,
+        table_config: dict[str, Any] | None = None,
+        auto_create: bool = True,
+    ) -> None:
         """Initialize the DynamoDB store.
 
         Args:
             client: The DynamoDB client to use. You must have entered the context manager before passing this in.
             table_name: The name of the DynamoDB table to use.
             default_collection: The default collection to use if no collection is provided.
+            table_config: Additional configuration to pass to create_table(). Merged with defaults.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
         """
 
     @overload
@@ -62,6 +73,8 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         aws_secret_access_key: str | None = None,
         aws_session_token: str | None = None,
         default_collection: str | None = None,
+        table_config: dict[str, Any] | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the DynamoDB store.
 
@@ -73,6 +86,8 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             aws_secret_access_key: AWS secret access key. Defaults to None (uses AWS default credentials).
             aws_session_token: AWS session token. Defaults to None (uses AWS default credentials).
             default_collection: The default collection to use if no collection is provided.
+            table_config: Additional configuration to pass to create_table(). Merged with defaults.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
         """
 
     def __init__(
@@ -86,10 +101,15 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         aws_secret_access_key: str | None = None,
         aws_session_token: str | None = None,
         default_collection: str | None = None,
+        table_config: dict[str, Any] | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the DynamoDB store.
 
         Args:
+            client: The DynamoDB client to use. If provided, the store will not manage the client's
+                lifecycle (will not enter/exit its context manager). The caller is responsible for
+                managing the client's lifecycle and must ensure the client is already entered.
             table_name: The name of the DynamoDB table to use.
             region_name: AWS region name. Defaults to None (uses AWS default).
             endpoint_url: Custom endpoint URL (useful for local DynamoDB). Defaults to None.
@@ -97,10 +117,21 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             aws_secret_access_key: AWS secret access key. Defaults to None (uses AWS default credentials).
             aws_session_token: AWS session token. Defaults to None (uses AWS default credentials).
             default_collection: The default collection to use if no collection is provided.
+            table_config: Additional configuration to pass to create_table(). Merged with defaults.
+                Examples: SSESpecification, Tags, StreamSpecification, etc.
+                Note: Critical parameters (TableName, KeySchema, AttributeDefinitions, BillingMode)
+                cannot be overridden as they are required for store operation.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
+                When False, raises ValueError if the table doesn't exist.
         """
         self._table_name = table_name
+        self._table_config = table_config or {}
+        self._auto_create = auto_create
+        client_provided = client is not None
+
         if client:
             self._client = client
+            self._raw_client = None
         else:
             session: Session = aioboto3.Session(
                 region_name=region_name,
@@ -113,22 +144,10 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
 
             self._client = None
 
-        super().__init__(default_collection=default_collection)
-
-    @override
-    async def __aenter__(self) -> Self:
-        if self._raw_client:
-            self._client = await self._raw_client.__aenter__()
-        await super().__aenter__()
-        return self
-
-    @override
-    async def __aexit__(
-        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
-    ) -> None:
-        await super().__aexit__(exc_type, exc_value, traceback)
-        if self._client:
-            await self._client.__aexit__(exc_type, exc_value, traceback)
+        super().__init__(
+            default_collection=default_collection,
+            client_provided_by_user=client_provided,
+        )
 
     @property
     def _connected_client(self) -> DynamoDBClient:
@@ -140,26 +159,37 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     @override
     async def _setup(self) -> None:
         """Setup the DynamoDB client and ensure table exists."""
-
-        if not self._client:
-            self._client = await self._raw_client.__aenter__()
-
+        # Register client cleanup if we own the client
+        if not self._client_provided_by_user and self._raw_client is not None:
+            self._client = await self._exit_stack.enter_async_context(self._raw_client)
         try:
             await self._connected_client.describe_table(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
         except self._connected_client.exceptions.ResourceNotFoundException:  # pyright: ignore[reportUnknownMemberType]
+            if not self._auto_create:
+                msg = f"Table '{self._table_name}' does not exist. Either create the table manually or set auto_create=True."
+                raise ValueError(msg) from None
+
             # Create the table with composite primary key
-            await self._connected_client.create_table(  # pyright: ignore[reportUnknownMemberType]
-                TableName=self._table_name,
-                KeySchema=[
-                    {"AttributeName": "collection", "KeyType": "HASH"},  # Partition key
-                    {"AttributeName": "key", "KeyType": "RANGE"},  # Sort key
-                ],
-                AttributeDefinitions=[
-                    {"AttributeName": "collection", "AttributeType": "S"},
-                    {"AttributeName": "key", "AttributeType": "S"},
-                ],
-                BillingMode="PAY_PER_REQUEST",  # On-demand billing
+            # Start with user-provided configuration, then overlay required parameters
+            create_table_params: dict[str, Any] = {**self._table_config}
+
+            # Override with required configuration that cannot be changed
+            create_table_params.update(
+                {
+                    "TableName": self._table_name,
+                    "KeySchema": [
+                        {"AttributeName": "collection", "KeyType": "HASH"},  # Partition key
+                        {"AttributeName": "key", "KeyType": "RANGE"},  # Sort key
+                    ],
+                    "AttributeDefinitions": [
+                        {"AttributeName": "collection", "AttributeType": "S"},
+                        {"AttributeName": "key", "AttributeType": "S"},
+                    ],
+                    "BillingMode": "PAY_PER_REQUEST",  # On-demand billing
+                }
             )
+
+            await self._connected_client.create_table(**create_table_params)  # pyright: ignore[reportUnknownMemberType]
 
             # Wait for table to be active
             waiter = self._connected_client.get_waiter("table_exists")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
@@ -253,8 +283,4 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         # Return True if an item was actually deleted
         return "Attributes" in response  # pyright: ignore[reportUnknownArgumentType]
 
-    @override
-    async def _close(self) -> None:
-        """Close the DynamoDB client."""
-        if self._client:
-            await self._client.__aexit__(None, None, None)  # pyright: ignore[reportUnknownMemberType]
+    # No need to override _close - the exit stack handles all cleanup automatically

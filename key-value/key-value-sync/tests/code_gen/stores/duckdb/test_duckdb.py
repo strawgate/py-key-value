@@ -37,13 +37,13 @@ class TestDuckDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 class TestDuckDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
-    def store(self) -> Generator[DuckDBStore, None, None]:
+    def store(self, per_test_temp_dir: Path) -> Generator[DuckDBStore, None, None]:
         """Test with persistent DuckDB database file."""
-        with TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "test.db"
-            duckdb_store = DuckDBStore(database_path=db_path)
-            yield duckdb_store
-            duckdb_store.close()
+        duckdb_store = DuckDBStore(database_path=per_test_temp_dir / "test.db")
+
+        yield duckdb_store
+
+        duckdb_store.close()
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
     def test_not_unbounded(self, store: BaseStore): ...

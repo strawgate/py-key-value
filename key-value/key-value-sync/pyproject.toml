@@ -1,6 +1,6 @@
 [project]
 name = "py-key-value-sync"
-version = "0.2.8"
+version = "0.3.0"
 description = "Sync Key-Value"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,7 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "py-key-value-shared==0.2.8",
+    "py-key-value-shared==0.3.0",
     "beartype>=0.20.0",
 ]
 
@@ -41,7 +41,7 @@ valkey = ["valkey-glide-sync>=2.1.0"]
 vault = ["hvac>=2.3.0", "types-hvac>=2.3.0"]
 memcached = ["aiomcache>=0.8.0"]
 elasticsearch = ["elasticsearch>=8.0.0", "aiohttp>=3.12"]
-opensearch = ["opensearch-py[async]>=2.0.0"]
+opensearch = ["opensearch-py>=2.0.0"]
 pydantic = ["pydantic>=2.11.9"]
 keyring = ["keyring>=25.6.0"]
 keyring-linux = ["keyring>=25.6.0", "dbus-python>=1.4.0"]
@@ -64,6 +64,7 @@ markers = [
     "skip_on_ci: Skip running the test when running on CI",
 ]
 timeout = 10
+timeout_func_only = true
 
 env_files = [".env"]
 
