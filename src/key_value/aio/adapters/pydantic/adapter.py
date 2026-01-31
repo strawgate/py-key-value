@@ -1,6 +1,8 @@
-from typing import TypeVar
+from typing import Any, TypeVar
 
+from pydantic.json_schema import GenerateJsonSchema, JsonSchemaValue
 from pydantic.type_adapter import TypeAdapter
+from pydantic_core import PydanticOmit
 from typing_extensions import TypeForm
 
 from key_value.aio.adapters.pydantic.base import BasePydanticAdapter
@@ -8,6 +10,18 @@ from key_value.aio.protocols.key_value import AsyncKeyValue
 from key_value.shared.beartype import bear_spray
 
 T = TypeVar("T")
+
+
+class _SkipInvalidJsonSchema(GenerateJsonSchema):
+    """Schema generator that skips fields that can't be represented in JSON schema.
+
+    This handles models with Callable fields, custom validators, or other types
+    that cannot be converted to JSON schema. Such fields are omitted from the
+    schema rather than raising an error.
+    """
+
+    def handle_invalid_for_json_schema(self, schema: Any, error_info: str) -> JsonSchemaValue:  # noqa: ARG002
+        raise PydanticOmit
 
 
 class PydanticAdapter(BasePydanticAdapter[T]):
@@ -72,10 +86,13 @@ class PydanticAdapter(BasePydanticAdapter[T]):
         This uses Pydantic's TypeAdapter.json_schema() to reliably determine the output structure.
         Types that produce a JSON object (schema type "object") are dict-serializable.
 
+        Uses a custom schema generator to skip fields that can't be represented in JSON schema
+        (e.g., Callable fields), avoiding PydanticInvalidForJsonSchema errors.
+
         Returns:
             True if the type serializes to a dict (JSON object), False otherwise.
         """
-        schema = self._type_adapter.json_schema()
+        schema = self._type_adapter.json_schema(schema_generator=_SkipInvalidJsonSchema)
         return schema.get("type") == "object"
 
     def _get_model_type_name(self) -> str:
