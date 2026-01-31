@@ -2,7 +2,6 @@
 # from the original file 'test_rocksdb.py'
 # DO NOT CHANGE! Change the original file instead.
 import json
-from collections.abc import Generator
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -21,13 +20,8 @@ from tests.code_gen.stores.base import BaseStoreTests, ContextManagerStoreTestMi
 class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
-    def store(self) -> Generator[RocksDBStore, None, None]:
-        """Create a RocksDB store for testing."""
-        # Create a temporary directory for the RocksDB database
-        with TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "test_db"
-            rocksdb_store = RocksDBStore(path=db_path)
-            yield rocksdb_store
+    def store(self, per_test_temp_dir: Path) -> RocksDBStore:
+        return RocksDBStore(path=per_test_temp_dir / "test_db")
 
     def test_rocksdb_path_connection(self):
         """Test RocksDB store creation with path."""
@@ -62,6 +56,8 @@ class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         assert result == {"test": "value"}
 
         store.close()
+        # Close the user-provided database before cleanup
+        db.close()
         temp_dir.cleanup()
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")

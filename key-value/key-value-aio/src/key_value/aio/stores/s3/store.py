@@ -1,10 +1,9 @@
-from types import TracebackType
 from typing import TYPE_CHECKING, Any, overload
 
 from key_value.shared.utils.managed_entry import ManagedEntry
 from key_value.shared.utils.sanitization import SanitizationStrategy
 from key_value.shared.utils.sanitize import hash_excess_length
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from key_value.aio.stores.base import (
     BaseContextManagerStore,
@@ -135,7 +134,6 @@ class S3Store(BaseContextManagerStore, BaseStore):
     _endpoint_url: str | None
     _raw_client: Any
     _client: S3Client | None
-    _owns_client: bool
 
     @overload
     def __init__(
@@ -218,11 +216,11 @@ class S3Store(BaseContextManagerStore, BaseStore):
         """
         self._bucket_name = bucket_name
         self._endpoint_url = endpoint_url
+        client_provided = client is not None
 
         if client:
             self._client = client
             self._raw_client = None
-            self._owns_client = False
         else:
             session: Session = aioboto3.Session(
                 region_name=region_name,
@@ -233,28 +231,13 @@ class S3Store(BaseContextManagerStore, BaseStore):
 
             self._raw_client = session.client(service_name="s3", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType]
             self._client = None
-            self._owns_client = True
 
         super().__init__(
             default_collection=default_collection,
             collection_sanitization_strategy=collection_sanitization_strategy,
             key_sanitization_strategy=key_sanitization_strategy,
+            client_provided_by_user=client_provided,
         )
-
-    @override
-    async def __aenter__(self) -> Self:
-        if self._raw_client:
-            self._client = await self._raw_client.__aenter__()
-        await super().__aenter__()
-        return self
-
-    @override
-    async def __aexit__(
-        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
-    ) -> None:
-        await super().__aexit__(exc_type, exc_value, traceback)
-        if self._owns_client and self._raw_client:
-            await self._raw_client.__aexit__(exc_type, exc_value, traceback)
 
     @property
     def _connected_client(self) -> S3Client:
@@ -278,6 +261,10 @@ class S3Store(BaseContextManagerStore, BaseStore):
         This method creates the S3 bucket if it doesn't already exist. It uses the
         HeadBucket operation to check for bucket existence and creates it if not found.
         """
+        # Register client cleanup if we own the client
+        if not self._client_provided_by_user and self._raw_client is not None:
+            self._client = await self._exit_stack.enter_async_context(self._raw_client)
+
         from botocore.exceptions import ClientError
 
         try:
@@ -440,8 +427,4 @@ class S3Store(BaseContextManagerStore, BaseStore):
         )
         return True
 
-    @override
-    async def _close(self) -> None:
-        """Close the S3 client."""
-        if self._owns_client and self._raw_client:
-            await self._raw_client.__aexit__(None, None, None)
+    # No need to override _close - the exit stack handles all cleanup automatically

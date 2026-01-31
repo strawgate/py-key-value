@@ -249,7 +249,7 @@ type annotation issues to maintain type safety guarantees.
 ## Make Commands Reference
 
 | Command | Purpose |
-|---------|---------|
+| ------- | ------- |
 | `make sync` | Install all dependencies |
 | `make install` | Alias for `make sync` |
 | `make lint` | Lint Python + Markdown |

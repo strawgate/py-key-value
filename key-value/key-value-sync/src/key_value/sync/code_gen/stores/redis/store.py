@@ -57,7 +57,9 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         """Initialize the Redis store.
 
         Args:
-            client: An existing Redis client to use.
+            client: An existing Redis client to use. If provided, the store will not manage
+                the client's lifecycle (will not close it). The caller is responsible for
+                managing the client's lifecycle.
             url: Redis URL (e.g., redis://localhost:6379/0).
             host: Redis host. Defaults to localhost.
             port: Redis port. Defaults to 6379.
@@ -65,6 +67,8 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             password: Redis password. Defaults to None.
             default_collection: The default collection to use if no collection is provided.
         """
+        client_provided = client is not None
+
         if client:
             self._client = client
         elif url:
@@ -73,16 +77,16 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
                 host=parsed_url.hostname or "localhost",
                 port=parsed_url.port or 6379,
                 db=int(parsed_url.path.lstrip("/")) if parsed_url.path and parsed_url.path != "/" else 0,
+                username=parsed_url.username,
                 password=parsed_url.password or password,
                 decode_responses=True,
             )
         else:
             self._client = Redis(host=host, port=port, db=db, password=password, decode_responses=True)
 
-        self._stable_api = True
         self._adapter = BasicSerializationAdapter(date_format="isoformat", value_format="dict")
 
-        super().__init__(default_collection=default_collection)
+        super().__init__(default_collection=default_collection, client_provided_by_user=client_provided, stable_api=True)
 
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -203,9 +207,11 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         return get_keys_from_compound_keys(compound_keys=keys, collection=collection)
 
     @override
-    def _delete_store(self) -> bool:
-        return self._client.flushdb()  # pyright: ignore[reportUnknownMemberType, reportAny]
+    def _setup(self) -> None:
+        """Register client cleanup if we own the client."""
+        if not self._client_provided_by_user:
+            self._exit_stack.callback(self._client.close)
 
     @override
-    def _close(self) -> None:
-        self._client.close()
+    def _delete_store(self) -> bool:
+        return self._client.flushdb()  # pyright: ignore[reportUnknownMemberType, reportAny]
