@@ -7,14 +7,12 @@ py-key-value project. For human developers, see [DEVELOPING.md](DEVELOPING.md).
 
 ### Required Pre-commit Checks
 
-All four checks must pass before committing:
+All checks must pass before committing:
 
 1. `make lint` - Runs Ruff formatting and linting (Python + Markdown)
 2. `make typecheck` - Runs Basedpyright type checking
-3. `make codegen` - Regenerates sync library from async
-4. `make lint` - Runs Ruff formatting and linting after the other checks have
 
-Or run all four together:
+Or run both together:
 
 ```bash
 make precommit
@@ -22,37 +20,22 @@ make precommit
 
 ### Testing Requirements
 
-- All new features require tests in both async and sync packages
+- All new features require tests
 - Run `make test` to execute all test suites (verbose output)
 - Run `make test-concise` for minimal output (recommended for AI agents)
 - Run `make test-aio` for async package tests only
-- Run `make test-sync` for sync package tests only
 - Test coverage should be maintained
 
 ## Architecture
-
-### Async-First Development
-
-**This is a critical constraint**: Always modify the async package first.
-
-- **Primary codebase**: `key-value/key-value-aio/` (async implementation)
-- **Generated codebase**: `key-value/key-value-sync/` (DO NOT EDIT DIRECTLY)
-- **Sync generation**: Run `make codegen` to generate sync from async
-
-The sync library is automatically generated from the async library using
-`scripts/build_sync_library.py`. All changes must be made to the async
-package first, then regenerated into the sync package.
 
 ### Monorepo Structure
 
 ```text
 key-value/
 ├── key-value-aio/         # Primary async library
-├── key-value-sync/        # Generated sync library (DO NOT EDIT)
 ├── key-value-shared/      # Shared utilities and types
 └── key-value-shared-test/ # Shared test utilities
 scripts/
-├── build_sync_library.py  # Codegen script for sync library
 └── bump_versions.py       # Version management script
 ```
 
@@ -65,7 +48,7 @@ scripts/
 - **Type checker**: Basedpyright (strict mode)
 - **Runtime type checking**: Beartype (can be disabled via
   `PY_KEY_VALUE_DISABLE_BEARTYPE=true`)
-- **Python version**: 3.10+ (sync codegen targets 3.10)
+- **Python version**: 3.10+
 
 ### Markdown
 
@@ -87,12 +70,6 @@ the raw value but a `ManagedEntry` containing:
 - Creation timestamp
 - TTL metadata
 
-### Python Version Compatibility
-
-The sync codegen targets Python 3.10. Running the codegen script with a
-different Python version may produce unexpected results or compatibility
-issues. Use Python 3.10 when running `make codegen`.
-
 ### Optional Backend Dependencies
 
 Store implementations have optional dependencies. Install extras as needed:
@@ -103,15 +80,6 @@ pip install py-key-value-aio[dynamodb]   # DynamoDB support
 pip install py-key-value-aio[mongodb]    # MongoDB support
 # etc. - see README.md for full list
 ```
-
-### Sync Package is Generated
-
-**Never edit files in `key-value/key-value-sync/` directly**. Any changes
-will be overwritten when `make codegen` runs. Always make changes in the
-async package and regenerate. Always run `make codegen` after making changes
-to the async package. You will need to include the generated code in your pull
-request. Nobody will generate it for you. This also means pull requests will contain
-two copies of your changes, this is intentional!
 
 ## Working with Code Review Feedback
 
@@ -162,7 +130,7 @@ Before claiming work is "ready to merge" or "complete":
 - [ ] All critical issues addressed or documented as out-of-scope
 - [ ] All important issues addressed or explicitly deferred with rationale
 - [ ] No unrelated changes from bad merges
-- [ ] `make precommit` passes (lint, typecheck, codegen)
+- [ ] `make precommit` passes (lint, typecheck)
 - [ ] Tests pass
 
 Never claim completion with unresolved critical or important issues.
@@ -182,9 +150,7 @@ When reviewing pull requests, please consider:
 
 #### Project-Specific Patterns
 
-- **Async-first architecture**: All changes originate in `key-value/key-value-aio/`
-  and are code-generated into `key-value/key-value-sync/`. PRs will naturally
-  contain duplicate changes - this is intentional.
+- **Async-only architecture**: All code is in `key-value/key-value-aio/`.
 - **Test patterns**: The project uses `ContextManagerStoreTestMixin` for store
   tests. Look for consistency with existing test implementations.
 - **ManagedEntry wrapper**: Values are never stored directly but are wrapped in
@@ -258,12 +224,9 @@ type annotation issues to maintain type safety guarantees.
 | `make test-concise` | Run all test suites (concise output for AI) |
 | `make test-aio` | Run async package tests |
 | `make test-aio-concise` | Run async package tests (concise) |
-| `make test-sync` | Run sync package tests |
-| `make test-sync-concise` | Run sync package tests (concise) |
 | `make test-shared` | Run shared package tests |
 | `make test-shared-concise` | Run shared package tests (concise) |
-| `make codegen` | Generate sync library from async |
-| `make precommit` | Run lint + typecheck + codegen |
+| `make precommit` | Run lint + typecheck |
 | `make build` | Build all packages |
 
 ### Per-Project Commands
@@ -281,8 +244,8 @@ make build PROJECT=key-value/key-value-aio
 
 ### AsyncKeyValue Protocol
 
-The core async interface is `AsyncKeyValue` protocol from
-`key_value/aio/protocols/key_value.py`. All async stores implement this
+The core interface is `AsyncKeyValue` protocol from
+`key_value/aio/protocols/key_value.py`. All stores implement this
 protocol, which defines:
 
 - `get`, `get_many` - Retrieve values
@@ -290,27 +253,17 @@ protocol, which defines:
 - `delete`, `delete_many` - Remove values
 - `ttl`, `ttl_many` - Get TTL information
 
-### KeyValue Protocol (Sync)
-
-The sync mirror is `KeyValue` from `key_value/sync/code_gen/protocols/key_value.py`,
-generated from the async protocol.
-
 ## Store Implementations
 
-Stores are located in:
-
-- Async: `key-value/key-value-aio/src/key_value/aio/stores/`
-- Sync: `key-value/key-value-sync/src/key_value/sync/code_gen/stores/`
+Stores are located in `key-value/key-value-aio/src/key_value/aio/stores/`.
 
 Available backends include: DynamoDB, Elasticsearch, Memcached, Memory, Disk,
 MongoDB, Redis, RocksDB, Valkey, Vault, Windows Registry, Keyring, and more.
 
 ## Wrappers
 
-Wrappers add functionality to stores and are located in:
-
-- Async: `key-value/key-value-aio/src/key_value/aio/wrappers/`
-- Sync: `key-value/key-value-sync/src/key_value/sync/code_gen/wrappers/`
+Wrappers add functionality to stores and are located in
+`key-value/key-value-aio/src/key_value/aio/wrappers/`.
 
 Wrappers include: Compression, DefaultValue, Encryption, Logging, Statistics,
 Retry, Timeout, Cache, Prefix, TTL clamping, and more.
@@ -318,10 +271,7 @@ Retry, Timeout, Cache, Prefix, TTL clamping, and more.
 ## Adapters
 
 Adapters simplify store interactions but don't implement the protocol directly.
-Located in:
-
-- Async: `key-value/key-value-aio/src/key_value/aio/adapters/`
-- Sync: `key-value/key-value-sync/src/key_value/sync/code_gen/adapters/`
+Located in `key-value/key-value-aio/src/key_value/aio/adapters/`.
 
 Key adapters:
 
@@ -354,8 +304,6 @@ make sync
 GitHub Actions workflows are in `.github/workflows/`:
 
 - `test.yml` - Run tests across packages
-  - `codegen_check` job - Ensures `make codegen lint` has been run before
-    commits
   - `static_analysis` job - Runs linting and type checking per package
   - `test_quick` and `test_all` jobs - Run tests across Python versions and
     platforms

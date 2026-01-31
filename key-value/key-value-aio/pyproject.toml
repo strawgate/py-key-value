@@ -46,7 +46,7 @@ s3 = ["aioboto3>=13.3.0", "types-aiobotocore-s3>=2.16.0"]
 keyring = ["keyring>=25.6.0"]
 keyring-linux = ["keyring>=25.6.0", "dbus-python>=1.4.0"]
 pydantic = ["pydantic>=2.11.9"]
-aerospike = ["aerospike>=14.0.0"]
+aerospike = ["aerospike>=16.0.0"]
 rocksdb = [
     "rocksdict>=0.3.24 ; python_version >= '3.12'", # RocksDB 0.3.24 is the first version to support Python 3.13
     "rocksdict>=0.3.2 ; python_version < '3.12'"
@@ -75,6 +75,7 @@ env_files = [".env"]
 dev = [
     "py-key-value-aio[memory,disk,filetree,redis,elasticsearch,memcached,mongodb,vault,dynamodb,s3,rocksdb,duckdb,postgresql]",
     "py-key-value-aio[valkey]; platform_system != 'Windows'",
+    "py-key-value-aio[aerospike]; platform_system != 'Windows'",
     "py-key-value-aio[keyring]",
     "py-key-value-aio[pydantic]",
     "py-key-value-aio[wrappers-encryption]",

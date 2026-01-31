@@ -1,3 +1,3 @@
 # py-key-value-shared-test
 
-Shared data for tests between key-value-aio and key-value-sync
+Shared test utilities for the py-key-value library.
