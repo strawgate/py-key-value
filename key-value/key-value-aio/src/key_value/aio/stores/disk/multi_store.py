@@ -3,10 +3,10 @@ from datetime import timezone
 from pathlib import Path
 from typing import overload
 
-from key_value.shared.utils.managed_entry import ManagedEntry, datetime
-from key_value.shared.utils.serialization import BasicSerializationAdapter
 from typing_extensions import override
 
+from key_value.aio._shared.utils.managed_entry import ManagedEntry, datetime
+from key_value.aio._shared.utils.serialization import BasicSerializationAdapter
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
 
 try:

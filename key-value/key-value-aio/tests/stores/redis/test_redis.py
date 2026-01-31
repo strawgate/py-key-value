@@ -5,10 +5,10 @@ from typing import Any
 import pytest
 from dirty_equals import IsDatetime
 from inline_snapshot import snapshot
-from key_value.shared.stores.wait import async_wait_for_true
 from redis.asyncio.client import Redis
 from typing_extensions import override
 
+from key_value.aio._shared.stores.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.redis import RedisStore
 from tests.conftest import docker_container, should_skip_docker_tests

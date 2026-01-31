@@ -1,6 +1,6 @@
-from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
 
+from key_value.aio._shared.utils.managed_entry import ManagedEntry
 from key_value.aio.stores.base import BaseStore
 
 

@@ -1,7 +1,7 @@
 import pytest
-from key_value.shared.errors.wrappers.read_only import ReadOnlyError
 from typing_extensions import override
 
+from key_value.aio._shared.errors.wrappers.read_only import ReadOnlyError
 from key_value.aio.stores.memory.store import MemoryStore
 from key_value.aio.wrappers.read_only import ReadOnlyWrapper
 

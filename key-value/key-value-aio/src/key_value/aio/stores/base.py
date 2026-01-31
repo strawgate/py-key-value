@@ -11,15 +11,15 @@ from datetime import datetime
 from types import MappingProxyType, TracebackType
 from typing import Any, SupportsFloat
 
-from key_value.shared.constants import DEFAULT_COLLECTION_NAME
-from key_value.shared.errors import StoreSetupError
-from key_value.shared.type_checking.bear_spray import bear_enforce
-from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitization import PassthroughStrategy, SanitizationStrategy
-from key_value.shared.utils.serialization import BasicSerializationAdapter, SerializationAdapter
-from key_value.shared.utils.time_to_live import prepare_entry_timestamps
 from typing_extensions import Self, override
 
+from key_value.aio._shared.constants import DEFAULT_COLLECTION_NAME
+from key_value.aio._shared.errors import StoreSetupError
+from key_value.aio._shared.type_checking.bear_spray import bear_enforce
+from key_value.aio._shared.utils.managed_entry import ManagedEntry
+from key_value.aio._shared.utils.sanitization import PassthroughStrategy, SanitizationStrategy
+from key_value.aio._shared.utils.serialization import BasicSerializationAdapter, SerializationAdapter
+from key_value.aio._shared.utils.time_to_live import prepare_entry_timestamps
 from key_value.aio.protocols.key_value import (
     AsyncCullProtocol,
     AsyncDestroyCollectionProtocol,

@@ -7,11 +7,11 @@ import pytest
 from bson import ObjectId
 from dirty_equals import IsDatetime, IsFloat, IsInstance
 from inline_snapshot import snapshot
-from key_value.shared.stores.wait import async_wait_for_true
-from key_value.shared.utils.managed_entry import ManagedEntry
 from pymongo import AsyncMongoClient
 from typing_extensions import override
 
+from key_value.aio._shared.stores.wait import async_wait_for_true
+from key_value.aio._shared.utils.managed_entry import ManagedEntry
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.mongodb import MongoDBStore
 from key_value.aio.stores.mongodb.store import (

@@ -2,9 +2,9 @@ import contextlib
 from collections.abc import AsyncGenerator
 
 import pytest
-from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
 
+from key_value.aio._shared.stores.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.s3 import S3Store
 from tests.conftest import docker_container, should_skip_docker_tests

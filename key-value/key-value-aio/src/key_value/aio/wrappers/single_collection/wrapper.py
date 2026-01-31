@@ -1,10 +1,10 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, SupportsFloat
 
-from key_value.shared.constants import DEFAULT_COLLECTION_NAME
-from key_value.shared.utils.compound import DEFAULT_PREFIX_SEPARATOR, prefix_key, unprefix_key
 from typing_extensions import override
 
+from key_value.aio._shared.constants import DEFAULT_COLLECTION_NAME
+from key_value.aio._shared.utils.compound import DEFAULT_PREFIX_SEPARATOR, prefix_key, unprefix_key
 from key_value.aio.protocols.key_value import AsyncKeyValue
 from key_value.aio.wrappers.base import BaseWrapper
 

@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform != 'win32'",
@@ -12,8 +12,6 @@ resolution-markers = [
 members = [
     "py-key-value",
     "py-key-value-aio",
-    "py-key-value-shared",
-    "py-key-value-shared-test",
 ]
 
 [[package]]
@@ -1796,7 +1794,6 @@ dev = [
     { name = "diskcache-stubs" },
     { name = "docker" },
     { name = "inline-snapshot" },
-    { name = "py-key-value-shared-test" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-dotenv" },
@@ -1824,7 +1821,6 @@ requires-dist = [
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.30.0" },
     { name = "mkdocstrings-python", marker = "extra == 'docs'", specifier = ">=1.10.0" },
-    { name = "py-key-value-shared-test", marker = "extra == 'dev'", editable = "key-value/key-value-shared-test" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.2" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.2.0" },
     { name = "pytest-dotenv", marker = "extra == 'dev'", specifier = ">=0.5.2" },
@@ -1841,7 +1837,7 @@ version = "0.3.0"
 source = { editable = "key-value/key-value-aio" }
 dependencies = [
     { name = "beartype" },
-    { name = "py-key-value-shared" },
+    { name = "typing-extensions" },
 ]
 
 [package.optional-dependencies]
@@ -1939,7 +1935,6 @@ requires-dist = [
     { name = "keyring", marker = "extra == 'keyring'", specifier = ">=25.6.0" },
     { name = "keyring", marker = "extra == 'keyring-linux'", specifier = ">=25.6.0" },
     { name = "pathvalidate", marker = "extra == 'disk'", specifier = ">=3.3.1" },
-    { name = "py-key-value-shared", editable = "key-value/key-value-shared" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
     { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.0.0" },
     { name = "pytz", marker = "extra == 'duckdb'", specifier = ">=2025.2" },
@@ -1949,6 +1944,7 @@ requires-dist = [
     { name = "types-aiobotocore-dynamodb", marker = "extra == 'dynamodb'", specifier = ">=2.16.0" },
     { name = "types-aiobotocore-s3", marker = "extra == 's3'", specifier = ">=2.16.0" },
     { name = "types-hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
+    { name = "typing-extensions", specifier = ">=4.15.0" },
     { name = "valkey-glide", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
 provides-extras = ["memory", "disk", "filetree", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "dynamodb", "s3", "keyring", "keyring-linux", "pydantic", "aerospike", "rocksdb", "duckdb", "postgresql", "wrappers-encryption"]
@@ -1962,66 +1958,6 @@ dev = [
     { name = "py-key-value-aio", extras = ["pydantic"] },
     { name = "py-key-value-aio", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extras = ["wrappers-encryption"] },
-]
-
-[[package]]
-name = "py-key-value-shared"
-version = "0.3.0"
-source = { editable = "key-value/key-value-shared" }
-dependencies = [
-    { name = "beartype" },
-    { name = "typing-extensions" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "py-key-value", extra = ["dev"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "beartype", specifier = ">=0.20.0" },
-    { name = "typing-extensions", specifier = ">=4.15.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "py-key-value", extras = ["dev"], virtual = "." }]
-
-[[package]]
-name = "py-key-value-shared-test"
-version = "0.3.0"
-source = { editable = "key-value/key-value-shared-test" }
-
-[package.dev-dependencies]
-dev = [
-    { name = "basedpyright" },
-    { name = "dirty-equals" },
-    { name = "docker" },
-    { name = "inline-snapshot" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-dotenv" },
-    { name = "pytest-mock" },
-    { name = "pytest-timeout" },
-    { name = "pytest-xdist" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "basedpyright", specifier = ">=1.32.1" },
-    { name = "dirty-equals", specifier = ">=0.10.0" },
-    { name = "docker", specifier = ">=7.1.0" },
-    { name = "inline-snapshot", specifier = ">=0.30.1" },
-    { name = "pytest", specifier = ">=8.4.2" },
-    { name = "pytest-asyncio", specifier = ">=1.2.0" },
-    { name = "pytest-dotenv", specifier = ">=0.5.2" },
-    { name = "pytest-mock", specifier = ">=3.15.1" },
-    { name = "pytest-timeout", specifier = ">=2.4.0" },
-    { name = "pytest-xdist", specifier = ">=3.8.0" },
-    { name = "ruff", specifier = ">=0.14.2" },
 ]
 
 [[package]]

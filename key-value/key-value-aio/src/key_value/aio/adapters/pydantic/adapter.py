@@ -1,9 +1,9 @@
 from typing import TypeVar
 
-from key_value.shared.type_checking.bear_spray import bear_spray
 from pydantic.type_adapter import TypeAdapter
 from typing_extensions import TypeForm
 
+from key_value.aio._shared.type_checking.bear_spray import bear_spray
 from key_value.aio.adapters.pydantic.base import BasePydanticAdapter
 from key_value.aio.protocols.key_value import AsyncKeyValue
 

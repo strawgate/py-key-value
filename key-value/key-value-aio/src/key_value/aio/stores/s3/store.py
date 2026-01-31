@@ -1,10 +1,10 @@
 from typing import TYPE_CHECKING, Any, overload
 
-from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitization import SanitizationStrategy
-from key_value.shared.utils.sanitize import hash_excess_length
 from typing_extensions import override
 
+from key_value.aio._shared.utils.managed_entry import ManagedEntry
+from key_value.aio._shared.utils.sanitization import SanitizationStrategy
+from key_value.aio._shared.utils.sanitize import hash_excess_length
 from key_value.aio.stores.base import (
     BaseContextManagerStore,
     BaseStore,

@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import sys
 import tempfile
@@ -8,20 +9,18 @@ from typing import Any
 
 import pytest
 from dirty_equals import IsFloat
-from key_value.shared.code_gen.gather import async_gather
-from key_value.shared.code_gen.sleep import asleep
-from key_value.shared.errors import InvalidTTLError, SerializationError
-from key_value.shared_test.cases import (
+from pydantic import AnyHttpUrl
+
+from key_value.aio._shared.errors import InvalidTTLError, SerializationError
+from key_value.aio.protocols.key_value import AsyncKeyValueProtocol
+from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
+from tests._shared_test.cases import (
     LARGE_DATA_CASES,
     NEGATIVE_SIMPLE_CASES,
     SIMPLE_CASES,
     NegativeCases,
     PositiveCases,
 )
-from pydantic import AnyHttpUrl
-
-from key_value.aio.protocols.key_value import AsyncKeyValueProtocol
-from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
 from tests.conftest import async_running_in_event_loop
 
 
@@ -198,10 +197,10 @@ class BaseStoreTests(ABC):
         """Tests that a put call with a negative ttl will return None when getting the key."""
         await store.put(collection="test_collection", key="test_key", value={"test": "test"}, ttl=2)
         assert await store.get(collection="test_collection", key="test_key") is not None
-        await asleep(seconds=1)
+        await asyncio.sleep(1)
 
         for _ in range(8):
-            await asleep(seconds=0.25)
+            await asyncio.sleep(0.25)
             if await store.get(collection="test_collection", key="test_key") is None:
                 # pass the test
                 return
@@ -255,7 +254,7 @@ class BaseStoreTests(ABC):
                 assert await store.delete(collection="test_collection", key=f"test_{worker_id}_{i}")
                 assert await store.get(collection="test_collection", key=f"test_{worker_id}_{i}") is None
 
-        _ = await async_gather(*[worker(store, worker_id) for worker_id in range(3)])
+        _ = await asyncio.gather(*[worker(store, worker_id) for worker_id in range(3)])
 
     async def test_minimum_put_many_get_many_performance(self, store: BaseStore):
         """Tests that the store meets minimum performance requirements."""

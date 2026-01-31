@@ -2,9 +2,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, SupportsFloat
 
-from key_value.shared.constants import DEFAULT_COLLECTION_NAME
 from typing_extensions import override
 
+from key_value.aio._shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.aio.protocols.key_value import AsyncKeyValue
 from key_value.aio.wrappers.base import BaseWrapper
 

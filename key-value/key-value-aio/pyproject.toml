@@ -15,8 +15,8 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "py-key-value-shared==0.3.0",
     "beartype>=0.20.0",
+    "typing-extensions>=4.15.0",
 ]
 
 
@@ -28,8 +28,6 @@ build-backend = "uv_build"
 module-name = "key_value.aio"
 
 [tool.uv.sources]
-py-key-value-shared = { workspace = true }
-py-key-value-shared-test = { workspace = true }
 
 [project.optional-dependencies]
 memory = ["cachetools>=5.0.0"]

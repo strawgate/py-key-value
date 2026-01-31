@@ -3,11 +3,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 
-from key_value.shared.utils.compound import compound_key, get_collections_from_compound_keys, get_keys_from_compound_keys
-from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.serialization import BasicSerializationAdapter
 from typing_extensions import override
 
+from key_value.aio._shared.utils.compound import compound_key, get_collections_from_compound_keys, get_keys_from_compound_keys
+from key_value.aio._shared.utils.managed_entry import ManagedEntry
+from key_value.aio._shared.utils.serialization import BasicSerializationAdapter
 from key_value.aio.stores.base import (
     BaseDestroyStore,
     BaseEnumerateCollectionsStore,

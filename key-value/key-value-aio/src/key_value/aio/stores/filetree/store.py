@@ -9,13 +9,13 @@ from typing import Any
 
 from aiofile import async_open as aopen
 from anyio import Path as AsyncPath
-from key_value.shared.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
-from key_value.shared.utils.sanitization import HybridSanitizationStrategy, SanitizationStrategy
-from key_value.shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
-from key_value.shared.utils.serialization import BasicSerializationAdapter, SerializationAdapter
-from key_value.shared.utils.time_to_live import now
 from typing_extensions import Self, override
 
+from key_value.aio._shared.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
+from key_value.aio._shared.utils.sanitization import HybridSanitizationStrategy, SanitizationStrategy
+from key_value.aio._shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
+from key_value.aio._shared.utils.serialization import BasicSerializationAdapter, SerializationAdapter
+from key_value.aio._shared.utils.time_to_live import now
 from key_value.aio.stores.base import (
     BaseStore,
 )

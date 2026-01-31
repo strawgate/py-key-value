@@ -3,13 +3,13 @@ import logging
 import os
 import platform
 import subprocess
+import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
 import pytest
 from docker import DockerClient
 from docker.models.containers import Container
-from key_value.shared.code_gen.sleep import sleep
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +109,7 @@ def docker_wait_container_gone(name: str, max_tries: int = 10, wait_time: float 
     while count < max_tries:
         if not docker_get(name=name, raise_on_not_found=False):
             return True
-        sleep(wait_time)
+        time.sleep(wait_time)
         count += 1
     return False
 

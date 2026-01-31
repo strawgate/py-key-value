@@ -3,11 +3,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, overload
 
-from key_value.shared.errors import DeserializationError
-from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.serialization import SerializationAdapter
 from typing_extensions import override
 
+from key_value.aio._shared.errors import DeserializationError
+from key_value.aio._shared.utils.managed_entry import ManagedEntry
+from key_value.aio._shared.utils.serialization import SerializationAdapter
 from key_value.aio.stores.base import SEED_DATA_TYPE, BaseContextManagerStore, BaseStore
 
 try:

@@ -1,7 +1,7 @@
 import hashlib
 from enum import Enum
 
-from key_value.shared.type_checking.bear_spray import bear_enforce
+from key_value.aio._shared.type_checking.bear_spray import bear_enforce
 
 MINIMUM_MAX_LENGTH = 16
 

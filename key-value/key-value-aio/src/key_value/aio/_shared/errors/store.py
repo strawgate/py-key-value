@@ -1,4 +1,4 @@
-from key_value.shared.errors.base import BaseKeyValueError
+from key_value.aio._shared.errors.base import BaseKeyValueError
 
 
 class KeyValueStoreError(BaseKeyValueError):

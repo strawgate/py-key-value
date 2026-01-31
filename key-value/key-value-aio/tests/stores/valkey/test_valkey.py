@@ -5,9 +5,9 @@ from collections.abc import AsyncGenerator
 import pytest
 from dirty_equals import IsDatetime
 from inline_snapshot import snapshot
-from key_value.shared.stores.wait import async_wait_for_true
 from typing_extensions import override
 
+from key_value.aio._shared.stores.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
 from tests.conftest import detect_on_windows, docker_container, should_skip_docker_tests
 from tests.stores.base import (

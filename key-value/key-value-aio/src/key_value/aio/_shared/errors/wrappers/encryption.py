@@ -1,4 +1,4 @@
-from key_value.shared.errors import KeyValueOperationError
+from key_value.aio._shared.errors import KeyValueOperationError
 
 
 class EncryptionError(KeyValueOperationError):

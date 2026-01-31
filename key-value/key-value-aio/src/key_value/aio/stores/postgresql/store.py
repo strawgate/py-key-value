@@ -8,9 +8,9 @@ This is safe because table names are validated in __init__ to be alphanumeric pl
 
 from typing import overload
 
-from key_value.shared.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
 from typing_extensions import override
 
+from key_value.aio._shared.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseStore
 
 try:

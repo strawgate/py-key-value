@@ -1,5 +1,5 @@
 .PHONY: bump-version bump-version-dry lint typecheck sync precommit test build help
-.PHONY: install test-aio test-shared test-concise test-aio-concise test-shared-concise docs-serve docs-build docs-deploy
+.PHONY: install test-aio test-concise test-aio-concise docs-serve docs-build docs-deploy
 
 # Default target - show help
 .DEFAULT_GOAL := help
@@ -16,8 +16,6 @@ help:
 	@echo "  make test-concise      - Run all tests (concise output for AI agents)"
 	@echo "  make test-aio          - Run async package tests"
 	@echo "  make test-aio-concise  - Run async package tests (concise)"
-	@echo "  make test-shared       - Run shared package tests"
-	@echo "  make test-shared-concise - Run shared package tests (concise)"
 	@echo "  make build             - Build all packages"
 	@echo "  make precommit         - Run pre-commit checks (lint + typecheck)"
 	@echo "  make docs-serve        - Start documentation server"
@@ -90,17 +88,12 @@ ifdef PROJECT
 else
 	@echo "Testing all packages..."
 	@uv run pytest key-value/key-value-aio/tests -vv
-	@uv run pytest key-value/key-value-shared/tests -vv
 endif
 
 # Convenience targets for specific packages
 test-aio:
 	@echo "Testing key-value-aio..."
 	@uv run pytest key-value/key-value-aio/tests -vv
-
-test-shared:
-	@echo "Testing key-value-shared..."
-	@uv run pytest key-value/key-value-shared/tests -vv
 
 # Concise test output for AI agents - supports PROJECT parameter
 test-concise:
@@ -110,17 +103,12 @@ ifdef PROJECT
 else
 	@echo "Testing all packages (concise output)..."
 	@uv run pytest key-value/key-value-aio/tests -qq --tb=line --no-header
-	@uv run pytest key-value/key-value-shared/tests -qq --tb=line --no-header
 endif
 
 # Convenience targets for specific packages with concise output
 test-aio-concise:
 	@echo "Testing key-value-aio (concise output)..."
 	@uv run pytest key-value/key-value-aio/tests -qq --tb=line --no-header
-
-test-shared-concise:
-	@echo "Testing key-value-shared (concise output)..."
-	@uv run pytest key-value/key-value-shared/tests -qq --tb=line --no-header
 
 # Build target - supports PROJECT parameter
 build:
@@ -130,7 +118,6 @@ ifdef PROJECT
 else
 	@echo "Building all packages..."
 	@cd key-value/key-value-aio && uv build .
-	@cd key-value/key-value-shared && uv build .
 endif
 
 precommit: lint typecheck

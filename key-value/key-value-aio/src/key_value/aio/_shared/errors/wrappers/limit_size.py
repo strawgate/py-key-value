@@ -1,4 +1,4 @@
-from key_value.shared.errors.key_value import KeyValueOperationError
+from key_value.aio._shared.errors.key_value import KeyValueOperationError
 
 
 class EntryTooLargeError(KeyValueOperationError):

@@ -7,8 +7,9 @@ from uuid import UUID
 
 import pytest
 from _pytest.mark.structures import MarkDecorator
-from key_value.shared.errors.key_value import SerializationError
 from typing_extensions import Self
+
+from key_value.aio._shared.errors.key_value import SerializationError
 
 FIXED_DATETIME = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 FIXED_TIME = FIXED_DATETIME.time()

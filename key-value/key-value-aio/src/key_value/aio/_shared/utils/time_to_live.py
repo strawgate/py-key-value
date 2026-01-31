@@ -2,8 +2,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, SupportsFloat, overload
 
-from key_value.shared.errors import InvalidTTLError
-from key_value.shared.type_checking.bear_spray import bear_enforce
+from key_value.aio._shared.errors import InvalidTTLError
+from key_value.aio._shared.type_checking.bear_spray import bear_enforce
 
 
 def epoch_to_datetime(epoch: float) -> datetime:

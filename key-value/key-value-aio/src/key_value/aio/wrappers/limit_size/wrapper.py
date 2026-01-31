@@ -1,10 +1,10 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, SupportsFloat
 
-from key_value.shared.errors.wrappers.limit_size import EntryTooLargeError, EntryTooSmallError
-from key_value.shared.utils.managed_entry import estimate_serialized_size
 from typing_extensions import override
 
+from key_value.aio._shared.errors.wrappers.limit_size import EntryTooLargeError, EntryTooSmallError
+from key_value.aio._shared.utils.managed_entry import estimate_serialized_size
 from key_value.aio.protocols.key_value import AsyncKeyValue
 from key_value.aio.wrappers.base import BaseWrapper
 

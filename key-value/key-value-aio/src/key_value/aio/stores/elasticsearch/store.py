@@ -3,24 +3,24 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, overload
 
-from key_value.shared.errors import DeserializationError, SerializationError
-from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.sanitization import (
+from typing_extensions import override
+
+from key_value.aio._shared.errors import DeserializationError, SerializationError
+from key_value.aio._shared.utils.managed_entry import ManagedEntry
+from key_value.aio._shared.utils.sanitization import (
     AlwaysHashStrategy,
     HashFragmentMode,
     HybridSanitizationStrategy,
     SanitizationStrategy,
 )
-from key_value.shared.utils.sanitize import (
+from key_value.aio._shared.utils.sanitize import (
     ALPHANUMERIC_CHARACTERS,
     LOWERCASE_ALPHABET,
     NUMBERS,
     UPPERCASE_ALPHABET,
 )
-from key_value.shared.utils.serialization import SerializationAdapter
-from key_value.shared.utils.time_to_live import now_as_epoch
-from typing_extensions import override
-
+from key_value.aio._shared.utils.serialization import SerializationAdapter
+from key_value.aio._shared.utils.time_to_live import now_as_epoch
 from key_value.aio.stores.base import (
     BaseContextManagerStore,
     BaseCullStore,

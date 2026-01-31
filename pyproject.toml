@@ -10,12 +10,9 @@ license = {text = "Apache-2.0"}
 [tool.uv.workspace]
 members = [
     "key-value/key-value-aio",
-    "key-value/key-value-shared",
-    "key-value/key-value-shared-test",
 ]
 
 [tool.uv.sources]
-py-key-value-shared-test = { workspace = true }
 py-key-value = { workspace = true }
 
 [tool.ruff]
@@ -80,7 +77,6 @@ line-length = 140
 [project.optional-dependencies]
 dev = [
     "ast-comments>=1.2.3",
-    "py-key-value-shared-test",
     "basedpyright>=1.32.1",
     "dirty-equals>=0.10.0",
     "diskcache-stubs>=5.6.3.6.20240818",

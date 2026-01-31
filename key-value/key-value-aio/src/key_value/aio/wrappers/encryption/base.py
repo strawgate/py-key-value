@@ -3,10 +3,10 @@ import json
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, SupportsFloat
 
-from key_value.shared.errors.key_value import SerializationError
-from key_value.shared.errors.wrappers.encryption import CorruptedDataError, DecryptionError, EncryptionError
 from typing_extensions import override
 
+from key_value.aio._shared.errors.key_value import SerializationError
+from key_value.aio._shared.errors.wrappers.encryption import CorruptedDataError, DecryptionError, EncryptionError
 from key_value.aio.protocols.key_value import AsyncKeyValue
 from key_value.aio.wrappers.base import BaseWrapper
 

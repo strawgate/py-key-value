@@ -3,11 +3,11 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from typing import Any, Generic, SupportsFloat, TypeVar, overload
 
-from key_value.shared.errors import DeserializationError, SerializationError
 from pydantic import ValidationError
 from pydantic.type_adapter import TypeAdapter
 from pydantic_core import PydanticSerializationError
 
+from key_value.aio._shared.errors import DeserializationError, SerializationError
 from key_value.aio.protocols.key_value import AsyncKeyValue
 
 logger = logging.getLogger(__name__)

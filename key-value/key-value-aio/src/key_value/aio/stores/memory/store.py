@@ -3,10 +3,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.serialization import BasicSerializationAdapter
 from typing_extensions import override
 
+from key_value.aio._shared.utils.managed_entry import ManagedEntry
+from key_value.aio._shared.utils.serialization import BasicSerializationAdapter
 from key_value.aio.stores.base import (
     SEED_DATA_TYPE,
     BaseDestroyCollectionStore,

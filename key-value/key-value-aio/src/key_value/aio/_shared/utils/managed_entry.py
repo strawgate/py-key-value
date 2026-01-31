@@ -6,9 +6,9 @@ from typing import Any, SupportsFloat
 
 from typing_extensions import Self
 
-from key_value.shared.errors import DeserializationError, SerializationError
-from key_value.shared.type_checking.bear_spray import bear_enforce
-from key_value.shared.utils.time_to_live import now, now_plus, seconds_to
+from key_value.aio._shared.errors import DeserializationError, SerializationError
+from key_value.aio._shared.type_checking.bear_spray import bear_enforce
+from key_value.aio._shared.utils.time_to_live import now, now_plus, seconds_to
 
 
 @dataclass(kw_only=True)

@@ -6,10 +6,10 @@ import pytest
 from dirty_equals import IsFloat, IsStr
 from elasticsearch import AsyncElasticsearch
 from inline_snapshot import snapshot
-from key_value.shared.stores.wait import async_wait_for_true
-from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
 
+from key_value.aio._shared.stores.wait import async_wait_for_true
+from key_value.aio._shared.utils.managed_entry import ManagedEntry
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.elasticsearch import ElasticsearchStore
 from key_value.aio.stores.elasticsearch.store import (

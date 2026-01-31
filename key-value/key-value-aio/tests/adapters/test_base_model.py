@@ -3,9 +3,9 @@ from logging import LogRecord
 
 import pytest
 from inline_snapshot import snapshot
-from key_value.shared.errors import DeserializationError
 from pydantic import AnyHttpUrl, BaseModel
 
+from key_value.aio._shared.errors import DeserializationError
 from key_value.aio.adapters.base_model import BaseModelAdapter
 from key_value.aio.stores.memory.store import MemoryStore
 
