@@ -41,7 +41,9 @@ class AerospikeFailedToStartError(Exception):
 class TestAerospikeStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="session")
     async def setup_aerospike(self) -> AsyncGenerator[None, None]:
-        with docker_container("aerospike-test", "aerospike/aerospike-server:latest", {"3000": 3000}):
+        # NSUP_PERIOD enables TTL expiration (namespace supervisor runs every N seconds)
+        environment = {"NSUP_PERIOD": "1"}
+        with docker_container("aerospike-test", "aerospike/aerospike-server:latest", {"3000": 3000}, environment=environment):
             if not await async_wait_for_true(bool_fn=ping_aerospike, tries=30, wait_time=1):
                 msg = "Aerospike failed to start"
                 raise AerospikeFailedToStartError(msg)
