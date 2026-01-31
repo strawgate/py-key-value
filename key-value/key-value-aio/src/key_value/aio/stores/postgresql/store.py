@@ -94,6 +94,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
     _user: str | None
     _password: str | None
     _table_name: str
+    _auto_create: bool
 
     @overload
     def __init__(
@@ -102,6 +103,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         pool: asyncpg.Pool,  # type: ignore[type-arg]
         table_name: str | None = None,
         default_collection: str | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the PostgreSQL store with an existing connection pool.
 
@@ -109,6 +111,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             pool: An existing asyncpg connection pool to use.
             table_name: The name of the table to use for storage (default: kv_store).
             default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
         """
 
     @overload
@@ -118,6 +121,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         url: str,
         table_name: str | None = None,
         default_collection: str | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the PostgreSQL store with a connection URL.
 
@@ -125,6 +129,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             url: PostgreSQL connection URL (e.g., postgresql://user:pass@localhost/dbname).
             table_name: The name of the table to use for storage (default: kv_store).
             default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
         """
 
     @overload
@@ -138,6 +143,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         password: str | None = None,
         table_name: str | None = None,
         default_collection: str | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the PostgreSQL store with connection parameters.
 
@@ -149,6 +155,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             password: Database password (default: None).
             table_name: The name of the table to use for storage (default: kv_store).
             default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
         """
 
     def __init__(
@@ -163,8 +170,23 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         password: str | None = None,
         table_name: str | None = None,
         default_collection: str | None = None,
+        auto_create: bool = True,
     ) -> None:
-        """Initialize the PostgreSQL store."""
+        """Initialize the PostgreSQL store.
+
+        Args:
+            pool: An existing asyncpg connection pool to use.
+            url: PostgreSQL connection URL (e.g., postgresql://user:pass@localhost/dbname).
+            host: PostgreSQL server host (default: localhost).
+            port: PostgreSQL server port (default: 5432).
+            database: Database name (default: postgres).
+            user: Database user (default: current user).
+            password: Database password (default: None).
+            table_name: The name of the table to use for storage (default: kv_store).
+            default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to automatically create the table if it doesn't exist. Defaults to True.
+                When False, raises ValueError if the table doesn't exist.
+        """
         pool_provided = pool is not None
 
         self._pool = pool
@@ -174,6 +196,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         self._database = database
         self._user = user
         self._password = password
+        self._auto_create = auto_create
 
         # Validate table name to prevent SQL injection and invalid identifiers
         table_name = table_name or DEFAULT_TABLE
@@ -231,30 +254,44 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
 
         pool = self._pool  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
-        # Create the main table if it doesn't exist
-        table_sql = (
-            f"CREATE TABLE IF NOT EXISTS {self._table_name} ("
-            "collection TEXT NOT NULL, "
-            "key TEXT NOT NULL, "
-            "value JSONB NOT NULL, "
-            "ttl DOUBLE PRECISION, "
-            "created_at TIMESTAMPTZ, "
-            "expires_at TIMESTAMPTZ, "
-            "PRIMARY KEY (collection, key))"
-        )
+        # Check if table exists
+        table_exists_sql = """
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_name = $1
+            )
+        """
+        table_exists = await pool.fetchval(table_exists_sql, self._table_name)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
-        # Create index on expires_at for efficient TTL queries
-        # Ensure index name <= 63 chars (PostgreSQL identifier limit)
-        index_name = f"idx_{self._table_name}_expires_at"
-        if len(index_name) > POSTGRES_MAX_IDENTIFIER_LEN:
-            import hashlib
+        if not table_exists:
+            if not self._auto_create:
+                msg = f"Table '{self._table_name}' does not exist. Either create the table manually or set auto_create=True."
+                raise ValueError(msg)
 
-            index_name = "idx_" + hashlib.sha256(self._table_name.encode()).hexdigest()[:16] + "_exp"
+            # Create the main table
+            table_sql = (
+                f"CREATE TABLE IF NOT EXISTS {self._table_name} ("
+                "collection TEXT NOT NULL, "
+                "key TEXT NOT NULL, "
+                "value JSONB NOT NULL, "
+                "ttl DOUBLE PRECISION, "
+                "created_at TIMESTAMPTZ, "
+                "expires_at TIMESTAMPTZ, "
+                "PRIMARY KEY (collection, key))"
+            )
 
-        index_sql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {self._table_name}(expires_at) WHERE expires_at IS NOT NULL"
+            # Create index on expires_at for efficient TTL queries
+            # Ensure index name <= 63 chars (PostgreSQL identifier limit)
+            index_name = f"idx_{self._table_name}_expires_at"
+            if len(index_name) > POSTGRES_MAX_IDENTIFIER_LEN:
+                import hashlib
 
-        await pool.execute(table_sql)  # pyright: ignore[reportUnknownMemberType]
-        await pool.execute(index_sql)  # pyright: ignore[reportUnknownMemberType]
+                index_name = "idx_" + hashlib.sha256(self._table_name.encode()).hexdigest()[:16] + "_exp"
+
+            index_sql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {self._table_name}(expires_at) WHERE expires_at IS NOT NULL"
+
+            await pool.execute(table_sql)  # pyright: ignore[reportUnknownMemberType]
+            await pool.execute(index_sql)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:

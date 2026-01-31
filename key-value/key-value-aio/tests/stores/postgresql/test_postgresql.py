@@ -20,7 +20,7 @@ except ImportError:
 POSTGRESQL_HOST = "localhost"
 POSTGRESQL_HOST_PORT = 5432
 POSTGRESQL_USER = "postgres"
-POSTGRESQL_PASSWORD = "test"  # noqa: S105
+POSTGRESQL_PASSWORD = "test"
 POSTGRESQL_TEST_DB = "kv_store_test"
 
 WAIT_FOR_POSTGRESQL_TIMEOUT = 30
@@ -86,24 +86,27 @@ class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture
     async def store(self, setup_postgresql: None) -> PostgreSQLStore:
         """Create a PostgreSQL store for testing."""
-        store = PostgreSQLStore(
+        # Clean up the database before each test by dropping the table
+        # The table will be recreated when the store is used via _setup()
+        pool = await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            host=POSTGRESQL_HOST,
+            port=POSTGRESQL_HOST_PORT,
+            user=POSTGRESQL_USER,
+            password=POSTGRESQL_PASSWORD,
+            database=POSTGRESQL_TEST_DB,
+        )
+        async with pool.acquire() as conn:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            with contextlib.suppress(Exception):
+                await conn.execute("DROP TABLE IF EXISTS kv_store")  # pyright: ignore[reportUnknownMemberType]
+        await pool.close()  # pyright: ignore[reportUnknownMemberType]
+
+        return PostgreSQLStore(
             host=POSTGRESQL_HOST,
             port=POSTGRESQL_HOST_PORT,
             database=POSTGRESQL_TEST_DB,
             user=POSTGRESQL_USER,
             password=POSTGRESQL_PASSWORD,
         )
-
-        # Clean up the database before each test
-        # Initialize the pool by calling setup() which is protected by a lock
-        await store.setup()
-        if store._pool is not None:  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType]
-            async with store._pool.acquire() as conn:  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportUnknownVariableType]
-                # Drop and recreate the kv_store table
-                with contextlib.suppress(Exception):
-                    await conn.execute("DROP TABLE IF EXISTS kv_store")  # pyright: ignore[reportUnknownMemberType]
-
-        return store
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
