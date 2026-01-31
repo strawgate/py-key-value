@@ -88,7 +88,7 @@ class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
         """Create a PostgreSQL store for testing."""
         # Clean up the database before each test by dropping the table
         # The table will be recreated when the store is used via _setup()
-        pool = await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        pool = await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportOptionalMemberAccess]
             host=POSTGRESQL_HOST,
             port=POSTGRESQL_HOST_PORT,
             user=POSTGRESQL_USER,
