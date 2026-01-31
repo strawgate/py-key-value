@@ -23,7 +23,7 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
     The data is stored in collections.
     """
 
-    _client: firestore.Client | None
+    _client: firestore.Client
 
     @overload
     def __init__(self, client: firestore.Client, *, default_collection: str | None = None) -> None:
@@ -84,6 +84,12 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
         )
 
     @override
+    def _setup(self) -> None:
+        """Register client cleanup if we own the client."""
+        if not self._client_provided_by_user:
+            self._exit_stack.callback(self._client.close)
+
+    @override
     def _get_managed_entry(self, *, key: str, collection: str | None = None) -> ManagedEntry | None:
         """Get a managed entry from Firestore."""
         collection = collection or self.default_collection
@@ -102,12 +108,17 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
 
     @override
     def _delete_managed_entry(self, *, key: str, collection: str | None = None) -> bool:
-        """Delete a managed entry from Firestore."""
-        collection = collection or self.default_collection
-        self._client.collection(collection).document(key).delete()  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
-        return True
+        """Delete a managed entry from Firestore.
 
-    def _close(self) -> None:
-        """Close the Firestore client."""
-        if self._client and (not self._client_provided_by_user):
-            self._client.close()
+        Returns True if the document existed and was deleted, False otherwise.
+        """
+        collection = collection or self.default_collection
+        # Check if document exists before deleting
+        doc_ref = self._client.collection(collection).document(key)  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
+        doc_snapshot = doc_ref.get()  # pyright: ignore[reportUnknownMemberType]
+        exists: bool = doc_snapshot.exists  # pyright: ignore[reportUnknownMemberType]
+
+        # Always perform the delete operation (idempotent)
+        doc_ref.delete()  # pyright: ignore[reportUnknownMemberType]
+
+        return bool(exists)
