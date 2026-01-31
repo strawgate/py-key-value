@@ -13,11 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    strategy:
-      matrix:
-        project:
-          - "key-value/key-value-aio"
-          - "key-value/key-value-shared"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,11 +22,9 @@ jobs:
 
       - name: "Install"
         run: uv sync --locked --group dev
-        working-directory: ${{ matrix.project }}
 
       - name: "Test"
         run: uv run pytest tests
-        working-directory: ${{ matrix.project }}
 
   publish:
     needs: test
@@ -41,11 +34,6 @@ jobs:
       id-token: write
     environment: pypi
 
-    strategy:
-      matrix:
-        project:
-          - "key-value/key-value-aio"
-          - "key-value/key-value-shared"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -55,11 +43,9 @@ jobs:
 
       - name: "Install"
         run: uv sync --locked --group dev
-        working-directory: ${{ matrix.project }}
 
       - name: "Build"
         run: uv build
-        working-directory: ${{ matrix.project }}
 
       - name: "Publish to PyPi"
         if: github.event_name == 'release' && github.event.action == 'created'
