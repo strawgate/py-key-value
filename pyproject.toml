@@ -25,7 +25,7 @@ requires = ["uv_build>=0.8.2,<0.9.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = "key_value.aio"
+module-name = ["key_value.aio", "key_value.shared"]
 
 [project.optional-dependencies]
 memory = ["cachetools>=5.0.0"]
