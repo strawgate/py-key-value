@@ -295,7 +295,9 @@ class ElasticsearchStore(
             raise
 
     def _get_index_name(self, collection: str) -> str:
-        return self._index_prefix + "-" + self._sanitize_collection(collection=collection).lower()
+        # Apply lowercase before sanitization to prevent index collisions
+        # when collections differ only by case
+        return self._index_prefix + "-" + self._sanitize_collection(collection=collection.lower())
 
     def _get_document_id(self, key: str) -> str:
         return self._sanitize_key(key=key)
