@@ -54,6 +54,9 @@ def get_hits_from_response(response: Any) -> list[dict[str, Any]]:
     if not (hits := body.get("hits")):
         return []
 
+    if not isinstance(hits, dict):
+        return []
+
     hits_dict: dict[str, Any] = cast("dict[str, Any]", hits)
 
     if not (hits_list := hits_dict.get("hits")):

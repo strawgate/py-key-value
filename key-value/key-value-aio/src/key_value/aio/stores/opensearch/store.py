@@ -1,4 +1,3 @@
-import contextlib
 import logging
 from collections.abc import Sequence
 from typing import Any, overload
@@ -64,6 +63,9 @@ DEFAULT_MAPPING = {
         },
         "key": {
             "type": "keyword",
+        },
+        "version": {
+            "type": "integer",
         },
         "value": {
             "properties": {
@@ -153,6 +155,7 @@ class OpenSearchStore(
 
     _key_sanitization_strategy: SanitizationStrategy
     _collection_sanitization_strategy: SanitizationStrategy
+    _auto_create: bool
 
     @overload
     def __init__(
@@ -163,15 +166,19 @@ class OpenSearchStore(
         default_collection: str | None = None,
         key_sanitization_strategy: SanitizationStrategy | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the opensearch store.
 
         Args:
-            opensearch_client: The opensearch client to use.
+            opensearch_client: The opensearch client to use. If provided, the store will not
+                manage the client's lifecycle (will not close it). The caller is responsible for
+                managing the client's lifecycle.
             index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
             default_collection: The default collection to use if no collection is provided.
             key_sanitization_strategy: The sanitization strategy to use for keys.
             collection_sanitization_strategy: The sanitization strategy to use for collections.
+            auto_create: Whether to automatically create indices if they don't exist. Defaults to True.
         """
 
     @overload
@@ -184,6 +191,7 @@ class OpenSearchStore(
         default_collection: str | None = None,
         key_sanitization_strategy: SanitizationStrategy | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the opensearch store.
 
@@ -192,6 +200,9 @@ class OpenSearchStore(
             api_key: The api key to use.
             index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
             default_collection: The default collection to use if no collection is provided.
+            key_sanitization_strategy: The sanitization strategy to use for keys.
+            collection_sanitization_strategy: The sanitization strategy to use for collections.
+            auto_create: Whether to automatically create indices if they don't exist. Defaults to True.
         """
 
     def __init__(
@@ -204,21 +215,28 @@ class OpenSearchStore(
         default_collection: str | None = None,
         key_sanitization_strategy: SanitizationStrategy | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the opensearch store.
 
         Args:
-            opensearch_client: The opensearch client to use.
+            opensearch_client: The opensearch client to use. If provided, the store will not
+                manage the client's lifecycle (will not close it). The caller is responsible for
+                managing the client's lifecycle.
             url: The url of the opensearch cluster.
             api_key: The api key to use.
             index_prefix: The index prefix to use. Collections will be prefixed with this prefix.
             default_collection: The default collection to use if no collection is provided.
             key_sanitization_strategy: The sanitization strategy to use for keys.
             collection_sanitization_strategy: The sanitization strategy to use for collections.
+            auto_create: Whether to automatically create indices if they don't exist. Defaults to True.
+                When False, raises ValueError if an index doesn't exist.
         """
         if opensearch_client is None and url is None:
             msg = "Either opensearch_client or url must be provided"
             raise ValueError(msg)
+
+        client_provided = opensearch_client is not None
 
         if opensearch_client:
             self._client = opensearch_client
@@ -228,6 +246,7 @@ class OpenSearchStore(
                 "http_compress": True,
                 "timeout": 10,
                 "max_retries": 3,
+                "retry_on_timeout": True,
             }
             if api_key:
                 client_kwargs["api_key"] = api_key
@@ -240,6 +259,7 @@ class OpenSearchStore(
         LessCapableJsonSerializer.install_serializer(client=self._client)
 
         self._index_prefix = index_prefix.lower()
+        self._auto_create = auto_create
 
         self._serializer = OpenSearchSerializationAdapter()
 
@@ -247,12 +267,14 @@ class OpenSearchStore(
             default_collection=default_collection,
             collection_sanitization_strategy=collection_sanitization_strategy,
             key_sanitization_strategy=key_sanitization_strategy,
+            client_provided_by_user=client_provided,
         )
 
     @override
     async def _setup(self) -> None:
-        # OpenSearch doesn't have serverless mode, so we can skip the cluster info check
-        pass
+        # Register client cleanup if we own the client
+        if not self._client_provided_by_user:
+            self._exit_stack.push_async_callback(self._client.close)
 
     @override
     async def _setup_collection(self, *, collection: str) -> None:
@@ -260,6 +282,10 @@ class OpenSearchStore(
 
         if await self._client.indices.exists(index=index_name):
             return
+
+        if not self._auto_create:
+            msg = f"Index '{index_name}' does not exist. Either create the index manually or set auto_create=True."
+            raise ValueError(msg)
 
         try:
             _ = await self._client.indices.create(index=index_name, body={"mappings": DEFAULT_MAPPING, "settings": {}})
@@ -269,7 +295,9 @@ class OpenSearchStore(
             raise
 
     def _get_index_name(self, collection: str) -> str:
-        return self._index_prefix + "-" + self._sanitize_collection(collection=collection).lower()
+        # Apply lowercase before sanitization to prevent index collisions
+        # when collections differ only by case
+        return self._index_prefix + "-" + self._sanitize_collection(collection=collection.lower())
 
     def _get_document_id(self, key: str) -> str:
         return self._sanitize_key(key=key)
@@ -358,18 +386,18 @@ class OpenSearchStore(
         index_name: str = self._get_index_name(collection=collection)
         document_id: str = self._get_document_id(key=key)
 
-        document: dict[str, Any] = self._serializer.dump_dict(entry=managed_entry, key=key, collection=collection)
-
         try:
-            _ = await self._client.index(  # type: ignore[reportUnknownVariableType]
-                index=index_name,
-                id=document_id,
-                body=document,
-                params={"refresh": "true"},
-            )
+            document: dict[str, Any] = self._serializer.dump_dict(entry=managed_entry, key=key, collection=collection)
         except Exception as e:
             msg = f"Failed to serialize document: {e}"
             raise SerializationError(message=msg) from e
+
+        _ = await self._client.index(  # type: ignore[reportUnknownVariableType]
+            index=index_name,
+            id=document_id,
+            body=document,
+            params={"refresh": "true"},
+        )
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
@@ -417,7 +445,9 @@ class OpenSearchStore(
         all_keys: list[str] = []
 
         for hit in hits:
-            if not (key := get_first_value_from_field_in_hit(hit=hit, field="key", value_type=str)):
+            try:
+                key = get_first_value_from_field_in_hit(hit=hit, field="key", value_type=str)
+            except TypeError:
                 continue
 
             all_keys.append(key)
@@ -484,18 +514,13 @@ class OpenSearchStore(
     @override
     async def _cull(self) -> None:
         ms_epoch = int(now_as_epoch() * 1000)
-        with contextlib.suppress(Exception):
-            _ = await self._client.delete_by_query(
-                index=f"{self._index_prefix}-*",
-                body={
-                    "query": {
-                        "range": {
-                            "expires_at": {"lt": ms_epoch},
-                        },
+        _ = await self._client.delete_by_query(
+            index=f"{self._index_prefix}-*",
+            body={
+                "query": {
+                    "range": {
+                        "expires_at": {"lt": ms_epoch},
                     },
                 },
-            )
-
-    @override
-    async def _close(self) -> None:
-        await self._client.close()
+            },
+        )
