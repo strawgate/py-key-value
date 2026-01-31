@@ -17,8 +17,8 @@ This monorepo contains two libraries:
 
 ## Why use this library?
 
-- **Multiple backends**: DynamoDB, S3, Elasticsearch, Memcached, MongoDB, Redis,
-  RocksDB, Valkey, and In-memory, Disk, etc
+- **Multiple backends**: Aerospike, DynamoDB, S3, Elasticsearch, Memcached, MongoDB,
+  Redis, RocksDB, Valkey, and In-memory, Disk, etc
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
 - **Adapters**: Pydantic model support, raise-on-missing behavior, etc
@@ -133,7 +133,7 @@ pip install py-key-value-aio[disk]
 pip install py-key-value-aio[dynamodb]
 pip install py-key-value-aio[s3]
 pip install py-key-value-aio[elasticsearch]
-# or: redis, mongodb, memcached, valkey, vault, registry, rocksdb, see below for all options
+# or: aerospike, redis, mongodb, memcached, valkey, vault, registry, rocksdb, see below for all options
 ```
 
 ```python
