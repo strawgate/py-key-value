@@ -204,6 +204,65 @@ Use FileTreeStore when you need to:
 
 ---
 
+### DuckDBStore
+
+In-process SQL OLAP database with native JSON storage.
+
+```python
+from key_value.aio.stores.duckdb import DuckDBStore
+
+# In-memory database (default)
+store = DuckDBStore()
+
+# Persistent database
+store = DuckDBStore(database_path="./my_store.duckdb")
+
+# With existing connection
+import duckdb
+connection = duckdb.connect("./my_store.duckdb")
+store = DuckDBStore(connection=connection)
+```
+
+**Installation:**
+
+```bash
+pip install py-key-value-aio[duckdb]
+```
+
+**Use Cases:**
+
+- Analytics on stored key-value data
+- Local development with SQL querying capabilities
+- Applications needing both key-value and SQL access
+- Data exploration and reporting
+
+**Characteristics:**
+
+- Native JSON column support for queryable values
+- In-memory or persistent storage
+- Standard SQL access to stored data
+- Efficient timestamp handling for TTL queries
+- Stable storage format: **Unstable**
+
+**Direct SQL Access:**
+
+DuckDB allows you to query your key-value data directly with SQL:
+
+```python
+# After storing some data
+await store.put("user:1", {"name": "Alice", "age": 30}, collection="users")
+await store.put("user:2", {"name": "Bob", "age": 25}, collection="users")
+
+# Query directly via DuckDB
+result = store._connection.execute("""
+    SELECT key, value->>'name' as name
+    FROM kv_entries
+    WHERE collection = 'users'
+""").fetchall()
+```
+
+---
+
 ### RocksDBStore
 
 High-performance embedded database using RocksDB.
@@ -398,6 +457,7 @@ Distributed stores provide network-based storage for multi-node applications.
 | Firestore | Unstable | Google Cloud Firestore key-value storage |
 | Memcached | Unstable | High-performance distributed memory cache |
 | MongoDB | Unstable | Document database used as key-value store |
+| OpenSearch | Unstable | OpenSearch search engine with key-value capabilities |
 | PostgreSQL | Unstable | PostgreSQL database with JSONB storage |
 | Redis | Stable | Popular in-memory data structure store |
 | Valkey | Stable | Open-source Redis fork |
@@ -645,6 +705,72 @@ pip install py-key-value-aio[elasticsearch]
 - Distributed by default
 - Rich querying
 - Stable storage format: **Unstable**
+
+---
+
+### OpenSearchStore
+
+OpenSearch search engine used as a key-value store. Collections are stored in
+separate indices with values in flattened fields.
+
+```python
+from key_value.aio.stores.opensearch import OpenSearchStore
+
+# Using URL and API key
+store = OpenSearchStore(
+    url="https://localhost:9200",
+    api_key="your-api-key",
+    index_prefix="kv_store"
+)
+
+# With existing client
+from opensearchpy import AsyncOpenSearch
+client = AsyncOpenSearch(hosts=["https://localhost:9200"])
+store = OpenSearchStore(
+    opensearch_client=client,
+    index_prefix="kv_store"
+)
+```
+
+**Installation:**
+
+```bash
+pip install py-key-value-aio[opensearch]
+```
+
+**Use Cases:**
+
+- Applications already using OpenSearch
+- Need for search capabilities with AWS-managed service
+- Analytics and logging
+
+**Characteristics:**
+
+- Search capabilities
+- Distributed by default
+- Collections stored in separate indices
+- Values stored in flat_object fields
+- Stable storage format: **Unstable**
+
+**Sanitization Strategies:**
+
+OpenSearch has specific restrictions on keys and index names. Use the built-in
+sanitization strategies to avoid issues:
+
+```python
+from key_value.aio.stores.opensearch import (
+    OpenSearchStore,
+    OpenSearchV1KeySanitizationStrategy,
+    OpenSearchV1CollectionSanitizationStrategy,
+)
+
+store = OpenSearchStore(
+    url="https://localhost:9200",
+    index_prefix="kv_store",
+    key_sanitization_strategy=OpenSearchV1KeySanitizationStrategy(),
+    collection_sanitization_strategy=OpenSearchV1CollectionSanitizationStrategy(),
+)
+```
 
 ---
 
