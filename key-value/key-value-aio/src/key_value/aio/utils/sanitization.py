@@ -13,8 +13,8 @@ import hashlib
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from key_value.aio._shared.errors.key_value import InvalidKeyError
-from key_value.aio._shared.utils.sanitize import sanitize_characters_in_string
+from key_value.aio.errors import InvalidKeyError
+from key_value.aio.utils.sanitize import sanitize_characters_in_string
 
 
 class HashFragmentMode(Enum):

@@ -13,13 +13,7 @@ from typing import Any, SupportsFloat
 
 from typing_extensions import Self, override
 
-from key_value.aio._shared.constants import DEFAULT_COLLECTION_NAME
-from key_value.aio._shared.errors import StoreSetupError
-from key_value.aio._shared.type_checking.bear_spray import bear_enforce
-from key_value.aio._shared.utils.managed_entry import ManagedEntry
-from key_value.aio._shared.utils.sanitization import PassthroughStrategy, SanitizationStrategy
-from key_value.aio._shared.utils.serialization import BasicSerializationAdapter, SerializationAdapter
-from key_value.aio._shared.utils.time_to_live import prepare_entry_timestamps
+from key_value.aio.errors import StoreSetupError
 from key_value.aio.protocols.key_value import (
     AsyncCullProtocol,
     AsyncDestroyCollectionProtocol,
@@ -28,6 +22,12 @@ from key_value.aio.protocols.key_value import (
     AsyncEnumerateKeysProtocol,
     AsyncKeyValueProtocol,
 )
+from key_value.aio.utils.beartype import bear_enforce
+from key_value.aio.utils.constants import DEFAULT_COLLECTION_NAME
+from key_value.aio.utils.managed_entry import ManagedEntry
+from key_value.aio.utils.sanitization import PassthroughStrategy, SanitizationStrategy
+from key_value.aio.utils.serialization import BasicSerializationAdapter, SerializationAdapter
+from key_value.aio.utils.time_to_live import prepare_entry_timestamps
 
 SEED_DATA_TYPE = Mapping[str, Mapping[str, Mapping[str, Any]]]
 FROZEN_SEED_DATA_TYPE = MappingProxyType[str, MappingProxyType[str, MappingProxyType[str, Any]]]

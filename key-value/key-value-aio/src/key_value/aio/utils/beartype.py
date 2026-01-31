@@ -1,3 +1,10 @@
+"""Beartype configuration and decorators for runtime type checking.
+
+This module provides decorators for controlling beartype's runtime type checking
+behavior. Use `bear_enforce` when you want type violations to raise exceptions
+rather than warnings.
+"""
+
 from collections.abc import Callable
 
 from beartype import BeartypeConf, BeartypeStrategy, beartype
@@ -15,6 +22,7 @@ R = TypeVar(name="R")
 
 
 def no_bear_type_check(func: Callable[P, R]) -> Callable[P, R]:
+    """Disable beartype checking for a function."""
     return no_bear_type(func)
 
 
@@ -23,4 +31,5 @@ def bear_enforce(func: Callable[P, R]) -> Callable[P, R]:
     return enforce_bear_type(func)
 
 
+# Legacy alias
 bear_spray = no_bear_type_check

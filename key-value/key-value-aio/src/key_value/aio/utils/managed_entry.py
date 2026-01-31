@@ -1,3 +1,9 @@
+"""ManagedEntry dataclass for storing values with metadata.
+
+The ManagedEntry class wraps stored values with metadata including creation time
+and expiration time. This allows stores to track TTL information consistently.
+"""
+
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -6,9 +12,9 @@ from typing import Any, SupportsFloat
 
 from typing_extensions import Self
 
-from key_value.aio._shared.errors import DeserializationError, SerializationError
-from key_value.aio._shared.type_checking.bear_spray import bear_enforce
-from key_value.aio._shared.utils.time_to_live import now, now_plus, seconds_to
+from key_value.aio.errors import DeserializationError, SerializationError
+from key_value.aio.utils.beartype import bear_enforce
+from key_value.aio.utils.time_to_live import now, now_plus, seconds_to
 
 
 @dataclass(kw_only=True)
@@ -65,6 +71,7 @@ class ManagedEntry:
 
 @bear_enforce
 def dump_to_json(obj: dict[str, Any]) -> str:
+    """Serialize a dictionary to a JSON string."""
     try:
         return json.dumps(obj, sort_keys=True)
     except (json.JSONDecodeError, TypeError) as e:
@@ -74,6 +81,7 @@ def dump_to_json(obj: dict[str, Any]) -> str:
 
 @bear_enforce
 def load_from_json(json_str: str) -> dict[str, Any]:
+    """Deserialize a JSON string to a dictionary."""
     try:
         return verify_dict(obj=json.loads(json_str))  # pyright: ignore[reportAny]
 
@@ -84,6 +92,7 @@ def load_from_json(json_str: str) -> dict[str, Any]:
 
 @bear_enforce
 def verify_dict(obj: Any) -> dict[str, Any]:
+    """Verify that an object is a mapping with string keys."""
     if not isinstance(obj, Mapping):
         msg = "Object is not a Mapping"
         raise TypeError(msg)

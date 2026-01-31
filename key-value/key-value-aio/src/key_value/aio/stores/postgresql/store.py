@@ -10,8 +10,8 @@ from typing import overload
 
 from typing_extensions import override
 
-from key_value.aio._shared.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseStore
+from key_value.aio.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
 
 try:
     import asyncpg

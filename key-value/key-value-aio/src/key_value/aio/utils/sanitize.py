@@ -1,7 +1,14 @@
+"""Low-level string sanitization functions.
+
+This module provides low-level functions for sanitizing strings by replacing
+or removing invalid characters. For higher-level sanitization strategies,
+see the sanitization module.
+"""
+
 import hashlib
 from enum import Enum
 
-from key_value.aio._shared.type_checking.bear_spray import bear_enforce
+from key_value.aio.utils.beartype import bear_enforce
 
 MINIMUM_MAX_LENGTH = 16
 
@@ -26,20 +33,27 @@ def generate_hash_fragment(
 
 
 class HashFragmentMode(str, Enum):
+    """Mode for adding hash fragments to sanitized strings."""
+
     ALWAYS = "always"
     NEVER = "never"
     ONLY_IF_CHANGED = "only_if_changed"
 
 
 def sanitize_characters_in_string(value: str, allowed_characters: str, replace_with: str) -> str:
-    """Replace characters in a string. If multiple characters are in a row that are not allowed, only
-    the first one will be replaced. The rest will be removed. If all characters are not allowed, an
-    empty string will be returned.
+    """Replace characters in a string.
+
+    If multiple characters are in a row that are not allowed, only
+    the first one will be replaced. The rest will be removed. If all
+    characters are not allowed, an empty string will be returned.
 
     Args:
         value: The value to replace characters in.
-        to_replace: The characters to replace.
+        allowed_characters: The characters that are allowed.
         replace_with: The characters to replace with.
+
+    Returns:
+        The sanitized string.
     """
     new_value = ""
     last_char_was_replaced = False
@@ -112,11 +126,16 @@ def sanitize_string(
 
     Args:
         value: The value to sanitize.
-        allowed_characters: The allowed characters in the value.
         max_length: The maximum length of the value (with hash fragment). Interpreted as bytes if length_is_bytes is True.
+        allowed_characters: The allowed characters in the value.
+        replacement_character: The character to replace invalid characters with.
         hash_fragment_separator: The separator to add between the value and the hash fragment.
         hash_fragment_mode: The mode to add the hash fragment.
+        hash_fragment_length: The length of the hash fragment.
         length_is_bytes: If True, max_length is interpreted as bytes instead of characters.
+
+    Returns:
+        The sanitized string.
     """
     if max_length < MINIMUM_MAX_LENGTH:
         msg = f"max_length must be greater than or equal to {MINIMUM_MAX_LENGTH}"
@@ -173,9 +192,10 @@ def sanitize_string(
 
 @bear_enforce
 def hash_excess_length(value: str, max_length: int, length_is_bytes: bool = False) -> str:
-    """Hash part of the value if it exceeds the maximum length. This operation
-    will truncate the value to the maximum length minus 8 characters and will swap
-    the last 8 characters with the first 8 characters of the generated hash.
+    """Hash part of the value if it exceeds the maximum length.
+
+    This operation will truncate the value to the maximum length minus 8 characters
+    and will swap the last 8 characters with the first 8 characters of the generated hash.
 
     Args:
         value: The value to hash.

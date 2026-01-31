@@ -1,9 +1,15 @@
+"""TTL handling and datetime utilities.
+
+This module provides functions for working with TTL (time-to-live) values
+and datetime conversions used throughout the key-value stores.
+"""
+
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, SupportsFloat, overload
 
-from key_value.aio._shared.errors import InvalidTTLError
-from key_value.aio._shared.type_checking.bear_spray import bear_enforce
+from key_value.aio.errors import InvalidTTLError
+from key_value.aio.utils.beartype import bear_enforce
 
 
 def epoch_to_datetime(epoch: float) -> datetime:
@@ -32,6 +38,7 @@ def now_plus(seconds: float) -> datetime:
 
 
 def try_parse_datetime_str(value: Any) -> datetime | None:  # pyright: ignore[reportAny]
+    """Try to parse a datetime string, returning None on failure."""
     try:
         if isinstance(value, str):
             return datetime.fromisoformat(value)
@@ -82,6 +89,11 @@ def _validate_ttl(t: SupportsFloat | None) -> float | None:
 
 
 def prepare_entry_timestamps(ttl: SupportsFloat | None) -> tuple[datetime, float | None, datetime | None]:
+    """Prepare timestamps for a new entry.
+
+    Returns:
+        A tuple of (created_at, ttl_seconds, expires_at).
+    """
     created_at: datetime = now()
 
     ttl_seconds: float | None = prepare_ttl(t=ttl)

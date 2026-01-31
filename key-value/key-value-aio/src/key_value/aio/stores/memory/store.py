@@ -5,8 +5,6 @@ from typing import Any
 
 from typing_extensions import override
 
-from key_value.aio._shared.utils.managed_entry import ManagedEntry
-from key_value.aio._shared.utils.serialization import BasicSerializationAdapter
 from key_value.aio.stores.base import (
     SEED_DATA_TYPE,
     BaseDestroyCollectionStore,
@@ -14,6 +12,8 @@ from key_value.aio.stores.base import (
     BaseEnumerateCollectionsStore,
     BaseEnumerateKeysStore,
 )
+from key_value.aio.utils.managed_entry import ManagedEntry
+from key_value.aio.utils.serialization import BasicSerializationAdapter
 
 try:
     from cachetools import TLRUCache

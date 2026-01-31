@@ -1,3 +1,5 @@
+"""Base exception classes for key-value store errors."""
+
 ExtraInfoType = dict[str, str | int | float | bool | None]
 
 

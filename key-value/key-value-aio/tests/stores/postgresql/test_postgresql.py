@@ -74,7 +74,7 @@ class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
             },
         ):
             # Import here to avoid issues when asyncpg is not installed
-            from key_value.aio._shared.stores.wait import async_wait_for_true
+            from key_value.aio.utils.wait import async_wait_for_true
 
             if not await async_wait_for_true(bool_fn=ping_postgresql, tries=WAIT_FOR_POSTGRESQL_TIMEOUT, wait_time=1):
                 msg = f"PostgreSQL {version} failed to start"

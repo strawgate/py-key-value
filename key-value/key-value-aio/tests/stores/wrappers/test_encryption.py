@@ -4,7 +4,7 @@ from dirty_equals import IsStr
 from inline_snapshot import snapshot
 from typing_extensions import override
 
-from key_value.aio._shared.errors.wrappers.encryption import DecryptionError
+from key_value.aio.errors import DecryptionError
 from key_value.aio.stores.memory.store import MemoryStore
 from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
 from key_value.aio.wrappers.encryption.fernet import _generate_encryption_key  # pyright: ignore[reportPrivateUsage]

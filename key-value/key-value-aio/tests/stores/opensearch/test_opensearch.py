@@ -6,8 +6,6 @@ from typing import Any
 import pytest
 from dirty_equals import IsFloat, IsStr
 from inline_snapshot import snapshot
-from key_value.shared.stores.wait import async_wait_for_true
-from key_value.shared.utils.managed_entry import ManagedEntry
 from opensearchpy import AsyncOpenSearch
 from typing_extensions import override
 
@@ -18,6 +16,8 @@ from key_value.aio.stores.opensearch.store import (
     OpenSearchV1CollectionSanitizationStrategy,
     OpenSearchV1KeySanitizationStrategy,
 )
+from key_value.aio.utils.managed_entry import ManagedEntry
+from key_value.aio.utils.wait import async_wait_for_true
 from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 

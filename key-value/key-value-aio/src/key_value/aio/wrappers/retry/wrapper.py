@@ -3,8 +3,8 @@ from typing import Any, SupportsFloat, TypeVar
 
 from typing_extensions import override
 
-from key_value.aio._shared.utils.retry import async_retry_operation
 from key_value.aio.protocols.key_value import AsyncKeyValue
+from key_value.aio.utils.retry import async_retry_operation
 from key_value.aio.wrappers.base import BaseWrapper
 
 T = TypeVar("T")

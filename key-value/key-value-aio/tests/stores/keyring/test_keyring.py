@@ -6,8 +6,8 @@ from typing_extensions import override
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.elasticsearch.store import ElasticsearchStore
 from key_value.aio.stores.keyring.store import KeyringStore, KeyringV1CollectionSanitizationStrategy, KeyringV1KeySanitizationStrategy
-from tests._shared_test.cases import LARGE_DATA_CASES, PositiveCases
 from tests.conftest import detect_on_macos, detect_on_windows
+from tests.shared.cases import LARGE_DATA_CASES, PositiveCases
 from tests.stores.base import BaseStoreTests
 
 

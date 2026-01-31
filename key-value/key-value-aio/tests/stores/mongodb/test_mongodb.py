@@ -10,14 +10,14 @@ from inline_snapshot import snapshot
 from pymongo import AsyncMongoClient
 from typing_extensions import override
 
-from key_value.aio._shared.stores.wait import async_wait_for_true
-from key_value.aio._shared.utils.managed_entry import ManagedEntry
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.mongodb import MongoDBStore
 from key_value.aio.stores.mongodb.store import (
     MongoDBSerializationAdapter,
     MongoDBV1CollectionSanitizationStrategy,
 )
+from key_value.aio.utils.managed_entry import ManagedEntry
+from key_value.aio.utils.wait import async_wait_for_true
 from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 

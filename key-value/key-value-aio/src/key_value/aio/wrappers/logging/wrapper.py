@@ -5,8 +5,8 @@ from typing import Any, Literal, SupportsFloat
 
 from typing_extensions import override
 
-from key_value.aio._shared.constants import DEFAULT_COLLECTION_NAME
 from key_value.aio.protocols.key_value import AsyncKeyValue
+from key_value.aio.utils.constants import DEFAULT_COLLECTION_NAME
 from key_value.aio.wrappers.base import BaseWrapper
 
 

@@ -9,15 +9,16 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Literal, TypeVar
 
-from key_value.aio._shared.errors import DeserializationError, SerializationError
-from key_value.aio._shared.type_checking.bear_spray import bear_enforce
-from key_value.aio._shared.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json, verify_dict
+from key_value.aio.errors import DeserializationError, SerializationError
+from key_value.aio.utils.beartype import bear_enforce
+from key_value.aio.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json, verify_dict
 
 T = TypeVar("T")
 
 
 @bear_enforce
 def key_must_be(dictionary: dict[str, Any], /, key: str, expected_type: type[T]) -> T | None:
+    """Check that a dictionary key is of the expected type, returning None if missing."""
     if key not in dictionary:
         return None
     if not isinstance(dictionary[key], expected_type):
@@ -28,6 +29,7 @@ def key_must_be(dictionary: dict[str, Any], /, key: str, expected_type: type[T])
 
 @bear_enforce
 def parse_datetime_str(value: str) -> datetime:
+    """Parse an ISO format datetime string."""
     try:
         return datetime.fromisoformat(value)
     except ValueError:

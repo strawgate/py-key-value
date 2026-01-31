@@ -5,10 +5,10 @@ from winreg import HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE
 
 from typing_extensions import override
 
-from key_value.aio._shared.utils.managed_entry import ManagedEntry
-from key_value.aio._shared.utils.sanitization import HybridSanitizationStrategy, SanitizationStrategy
-from key_value.aio._shared.utils.sanitize import ALPHANUMERIC_CHARACTERS
 from key_value.aio.stores.base import BaseStore
+from key_value.aio.utils.managed_entry import ManagedEntry
+from key_value.aio.utils.sanitization import HybridSanitizationStrategy, SanitizationStrategy
+from key_value.aio.utils.sanitize import ALPHANUMERIC_CHARACTERS
 
 try:
     import winreg  # pyright: ignore[reportUnusedImport]  # noqa: F401

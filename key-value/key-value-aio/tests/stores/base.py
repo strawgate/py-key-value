@@ -11,17 +11,17 @@ import pytest
 from dirty_equals import IsFloat
 from pydantic import AnyHttpUrl
 
-from key_value.aio._shared.errors import InvalidTTLError, SerializationError
+from key_value.aio.errors import InvalidTTLError, SerializationError
 from key_value.aio.protocols.key_value import AsyncKeyValueProtocol
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
-from tests._shared_test.cases import (
+from tests.conftest import async_running_in_event_loop
+from tests.shared.cases import (
     LARGE_DATA_CASES,
     NEGATIVE_SIMPLE_CASES,
     SIMPLE_CASES,
     NegativeCases,
     PositiveCases,
 )
-from tests.conftest import async_running_in_event_loop
 
 
 class BaseStoreTests(ABC):

@@ -4,9 +4,9 @@ from typing import overload
 
 from typing_extensions import override
 
-from key_value.aio._shared.utils.compound import compound_key
-from key_value.aio._shared.utils.managed_entry import ManagedEntry
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
+from key_value.aio.utils.compound import compound_key
+from key_value.aio.utils.managed_entry import ManagedEntry
 
 try:
     from diskcache import Cache

@@ -5,10 +5,10 @@ from typing import Any, overload
 
 from typing_extensions import override
 
-from key_value.aio._shared.errors import DeserializationError
-from key_value.aio._shared.utils.managed_entry import ManagedEntry
-from key_value.aio._shared.utils.serialization import SerializationAdapter
+from key_value.aio.errors import DeserializationError
 from key_value.aio.stores.base import SEED_DATA_TYPE, BaseContextManagerStore, BaseStore
+from key_value.aio.utils.managed_entry import ManagedEntry
+from key_value.aio.utils.serialization import SerializationAdapter
 
 try:
     import duckdb

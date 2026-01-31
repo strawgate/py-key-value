@@ -2,13 +2,13 @@ from typing import TYPE_CHECKING, Any, overload
 
 from typing_extensions import override
 
-from key_value.aio._shared.utils.managed_entry import ManagedEntry
-from key_value.aio._shared.utils.sanitization import SanitizationStrategy
-from key_value.aio._shared.utils.sanitize import hash_excess_length
 from key_value.aio.stores.base import (
     BaseContextManagerStore,
     BaseStore,
 )
+from key_value.aio.utils.managed_entry import ManagedEntry
+from key_value.aio.utils.sanitization import SanitizationStrategy
+from key_value.aio.utils.sanitize import hash_excess_length
 
 HTTP_NOT_FOUND = 404
 
