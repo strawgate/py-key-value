@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform != 'win32'",
@@ -14,7 +14,6 @@ members = [
     "py-key-value-aio",
     "py-key-value-shared",
     "py-key-value-shared-test",
-    "py-key-value-sync",
 ]
 
 [[package]]
@@ -1824,7 +1823,7 @@ wheels = [
 [[package]]
 name = "py-key-value"
 version = "0.3.0"
-source = { editable = "." }
+source = { virtual = "." }
 
 [package.optional-dependencies]
 dev = [
@@ -1952,13 +1951,13 @@ wrappers-encryption = [
 [package.dev-dependencies]
 dev = [
     { name = "py-key-value", extra = ["dev"] },
+    { name = "py-key-value-aio", extra = ["aerospike", "valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extra = ["disk", "duckdb", "dynamodb", "elasticsearch", "filetree", "keyring", "memcached", "memory", "mongodb", "postgresql", "pydantic", "redis", "rocksdb", "s3", "vault", "wrappers-encryption"] },
-    { name = "py-key-value-aio", extra = ["valkey"], marker = "sys_platform != 'win32'" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "aerospike", marker = "extra == 'aerospike'", specifier = ">=14.0.0" },
+    { name = "aerospike", marker = "extra == 'aerospike'", specifier = ">=16.0.0" },
     { name = "aioboto3", marker = "extra == 'dynamodb'", specifier = ">=13.3.0" },
     { name = "aioboto3", marker = "extra == 's3'", specifier = ">=13.3.0" },
     { name = "aiofile", marker = "extra == 'filetree'", specifier = ">=3.5.0" },
@@ -1993,7 +1992,8 @@ provides-extras = ["memory", "disk", "filetree", "redis", "mongodb", "valkey", "
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "py-key-value", extras = ["dev"], editable = "." },
+    { name = "py-key-value", extras = ["dev"], virtual = "." },
+    { name = "py-key-value-aio", extras = ["aerospike"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extras = ["keyring"] },
     { name = "py-key-value-aio", extras = ["memory", "disk", "filetree", "redis", "elasticsearch", "memcached", "mongodb", "vault", "dynamodb", "s3", "rocksdb", "duckdb", "postgresql"] },
     { name = "py-key-value-aio", extras = ["pydantic"] },
@@ -2022,7 +2022,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-dev = [{ name = "py-key-value", extras = ["dev"], editable = "." }]
+dev = [{ name = "py-key-value", extras = ["dev"], virtual = "." }]
 
 [[package]]
 name = "py-key-value-shared-test"
@@ -2059,112 +2059,6 @@ dev = [
     { name = "pytest-timeout", specifier = ">=2.4.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
     { name = "ruff", specifier = ">=0.14.2" },
-]
-
-[[package]]
-name = "py-key-value-sync"
-version = "0.3.0"
-source = { editable = "key-value/key-value-sync" }
-dependencies = [
-    { name = "beartype" },
-    { name = "py-key-value-shared" },
-]
-
-[package.optional-dependencies]
-disk = [
-    { name = "diskcache" },
-    { name = "pathvalidate" },
-]
-duckdb = [
-    { name = "duckdb" },
-    { name = "pytz" },
-]
-elasticsearch = [
-    { name = "aiohttp" },
-    { name = "elasticsearch" },
-]
-filetree = [
-    { name = "anyio" },
-]
-keyring = [
-    { name = "keyring" },
-]
-keyring-linux = [
-    { name = "dbus-python" },
-    { name = "keyring" },
-]
-memcached = [
-    { name = "aiomcache" },
-]
-memory = [
-    { name = "cachetools" },
-]
-mongodb = [
-    { name = "pymongo" },
-]
-pydantic = [
-    { name = "pydantic" },
-]
-redis = [
-    { name = "redis" },
-]
-rocksdb = [
-    { name = "rocksdict" },
-]
-valkey = [
-    { name = "valkey-glide-sync" },
-]
-vault = [
-    { name = "hvac" },
-    { name = "types-hvac" },
-]
-wrappers-encryption = [
-    { name = "cryptography" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "py-key-value", extra = ["dev"] },
-    { name = "py-key-value-sync", extra = ["disk", "duckdb", "elasticsearch", "filetree", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "rocksdb", "vault", "wrappers-encryption"] },
-    { name = "py-key-value-sync", extra = ["valkey"], marker = "sys_platform != 'win32'" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
-    { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
-    { name = "anyio", marker = "extra == 'filetree'", specifier = ">=4.4.0" },
-    { name = "beartype", specifier = ">=0.20.0" },
-    { name = "cachetools", marker = "extra == 'memory'", specifier = ">=5.0.0" },
-    { name = "cryptography", marker = "extra == 'wrappers-encryption'", specifier = ">=45.0.0" },
-    { name = "dbus-python", marker = "extra == 'keyring-linux'", specifier = ">=1.4.0" },
-    { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.0.0" },
-    { name = "duckdb", marker = "extra == 'duckdb'", specifier = ">=1.1.1" },
-    { name = "elasticsearch", marker = "extra == 'elasticsearch'", specifier = ">=8.0.0" },
-    { name = "hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
-    { name = "keyring", marker = "extra == 'keyring'", specifier = ">=25.6.0" },
-    { name = "keyring", marker = "extra == 'keyring-linux'", specifier = ">=25.6.0" },
-    { name = "pathvalidate", marker = "extra == 'disk'", specifier = ">=3.3.1" },
-    { name = "py-key-value-shared", editable = "key-value/key-value-shared" },
-    { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.11.9" },
-    { name = "pymongo", marker = "extra == 'mongodb'", specifier = ">=4.0.0" },
-    { name = "pytz", marker = "extra == 'duckdb'", specifier = ">=2025.2" },
-    { name = "redis", marker = "extra == 'redis'", specifier = ">=4.3.0" },
-    { name = "rocksdict", marker = "python_full_version >= '3.12' and extra == 'rocksdb'", specifier = ">=0.3.24" },
-    { name = "rocksdict", marker = "python_full_version < '3.12' and extra == 'rocksdb'", specifier = ">=0.3.2" },
-    { name = "types-hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
-    { name = "valkey-glide-sync", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
-]
-provides-extras = ["memory", "disk", "filetree", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "pydantic", "keyring", "keyring-linux", "rocksdb", "duckdb", "wrappers-encryption"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "py-key-value", extras = ["dev"], editable = "." },
-    { name = "py-key-value-sync", extras = ["keyring"] },
-    { name = "py-key-value-sync", extras = ["memory", "disk", "filetree", "redis", "elasticsearch", "memcached", "mongodb", "vault", "rocksdb", "duckdb"] },
-    { name = "py-key-value-sync", extras = ["pydantic"] },
-    { name = "py-key-value-sync", extras = ["valkey"], marker = "sys_platform != 'win32'" },
-    { name = "py-key-value-sync", extras = ["wrappers-encryption"] },
 ]
 
 [[package]]
@@ -2968,43 +2862,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/6a/9c/b8c95aac6ff7703b6815f80057212276577aa584eb1e534907f162a1edd6/valkey_glide-2.1.1-pp311-pypy311_pp73-macosx_11_0_arm64.whl", hash = "sha256:6197b359ad034bb1a46898555d2940510c5090960e99caa63897f6de725c27f0", size = 4751262, upload-time = "2025-10-08T19:44:12.917Z" },
     { url = "https://files.pythonhosted.org/packages/36/13/8c602d6c1e765a8d9f691403e27007bf8d8f69ced37b42e82b0581cb4cea/valkey_glide-2.1.1-pp311-pypy311_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:773ece3da6ecd1f660e0cba81a5b4f87dfcc930520c18ff0b766321ade971527", size = 4807169, upload-time = "2025-10-08T19:44:14.46Z" },
     { url = "https://files.pythonhosted.org/packages/a2/45/674c30f0711456079cf01abb269181ccd838173df7fa780c77806d9eb88c/valkey_glide-2.1.1-pp311-pypy311_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:60704e6ca43cd41893bccf1dcbacd9dd329d3f32c00533c18a99d4428370965e", size = 5133458, upload-time = "2025-10-08T19:44:15.948Z" },
-]
-
-[[package]]
-name = "valkey-glide-sync"
-version = "2.1.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cffi" },
-    { name = "protobuf" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/49/5f/d1845d6720348b0e6992830d4f63f43f7081fec2508a2d071885fb7c82ac/valkey_glide_sync-2.1.1.tar.gz", hash = "sha256:8be86f5b7f5095fc1a1accb726ca6de90e6ec42a09fbd0801a9c395cf5349a2f", size = 558645, upload-time = "2025-10-08T19:45:18.851Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ab/04/744c871fdf8758290a5d20a46d5e7959bb813970328bb929a687cb1dfb68/valkey_glide_sync-2.1.1-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:16eb1e0c27c20cccd86164134f0d284672d75d363d2afd046969384821c190f0", size = 3752486, upload-time = "2025-10-08T19:44:38.913Z" },
-    { url = "https://files.pythonhosted.org/packages/5a/82/dfb1c3f056a306f26bd67a2ef4f17edbf6483ca5ac4361b695a36ba63123/valkey_glide_sync-2.1.1-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:1f180a61ab91851edc1687ca0276811905768635afcf411d0b7c2b6514103fe1", size = 3475060, upload-time = "2025-10-08T19:44:40.569Z" },
-    { url = "https://files.pythonhosted.org/packages/c7/66/716967bf5bbae1147c1245eb8bbae3f4f4406afd1da9b896d2f0b2d176b6/valkey_glide_sync-2.1.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:37d10282ae76083678e22ff4ae0b2a2fb26a04cadf892815a6e149532746ba05", size = 3574241, upload-time = "2025-10-08T19:44:41.75Z" },
-    { url = "https://files.pythonhosted.org/packages/f6/e5/8fa3ca3881fb8a88de0a00450d07a7d05b912bcb1cbb9b60e7c6b4f16e13/valkey_glide_sync-2.1.1-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:9326268e285684a37eae5900f00892a7a774616c52ddb01331312a6c4d1004b1", size = 3848690, upload-time = "2025-10-08T19:44:42.904Z" },
-    { url = "https://files.pythonhosted.org/packages/0d/82/404148a2b9bc8f4a2ced0b41279fc9e057b4b35c2bd4a16453e0bf9890b2/valkey_glide_sync-2.1.1-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:7747e52d6fc3ddaa27e457016132b0e116b660a3880b6d8e37c3e27d73fdeed2", size = 3752487, upload-time = "2025-10-08T19:44:43.932Z" },
-    { url = "https://files.pythonhosted.org/packages/4f/d2/fb9bdc0a24207c694efa4ead3715a34ba743436e010d60a44a7da3cd8675/valkey_glide_sync-2.1.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:8c343b794e97221cccfb99f62f0fefcea0c0bb4a9131cad700d579f78e33c72a", size = 3475061, upload-time = "2025-10-08T19:44:45.104Z" },
-    { url = "https://files.pythonhosted.org/packages/e5/dd/5a5ef075847e3119de9ac6ced73cd4f66f174ffcde27cd36c978017df922/valkey_glide_sync-2.1.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ca7b79ad1e052a208a91f1e23bd754712645500dc8ea89f97cb8101dc084d231", size = 3574243, upload-time = "2025-10-08T19:44:46.201Z" },
-    { url = "https://files.pythonhosted.org/packages/22/6f/678433e92e7cce659e6c0bbdb812cf97e089074ef662c59a303c072b59f9/valkey_glide_sync-2.1.1-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:56b79b8a54cc7d792c8b88fa25e8183e705dc4a1a8423ca0a22daa0319041ec6", size = 3848690, upload-time = "2025-10-08T19:44:47.24Z" },
-    { url = "https://files.pythonhosted.org/packages/2b/94/0e1fe3e359cfba13d0dc54e201e8ef8146f33f798bb9e77de9a4d5913038/valkey_glide_sync-2.1.1-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:6c0c28f2a285c04937a4cd71ebb9ec904f951a54f44486820ff42326a1ef82db", size = 3752487, upload-time = "2025-10-08T19:44:48.288Z" },
-    { url = "https://files.pythonhosted.org/packages/55/f3/743d261f4ddc5e2cabde63406951db3d0f493f817bc3b0d9c7f9f501693a/valkey_glide_sync-2.1.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:f76fe3131b287fed6c3075144d0e11fe828536983a8d06bc8220dda96d2f8c29", size = 3475060, upload-time = "2025-10-08T19:44:49.711Z" },
-    { url = "https://files.pythonhosted.org/packages/14/bf/172808c17b498151917475c587430d0072cd797c317b9df1c9ef9c7fd973/valkey_glide_sync-2.1.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:9d7f05449dd25b9e12cfb8b69a5d939d4c0ec867b0034d2d8fe6d67958175e6c", size = 3574242, upload-time = "2025-10-08T19:44:50.797Z" },
-    { url = "https://files.pythonhosted.org/packages/f6/9d/3ce1e2d4cbcd6317fe461e9f86b87db8216e488bdfc6f09695ee77371250/valkey_glide_sync-2.1.1-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:dbab2e09711d0280fb95bb6a7ffaf3e797d9aaf29916de57832171379b57fd44", size = 3848690, upload-time = "2025-10-08T19:44:52.37Z" },
-    { url = "https://files.pythonhosted.org/packages/75/23/602bcadad9f66bdef0a03a76c8085f29a19c909723c19c8f0bfca96226b2/valkey_glide_sync-2.1.1-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:bd096a7165ea8cafdc6efb168a49d2efef3ecdb221398ce92e5bf02e91132363", size = 3752488, upload-time = "2025-10-08T19:44:53.514Z" },
-    { url = "https://files.pythonhosted.org/packages/d7/c5/4bd749f2d996d1d429c46ae5df24bb7ff30bc4189d774f013a12d3496cbd/valkey_glide_sync-2.1.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:a391ddcdfd799d1cf57c80b2a43b98ad59d59d05a5c7f557828f3b0948c8a389", size = 3475060, upload-time = "2025-10-08T19:44:54.633Z" },
-    { url = "https://files.pythonhosted.org/packages/97/a6/19edd4e4df86b822708673bbc08addf08e859d779628f387e1fa2eccc35c/valkey_glide_sync-2.1.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:2915a0e96a5e0d558d53f5af02190bdfd71d1db9d4072873b1497665b4e310b7", size = 3574244, upload-time = "2025-10-08T19:44:55.933Z" },
-    { url = "https://files.pythonhosted.org/packages/3b/74/776fb850cda8d00a916cf6fb3b075c8f6ee878df72224aef5c7149d797c4/valkey_glide_sync-2.1.1-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:2130422fade7f2fc93c4f3e27685546e32072ff1008996145df0324dfd057708", size = 3848691, upload-time = "2025-10-08T19:44:57.39Z" },
-    { url = "https://files.pythonhosted.org/packages/29/f5/62161c5a0aae825aed98b740b03e7ce328c96690976a50e8fc652070cea2/valkey_glide_sync-2.1.1-pp310-pypy310_pp73-macosx_10_15_x86_64.whl", hash = "sha256:64d59edec6a69d89bbce2442dd519a1def88659187f7a3cfa9ec4198b7022291", size = 3752855, upload-time = "2025-10-08T19:45:03.326Z" },
-    { url = "https://files.pythonhosted.org/packages/50/0d/0a18b0997dbe0e4090fc6c6922615ffce61eb69ad42fece09afcb43be67f/valkey_glide_sync-2.1.1-pp310-pypy310_pp73-macosx_11_0_arm64.whl", hash = "sha256:16a94d38a165011017f8559a4b9ca42392a2cfeb05ee0692a3c4d81ff36e6118", size = 3475067, upload-time = "2025-10-08T19:45:04.517Z" },
-    { url = "https://files.pythonhosted.org/packages/a8/00/6a5677037b1ae2fd661f06387ecf287b5911134fccd174ee3b4603d50c92/valkey_glide_sync-2.1.1-pp310-pypy310_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:143a729fdbaf0ecd0d4153a6dd0d8a71eb138cd7654eec195dfd72a1554f6c61", size = 3574249, upload-time = "2025-10-08T19:45:05.585Z" },
-    { url = "https://files.pythonhosted.org/packages/6e/8b/d57a66482ba81e6888ecd43f9e4fa7638bd373662aa85bbcd14b41d0e86c/valkey_glide_sync-2.1.1-pp310-pypy310_pp73-manylinux_2_28_x86_64.whl", hash = "sha256:0fac43b89eb551ea646b3edb7c61712c4230ede747537004f68c79fff9e3cf68", size = 3848696, upload-time = "2025-10-08T19:45:08.322Z" },
-    { url = "https://files.pythonhosted.org/packages/29/fa/3fdba5ac652a5dc0b3fc433028e256db798d624fe74c618692f96c97559b/valkey_glide_sync-2.1.1-pp311-pypy311_pp73-macosx_10_15_x86_64.whl", hash = "sha256:d5e7bdc9d3466c98aab92862d8952604219666cc3f6bbb417c16defcafc2801c", size = 3752853, upload-time = "2025-10-08T19:45:09.408Z" },
-    { url = "https://files.pythonhosted.org/packages/bd/86/ff4957c6d03bae7e89566ff2a136ca547e00237b01deb87a72ab8170c530/valkey_glide_sync-2.1.1-pp311-pypy311_pp73-macosx_11_0_arm64.whl", hash = "sha256:37e8255128f6d82e63686cebd90ab309bbd4b0a59d84e6f7fbf6a6abeaba7f3c", size = 3475066, upload-time = "2025-10-08T19:45:10.878Z" },
-    { url = "https://files.pythonhosted.org/packages/17/39/2b4a7dfb0cdd7cae108db5903c05150b99f6e44225cc9a5943be2eddbd86/valkey_glide_sync-2.1.1-pp311-pypy311_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8a92263b75222313ef16588b2eb5fb086a2b3dd1bfd56fad571cc2f39e691d52", size = 3574247, upload-time = "2025-10-08T19:45:11.945Z" },
-    { url = "https://files.pythonhosted.org/packages/68/30/43dcf1af15383bbc2e13c77c7b466723b0a7a338033d462176d60c959057/valkey_glide_sync-2.1.1-pp311-pypy311_pp73-manylinux_2_28_x86_64.whl", hash = "sha256:e85d2bc61dd336f409e40a9fde7ddbc93aec9a6c54d236497ea8e5a7faba2b58", size = 3848695, upload-time = "2025-10-08T19:45:13.081Z" },
 ]
 
 [[package]]

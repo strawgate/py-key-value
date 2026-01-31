@@ -21,15 +21,6 @@
         "VERSION=${input:newVersion}"
       ],
       "problemMatcher": []
-    },
-    {
-      "label": "Build sync library (make)",
-      "type": "shell",
-      "command": "make",
-      "args": [
-        "build-sync"
-      ],
-      "problemMatcher": []
     }
   ],
   "inputs": [
@@ -41,5 +32,3 @@
     }
   ]
 }
-
-

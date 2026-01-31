@@ -15,10 +15,8 @@ The py-key-value API is organized into four main components:
 
 ### Core Protocols
 
-The [`AsyncKeyValue`](protocols.md) protocol defines the async interface that all
+The [`AsyncKeyValue`](protocols.md) protocol defines the interface that all
 stores implement.
-
-The [`KeyValue`](protocols.md) protocol is the synchronous version.
 
 ### Popular Stores
 

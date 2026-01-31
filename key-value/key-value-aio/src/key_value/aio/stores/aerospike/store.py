@@ -139,7 +139,7 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         """
         try:
             return self._client.get(aerospike_key)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        except aerospike.exception.RecordNotFound:  # pyright: ignore[reportUnknownMemberType]
+        except aerospike.exception.RecordNotFound:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
             return None
 
     def _put_record(self, aerospike_key: tuple[str, str, str], bins: dict[str, Any], meta: dict[str, Any] | None = None) -> None:
@@ -157,7 +157,7 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         """
         try:
             self._client.remove(aerospike_key)  # pyright: ignore[reportUnknownMemberType]
-        except aerospike.exception.RecordNotFound:  # pyright: ignore[reportUnknownMemberType]
+        except aerospike.exception.RecordNotFound:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
             return False
         else:
             return True

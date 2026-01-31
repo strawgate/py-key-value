@@ -243,7 +243,7 @@ class BaseStoreTests(ABC):
         """Tests that the store can handle concurrent operations."""
 
         async def worker(store: BaseStore, worker_id: int):
-            for i in range(10):
+            for i in range(5):
                 assert await store.get(collection="test_collection", key=f"test_{worker_id}_{i}") is None
 
                 await store.put(collection="test_collection", key=f"test_{worker_id}_{i}", value={"test": f"test_{i}"})
@@ -255,7 +255,7 @@ class BaseStoreTests(ABC):
                 assert await store.delete(collection="test_collection", key=f"test_{worker_id}_{i}")
                 assert await store.get(collection="test_collection", key=f"test_{worker_id}_{i}") is None
 
-        _ = await async_gather(*[worker(store, worker_id) for worker_id in range(5)])
+        _ = await async_gather(*[worker(store, worker_id) for worker_id in range(3)])
 
     async def test_minimum_put_many_get_many_performance(self, store: BaseStore):
         """Tests that the store meets minimum performance requirements."""

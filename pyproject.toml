@@ -10,7 +10,6 @@ license = {text = "Apache-2.0"}
 [tool.uv.workspace]
 members = [
     "key-value/key-value-aio",
-    "key-value/key-value-sync",
     "key-value/key-value-shared",
     "key-value/key-value-shared-test",
 ]

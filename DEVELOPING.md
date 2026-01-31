@@ -1,9 +1,8 @@
 # Developing
 
-This monorepo contains two Python packages:
+This monorepo contains the Python package:
 
-- `py-key-value-aio` (async; supported)
-- `py-key-value-sync` (sync; generated from async)
+- `py-key-value-aio` (async)
 
 ## Prerequisites
 
@@ -15,7 +14,7 @@ This monorepo contains two Python packages:
 
 ### Option 2: Local Development
 
-- Python 3.10 (the sync codegen targets 3.10)
+- Python 3.10+
 - `uv` for dependency management and running tools
 - Node.js and npm for markdown linting
 
@@ -61,7 +60,6 @@ make test PROJECT=key-value/key-value-aio
 
 # Convenience targets for specific packages
 make test-aio      # async package
-make test-sync     # sync package
 make test-shared   # shared package
 ```
 
@@ -75,21 +73,6 @@ make build
 make build PROJECT=key-value/key-value-aio
 ```
 
-## Generate/Update Sync Package
-
-The sync package is generated from the async package. After changes to the
-async code, regenerate the sync package:
-
-```bash
-make codegen
-```
-
-Notes:
-
-- The codegen script lints the generated code automatically.
-- Some extras differ between async and sync (e.g., valkey). Refer to each
-  package's README for current extras.
-
 ## Pre-commit Checks
 
 Before committing, run:
@@ -98,12 +81,7 @@ Before committing, run:
 make precommit
 ```
 
-This runs linting, type checking, and code generation.
-
-**Important**: CI will fail if `make codegen lint` has not been run before
-committing. The `codegen_check` job in the test workflow verifies that
-running these commands produces no file changes, ensuring all generated
-code and formatting is up to date.
+This runs linting and type checking.
 
 ## Using Makefile in CI
 
@@ -125,9 +103,7 @@ suitable for CI workflows:
 ## Project Layout
 
 - Async package: `key-value/key-value-aio/`
-- Sync package: `key-value/key-value-sync/`
 - Shared utilities: `key-value/key-value-shared/`
-- Codegen script: `scripts/build_sync_library.py`
 - Makefile: Root directory
 
 ## Releasing
