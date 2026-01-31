@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from dirty_equals import IsDatetime
 from inline_snapshot import snapshot
+from key_value.shared.errors.store import StoreSetupError
 from key_value.shared.stores.wait import async_wait_for_true
 from types_aiobotocore_dynamodb.client import DynamoDBClient
 from types_aiobotocore_dynamodb.type_defs import GetItemOutputTypeDef
@@ -14,7 +15,6 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.dynamodb import DynamoDBStore
-from key_value.shared.errors.store import StoreSetupError
 from tests.conftest import docker_container, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -168,7 +168,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         session = aioboto3.Session(
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
         )
         async with session.client(service_name="dynamodb", endpoint_url=DYNAMODB_ENDPOINT) as client:  # type: ignore
@@ -182,7 +182,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
             table_name=table_name,
             endpoint_url=DYNAMODB_ENDPOINT,
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
             table_config={
                 "SSESpecification": {
@@ -215,7 +215,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         session = aioboto3.Session(
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
         )
         async with session.client(service_name="dynamodb", endpoint_url=DYNAMODB_ENDPOINT) as client:  # type: ignore
@@ -229,7 +229,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
             table_name=table_name,
             endpoint_url=DYNAMODB_ENDPOINT,
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
             auto_create=False,
         )
@@ -248,7 +248,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         session = aioboto3.Session(
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
         )
         async with session.client(service_name="dynamodb", endpoint_url=DYNAMODB_ENDPOINT) as client:  # type: ignore
@@ -262,7 +262,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
             table_name=table_name,
             endpoint_url=DYNAMODB_ENDPOINT,
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
             auto_create=True,
         )

@@ -3,7 +3,7 @@
 This monorepo contains:
 
 - `py-key-value-aio`: Async key-value store library (primary and supported).
-- `py-key-value-sync`: Sync key-value store library (no longer planned; async-only focus).
+- `py-key-value-sync`: Sync version (no longer planned; async-only focus).
 
 ## Documentation
 
