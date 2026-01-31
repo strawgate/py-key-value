@@ -6,8 +6,8 @@ from typing import overload
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
-from key_value.aio.utils.managed_entry import ManagedEntry, datetime
-from key_value.aio.utils.serialization import BasicSerializationAdapter
+from key_value.shared.managed_entry import ManagedEntry, datetime
+from key_value.shared.serialization import BasicSerializationAdapter
 
 try:
     from diskcache import Cache

@@ -1,6 +1,6 @@
 """Wrapper-specific error classes for encryption, read-only, and size limiting."""
 
-from key_value.aio.errors.key_value import KeyValueOperationError
+from key_value.shared.errors.key_value import KeyValueOperationError
 
 
 class EncryptionError(KeyValueOperationError):

@@ -1,9 +1,10 @@
-"""Utility modules for key-value store implementations.
+"""Shared utilities and types for key-value store implementations.
 
 This package provides shared utilities used across store implementations:
 
 - beartype: Type checking decorators using beartype
 - compound: Key/collection compounding and prefixing utilities
+- constants: Default values for TTL, etc.
 - managed_entry: ManagedEntry dataclass for storing values with metadata
 - retry: Async retry operation with exponential backoff
 - sanitization: Key/collection sanitization strategies
@@ -14,6 +15,6 @@ This package provides shared utilities used across store implementations:
 """
 
 # Re-export commonly used items for convenience
-from key_value.aio.utils.managed_entry import ManagedEntry
+from key_value.shared.managed_entry import ManagedEntry
 
 __all__ = ["ManagedEntry"]

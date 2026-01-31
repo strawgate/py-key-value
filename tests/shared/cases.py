@@ -9,7 +9,7 @@ import pytest
 from _pytest.mark.structures import MarkDecorator
 from typing_extensions import Self
 
-from key_value.aio.errors import SerializationError
+from key_value.shared.errors import SerializationError
 
 FIXED_DATETIME = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 FIXED_TIME = FIXED_DATETIME.time()

@@ -5,9 +5,9 @@ from typing import Any, SupportsFloat
 
 from typing_extensions import override
 
-from key_value.aio.errors import CorruptedDataError, DecryptionError, EncryptionError, SerializationError
 from key_value.aio.protocols.key_value import AsyncKeyValue
 from key_value.aio.wrappers.base import BaseWrapper
+from key_value.shared.errors import CorruptedDataError, DecryptionError, EncryptionError, SerializationError
 
 _ENCRYPTED_DATA_KEY = "__encrypted_data__"
 _ENCRYPTION_VERSION_KEY = "__encryption_version__"

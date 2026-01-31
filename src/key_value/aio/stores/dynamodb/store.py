@@ -7,7 +7,7 @@ from key_value.aio.stores.base import (
     BaseContextManagerStore,
     BaseStore,
 )
-from key_value.aio.utils.managed_entry import ManagedEntry
+from key_value.shared.managed_entry import ManagedEntry
 
 try:
     import aioboto3

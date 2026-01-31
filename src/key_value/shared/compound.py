@@ -7,7 +7,7 @@ natively support collections.
 
 from collections.abc import Sequence
 
-from key_value.aio.utils.beartype import bear_enforce
+from key_value.shared.beartype import bear_enforce
 
 DEFAULT_COMPOUND_SEPARATOR = "::"
 DEFAULT_PREFIX_SEPARATOR = "__"

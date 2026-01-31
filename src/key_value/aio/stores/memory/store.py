@@ -12,8 +12,8 @@ from key_value.aio.stores.base import (
     BaseEnumerateCollectionsStore,
     BaseEnumerateKeysStore,
 )
-from key_value.aio.utils.managed_entry import ManagedEntry
-from key_value.aio.utils.serialization import BasicSerializationAdapter
+from key_value.shared.managed_entry import ManagedEntry
+from key_value.shared.serialization import BasicSerializationAdapter
 
 try:
     from cachetools import TLRUCache

@@ -1,10 +1,10 @@
 import pytest
 from typing_extensions import override
 
-from key_value.aio.errors import EntryTooLargeError, EntryTooSmallError
 from key_value.aio.stores.memory.store import MemoryStore
-from key_value.aio.utils.managed_entry import estimate_serialized_size
 from key_value.aio.wrappers.limit_size import LimitSizeWrapper
+from key_value.shared.errors import EntryTooLargeError, EntryTooSmallError
+from key_value.shared.managed_entry import estimate_serialized_size
 from tests.stores.base import BaseStoreTests
 
 

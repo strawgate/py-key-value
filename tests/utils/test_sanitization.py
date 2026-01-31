@@ -3,15 +3,15 @@
 import pytest
 from inline_snapshot import snapshot
 
-from key_value.aio.errors import InvalidKeyError
-from key_value.aio.utils.sanitization import (
+from key_value.shared.errors import InvalidKeyError
+from key_value.shared.sanitization import (
     AlwaysHashStrategy,
     HashExcessLengthStrategy,
     HashFragmentMode,
     HybridSanitizationStrategy,
     PassthroughStrategy,
 )
-from key_value.aio.utils.sanitize import ALPHANUMERIC_CHARACTERS, LOWERCASE_ALPHABET
+from key_value.shared.sanitize import ALPHANUMERIC_CHARACTERS, LOWERCASE_ALPHABET
 
 
 class TestPassthroughStrategy:

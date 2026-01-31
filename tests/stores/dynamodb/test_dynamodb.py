@@ -13,10 +13,10 @@ from types_aiobotocore_dynamodb.client import DynamoDBClient
 from types_aiobotocore_dynamodb.type_defs import GetItemOutputTypeDef
 from typing_extensions import override
 
-from key_value.aio.errors import StoreSetupError
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.dynamodb import DynamoDBStore
-from key_value.aio.utils.wait import async_wait_for_true
+from key_value.shared.errors import StoreSetupError
+from key_value.shared.wait import async_wait_for_true
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 

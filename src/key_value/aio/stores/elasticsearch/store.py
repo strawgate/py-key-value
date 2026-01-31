@@ -5,7 +5,6 @@ from typing import Any, overload
 
 from typing_extensions import override
 
-from key_value.aio.errors import DeserializationError, SerializationError
 from key_value.aio.stores.base import (
     BaseContextManagerStore,
     BaseCullStore,
@@ -15,21 +14,22 @@ from key_value.aio.stores.base import (
     BaseStore,
 )
 from key_value.aio.stores.elasticsearch.utils import LessCapableJsonSerializer, LessCapableNdjsonSerializer, new_bulk_action
-from key_value.aio.utils.managed_entry import ManagedEntry
-from key_value.aio.utils.sanitization import (
+from key_value.shared.errors import DeserializationError, SerializationError
+from key_value.shared.managed_entry import ManagedEntry
+from key_value.shared.sanitization import (
     AlwaysHashStrategy,
     HashFragmentMode,
     HybridSanitizationStrategy,
     SanitizationStrategy,
 )
-from key_value.aio.utils.sanitize import (
+from key_value.shared.sanitize import (
     ALPHANUMERIC_CHARACTERS,
     LOWERCASE_ALPHABET,
     NUMBERS,
     UPPERCASE_ALPHABET,
 )
-from key_value.aio.utils.serialization import SerializationAdapter
-from key_value.aio.utils.time_to_live import now_as_epoch
+from key_value.shared.serialization import SerializationAdapter
+from key_value.shared.time_to_live import now_as_epoch
 
 try:
     from elastic_transport import ObjectApiResponse

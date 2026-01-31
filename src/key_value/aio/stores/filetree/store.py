@@ -14,11 +14,11 @@ from typing_extensions import Self, override
 from key_value.aio.stores.base import (
     BaseStore,
 )
-from key_value.aio.utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
-from key_value.aio.utils.sanitization import HybridSanitizationStrategy, SanitizationStrategy
-from key_value.aio.utils.sanitize import ALPHANUMERIC_CHARACTERS
-from key_value.aio.utils.serialization import BasicSerializationAdapter, SerializationAdapter
-from key_value.aio.utils.time_to_live import now
+from key_value.shared.managed_entry import ManagedEntry, dump_to_json, load_from_json
+from key_value.shared.sanitization import HybridSanitizationStrategy, SanitizationStrategy
+from key_value.shared.sanitize import ALPHANUMERIC_CHARACTERS
+from key_value.shared.serialization import BasicSerializationAdapter, SerializationAdapter
+from key_value.shared.time_to_live import now
 
 DIRECTORY_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
 

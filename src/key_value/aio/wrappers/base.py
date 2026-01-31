@@ -4,7 +4,7 @@ from typing import Any, SupportsFloat
 from typing_extensions import override
 
 from key_value.aio.protocols.key_value import AsyncKeyValue
-from key_value.aio.utils.beartype import bear_enforce
+from key_value.shared.beartype import bear_enforce
 
 
 class BaseWrapper(AsyncKeyValue):

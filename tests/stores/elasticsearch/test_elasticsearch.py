@@ -17,8 +17,8 @@ from key_value.aio.stores.elasticsearch.store import (
     ElasticsearchV1CollectionSanitizationStrategy,
     ElasticsearchV1KeySanitizationStrategy,
 )
-from key_value.aio.utils.managed_entry import ManagedEntry
-from key_value.aio.utils.wait import async_wait_for_true
+from key_value.shared.managed_entry import ManagedEntry
+from key_value.shared.wait import async_wait_for_true
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 

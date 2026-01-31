@@ -8,7 +8,7 @@ see the sanitization module.
 import hashlib
 from enum import Enum
 
-from key_value.aio.utils.beartype import bear_enforce
+from key_value.shared.beartype import bear_enforce
 
 MINIMUM_MAX_LENGTH = 16
 

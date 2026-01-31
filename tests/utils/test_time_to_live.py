@@ -4,8 +4,8 @@ from typing import Any
 
 import pytest
 
-from key_value.aio.errors import InvalidTTLError
-from key_value.aio.utils.time_to_live import prepare_ttl
+from key_value.shared.errors import InvalidTTLError
+from key_value.shared.time_to_live import prepare_ttl
 
 FIXED_DATETIME = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 
@@ -54,7 +54,7 @@ def test_prepare_ttl(t: Any, expected: int | float | None):
         "bool-false",
     ],
 )
-@pytest.mark.filterwarnings("ignore:Function key_value.aio.utils")  # Ignore BearType warnings here
+@pytest.mark.filterwarnings("ignore:Function key_value.shared")  # Ignore BearType warnings here
 def test_prepare_ttl_invalid(t: Any):
     with pytest.raises(InvalidTTLError):
         prepare_ttl(t)

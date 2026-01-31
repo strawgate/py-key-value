@@ -11,9 +11,9 @@ from key_value.aio.stores.base import (
     BaseEnumerateKeysStore,
     BaseStore,
 )
-from key_value.aio.utils.compound import compound_key, get_collections_from_compound_keys, get_keys_from_compound_keys
-from key_value.aio.utils.managed_entry import ManagedEntry
-from key_value.aio.utils.serialization import BasicSerializationAdapter
+from key_value.shared.compound import compound_key, get_collections_from_compound_keys, get_keys_from_compound_keys
+from key_value.shared.managed_entry import ManagedEntry
+from key_value.shared.serialization import BasicSerializationAdapter
 
 
 @dataclass

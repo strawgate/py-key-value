@@ -4,8 +4,8 @@ from typing import Any, SupportsFloat, overload
 from typing_extensions import override
 
 from key_value.aio.protocols.key_value import AsyncKeyValue
-from key_value.aio.utils.time_to_live import prepare_ttl
 from key_value.aio.wrappers.base import BaseWrapper
+from key_value.shared.time_to_live import prepare_ttl
 
 
 class TTLClampWrapper(BaseWrapper):

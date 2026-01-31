@@ -6,8 +6,8 @@ from inline_snapshot import snapshot
 from pydantic import AnyHttpUrl, BaseModel
 
 from key_value.aio.adapters.pydantic import PydanticAdapter
-from key_value.aio.errors import DeserializationError
 from key_value.aio.stores.memory.store import MemoryStore
+from key_value.shared.errors import DeserializationError
 
 
 class User(BaseModel):

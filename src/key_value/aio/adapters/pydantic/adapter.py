@@ -5,7 +5,7 @@ from typing_extensions import TypeForm
 
 from key_value.aio.adapters.pydantic.base import BasePydanticAdapter
 from key_value.aio.protocols.key_value import AsyncKeyValue
-from key_value.aio.utils.beartype import bear_spray
+from key_value.shared.beartype import bear_spray
 
 T = TypeVar("T")
 

@@ -6,9 +6,9 @@ from key_value.aio.stores.base import (
     BaseContextManagerStore,
     BaseStore,
 )
-from key_value.aio.utils.managed_entry import ManagedEntry
-from key_value.aio.utils.sanitization import SanitizationStrategy
-from key_value.aio.utils.sanitize import hash_excess_length
+from key_value.shared.managed_entry import ManagedEntry
+from key_value.shared.sanitization import SanitizationStrategy
+from key_value.shared.sanitize import hash_excess_length
 
 HTTP_NOT_FOUND = 404
 

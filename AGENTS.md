@@ -32,13 +32,14 @@ make precommit
 ```text
 src/
 └── key_value/
-    └── aio/               # Async key-value library
-        ├── adapters/      # Type adapters (Pydantic, Dataclass, etc.)
+    ├── aio/               # Async key-value library
+    │   ├── adapters/      # Type adapters (Pydantic, Dataclass, etc.)
+    │   ├── protocols/     # Protocol definitions
+    │   ├── stores/        # Backend implementations
+    │   └── wrappers/      # Store wrappers
+    └── shared/            # Shared utilities and errors
         ├── errors/        # Error classes
-        ├── protocols/     # Protocol definitions
-        ├── stores/        # Backend implementations
-        ├── utils/         # Utility modules
-        └── wrappers/      # Store wrappers
+        └── ...            # Utility modules (beartype, compound, etc.)
 tests/                     # Test suite
 scripts/
 └── bump_versions.py       # Version management script
@@ -65,7 +66,7 @@ scripts/
 ### ManagedEntry Wrapper Objects
 
 Raw values are **NEVER** stored directly in backends. The `ManagedEntry` wrapper
-(from `key_value.aio.utils.managed_entry`) wraps values with metadata
+(from `key_value.shared.managed_entry`) wraps values with metadata
 like TTL and creation timestamp, typically serialized to/from JSON.
 
 When implementing or debugging stores, remember that what's stored is not

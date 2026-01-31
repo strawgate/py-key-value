@@ -1,6 +1,6 @@
 """Store-level error classes."""
 
-from key_value.aio.errors.base import BaseKeyValueError
+from key_value.shared.errors.base import BaseKeyValueError
 
 
 class KeyValueStoreError(BaseKeyValueError):
