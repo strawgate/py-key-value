@@ -23,18 +23,24 @@ make precommit
 - All new features require tests
 - Run `make test` to execute all test suites (verbose output)
 - Run `make test-concise` for minimal output (recommended for AI agents)
-- Run `make test-aio` for async package tests only
 - Test coverage should be maintained
 
 ## Architecture
 
-### Monorepo Structure
+### Project Structure
 
 ```text
-key-value/
-├── key-value-aio/         # Primary async library
-├── key-value-shared/      # Shared utilities and types
-└── key-value-shared-test/ # Shared test utilities
+src/
+└── key_value/
+    ├── aio/               # Async key-value library
+    │   ├── adapters/      # Type adapters (Pydantic, Dataclass, etc.)
+    │   ├── protocols/     # Protocol definitions
+    │   ├── stores/        # Backend implementations
+    │   └── wrappers/      # Store wrappers
+    └── shared/            # Shared utilities and errors
+        ├── errors/        # Error classes
+        └── ...            # Utility modules (beartype, compound, etc.)
+tests/                     # Test suite
 scripts/
 └── bump_versions.py       # Version management script
 ```
@@ -60,7 +66,7 @@ scripts/
 ### ManagedEntry Wrapper Objects
 
 Raw values are **NEVER** stored directly in backends. The `ManagedEntry` wrapper
-(from `key_value/shared/utils/managed_entry.py`) wraps values with metadata
+(from `key_value.shared.managed_entry`) wraps values with metadata
 like TTL and creation timestamp, typically serialized to/from JSON.
 
 When implementing or debugging stores, remember that what's stored is not
@@ -150,7 +156,7 @@ When reviewing pull requests, please consider:
 
 #### Project-Specific Patterns
 
-- **Async-only architecture**: All code is in `key-value/key-value-aio/`.
+- **Async-only architecture**: All code is in `src/key_value/aio/`.
 - **Test patterns**: The project uses `ContextManagerStoreTestMixin` for store
   tests. Look for consistency with existing test implementations.
 - **ManagedEntry wrapper**: Values are never stored directly but are wrapped in
@@ -220,32 +226,17 @@ type annotation issues to maintain type safety guarantees.
 | `make install` | Alias for `make sync` |
 | `make lint` | Lint Python + Markdown |
 | `make typecheck` | Run Basedpyright type checking |
-| `make test` | Run all test suites (verbose) |
-| `make test-concise` | Run all test suites (concise output for AI) |
-| `make test-aio` | Run async package tests |
-| `make test-aio-concise` | Run async package tests (concise) |
-| `make test-shared` | Run shared package tests |
-| `make test-shared-concise` | Run shared package tests (concise) |
+| `make test` | Run all tests (verbose) |
+| `make test-concise` | Run all tests (concise output for AI) |
 | `make precommit` | Run lint + typecheck |
-| `make build` | Build all packages |
-
-### Per-Project Commands
-
-Add `PROJECT=<path>` to target a specific package:
-
-```bash
-make lint PROJECT=key-value/key-value-aio
-make typecheck PROJECT=key-value/key-value-aio
-make test PROJECT=key-value/key-value-aio
-make build PROJECT=key-value/key-value-aio
-```
+| `make build` | Build package |
 
 ## Key Protocols and Interfaces
 
 ### AsyncKeyValue Protocol
 
 The core interface is `AsyncKeyValue` protocol from
-`key_value/aio/protocols/key_value.py`. All stores implement this
+`key_value.aio.protocols.key_value`. All stores implement this
 protocol, which defines:
 
 - `get`, `get_many` - Retrieve values
@@ -255,7 +246,7 @@ protocol, which defines:
 
 ## Store Implementations
 
-Stores are located in `key-value/key-value-aio/src/key_value/aio/stores/`.
+Stores are located in `src/key_value/aio/stores/`.
 
 Available backends include: DynamoDB, Elasticsearch, Memcached, Memory, Disk,
 MongoDB, Redis, RocksDB, Valkey, Vault, Windows Registry, Keyring, and more.
@@ -263,7 +254,7 @@ MongoDB, Redis, RocksDB, Valkey, Vault, Windows Registry, Keyring, and more.
 ## Wrappers
 
 Wrappers add functionality to stores and are located in
-`key-value/key-value-aio/src/key_value/aio/wrappers/`.
+`src/key_value/aio/wrappers/`.
 
 Wrappers include: Compression, DefaultValue, Encryption, Logging, Statistics,
 Retry, Timeout, Cache, Prefix, TTL clamping, and more.
@@ -271,7 +262,7 @@ Retry, Timeout, Cache, Prefix, TTL clamping, and more.
 ## Adapters
 
 Adapters simplify store interactions but don't implement the protocol directly.
-Located in `key-value/key-value-aio/src/key_value/aio/adapters/`.
+Located in `src/key_value/aio/adapters/`.
 
 Key adapters:
 
@@ -303,19 +294,15 @@ make sync
 
 GitHub Actions workflows are in `.github/workflows/`:
 
-- `test.yml` - Run tests across packages
-  - `static_analysis` job - Runs linting and type checking per package
-  - `test_quick` and `test_all` jobs - Run tests across Python versions and
-    platforms
-- `publish.yml` - Publish packages to PyPI
-- `claude-on-mention.yml` - Claude Code assistant (can make PRs)
-- `claude-on-open-label.yml` - Claude triage assistant (read-only analysis)
-- `claude-on-test-failure.yml` - Claude test failure analysis (automatically
-  analyzes failed tests and suggests solutions)
+- `test.yml` - Run tests across Python versions and platforms
+- `publish.yml` - Publish package to PyPI
+- `claude-mention-pr.yml` - Claude Code assistant (can make PRs)
+- `claude-triage.yml` - Claude triage assistant (read-only analysis)
+- `claude-test-failure.yml` - Claude test failure analysis
 
 ## Version Management
 
-To bump versions across all packages:
+To bump version:
 
 ```bash
 make bump-version VERSION=1.2.3        # Actual bump
@@ -326,7 +313,6 @@ make bump-version-dry VERSION=1.2.3    # Dry run
 
 - For human developer documentation, see [DEVELOPING.md](DEVELOPING.md)
 - For library usage documentation, see [README.md](README.md)
-- For package-specific information, see READMEs in each package directory
 
 ## Radical Honesty
 

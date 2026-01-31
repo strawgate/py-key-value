@@ -4,7 +4,6 @@ Simple version bump script.
 
 Assumptions (per project layout):
   - One `pyproject.toml` at repo root
-  - One `pyproject.toml` inside each direct subdirectory of `key-value`
   - The version lives under the `[project]` section as `version = "..."`
 
 Usage:
@@ -24,13 +23,6 @@ def get_pyproject_paths(root: Path) -> list[Path]:
     root_py = root / "pyproject.toml"
     if root_py.exists():
         paths.append(root_py)
-
-    kv_dir = root / "key-value"
-    if kv_dir.is_dir():
-        for entry in sorted(kv_dir.iterdir()):
-            sub_py = entry / "pyproject.toml"
-            if sub_py.exists():
-                paths.append(sub_py)
     return paths
 
 
@@ -61,7 +53,7 @@ def bump_in_text(text: str, new_version: str) -> tuple[str, bool]:
 
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description="Bump version in all pyproject.toml files")
+    parser = argparse.ArgumentParser(description="Bump version in pyproject.toml")
     parser.add_argument("version", help="New version string, e.g. 1.2.3")
     parser.add_argument("--dry-run", action="store_true", help="Only print changes, do not write")
     args = parser.parse_args(argv)
