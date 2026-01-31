@@ -18,7 +18,7 @@ This monorepo contains two libraries:
 ## Why use this library?
 
 - **Multiple backends**: DynamoDB, Elasticsearch, Memcached, MongoDB, Redis,
-  RocksDB, Valkey, Firestore, and In-memory, Disk, etc
+  RocksDB, Valkey, Firestore, and In-memory, Disk, etc.
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
 - **Adapters**: Pydantic model support, raise-on-missing behavior, etc
