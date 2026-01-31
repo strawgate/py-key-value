@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform != 'win32'",
@@ -1914,7 +1914,7 @@ wrappers-encryption = [
 [package.dev-dependencies]
 dev = [
     { name = "py-key-value", extra = ["dev"] },
-    { name = "py-key-value-aio", extra = ["disk", "duckdb", "dynamodb", "elasticsearch", "filetree", "keyring", "memcached", "memory", "mongodb", "postgresql", "pydantic", "redis", "rocksdb", "s3", "vault", "wrappers-encryption"] },
+    { name = "py-key-value-aio", extra = ["aerospike", "disk", "duckdb", "dynamodb", "elasticsearch", "filetree", "keyring", "memcached", "memory", "mongodb", "postgresql", "pydantic", "redis", "rocksdb", "s3", "vault", "wrappers-encryption"] },
     { name = "py-key-value-aio", extra = ["valkey"], marker = "sys_platform != 'win32'" },
 ]
 
@@ -1957,7 +1957,7 @@ provides-extras = ["memory", "disk", "filetree", "redis", "mongodb", "valkey", "
 dev = [
     { name = "py-key-value", extras = ["dev"], virtual = "." },
     { name = "py-key-value-aio", extras = ["keyring"] },
-    { name = "py-key-value-aio", extras = ["memory", "disk", "filetree", "redis", "elasticsearch", "memcached", "mongodb", "vault", "dynamodb", "s3", "rocksdb", "duckdb", "postgresql"] },
+    { name = "py-key-value-aio", extras = ["memory", "disk", "filetree", "redis", "elasticsearch", "memcached", "mongodb", "vault", "dynamodb", "s3", "rocksdb", "duckdb", "postgresql", "aerospike"] },
     { name = "py-key-value-aio", extras = ["pydantic"] },
     { name = "py-key-value-aio", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extras = ["wrappers-encryption"] },

@@ -73,7 +73,7 @@ env_files = [".env"]
 
 [dependency-groups]
 dev = [
-    "py-key-value-aio[memory,disk,filetree,redis,elasticsearch,memcached,mongodb,vault,dynamodb,s3,rocksdb,duckdb,postgresql]",
+    "py-key-value-aio[memory,disk,filetree,redis,elasticsearch,memcached,mongodb,vault,dynamodb,s3,rocksdb,duckdb,postgresql,aerospike]",
     "py-key-value-aio[valkey]; platform_system != 'Windows'",
     "py-key-value-aio[keyring]",
     "py-key-value-aio[pydantic]",
