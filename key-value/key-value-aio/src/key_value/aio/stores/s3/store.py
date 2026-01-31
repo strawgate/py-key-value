@@ -19,7 +19,7 @@ MAX_KEY_LENGTH = 500
 
 try:
     import aioboto3
-    from aioboto3.session import Session  # noqa: TC002
+    from aioboto3.session import Session
 except ImportError as e:
     msg = "S3Store requires py-key-value-aio[s3]"
     raise ImportError(msg) from e
@@ -29,6 +29,133 @@ if TYPE_CHECKING:
     from types_aiobotocore_s3.client import S3Client
 else:
     from aiobotocore.client import AioBaseClient as S3Client
+
+
+# Private helper functions to encapsulate S3/boto3 client interactions with type ignore comments
+# These are module-level functions (not methods) so they are not exported with the store class
+
+
+def _create_s3_session(
+    *,
+    region_name: str | None = None,
+    aws_access_key_id: str | None = None,
+    aws_secret_access_key: str | None = None,
+    aws_session_token: str | None = None,
+) -> Session:
+    """Create an aioboto3 session for S3."""
+    return aioboto3.Session(
+        region_name=region_name,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+        aws_session_token=aws_session_token,
+    )
+
+
+def _create_s3_client_context(session: Session, *, endpoint_url: str | None = None) -> Any:  # pyright: ignore[reportUnknownVariableType]
+    """Create an S3 client context manager from a session."""
+    return session.client(service_name="s3", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+
+async def _head_s3_bucket(client: S3Client, bucket_name: str) -> None:
+    """Check if an S3 bucket exists."""
+    await client.head_bucket(Bucket=bucket_name)  # pyright: ignore[reportUnknownMemberType]
+
+
+async def _create_s3_bucket(client: S3Client, bucket_name: str, *, region_name: str | None = None) -> None:
+    """Create an S3 bucket.
+
+    Args:
+        client: The S3 client.
+        bucket_name: The name of the bucket to create.
+        region_name: The region for the bucket. If not us-east-1, LocationConstraint is set.
+    """
+    import contextlib
+
+    with contextlib.suppress(client.exceptions.BucketAlreadyOwnedByYou):  # pyright: ignore[reportUnknownMemberType]
+        create_params: dict[str, Any] = {"Bucket": bucket_name}
+
+        # For regions other than us-east-1, specify LocationConstraint
+        if region_name and region_name != "us-east-1":
+            create_params["CreateBucketConfiguration"] = {"LocationConstraint": region_name}
+
+        await client.create_bucket(**create_params)  # pyright: ignore[reportUnknownMemberType]
+
+
+async def _get_s3_object(client: S3Client, bucket_name: str, key: str) -> bytes | None:
+    """Get an object from S3.
+
+    Returns:
+        The object body as bytes, or None if not found.
+    """
+    try:
+        response = await client.get_object(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            Bucket=bucket_name,
+            Key=key,
+        )
+
+        async with response["Body"] as stream:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            return await stream.read()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    except client.exceptions.NoSuchKey:  # pyright: ignore[reportUnknownMemberType]
+        return None
+
+
+async def _put_s3_object(
+    client: S3Client,
+    bucket_name: str,
+    key: str,
+    body: bytes,
+    *,
+    content_type: str = "application/json",
+    metadata: dict[str, str] | None = None,
+) -> None:
+    """Put an object into S3."""
+    await client.put_object(  # pyright: ignore[reportUnknownMemberType]
+        Bucket=bucket_name,
+        Key=key,
+        Body=body,
+        ContentType=content_type,
+        Metadata=metadata or {},
+    )
+
+
+async def _delete_s3_object(client: S3Client, bucket_name: str, key: str) -> None:
+    """Delete an object from S3."""
+    await client.delete_object(  # pyright: ignore[reportUnknownMemberType]
+        Bucket=bucket_name,
+        Key=key,
+    )
+
+
+async def _head_s3_object(client: S3Client, bucket_name: str, key: str) -> bool:
+    """Check if an object exists in S3.
+
+    Returns:
+        True if the object exists, False otherwise.
+    """
+    from botocore.exceptions import ClientError
+
+    try:
+        await client.head_object(  # pyright: ignore[reportUnknownMemberType]
+            Bucket=bucket_name,
+            Key=key,
+        )
+    except ClientError as e:
+        error = e.response.get("Error", {})  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        metadata = e.response.get("ResponseMetadata", {})  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        error_code = error.get("Code", "")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        http_status = metadata.get("HTTPStatusCode", 0)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+        if error_code in ("404", "NoSuchKey") or http_status == HTTP_NOT_FOUND:
+            return False
+
+        raise
+    else:
+        return True
+
+
+def _get_s3_client_region(client: S3Client) -> str | None:
+    """Get the region name from an S3 client."""
+    return getattr(client.meta, "region_name", None)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
 
 class S3KeySanitizationStrategy(SanitizationStrategy):
@@ -222,14 +349,14 @@ class S3Store(BaseContextManagerStore, BaseStore):
             self._client = client
             self._raw_client = None
         else:
-            session: Session = aioboto3.Session(
+            session = _create_s3_session(
                 region_name=region_name,
                 aws_access_key_id=aws_access_key_id,
                 aws_secret_access_key=aws_secret_access_key,
                 aws_session_token=aws_session_token,
             )
 
-            self._raw_client = session.client(service_name="s3", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType]
+            self._raw_client = _create_s3_client_context(session, endpoint_url=endpoint_url)
             self._client = None
 
         super().__init__(
@@ -268,24 +395,15 @@ class S3Store(BaseContextManagerStore, BaseStore):
         from botocore.exceptions import ClientError
 
         try:
-            await self._connected_client.head_bucket(Bucket=self._bucket_name)  # pyright: ignore[reportUnknownMemberType]
+            await _head_s3_bucket(self._connected_client, self._bucket_name)
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             http_status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
             if error_code in ("404", "NoSuchBucket") or http_status == HTTP_NOT_FOUND:
-                import contextlib
-
-                with contextlib.suppress(self._connected_client.exceptions.BucketAlreadyOwnedByYou):  # pyright: ignore[reportUnknownMemberType]
-                    create_params: dict[str, Any] = {"Bucket": self._bucket_name}
-                    region_name = getattr(self._connected_client.meta, "region_name", None)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-
-                    # For regions other than us-east-1, specify LocationConstraint
-                    # Skip for custom endpoints (LocalStack, MinIO) which may not support it
-                    if region_name and region_name != "us-east-1" and not self._endpoint_url:
-                        create_params["CreateBucketConfiguration"] = {"LocationConstraint": region_name}
-
-                    await self._connected_client.create_bucket(**create_params)  # pyright: ignore[reportUnknownMemberType]
+                # Skip region specification for custom endpoints (LocalStack, MinIO)
+                region_name = None if self._endpoint_url else _get_s3_client_region(self._connected_client)
+                await _create_s3_bucket(self._connected_client, self._bucket_name, region_name=region_name)
             else:
                 raise
 
@@ -322,28 +440,17 @@ class S3Store(BaseContextManagerStore, BaseStore):
         """
         s3_key = self._get_s3_key(collection=collection, key=key)
 
-        try:
-            response = await self._connected_client.get_object(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                Bucket=self._bucket_name,
-                Key=s3_key,
-            )
-
-            async with response["Body"] as stream:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                body_bytes = await stream.read()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            json_value = body_bytes.decode("utf-8")  # pyright: ignore[reportUnknownMemberType]
-
-            managed_entry = self._serialization_adapter.load_json(json_str=json_value)
-
-            if managed_entry.is_expired:
-                await self._connected_client.delete_object(  # type: ignore[reportUnknownMemberType]
-                    Bucket=self._bucket_name,
-                    Key=s3_key,
-                )
-                return None
-            return managed_entry  # noqa: TRY300
-
-        except self._connected_client.exceptions.NoSuchKey:  # pyright: ignore[reportUnknownMemberType]
+        body_bytes = await _get_s3_object(self._connected_client, self._bucket_name, s3_key)
+        if body_bytes is None:
             return None
+
+        json_value = body_bytes.decode("utf-8")
+        managed_entry = self._serialization_adapter.load_json(json_str=json_value)
+
+        if managed_entry.is_expired:
+            await _delete_s3_object(self._connected_client, self._bucket_name, s3_key)
+            return None
+        return managed_entry
 
     @override
     async def _put_managed_entry(
@@ -374,12 +481,13 @@ class S3Store(BaseContextManagerStore, BaseStore):
         if managed_entry.created_at:
             metadata["created-at"] = managed_entry.created_at.isoformat()
 
-        await self._connected_client.put_object(  # pyright: ignore[reportUnknownMemberType]
-            Bucket=self._bucket_name,
-            Key=s3_key,
-            Body=json_value.encode("utf-8"),
-            ContentType="application/json",
-            Metadata=metadata,
+        await _put_s3_object(
+            self._connected_client,
+            self._bucket_name,
+            s3_key,
+            json_value.encode("utf-8"),
+            content_type="application/json",
+            metadata=metadata,
         )
 
     @override
@@ -398,33 +506,21 @@ class S3Store(BaseContextManagerStore, BaseStore):
         from botocore.exceptions import ClientError
 
         try:
-            await self._connected_client.head_object(  # pyright: ignore[reportUnknownMemberType]
-                Bucket=self._bucket_name,
-                Key=s3_key,
-            )
-
+            exists = await _head_s3_object(self._connected_client, self._bucket_name, s3_key)
+            if not exists:
+                return False
         except ClientError as e:
             error = e.response.get("Error", {})  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            metadata = e.response.get("ResponseMetadata", {})  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             error_code = error.get("Code", "")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            http_status = metadata.get("HTTPStatusCode", 0)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-
-            if error_code in ("404", "NoSuchKey") or http_status == HTTP_NOT_FOUND:
-                return False
 
             if error_code in ("403", "AccessDenied"):
-                await self._connected_client.delete_object(  # pyright: ignore[reportUnknownMemberType]
-                    Bucket=self._bucket_name,
-                    Key=s3_key,
-                )
+                # Can't check existence but try to delete anyway
+                await _delete_s3_object(self._connected_client, self._bucket_name, s3_key)
                 return True
 
             raise
 
-        await self._connected_client.delete_object(  # pyright: ignore[reportUnknownMemberType]
-            Bucket=self._bucket_name,
-            Key=s3_key,
-        )
+        await _delete_s3_object(self._connected_client, self._bucket_name, s3_key)
         return True
 
     # No need to override _close - the exit stack handles all cleanup automatically

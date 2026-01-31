@@ -22,6 +22,54 @@ DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
 
 
+# Private helper functions to encapsulate Redis client creation with type ignore comments
+# These are module-level functions (not methods) so they are not exported with the store class
+
+
+def _create_redis_client(
+    *,
+    host: str = "localhost",
+    port: int = 6379,
+    db: int = 0,
+    username: str | None = None,
+    password: str | None = None,
+    decode_responses: bool = True,
+) -> Redis:
+    """Create a Redis client with the given parameters."""
+    return Redis(
+        host=host,
+        port=port,
+        db=db,
+        username=username,
+        password=password,
+        decode_responses=decode_responses,
+    )
+
+
+def _create_redis_client_from_url(
+    url: str,
+    *,
+    password: str | None = None,
+    decode_responses: bool = True,
+) -> Redis:
+    """Create a Redis client from a URL.
+
+    Args:
+        url: Redis URL (e.g., redis://localhost:6379/0).
+        password: Override password (used if not in URL).
+        decode_responses: Whether to decode responses. Defaults to True.
+    """
+    parsed_url = urlparse(url)
+    return Redis(
+        host=parsed_url.hostname or "localhost",
+        port=parsed_url.port or 6379,
+        db=int(parsed_url.path.lstrip("/")) if parsed_url.path and parsed_url.path != "/" else 0,
+        username=parsed_url.username,
+        password=parsed_url.password or password,
+        decode_responses=decode_responses,
+    )
+
+
 class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):
     """Redis-based key-value store."""
 
@@ -69,23 +117,9 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         if client:
             self._client = client
         elif url:
-            parsed_url = urlparse(url)
-            self._client = Redis(
-                host=parsed_url.hostname or "localhost",
-                port=parsed_url.port or 6379,
-                db=int(parsed_url.path.lstrip("/")) if parsed_url.path and parsed_url.path != "/" else 0,
-                username=parsed_url.username,
-                password=parsed_url.password or password,
-                decode_responses=True,
-            )
+            self._client = _create_redis_client_from_url(url, password=password)
         else:
-            self._client = Redis(
-                host=host,
-                port=port,
-                db=db,
-                password=password,
-                decode_responses=True,
-            )
+            self._client = _create_redis_client(host=host, port=port, db=db, password=password)
 
         self._adapter = BasicSerializationAdapter(date_format="isoformat", value_format="dict")
 

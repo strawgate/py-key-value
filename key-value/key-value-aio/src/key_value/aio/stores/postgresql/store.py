@@ -57,6 +57,33 @@ def _validate_table_name(table_name: str) -> None:
         raise ValueError(msg)
 
 
+# Private helper functions to encapsulate asyncpg pool creation with type ignore comments
+# These are module-level functions (not methods) so they are not exported with the store class
+
+
+async def _create_postgresql_pool_from_url(url: str) -> asyncpg.Pool:  # type: ignore[type-arg]
+    """Create an asyncpg pool from a connection URL."""
+    return await asyncpg.create_pool(url)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+
+async def _create_postgresql_pool(
+    *,
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    database: str = DEFAULT_DATABASE,
+    user: str | None = None,
+    password: str | None = None,
+) -> asyncpg.Pool:  # type: ignore[type-arg]
+    """Create an asyncpg pool from connection parameters."""
+    return await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        host=host,
+        port=port,
+        database=database,
+        user=user,
+        password=password,
+    )
+
+
 class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
     """PostgreSQL-based key-value store using asyncpg.
 
@@ -227,8 +254,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             The newly created connection pool.
         """
         if self._url:
-            return await asyncpg.create_pool(self._url)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        return await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            return await _create_postgresql_pool_from_url(self._url)
+        return await _create_postgresql_pool(
             host=self._host,
             port=self._port,
             database=self._database,

@@ -11,7 +11,7 @@ from key_value.aio.stores.base import (
 
 try:
     import aioboto3
-    from aioboto3.session import Session  # noqa: TC002
+    from aioboto3.session import Session
 except ImportError as e:
     msg = "DynamoDBStore requires py-key-value-aio[dynamodb]"
     raise ImportError(msg) from e
@@ -24,6 +24,124 @@ else:
 
 DEFAULT_PAGE_SIZE = 1000
 PAGE_LIMIT = 1000
+
+
+# Private helper functions to encapsulate DynamoDB/boto3 client interactions with type ignore comments
+# These are module-level functions (not methods) so they are not exported with the store class
+
+
+def _create_dynamodb_session(
+    *,
+    region_name: str | None = None,
+    aws_access_key_id: str | None = None,
+    aws_secret_access_key: str | None = None,
+    aws_session_token: str | None = None,
+) -> Session:
+    """Create an aioboto3 session for DynamoDB."""
+    return aioboto3.Session(
+        region_name=region_name,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+        aws_session_token=aws_session_token,
+    )
+
+
+def _create_dynamodb_client_context(session: Session, *, endpoint_url: str | None = None) -> Any:  # pyright: ignore[reportUnknownVariableType]
+    """Create a DynamoDB client context manager from a session."""
+    return session.client(service_name="dynamodb", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+
+async def _describe_dynamodb_table(client: DynamoDBClient, table_name: str) -> bool:
+    """Check if a DynamoDB table exists.
+
+    Returns:
+        True if the table exists, False otherwise.
+    """
+    try:
+        await client.describe_table(TableName=table_name)  # pyright: ignore[reportUnknownMemberType]
+    except client.exceptions.ResourceNotFoundException:  # pyright: ignore[reportUnknownMemberType]
+        return False
+    else:
+        return True
+
+
+async def _create_dynamodb_table(client: DynamoDBClient, table_name: str, *, table_config: dict[str, Any] | None = None) -> None:
+    """Create a DynamoDB table with the standard schema.
+
+    Args:
+        client: The DynamoDB client.
+        table_name: The name of the table to create.
+        table_config: Additional configuration to pass to create_table().
+    """
+    # Start with user-provided configuration, then overlay required parameters
+    create_table_params: dict[str, Any] = {**(table_config or {})}
+
+    # Override with required configuration that cannot be changed
+    create_table_params.update(
+        {
+            "TableName": table_name,
+            "KeySchema": [
+                {"AttributeName": "collection", "KeyType": "HASH"},  # Partition key
+                {"AttributeName": "key", "KeyType": "RANGE"},  # Sort key
+            ],
+            "AttributeDefinitions": [
+                {"AttributeName": "collection", "AttributeType": "S"},
+                {"AttributeName": "key", "AttributeType": "S"},
+            ],
+            "BillingMode": "PAY_PER_REQUEST",  # On-demand billing
+        }
+    )
+
+    await client.create_table(**create_table_params)  # pyright: ignore[reportUnknownMemberType]
+
+    # Wait for table to be active
+    waiter = client.get_waiter("table_exists")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    await waiter.wait(TableName=table_name)  # pyright: ignore[reportUnknownMemberType]
+
+
+async def _describe_dynamodb_ttl(client: DynamoDBClient, table_name: str) -> str | None:
+    """Get the TTL status of a DynamoDB table.
+
+    Returns:
+        The TTL status string, or None if not available.
+    """
+    ttl_response = await client.describe_time_to_live(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        TableName=table_name
+    )
+    return ttl_response.get("TimeToLiveDescription", {}).get("TimeToLiveStatus")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+
+async def _enable_dynamodb_ttl(client: DynamoDBClient, table_name: str, attribute_name: str = "ttl") -> None:
+    """Enable TTL on a DynamoDB table."""
+    await client.update_time_to_live(  # pyright: ignore[reportUnknownMemberType]
+        TableName=table_name,
+        TimeToLiveSpecification={
+            "Enabled": True,
+            "AttributeName": attribute_name,
+        },
+    )
+
+
+async def _put_dynamodb_item(client: DynamoDBClient, table_name: str, item: dict[str, Any]) -> None:
+    """Put an item into a DynamoDB table."""
+    await client.put_item(  # pyright: ignore[reportUnknownMemberType]
+        TableName=table_name,
+        Item=item,
+    )
+
+
+async def _delete_dynamodb_item(client: DynamoDBClient, table_name: str, key: dict[str, Any]) -> dict[str, Any] | None:
+    """Delete an item from a DynamoDB table.
+
+    Returns:
+        The deleted item attributes if ReturnValues=ALL_OLD was used, or None.
+    """
+    response = await client.delete_item(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        TableName=table_name,
+        Key=key,
+        ReturnValues="ALL_OLD",
+    )
+    return response.get("Attributes")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
 
 class DynamoDBStore(BaseContextManagerStore, BaseStore):
@@ -133,14 +251,14 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             self._client = client
             self._raw_client = None
         else:
-            session: Session = aioboto3.Session(
+            session = _create_dynamodb_session(
                 region_name=region_name,
                 aws_access_key_id=aws_access_key_id,
                 aws_secret_access_key=aws_secret_access_key,
                 aws_session_token=aws_session_token,
             )
 
-            self._raw_client = session.client(service_name="dynamodb", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType]
+            self._raw_client = _create_dynamodb_client_context(session, endpoint_url=endpoint_url)
 
             self._client = None
 
@@ -162,54 +280,22 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         # Register client cleanup if we own the client
         if not self._client_provided_by_user and self._raw_client is not None:
             self._client = await self._exit_stack.enter_async_context(self._raw_client)
-        try:
-            await self._connected_client.describe_table(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
-        except self._connected_client.exceptions.ResourceNotFoundException:  # pyright: ignore[reportUnknownMemberType]
+
+        table_exists = await _describe_dynamodb_table(self._connected_client, self._table_name)
+
+        if not table_exists:
             if not self._auto_create:
                 msg = f"Table '{self._table_name}' does not exist. Either create the table manually or set auto_create=True."
-                raise ValueError(msg) from None
+                raise ValueError(msg)
 
-            # Create the table with composite primary key
-            # Start with user-provided configuration, then overlay required parameters
-            create_table_params: dict[str, Any] = {**self._table_config}
-
-            # Override with required configuration that cannot be changed
-            create_table_params.update(
-                {
-                    "TableName": self._table_name,
-                    "KeySchema": [
-                        {"AttributeName": "collection", "KeyType": "HASH"},  # Partition key
-                        {"AttributeName": "key", "KeyType": "RANGE"},  # Sort key
-                    ],
-                    "AttributeDefinitions": [
-                        {"AttributeName": "collection", "AttributeType": "S"},
-                        {"AttributeName": "key", "AttributeType": "S"},
-                    ],
-                    "BillingMode": "PAY_PER_REQUEST",  # On-demand billing
-                }
-            )
-
-            await self._connected_client.create_table(**create_table_params)  # pyright: ignore[reportUnknownMemberType]
-
-            # Wait for table to be active
-            waiter = self._connected_client.get_waiter("table_exists")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            await waiter.wait(TableName=self._table_name)  # pyright: ignore[reportUnknownMemberType]
+            await _create_dynamodb_table(self._connected_client, self._table_name, table_config=self._table_config)
 
         # Enable TTL on the table if not already enabled
-        ttl_response = await self._connected_client.describe_time_to_live(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            TableName=self._table_name
-        )
-        ttl_status = ttl_response.get("TimeToLiveDescription", {}).get("TimeToLiveStatus")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        ttl_status = await _describe_dynamodb_ttl(self._connected_client, self._table_name)
 
         # Only enable TTL if it's currently disabled
         if ttl_status == "DISABLED":
-            await self._connected_client.update_time_to_live(  # pyright: ignore[reportUnknownMemberType]
-                TableName=self._table_name,
-                TimeToLiveSpecification={
-                    "Enabled": True,
-                    "AttributeName": "ttl",
-                },
-            )
+            await _enable_dynamodb_ttl(self._connected_client, self._table_name)
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -263,24 +349,21 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
             ttl_timestamp = int(managed_entry.expires_at.timestamp())
             item["ttl"] = {"N": str(ttl_timestamp)}
 
-        await self._connected_client.put_item(  # pyright: ignore[reportUnknownMemberType]
-            TableName=self._table_name,
-            Item=item,
-        )
+        await _put_dynamodb_item(self._connected_client, self._table_name, item)
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         """Delete a managed entry from DynamoDB."""
-        response = await self._connected_client.delete_item(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            TableName=self._table_name,
-            Key={
+        deleted_item = await _delete_dynamodb_item(
+            self._connected_client,
+            self._table_name,
+            {
                 "collection": {"S": collection},
                 "key": {"S": key},
             },
-            ReturnValues="ALL_OLD",
         )
 
         # Return True if an item was actually deleted
-        return "Attributes" in response  # pyright: ignore[reportUnknownArgumentType]
+        return deleted_item is not None
 
     # No need to override _close - the exit stack handles all cleanup automatically
