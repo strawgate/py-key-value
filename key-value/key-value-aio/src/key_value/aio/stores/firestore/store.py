@@ -105,8 +105,11 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
     async def _delete_managed_entry(self, *, key: str, collection: str | None = None) -> bool:
         """Delete a managed entry from Firestore."""
         collection = collection or self.default_collection
-        await self._client.collection(collection).document(key).delete()  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
-        return True
+        doc_ref = self._client.collection(collection).document(key)  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
+        doc = await doc_ref.get()  # pyright: ignore[reportUnknownMemberType]
+        exists = doc.exists
+        await doc_ref.delete()  # pyright: ignore[reportUnknownMemberType]
+        return exists
 
     async def _close(self) -> None:
         """Close the Firestore client."""
