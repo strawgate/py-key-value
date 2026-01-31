@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform != 'win32'",
@@ -1815,6 +1815,10 @@ redis = [
 rocksdb = [
     { name = "rocksdict" },
 ]
+s3 = [
+    { name = "aioboto3" },
+    { name = "types-aiobotocore-s3" },
+]
 valkey = [
     { name = "valkey-glide" },
 ]
@@ -1829,13 +1833,14 @@ wrappers-encryption = [
 [package.dev-dependencies]
 dev = [
     { name = "py-key-value", extra = ["dev"] },
-    { name = "py-key-value-aio", extra = ["disk", "duckdb", "dynamodb", "elasticsearch", "filetree", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "rocksdb", "vault", "wrappers-encryption"] },
+    { name = "py-key-value-aio", extra = ["disk", "duckdb", "dynamodb", "elasticsearch", "filetree", "keyring", "memcached", "memory", "mongodb", "pydantic", "redis", "rocksdb", "s3", "vault", "wrappers-encryption"] },
     { name = "py-key-value-aio", extra = ["valkey"], marker = "sys_platform != 'win32'" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aioboto3", marker = "extra == 'dynamodb'", specifier = ">=13.3.0" },
+    { name = "aioboto3", marker = "extra == 's3'", specifier = ">=13.3.0" },
     { name = "aiofile", marker = "extra == 'filetree'", specifier = ">=3.5.0" },
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
@@ -1859,16 +1864,17 @@ requires-dist = [
     { name = "rocksdict", marker = "python_full_version >= '3.12' and extra == 'rocksdb'", specifier = ">=0.3.24" },
     { name = "rocksdict", marker = "python_full_version < '3.12' and extra == 'rocksdb'", specifier = ">=0.3.2" },
     { name = "types-aiobotocore-dynamodb", marker = "extra == 'dynamodb'", specifier = ">=2.16.0" },
+    { name = "types-aiobotocore-s3", marker = "extra == 's3'", specifier = ">=2.16.0" },
     { name = "types-hvac", marker = "extra == 'vault'", specifier = ">=2.3.0" },
     { name = "valkey-glide", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-provides-extras = ["memory", "disk", "filetree", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "dynamodb", "keyring", "keyring-linux", "pydantic", "rocksdb", "duckdb", "wrappers-encryption"]
+provides-extras = ["memory", "disk", "filetree", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "dynamodb", "s3", "keyring", "keyring-linux", "pydantic", "rocksdb", "duckdb", "wrappers-encryption"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "py-key-value", extras = ["dev"], editable = "." },
     { name = "py-key-value-aio", extras = ["keyring"] },
-    { name = "py-key-value-aio", extras = ["memory", "disk", "filetree", "redis", "elasticsearch", "memcached", "mongodb", "vault", "dynamodb", "rocksdb", "duckdb"] },
+    { name = "py-key-value-aio", extras = ["memory", "disk", "filetree", "redis", "elasticsearch", "memcached", "mongodb", "vault", "dynamodb", "s3", "rocksdb", "duckdb"] },
     { name = "py-key-value-aio", extras = ["pydantic"] },
     { name = "py-key-value-aio", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extras = ["wrappers-encryption"] },
@@ -2710,6 +2716,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/b0/d4/de8e1aa81d0d993db09328c4d7ff1b4500b3017e3094734454455412356b/types_aiobotocore_dynamodb-2.25.0.tar.gz", hash = "sha256:e194e2e404c4c3c3da5c0518e3a86b9b276ef083b690bb37d8b493216b27d836", size = 48094, upload-time = "2025-10-11T01:27:40.666Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ca/4f/05d80aa8b5a95b82ddb89547c3a037b9460702286c66ca6e0fbb8fa2ce86/types_aiobotocore_dynamodb-2.25.0-py3-none-any.whl", hash = "sha256:de791dfcef90eb3431c09b63419301f9ff824d82970623e149a427d5fd325430", size = 57971, upload-time = "2025-10-11T01:27:39.639Z" },
+]
+
+[[package]]
+name = "types-aiobotocore-s3"
+version = "2.25.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions", marker = "python_full_version < '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8e/c7/5ceb5faf9475470cf01e764def05e96a11db734139acd0a114195ff7e353/types_aiobotocore_s3-2.25.1.tar.gz", hash = "sha256:d7729dea44d144e9a24fdd17f4dc66b98ad71864f9bf6eb6db05958e0e59d01e", size = 76444, upload-time = "2025-10-29T01:52:02.49Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/89/5b/fbef89694f035c69cfcfd998fefe2c82ff1975ab9cd963b5a9627298afae/types_aiobotocore_s3-2.25.1-py3-none-any.whl", hash = "sha256:c6f1f4f60c253248fbf463ed179b9302e5258e07073e3786eafefff2891332e3", size = 83906, upload-time = "2025-10-29T01:52:01.029Z" },
 ]
 
 [[package]]

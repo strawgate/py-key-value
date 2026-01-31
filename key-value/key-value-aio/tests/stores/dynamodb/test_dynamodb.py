@@ -41,7 +41,7 @@ async def ping_dynamodb() -> bool:
 
         session = aioboto3.Session(
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
         )
         async with session.client(service_name="dynamodb", endpoint_url=DYNAMODB_ENDPOINT) as client:  # type: ignore
@@ -90,7 +90,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
             table_name=DYNAMODB_TEST_TABLE,
             endpoint_url=DYNAMODB_ENDPOINT,
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
         )
 
@@ -99,7 +99,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         session = aioboto3.Session(
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
             region_name="us-east-1",
         )
         async with session.client(service_name="dynamodb", endpoint_url=DYNAMODB_ENDPOINT) as client:  # type: ignore
