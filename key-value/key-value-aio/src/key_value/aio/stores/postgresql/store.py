@@ -234,8 +234,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         # Create the main table if it doesn't exist
         table_sql = (
             f"CREATE TABLE IF NOT EXISTS {self._table_name} ("
-            "collection VARCHAR(255) NOT NULL, "
-            "key VARCHAR(255) NOT NULL, "
+            "collection TEXT NOT NULL, "
+            "key TEXT NOT NULL, "
             "value JSONB NOT NULL, "
             "ttl DOUBLE PRECISION, "
             "created_at TIMESTAMPTZ, "
