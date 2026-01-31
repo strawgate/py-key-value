@@ -199,14 +199,15 @@ def hash_excess_length(value: str, max_length: int, length_is_bytes: bool = Fals
 
     Args:
         value: The value to hash.
-        max_length: The maximum length of the value. Must be greater than 16. If length_is_bytes is True, this is interpreted as bytes.
+        max_length: The maximum length of the value. Must be greater than or equal to 16.
+            If length_is_bytes is True, this is interpreted as bytes.
         length_is_bytes: If True, max_length is interpreted as bytes instead of characters.
 
     Returns:
         The hashed value if the value exceeds the maximum length, otherwise the original value.
     """
-    if max_length <= MINIMUM_MAX_LENGTH:
-        msg = f"max_length must be greater than {MINIMUM_MAX_LENGTH}"
+    if max_length < MINIMUM_MAX_LENGTH:
+        msg = f"max_length must be greater than or equal to {MINIMUM_MAX_LENGTH}"
         raise ValueError(msg)
 
     # Check if truncation is needed
