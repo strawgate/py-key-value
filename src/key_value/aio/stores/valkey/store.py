@@ -43,6 +43,16 @@ async def _create_valkey_client(config: GlideClientConfiguration | GlideClusterC
     return await GlideClient.create(config=config)  # pyright: ignore[reportArgumentType]
 
 
+async def _valkey_mget(client: BaseClient, keys: list[str]) -> list[bytes | None]:
+    """Get multiple values from Valkey."""
+    return await client.mget(keys=keys)  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+
+
+async def _valkey_delete(client: BaseClient, keys: list[str]) -> int:
+    """Delete one or more keys from Valkey."""
+    return await client.delete(keys=keys)  # pyright: ignore[reportArgumentType]
+
+
 class ValkeyStore(BaseContextManagerStore, BaseStore):
     """Valkey-based key-value store (Redis protocol compatible).
 
@@ -155,7 +165,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
 
         combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
 
-        responses: list[bytes | None] = await self._client.mget(keys=combo_keys)  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+        responses: list[bytes | None] = await _valkey_mget(self._client, combo_keys)
 
         entries: list[ManagedEntry | None] = []
         for response in responses:
@@ -195,6 +205,6 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
 
         combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
 
-        deleted_count: int = await self._client.delete(keys=combo_keys)  # pyright: ignore[reportArgumentType]
+        deleted_count: int = await _valkey_delete(self._client, combo_keys)
 
         return deleted_count

@@ -70,6 +70,46 @@ def _create_redis_client_from_url(
     )
 
 
+async def _redis_get(client: Redis, name: str) -> Any:
+    """Get a value from Redis."""
+    return await client.get(name=name)  # pyright: ignore[reportAny]
+
+
+async def _redis_mget(client: Redis, keys: list[str]) -> list[Any]:
+    """Get multiple values from Redis."""
+    return await client.mget(keys=keys)  # pyright: ignore[reportAny]
+
+
+async def _redis_set(client: Redis, name: str, value: str) -> None:
+    """Set a value in Redis without TTL."""
+    _ = await client.set(name=name, value=value)  # pyright: ignore[reportAny]
+
+
+async def _redis_setex(client: Redis, name: str, time: int, value: str) -> None:
+    """Set a value in Redis with TTL."""
+    _ = await client.setex(name=name, time=time, value=value)  # pyright: ignore[reportAny]
+
+
+async def _redis_pipeline_execute(pipeline: Any) -> None:  # pyright: ignore[reportAny]
+    """Execute a Redis pipeline."""
+    await pipeline.execute()  # pyright: ignore[reportAny]
+
+
+async def _redis_delete(client: Redis, *keys: str) -> int:
+    """Delete one or more keys from Redis."""
+    return await client.delete(*keys)  # pyright: ignore[reportAny]
+
+
+async def _redis_scan(client: Redis, cursor: int, match: str, count: int) -> tuple[int, list[str]]:
+    """Scan Redis keys matching a pattern."""
+    return await client.scan(cursor=cursor, match=match, count=count)  # pyright: ignore[reportUnknownMemberType, reportAny]
+
+
+async def _redis_flushdb(client: Redis) -> bool:
+    """Flush the current Redis database."""
+    return await client.flushdb()  # pyright: ignore[reportUnknownMemberType, reportAny]
+
+
 class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):
     """Redis-based key-value store."""
 
@@ -133,7 +173,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        redis_response: Any = await self._client.get(name=combo_key)  # pyright: ignore[reportAny]
+        redis_response: Any = await _redis_get(self._client, combo_key)
 
         if not isinstance(redis_response, str):
             return None
@@ -150,7 +190,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
         combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
 
-        redis_responses: list[Any] = await self._client.mget(keys=combo_keys)  # pyright: ignore[reportAny]
+        redis_responses: list[Any] = await _redis_mget(self._client, combo_keys)
 
         entries: list[ManagedEntry | None] = []
         for redis_response in redis_responses:
@@ -180,9 +220,9 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             # Redis does not support <= 0 TTLs
             ttl = max(int(managed_entry.ttl), 1)
 
-            _ = await self._client.setex(name=combo_key, time=ttl, value=json_value)  # pyright: ignore[reportAny]
+            await _redis_setex(self._client, combo_key, ttl, json_value)
         else:
-            _ = await self._client.set(name=combo_key, value=json_value)  # pyright: ignore[reportAny]
+            await _redis_set(self._client, combo_key, json_value)
 
     @override
     async def _put_managed_entries(
@@ -221,13 +261,13 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
             pipeline.setex(name=combo_key, time=ttl_seconds, value=json_value)
 
-        await pipeline.execute()  # pyright: ignore[reportAny]
+        await _redis_pipeline_execute(pipeline)
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        return await self._client.delete(combo_key) != 0  # pyright: ignore[reportAny]
+        return await _redis_delete(self._client, combo_key) != 0
 
     @override
     async def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
@@ -236,7 +276,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
         combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
 
-        deleted_count: int = await self._client.delete(*combo_keys)  # pyright: ignore[reportAny]
+        deleted_count: int = await _redis_delete(self._client, *combo_keys)
 
         return deleted_count
 
@@ -247,9 +287,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         pattern = compound_key(collection=collection, key="*")
 
         # redis.asyncio scan returns tuple(cursor, keys)
-        _cursor: int
-        keys: list[str]
-        _cursor, keys = await self._client.scan(cursor=0, match=pattern, count=limit)  # pyright: ignore[reportUnknownMemberType, reportAny]
+        _cursor, keys = await _redis_scan(self._client, cursor=0, match=pattern, count=limit)
 
         return get_keys_from_compound_keys(compound_keys=keys, collection=collection)
 
@@ -261,4 +299,4 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
     @override
     async def _delete_store(self) -> bool:
-        return await self._client.flushdb()  # pyright: ignore[reportUnknownMemberType, reportAny]
+        return await _redis_flushdb(self._client)

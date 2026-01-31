@@ -158,6 +158,24 @@ def _get_s3_client_region(client: S3Client) -> str | None:
     return getattr(client.meta, "region_name", None)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
 
+def _get_botocore_error_code(e: Exception) -> str:
+    """Get the error code from a botocore ClientError."""
+    from botocore.exceptions import ClientError
+
+    if not isinstance(e, ClientError):
+        return ""
+    return e.response.get("Error", {}).get("Code", "")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+
+def _get_botocore_http_status(e: Exception) -> int:
+    """Get the HTTP status code from a botocore ClientError."""
+    from botocore.exceptions import ClientError
+
+    if not isinstance(e, ClientError):
+        return 0
+    return e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+
 class S3KeySanitizationStrategy(SanitizationStrategy):
     """Sanitization strategy for S3 keys with byte-aware length limits.
 
@@ -397,8 +415,8 @@ class S3Store(BaseContextManagerStore, BaseStore):
         try:
             await _head_s3_bucket(self._connected_client, self._bucket_name)
         except ClientError as e:
-            error_code = e.response.get("Error", {}).get("Code", "")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            http_status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            error_code = _get_botocore_error_code(e)
+            http_status = _get_botocore_http_status(e)
 
             if error_code in ("404", "NoSuchBucket") or http_status == HTTP_NOT_FOUND:
                 # Skip region specification for custom endpoints (LocalStack, MinIO)
@@ -510,8 +528,7 @@ class S3Store(BaseContextManagerStore, BaseStore):
             if not exists:
                 return False
         except ClientError as e:
-            error = e.response.get("Error", {})  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            error_code = error.get("Code", "")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            error_code = _get_botocore_error_code(e)
 
             if error_code in ("403", "AccessDenied"):
                 # Can't check existence but try to delete anyway
