@@ -33,6 +33,7 @@ from key_value.aio.stores.opensearch.utils import LessCapableJsonSerializer
 try:
     from opensearchpy import AsyncOpenSearch
     from opensearchpy.exceptions import RequestError
+    from opensearchpy.exceptions import SerializationError as OpenSearchSerializationError
 
     from key_value.aio.stores.opensearch.utils import (
         get_aggregations_from_body,
@@ -397,12 +398,16 @@ class OpenSearchStore(
             msg = f"Failed to serialize document: {e}"
             raise SerializationError(message=msg) from e
 
-        _ = await self._client.index(  # type: ignore[reportUnknownVariableType]
-            index=index_name,
-            id=document_id,
-            body=document,
-            params={"refresh": "true"},
-        )
+        try:
+            _ = await self._client.index(  # type: ignore[reportUnknownVariableType]
+                index=index_name,
+                id=document_id,
+                body=document,
+                params={"refresh": "true"},
+            )
+        except OpenSearchSerializationError as e:
+            msg = f"Failed to serialize document: {e}"
+            raise SerializationError(message=msg) from e
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
