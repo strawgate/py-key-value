@@ -45,10 +45,10 @@ class DataclassAdapter(BasePydanticAdapter[T]):
         self._key_value = key_value
 
         origin = get_origin(dataclass_type)
-        self._is_list_model = origin is not None and isinstance(origin, type) and issubclass(origin, Sequence)
+        self._needs_wrapping = origin is not None and isinstance(origin, type) and issubclass(origin, Sequence)
 
         # Extract the inner type for list models
-        if self._is_list_model:
+        if self._needs_wrapping:
             args = get_args(dataclass_type)
             if not args:
                 msg = f"List type {dataclass_type} must have a type argument"

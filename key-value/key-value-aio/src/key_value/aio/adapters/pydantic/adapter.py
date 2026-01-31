@@ -1,26 +1,38 @@
-from collections.abc import Sequence
-from typing import TypeVar, get_origin
+from typing import TypeVar
 
 from key_value.shared.type_checking.bear_spray import bear_spray
-from pydantic import BaseModel
 from pydantic.type_adapter import TypeAdapter
+from typing_extensions import TypeForm
 
 from key_value.aio.adapters.pydantic.base import BasePydanticAdapter
 from key_value.aio.protocols.key_value import AsyncKeyValue
 
-T = TypeVar("T", bound=BaseModel | Sequence[BaseModel])
+T = TypeVar("T")
 
 
 class PydanticAdapter(BasePydanticAdapter[T]):
-    """Adapter around a KVStore-compliant Store that allows type-safe persistence of Pydantic models."""
+    """Adapter for persisting any pydantic-serializable type.
 
-    # Beartype cannot handle the parameterized type annotation (type[T]) used here for this generic adapter.
+    This is the "less safe" adapter that accepts any Python type that Pydantic can serialize.
+    Unlike BaseModelAdapter (which is constrained to BaseModel types), this adapter can handle:
+    - Pydantic BaseModel instances
+    - Dataclasses (standard and Pydantic)
+    - TypedDict
+    - Primitive types (int, str, float, bool, etc.)
+    - Collection types (list, dict, set, tuple, etc.)
+    - Datetime and other common types
+
+    Types that serialize to dicts (BaseModel, dataclass, TypedDict, dict) are stored directly.
+    Other types are wrapped in {"items": value} to ensure consistent dict-based storage.
+    """
+
+    # Beartype cannot handle the parameterized type annotation (TypeForm[T]) used here for this generic adapter.
     # Using @bear_spray to bypass beartype's runtime checks for this specific method.
     @bear_spray
     def __init__(
         self,
         key_value: AsyncKeyValue,
-        pydantic_model: type[T],
+        pydantic_model: TypeForm[T],
         default_collection: str | None = None,
         raise_on_validation_error: bool = False,
     ) -> None:
@@ -28,28 +40,44 @@ class PydanticAdapter(BasePydanticAdapter[T]):
 
         Args:
             key_value: The KVStore to use.
-            pydantic_model: The Pydantic model to use. Can be a single Pydantic model or list[Pydantic model].
+            pydantic_model: The type to serialize/deserialize. Can be any pydantic-serializable type.
             default_collection: The default collection to use.
-            raise_on_validation_error: Whether to raise a DeserializationError if validation fails during reads. Otherwise,
-                                       calls will return None if validation fails.
-
-        Raises:
-            TypeError: If pydantic_model is a sequence type other than list (e.g., tuple is not supported).
+            raise_on_validation_error: Whether to raise a DeserializationError if validation fails during reads.
+                                       Otherwise, calls will return None if validation fails.
         """
         self._key_value = key_value
-
-        origin = get_origin(pydantic_model)
-        self._is_list_model = origin is list
-
-        # Validate that if it's a generic type, it must be a list (not tuple, etc.)
-        if origin is not None and origin is not list:
-            msg = f"Only list[BaseModel] is supported for sequence types, got {pydantic_model}"
-            raise TypeError(msg)
-
         self._type_adapter = TypeAdapter[T](pydantic_model)
         self._default_collection = default_collection
         self._raise_on_validation_error = raise_on_validation_error
 
+        # Determine if this type needs wrapping
+        self._needs_wrapping = self._check_needs_wrapping()
+
+    @bear_spray
+    def _check_needs_wrapping(self) -> bool:
+        """Check if a type needs to be wrapped in {"items": ...} for storage.
+
+        Types that serialize to dicts don't need wrapping. Other types do.
+
+        Returns:
+            True if the type needs wrapping, False otherwise.
+        """
+        # Return the negated condition directly (fixes SIM103)
+        return not self._serializes_to_dict()
+
+    @bear_spray
+    def _serializes_to_dict(self) -> bool:
+        """Check if a type serializes to a dict by inspecting the TypeAdapter's JSON schema.
+
+        This uses Pydantic's TypeAdapter.json_schema() to reliably determine the output structure.
+        Types that produce a JSON object (schema type "object") are dict-serializable.
+
+        Returns:
+            True if the type serializes to a dict (JSON object), False otherwise.
+        """
+        schema = self._type_adapter.json_schema()
+        return schema.get("type") == "object"
+
     def _get_model_type_name(self) -> str:
         """Return the model type name for error messages."""
-        return "Pydantic model"
+        return "pydantic-serializable value"
