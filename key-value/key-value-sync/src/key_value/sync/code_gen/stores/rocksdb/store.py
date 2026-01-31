@@ -23,26 +23,31 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
     """A RocksDB-based key-value store."""
 
     _db: Rdict
+    _auto_create: bool
 
     @overload
-    def __init__(self, *, db: Rdict, default_collection: str | None = None) -> None:
+    def __init__(self, *, db: Rdict, default_collection: str | None = None, auto_create: bool = True) -> None:
         """Initialize the RocksDB store.
 
         Args:
             db: An existing Rdict database instance to use.
             default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to automatically create the directory if it doesn't exist. Defaults to True.
         """
 
     @overload
-    def __init__(self, *, path: Path | str, default_collection: str | None = None) -> None:
+    def __init__(self, *, path: Path | str, default_collection: str | None = None, auto_create: bool = True) -> None:
         """Initialize the RocksDB store.
 
         Args:
             path: The path to the RocksDB database directory.
             default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to automatically create the directory if it doesn't exist. Defaults to True.
         """
 
-    def __init__(self, *, db: Rdict | None = None, path: Path | str | None = None, default_collection: str | None = None) -> None:
+    def __init__(
+        self, *, db: Rdict | None = None, path: Path | str | None = None, default_collection: str | None = None, auto_create: bool = True
+    ) -> None:
         """Initialize the RocksDB store.
 
         Args:
@@ -51,6 +56,8 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
                 the database's lifecycle.
             path: The path to the RocksDB database directory.
             default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to automatically create the directory if it doesn't exist. Defaults to True.
+                When False, raises ValueError if the directory doesn't exist.
         """
         if db is not None and path is not None:
             msg = "Provide only one of db or path"
@@ -61,12 +68,18 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
             raise ValueError(msg)
 
         client_provided = db is not None
+        self._auto_create = auto_create
 
         if db:
             self._db = db
         elif path:
             path = Path(path)
-            path.mkdir(parents=True, exist_ok=True)
+
+            if not path.exists():
+                if not self._auto_create:
+                    msg = f"Directory '{path}' does not exist. Either create the directory manually or set auto_create=True."
+                    raise ValueError(msg)
+                path.mkdir(parents=True, exist_ok=True)
 
             opts = Options()
             opts.create_if_missing(True)

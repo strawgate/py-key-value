@@ -95,7 +95,7 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
         """Get a managed entry from Firestore."""
         collection = collection or self.default_collection
         response = await self._client.collection(collection).document(key).get()  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
-        doc = response.to_dict()
+        doc = response.to_dict()  # pyright: ignore[reportUnknownMemberType]
         if doc is None:
             return None
         return self._serialization_adapter.load_dict(data=doc)

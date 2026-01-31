@@ -91,7 +91,7 @@ def firestore_project() -> str:
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
-class TestFirestoreEmulatorDockerStore(ContextManagerStoreTestMixin, BaseStoreTests):
+class TestFirestoreStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self, ensure_emulator: None, firestore_project: str) -> FirestoreStore:
@@ -100,48 +100,6 @@ class TestFirestoreEmulatorDockerStore(ContextManagerStoreTestMixin, BaseStoreTe
     @override
     @pytest.mark.skip(reason="Distributed cloud stores are unbounded")
     async def test_not_unbounded(self, store: BaseStore): ...
-
-    @override
-    async def test_delete(self, store: BaseStore):
-        # Firestore deletes are idempotent and do not fail for missing keys.
-        assert await store.delete(collection="test", key="test") is True
-
-    @override
-    async def test_put_delete_delete(self, store: BaseStore):
-        # Firestore deletes are idempotent and do not fail for missing keys.
-        await store.put(collection="test", key="test", value={"test": "test"})
-        assert await store.delete(collection="test", key="test") is True
-        assert await store.delete(collection="test", key="test") is True
-
-    @override
-    async def test_delete_many(self, store: BaseStore):
-        # Firestore deletes are idempotent and do not fail for missing keys.
-        assert await store.delete_many(collection="test", keys=["test", "test_2"]) == 2
-
-    @override
-    async def test_put_delete_many(self, store: BaseStore):
-        # Firestore deletes are idempotent and do not fail for missing keys.
-        await store.put(collection="test", key="test", value={"test": "test"})
-        assert await store.delete_many(collection="test", keys=["test", "test_2"]) == 2
-
-    @override
-    async def test_delete_many_delete_many(self, store: BaseStore):
-        # Firestore deletes are idempotent and do not fail for missing keys.
-        await store.put(collection="test", key="test", value={"test": "test"})
-        assert await store.delete_many(collection="test", keys=["test", "test_2"]) == 2
-        assert await store.delete_many(collection="test", keys=["test", "test_2"]) == 2
-
-    async def test_default_collection_used_when_collection_missing(self, store: FirestoreStore):
-        await store.put(key="test_key", value={"value": "from_default"}, collection=None)
-        assert await store.get(key="test_key", collection=None) == {"value": "from_default"}
-
-    async def test_delete_returns_true_when_document_deleted(self, store: FirestoreStore):
-        await store.put(collection="test", key="test_key", value={"test": "value"})
-        assert await store.get(collection="test", key="test_key") == {"test": "value"}
-
-        deleted = await store.delete(collection="test", key="test_key")
-        assert deleted is True
-        assert await store.get(collection="test", key="test_key") is None
 
     async def test_firestore_document_format(self, store: FirestoreStore, firestore_project: str):
         await store.put(collection="test", key="document_format_test_1", value={"name": "Alice", "age": 30})

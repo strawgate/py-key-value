@@ -17,7 +17,7 @@ This monorepo contains two libraries:
 
 ## Why use this library?
 
-- **Multiple backends**: DynamoDB, Elasticsearch, Memcached, MongoDB, Redis,
+- **Multiple backends**: DynamoDB, S3, Elasticsearch, Memcached, MongoDB, Redis,
   RocksDB, Valkey, Firestore, and In-memory, Disk, etc.
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
@@ -131,6 +131,7 @@ pip install py-key-value-aio
 pip install py-key-value-aio[memory]
 pip install py-key-value-aio[disk]
 pip install py-key-value-aio[dynamodb]
+pip install py-key-value-aio[s3]
 pip install py-key-value-aio[elasticsearch]
 # Firestore support
 pip install py-key-value-aio[firestore]
@@ -193,7 +194,7 @@ categories:
 - **Local stores**: In-memory and disk-based storage (Memory, Disk, RocksDB, etc.)
 - **Secret stores**: Secure OS-level storage for sensitive data (Keyring, Vault)
 - **Distributed stores**: Network-based storage for multi-node apps (Redis,
-  DynamoDB, MongoDB, etc.)
+  DynamoDB, S3, MongoDB, etc.)
 
 Each store has a **stability rating** indicating likelihood of
 backwards-incompatible changes. Stable stores (Redis, Valkey, Disk, Keyring)
