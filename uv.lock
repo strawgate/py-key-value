@@ -1920,7 +1920,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aerospike", marker = "extra == 'aerospike'", specifier = ">=14.0.0" },
+    { name = "aerospike", marker = "extra == 'aerospike'", specifier = ">=16.0.0" },
     { name = "aioboto3", marker = "extra == 'dynamodb'", specifier = ">=13.3.0" },
     { name = "aioboto3", marker = "extra == 's3'", specifier = ">=13.3.0" },
     { name = "aiofile", marker = "extra == 'filetree'", specifier = ">=3.5.0" },
