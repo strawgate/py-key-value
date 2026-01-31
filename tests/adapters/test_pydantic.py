@@ -1,5 +1,7 @@
+from collections.abc import Callable
 from datetime import datetime, timezone
 from logging import LogRecord
+from typing import Any
 
 import pytest
 from inline_snapshot import snapshot
@@ -217,3 +219,58 @@ class TestPydanticAdapter:
         assert model_type_from_log_record(record) == "pydantic-serializable value"
         error = error_from_log_record(record)
         assert "missing 'items' wrapper" in str(error)
+
+    async def test_adapter_with_callable_field(self, store: MemoryStore):
+        """Test that PydanticAdapter works with models containing Callable fields.
+
+        This tests the fix for issue #279 where Pydantic's json_schema() would fail
+        with 'Cannot generate a JsonSchema for core_schema.CallableSchema' when
+        models contain Callable fields. The fix allows adapter creation to succeed
+        by skipping non-JSON-serializable fields when generating the schema.
+
+        Note: Callable fields cannot be serialized to JSON, so they must be optional
+        (with None default) for storage/retrieval to work.
+        """
+
+        class ModelWithCallable(BaseModel):
+            name: str
+            callback: Callable[[Any], str] | None = None
+
+        # This would previously fail with:
+        # PydanticInvalidForJsonSchema: Cannot generate a JsonSchema for core_schema.CallableSchema
+        adapter = PydanticAdapter[ModelWithCallable](key_value=store, pydantic_model=ModelWithCallable)
+
+        # Test storage/retrieval with callback=None (the serializable case)
+        model = ModelWithCallable(name="test", callback=None)
+        await adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=model)
+
+        result = await adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+        assert result is not None
+        assert result.name == "test"
+        assert result.callback is None
+
+    async def test_adapter_with_multiple_non_json_types(self, store: MemoryStore):
+        """Test that PydanticAdapter works with models containing multiple non-JSON-serializable fields.
+
+        This tests that the schema generator correctly handles multiple Callable fields.
+        """
+
+        class ModelWithMultipleCallables(BaseModel):
+            name: str
+            on_success: Callable[[str], None] | None = None
+            on_error: Callable[[Exception], None] | None = None
+            validator: Callable[[Any], bool] | None = None
+
+        # Creating the adapter should succeed (schema generation works)
+        adapter = PydanticAdapter[ModelWithMultipleCallables](key_value=store, pydantic_model=ModelWithMultipleCallables)
+
+        # Test basic storage and retrieval
+        model = ModelWithMultipleCallables(name="multi_callback_test")
+        await adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=model)
+
+        result = await adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
+        assert result is not None
+        assert result.name == "multi_callback_test"
+        assert result.on_success is None
+        assert result.on_error is None
+        assert result.validator is None

@@ -33,12 +33,6 @@ jobs:
   static_analysis:
     runs-on: ubuntu-latest
 
-    strategy:
-      fail-fast: false
-      matrix:
-        project:
-          - "key-value/key-value-aio"
-          - "key-value/key-value-shared"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,19 +42,15 @@ jobs:
 
       - name: "Install"
         run: uv sync --locked --group dev
-        working-directory: ${{ matrix.project }}
 
       - name: "Lint"
         run: uv run ruff check --exit-non-zero-on-fix --fix .
-        working-directory: ${{ matrix.project }}
 
       - name: "Format"
         run: uv run ruff format --check .
-        working-directory: ${{ matrix.project }}
 
       - name: "Type Check"
         run: uv run basedpyright .
-        working-directory: ${{ matrix.project }}
 
   test_quick:
     needs:
@@ -80,9 +70,6 @@ jobs:
             windows-2022,
             windows-latest,
           ]
-        project:
-          - "key-value/key-value-aio"
-          - "key-value/key-value-shared"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -104,23 +91,18 @@ jobs:
 
       - name: "Install latest dependencies"
         run: uv sync --locked --group dev --python ${{ matrix.python-version }}
-        working-directory: ${{ matrix.project }}
 
       - name: "Test with latest dependencies"
-        run: uv run pytest tests . -vv -n ${{ steps.pytest-workers.outputs.count }}
-        working-directory: ${{ matrix.project }}
+        run: uv run pytest tests -vv -n ${{ steps.pytest-workers.outputs.count }}
 
       - name: "Install oldest dependencies"
         run: uv sync --group dev --python ${{ matrix.python-version }} --resolution lowest-direct
-        working-directory: ${{ matrix.project }}
 
       - name: "Test with oldest dependencies"
-        run: uv run pytest tests . -vv -n ${{ steps.pytest-workers.outputs.count }}
-        working-directory: ${{ matrix.project }}
+        run: uv run pytest tests -vv -n ${{ steps.pytest-workers.outputs.count }}
 
       - name: "Build"
         run: uv build .
-        working-directory: ${{ matrix.project }}
 
   test_all:
     needs:
@@ -139,9 +121,6 @@ jobs:
             windows-2022,
             windows-latest,
           ]
-        project:
-          - "key-value/key-value-aio"
-          - "key-value/key-value-shared"
 
     runs-on: ${{ matrix.platform }}
 
@@ -164,20 +143,15 @@ jobs:
 
       - name: "Install latest dependencies"
         run: uv sync --locked --group dev --python ${{ matrix.python-version }}
-        working-directory: ${{ matrix.project }}
 
       - name: "Test with latest dependencies"
-        run: uv run pytest tests . -vv -n ${{ steps.pytest-workers.outputs.count }}
-        working-directory: ${{ matrix.project }}
+        run: uv run pytest tests -vv -n ${{ steps.pytest-workers.outputs.count }}
 
       - name: "Install oldest dependencies"
         run: uv sync --group dev --python ${{ matrix.python-version }} --resolution lowest-direct
-        working-directory: ${{ matrix.project }}
 
       - name: "Test with oldest dependencies"
-        run: uv run pytest tests . -vv -n ${{ steps.pytest-workers.outputs.count }}
-        working-directory: ${{ matrix.project }}
+        run: uv run pytest tests -vv -n ${{ steps.pytest-workers.outputs.count }}
 
       - name: "Build"
         run: uv build .
-        working-directory: ${{ matrix.project }}
