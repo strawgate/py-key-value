@@ -103,6 +103,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
     _db: AsyncDatabase[dict[str, Any]]
     _collections_by_name: dict[str, AsyncCollection[dict[str, Any]]]
     _adapter: SerializationAdapter
+    _auto_create: bool
 
     @overload
     def __init__(
@@ -113,6 +114,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         coll_name: str | None = None,
         default_collection: str | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the MongoDB store.
 
@@ -122,6 +124,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
             coll_name: The name of the MongoDB collection.
             default_collection: The default collection to use if no collection is provided.
             collection_sanitization_strategy: The sanitization strategy to use for collections.
+            auto_create: Whether to automatically create collections if they don't exist. Defaults to True.
         """
 
     @overload
@@ -133,6 +136,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         coll_name: str | None = None,
         default_collection: str | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the MongoDB store.
 
@@ -142,6 +146,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
             coll_name: The name of the MongoDB collection.
             default_collection: The default collection to use if no collection is provided.
             collection_sanitization_strategy: The sanitization strategy to use for collections.
+            auto_create: Whether to automatically create collections if they don't exist. Defaults to True.
         """
 
     def __init__(
@@ -153,6 +158,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         coll_name: str | None = None,
         default_collection: str | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the MongoDB store.
 
@@ -167,6 +173,8 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
             coll_name: The name of the MongoDB collection.
             default_collection: The default collection to use if no collection is provided.
             collection_sanitization_strategy: The sanitization strategy to use for collections.
+            auto_create: Whether to automatically create collections if they don't exist. Defaults to True.
+                When False, raises ValueError if a collection doesn't exist.
         """
 
         client_provided = client is not None
@@ -185,6 +193,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         self._db = self._client[db_name]
         self._collections_by_name = {}
         self._adapter = MongoDBSerializationAdapter()
+        self._auto_create = auto_create
 
         super().__init__(
             default_collection=default_collection,
@@ -209,6 +218,10 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
         if matching_collections:
             self._collections_by_name[collection] = self._db[sanitized_collection]
             return
+
+        if not self._auto_create:
+            msg = f"Collection '{sanitized_collection}' does not exist. Either create the collection manually or set auto_create=True."
+            raise ValueError(msg)
 
         new_collection: AsyncCollection[dict[str, Any]] = await self._db.create_collection(name=sanitized_collection)
 
