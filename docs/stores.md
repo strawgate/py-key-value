@@ -30,7 +30,7 @@ long-term storage, prefer stable stores.
 Local stores are stored in memory or on disk, local to the application.
 
 | Store | Stability | Async | Sync | Description |
-|-------|:---------:|:-----:|:----:|:------------|
+| ----- | :-------: | :---: | :--: | :---------- |
 | Memory | N/A | ✅ | ✅ | Fast in-memory storage for development and caching |
 | Disk | Stable | ☑️ | ✅ | Persistent file-based storage in a single file |
 | Disk (Per-Collection) | Stable | ☑️ | ✅ | Persistent storage with separate files per collection |
@@ -315,7 +315,7 @@ Secret stores provide secure storage for sensitive data, typically using
 operating system secret management facilities.
 
 | Store | Stability | Async | Sync | Description |
-|-------|:---------:|:-----:|:----:|:------------|
+| ----- | :-------: | :---: | :--: | :---------- |
 | Keyring | Stable | ✅ | ✅ | OS-level secure storage (Keychain, Credential Manager, etc.) |
 | Vault | Unstable | ✅ | ✅ | HashiCorp Vault integration for enterprise secrets |
 
@@ -395,8 +395,9 @@ pip install py-key-value-aio[vault]
 Distributed stores provide network-based storage for multi-node applications.
 
 | Store | Stability | Async | Sync | Description |
-|-------|:---------:|:-----:|:----:|:------------|
+| ----- | :-------: | :---: | :--: | :---------- |
 | DynamoDB | Unstable | ✅ | ✖️ | AWS DynamoDB key-value storage |
+| S3 | Unstable | ✅ | ✖️ | AWS S3 object storage |
 | Elasticsearch | Unstable | ✅ | ✅ | Full-text search with key-value capabilities |
 | Memcached | Unstable | ✅ | ✖️ | High-performance distributed memory cache |
 | MongoDB | Unstable | ✅ | ✅ | Document database used as key-value store |
@@ -498,6 +499,42 @@ pip install py-key-value-aio[dynamodb]
 - Fully managed
 - Auto-scaling
 - Global tables
+- Pay-per-use pricing
+- Stable storage format: **Unstable**
+
+---
+
+### S3Store
+
+AWS S3 object storage for durable, scalable key-value storage.
+
+```python
+from key_value.aio.stores.s3 import S3Store
+
+store = S3Store(
+    bucket_name="my-kv-bucket",
+    region_name="us-east-1"
+)
+```
+
+**Installation:**
+
+```bash
+pip install py-key-value-aio[s3]
+```
+
+**Use Cases:**
+
+- Large value storage (up to 5TB per object)
+- Durable, long-term storage
+- Cost-effective archival
+- Multi-region replication
+
+**Characteristics:**
+
+- 99.999999999% durability
+- Automatic key sanitization for S3 path limits
+- Supports lifecycle policies
 - Pay-per-use pricing
 - Stable storage format: **Unstable**
 

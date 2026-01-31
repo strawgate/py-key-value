@@ -1,10 +1,9 @@
 from typing import Any, overload
 
 from key_value.shared.errors import DeserializationError
-from key_value.shared.type_checking.bear_spray import bear_spray
 from key_value.shared.utils.compound import compound_key, get_keys_from_compound_keys
 from key_value.shared.utils.managed_entry import ManagedEntry
-from key_value.shared.utils.serialization import BasicSerializationAdapter, SerializationAdapter
+from key_value.shared.utils.serialization import BasicSerializationAdapter
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseEnumerateKeysStore, BaseStore
@@ -27,7 +26,6 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
     _client: aerospike.Client  # pyright: ignore[reportUnknownMemberType]
     _namespace: str
     _set: str
-    _adapter: SerializationAdapter
 
     @overload
     def __init__(
@@ -49,7 +47,6 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         default_collection: str | None = None,
     ) -> None: ...
 
-    @bear_spray
     def __init__(
         self,
         *,
@@ -62,12 +59,16 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         """Initialize the Aerospike store.
 
         Args:
-            client: An existing Aerospike client to use.
+            client: An existing Aerospike client to use. If provided, the store will not manage
+                the client's lifecycle (will not close it). The caller is responsible for
+                managing the client's lifecycle.
             hosts: List of (host, port) tuples. Defaults to [("localhost", 3000)].
             namespace: Aerospike namespace. Defaults to "test".
             set_name: Aerospike set. Defaults to "kv-store".
             default_collection: The default collection to use if no collection is provided.
         """
+        client_provided = client is not None
+
         if client:
             self._client = client
         else:
@@ -78,10 +79,12 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         self._namespace = namespace
         self._set = set_name
 
-        self._stable_api = True
-        self._adapter = BasicSerializationAdapter(date_format="isoformat", value_format="dict")
-
-        super().__init__(default_collection=default_collection)
+        super().__init__(
+            default_collection=default_collection,
+            client_provided_by_user=client_provided,
+            serialization_adapter=BasicSerializationAdapter(date_format="isoformat", value_format="dict"),
+            stable_api=True,
+        )
 
     # Helper methods to encapsulate aerospike client interactions with type ignore comments
 
@@ -139,8 +142,12 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
 
     @override
     async def _setup(self) -> None:
-        """Connect to Aerospike."""
+        """Connect to Aerospike and register cleanup."""
         self._connect_client()
+
+        # Register client cleanup if we own the client
+        if not self._client_provided_by_user:
+            self._exit_stack.callback(self._close_client)
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -158,7 +165,7 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
             return None
 
         try:
-            return self._adapter.load_json(json_str=json_value)
+            return self._serialization_adapter.load_json(json_str=json_value)
         except DeserializationError:
             return None
 
@@ -172,7 +179,7 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
     ) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
         aerospike_key = (self._namespace, self._set, combo_key)
-        json_value: str = self._adapter.dump_json(entry=managed_entry, key=key, collection=collection)
+        json_value: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
         bins = {"value": json_value}
 
@@ -221,8 +228,3 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         # Using 0 means truncate everything
         self._truncate_set()
         return True
-
-    @override
-    async def _close(self) -> None:
-        """Close the Aerospike connection."""
-        self._close_client()

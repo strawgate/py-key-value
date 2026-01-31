@@ -8,6 +8,7 @@ Base abstract class for managed key-value store implementations.
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from contextlib import ExitStack
 from datetime import datetime
 from threading import Lock
 from types import MappingProxyType, TracebackType
@@ -91,6 +92,7 @@ class BaseStore(KeyValueProtocol, ABC):
         collection_sanitization_strategy: SanitizationStrategy | None = None,
         default_collection: str | None = None,
         seed: SEED_DATA_TYPE | None = None,
+        stable_api: bool = False,
     ) -> None:
         """Initialize the managed key-value store.
 
@@ -103,6 +105,8 @@ class BaseStore(KeyValueProtocol, ABC):
             seed: Optional seed data to pre-populate the store. Format: {collection: {key: {field: value, ...}}}.
                 Seeding occurs once during store initialization (when the store is first entered or when the
                 first operation is performed on the store).
+            stable_api: Whether this store implementation has a stable API. If False, a warning will be issued.
+                Defaults to False.
         """
 
         self._setup_complete = False
@@ -119,8 +123,7 @@ class BaseStore(KeyValueProtocol, ABC):
         self._key_sanitization_strategy = key_sanitization_strategy or PassthroughStrategy()
         self._collection_sanitization_strategy = collection_sanitization_strategy or PassthroughStrategy()
 
-        if not hasattr(self, "_stable_api"):
-            self._stable_api = False
+        self._stable_api = stable_api
 
         if not self._stable_api:
             self._warn_about_stability()
@@ -397,22 +400,74 @@ class BaseEnumerateKeysStore(BaseStore, EnumerateKeysProtocol, ABC):
 
 
 class BaseContextManagerStore(BaseStore, ABC):
-    """An abstract base class for context manager stores."""
+    """An abstract base class for context manager stores.
+
+    Stores that accept a client parameter should pass `client_provided_by_user=True` to
+    the constructor. This ensures the store does not manage the lifecycle of user-provided
+    clients (i.e., does not close them).
+
+    The base class provides an ExitStack that stores can use to register cleanup
+    callbacks. Stores should add their cleanup operations to the exit stack as needed.
+    The base class handles entering and exiting the exit stack.
+    """
+
+    _client_provided_by_user: bool
+    _exit_stack: ExitStack
+    _exit_stack_entered: bool
+
+    def __init__(self, *, client_provided_by_user: bool = False, **kwargs: Any) -> None:
+        """Initialize the context manager store with client ownership configuration.
+
+        Args:
+            client_provided_by_user: Whether the client was provided by the user. If True,
+                the store will not manage the client's lifecycle (will not close it).
+                Defaults to False.
+            **kwargs: Additional arguments to pass to the base store constructor.
+        """
+        self._client_provided_by_user = client_provided_by_user
+        self._exit_stack = ExitStack()
+        self._exit_stack_entered = False
+        super().__init__(**kwargs)
+
+    def _ensure_exit_stack_entered(self) -> None:
+        """Ensure the exit stack has been entered."""
+        if not self._exit_stack_entered:
+            self._exit_stack.__enter__()
+            self._exit_stack_entered = True
 
     def __enter__(self) -> Self:
+        # Enter the exit stack
+        self._ensure_exit_stack_entered()
         self.setup()
         return self
 
-    def __exit__(self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None) -> None:
-        self._close()
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None
+    ) -> bool | None:
+        # Close the exit stack, which handles all cleanup
+        if self._exit_stack_entered:
+            result = self._exit_stack.__exit__(exc_type, exc_value, traceback)
+            self._exit_stack_entered = False
+
+            return result
+        return None
 
     def close(self) -> None:
-        self._close()
+        # Close the exit stack if it has been entered
+        if self._exit_stack_entered:
+            self._exit_stack.close()
+            self._exit_stack_entered = False
 
-    @abstractmethod
-    def _close(self) -> None:
-        """Close the store."""
-        ...
+    def setup(self) -> None:
+        """Initialize the store if not already initialized.
+
+        This override ensures the exit stack is entered before the store's _setup()
+        method is called, allowing stores to register cleanup callbacks during setup.
+        """
+        # Ensure exit stack is entered
+        self._ensure_exit_stack_entered()
+        # Call parent setup
+        super().setup()
 
 
 class BaseEnumerateCollectionsStore(BaseStore, EnumerateCollectionsProtocol, ABC):

@@ -1,6 +1,6 @@
 [project]
 name = "py-key-value-sync"
-version = "0.2.8"
+version = "0.3.0"
 description = "Sync Key-Value"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,7 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "py-key-value-shared==0.2.8",
+    "py-key-value-shared==0.3.0",
     "beartype>=0.20.0",
 ]
 
@@ -34,6 +34,7 @@ module-name = "key_value.sync"
 [project.optional-dependencies]
 memory = ["cachetools>=5.0.0"]
 disk = ["diskcache>=5.0.0", "pathvalidate>=3.3.1",]
+filetree = ["anyio>=4.4.0"]
 redis = ["redis>=4.3.0"]
 mongodb = ["pymongo>=4.0.0"]
 valkey = ["valkey-glide-sync>=2.1.0"]
@@ -47,6 +48,7 @@ rocksdb = [
     "rocksdict>=0.3.24 ; python_version >= '3.12'", # RocksDB 0.3.24 is the first version to support Python 3.13
     "rocksdict>=0.3.2 ; python_version < '3.12'"
 ]
+duckdb = ["duckdb>=1.1.1", "pytz>=2025.2"]
 wrappers-encryption = ["cryptography>=45.0.0"]
 
 [tool.pytest.ini_options]
@@ -61,12 +63,13 @@ markers = [
     "skip_on_ci: Skip running the test when running on CI",
 ]
 timeout = 10
+timeout_func_only = true
 
 env_files = [".env"]
 
 [dependency-groups]
 dev = [
-    "py-key-value-sync[memory,disk,redis,elasticsearch,memcached,mongodb,vault,rocksdb]",
+    "py-key-value-sync[memory,disk,filetree,redis,elasticsearch,memcached,mongodb,vault,rocksdb,duckdb]",
     "py-key-value-sync[valkey]; platform_system != 'Windows'",
     "py-key-value-sync[pydantic]",
     "py-key-value-sync[keyring]",

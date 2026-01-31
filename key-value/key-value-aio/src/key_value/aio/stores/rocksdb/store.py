@@ -1,9 +1,8 @@
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Any, overload
+from typing import overload
 
-from key_value.shared.errors.store import KeyValueStoreError
 from key_value.shared.utils.compound import compound_key
 from key_value.shared.utils.managed_entry import ManagedEntry
 from typing_extensions import override
@@ -21,24 +20,26 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
     """A RocksDB-based key-value store."""
 
     _db: Rdict
-    _is_closed: bool
+    _auto_create: bool
 
     @overload
-    def __init__(self, *, db: Rdict, default_collection: str | None = None) -> None:
+    def __init__(self, *, db: Rdict, default_collection: str | None = None, auto_create: bool = True) -> None:
         """Initialize the RocksDB store.
 
         Args:
             db: An existing Rdict database instance to use.
             default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to automatically create the directory if it doesn't exist. Defaults to True.
         """
 
     @overload
-    def __init__(self, *, path: Path | str, default_collection: str | None = None) -> None:
+    def __init__(self, *, path: Path | str, default_collection: str | None = None, auto_create: bool = True) -> None:
         """Initialize the RocksDB store.
 
         Args:
             path: The path to the RocksDB database directory.
             default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to automatically create the directory if it doesn't exist. Defaults to True.
         """
 
     def __init__(
@@ -47,13 +48,18 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         db: Rdict | None = None,
         path: Path | str | None = None,
         default_collection: str | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the RocksDB store.
 
         Args:
-            db: An existing Rdict database instance to use.
+            db: An existing Rdict database instance to use. If provided, the store will NOT
+                manage its lifecycle (will not close it). The caller is responsible for managing
+                the database's lifecycle.
             path: The path to the RocksDB database directory.
             default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to automatically create the directory if it doesn't exist. Defaults to True.
+                When False, raises ValueError if the directory doesn't exist.
         """
         if db is not None and path is not None:
             msg = "Provide only one of db or path"
@@ -63,44 +69,43 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
             msg = "Either db or path must be provided"
             raise ValueError(msg)
 
+        client_provided = db is not None
+        self._auto_create = auto_create
+
         if db:
             self._db = db
         elif path:
             path = Path(path)
-            path.mkdir(parents=True, exist_ok=True)
+
+            if not path.exists():
+                if not self._auto_create:
+                    msg = f"Directory '{path}' does not exist. Either create the directory manually or set auto_create=True."
+                    raise ValueError(msg)
+                path.mkdir(parents=True, exist_ok=True)
 
             opts = Options()
             opts.create_if_missing(True)
 
             self._db = Rdict(str(path), options=opts)
 
-        self._is_closed = False
-
-        super().__init__(default_collection=default_collection)
-
-    @override
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:  # pyright: ignore[reportAny]
-        await super().__aexit__(exc_type, exc_val, exc_tb)
-        await self._close()
+        super().__init__(
+            default_collection=default_collection,
+            client_provided_by_user=client_provided,
+        )
 
     @override
-    async def _close(self) -> None:
-        self._close_and_flush()
+    async def _setup(self) -> None:
+        """Register database cleanup if we own the database."""
+        if not self._client_provided_by_user:
+            # Register a callback to close and flush the database
+            self._exit_stack.callback(self._close_and_flush)
 
     def _close_and_flush(self) -> None:
-        if not self._is_closed:
-            self._db.flush()
-            self._db.close()
-            self._is_closed = True
-
-    def _fail_on_closed_store(self) -> None:
-        if self._is_closed:
-            raise KeyValueStoreError(message="Operation attempted on closed store")
+        self._db.flush()
+        self._db.close()
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        self._fail_on_closed_store()
-
         combo_key: str = compound_key(collection=collection, key=key)
 
         value: bytes | None = self._db.get(combo_key)
@@ -121,8 +126,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
-        self._fail_on_closed_store()
-
         combo_key: str = compound_key(collection=collection, key=key)
         json_value: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
@@ -139,8 +142,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
         created_at: datetime,
         expires_at: datetime | None,
     ) -> None:
-        self._fail_on_closed_store()
-
         if not keys:
             return
 
@@ -154,8 +155,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        self._fail_on_closed_store()
-
         combo_key: str = compound_key(collection=collection, key=key)
 
         # Check if key exists before deleting, this is only used for tracking deleted count
@@ -167,8 +166,6 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
 
     @override
     async def _delete_managed_entries(self, *, keys: Sequence[str], collection: str) -> int:
-        self._fail_on_closed_store()
-
         if not keys:
             return 0
 
@@ -189,6 +186,3 @@ class RocksDBStore(BaseContextManagerStore, BaseStore):
             self._db.write(batch)
 
         return deleted_count
-
-    def __del__(self) -> None:
-        self._close_and_flush()

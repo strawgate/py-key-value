@@ -1,5 +1,4 @@
 import json
-from collections.abc import AsyncGenerator
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -18,13 +17,8 @@ from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
-    async def store(self) -> AsyncGenerator[RocksDBStore, None]:
-        """Create a RocksDB store for testing."""
-        # Create a temporary directory for the RocksDB database
-        with TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "test_db"
-            rocksdb_store = RocksDBStore(path=db_path)
-            yield rocksdb_store
+    async def store(self, per_test_temp_dir: Path) -> RocksDBStore:
+        return RocksDBStore(path=per_test_temp_dir / "test_db")
 
     async def test_rocksdb_path_connection(self):
         """Test RocksDB store creation with path."""
@@ -59,6 +53,8 @@ class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         assert result == {"test": "value"}
 
         await store.close()
+        # Close the user-provided database before cleanup
+        db.close()
         temp_dir.cleanup()
 
     @pytest.mark.skip(reason="Local disk stores are unbounded")
