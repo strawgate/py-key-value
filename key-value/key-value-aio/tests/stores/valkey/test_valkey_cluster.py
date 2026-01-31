@@ -4,7 +4,6 @@ This test file verifies ValkeyStore type compatibility with GlideClusterClient.
 """
 
 
-
 class TestValkeyClusterClientSupport:
     """Tests for GlideClusterClient type compatibility with ValkeyStore."""
 

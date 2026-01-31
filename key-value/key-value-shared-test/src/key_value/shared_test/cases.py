@@ -146,7 +146,9 @@ NEGATIVE_INTEGER_CASES: NegativeCases = NegativeCases(
 
 FLOAT_CASES: PositiveCases = PositiveCases(
     Case(name="value", data={"float_key": 1.0}, json='{"float_key": 1.0}'),
-    Case(name="large-value", data={"large_float_key": 1.23456789012345 * 10**10}, json=f'{{"large_float_key": {1.23456789012345 * 10**10}}}'),
+    Case(
+        name="large-value", data={"large_float_key": 1.23456789012345 * 10**10}, json=f'{{"large_float_key": {1.23456789012345 * 10**10}}}'
+    ),
     Case(name="no-implicit-serialization-in-keys", data={"1.0": "str_value"}, json='{"1.0": "str_value"}'),
     Case(name="no-implicit-serialization-in-values", data={"str_key": "1.0"}, json='{"str_key": "1.0"}'),
     case_type="float",
