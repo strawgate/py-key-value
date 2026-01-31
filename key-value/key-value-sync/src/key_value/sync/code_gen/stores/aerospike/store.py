@@ -24,11 +24,19 @@ PAGE_LIMIT = 10000
 
 
 class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):
-    """Aerospike-based key-value store."""
+    """Aerospike-based key-value store.
+
+    Note: Aerospike namespaces must be pre-configured on the server. Sets are created
+    automatically when the first record is written.
+
+    When `auto_create=False`, the store will verify that the configured namespace exists
+    during setup and raise a ValueError if it doesn't.
+    """
 
     _client: aerospike.Client  # pyright: ignore[reportUnknownMemberType]
     _namespace: str
     _set: str
+    _auto_create: bool
 
     @overload
     def __init__(
@@ -38,7 +46,18 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         namespace: str = DEFAULT_NAMESPACE,
         set_name: str = DEFAULT_SET,
         default_collection: str | None = None,
-    ) -> None: ...
+        auto_create: bool = True,
+    ) -> None:
+        """Initialize the Aerospike store.
+
+        Args:
+            client: The Aerospike client to use. You must have connected the client before passing this in.
+            namespace: Aerospike namespace. Defaults to "test".
+            set_name: Aerospike set. Defaults to "kv-store".
+            default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to skip namespace validation. When False, verifies the namespace
+                exists during setup. Defaults to True.
+        """
 
     @overload
     def __init__(
@@ -48,7 +67,18 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         namespace: str = DEFAULT_NAMESPACE,
         set_name: str = DEFAULT_SET,
         default_collection: str | None = None,
-    ) -> None: ...
+        auto_create: bool = True,
+    ) -> None:
+        """Initialize the Aerospike store.
+
+        Args:
+            hosts: List of (host, port) tuples. Defaults to [("localhost", 3000)].
+            namespace: Aerospike namespace. Defaults to "test".
+            set_name: Aerospike set. Defaults to "kv-store".
+            default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to skip namespace validation. When False, verifies the namespace
+                exists during setup. Defaults to True.
+        """
 
     def __init__(
         self,
@@ -58,6 +88,7 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         namespace: str = DEFAULT_NAMESPACE,
         set_name: str = DEFAULT_SET,
         default_collection: str | None = None,
+        auto_create: bool = True,
     ) -> None:
         """Initialize the Aerospike store.
 
@@ -69,6 +100,9 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
             namespace: Aerospike namespace. Defaults to "test".
             set_name: Aerospike set. Defaults to "kv-store".
             default_collection: The default collection to use if no collection is provided.
+            auto_create: Whether to skip namespace validation. When False, verifies the namespace
+                exists during setup. Defaults to True. Note that Aerospike namespaces must be
+                pre-configured on the server; this option only controls validation.
         """
         client_provided = client is not None
 
@@ -81,6 +115,7 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
 
         self._namespace = namespace
         self._set = set_name
+        self._auto_create = auto_create
 
         super().__init__(
             default_collection=default_collection,
@@ -143,6 +178,21 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         """Close the Aerospike client connection."""
         self._client.close()  # pyright: ignore[reportUnknownMemberType]
 
+    def _get_namespaces(self) -> list[str]:
+        """Get the list of available namespaces from the cluster.
+
+        Returns:
+            List of namespace names.
+        """
+        info_response: dict[str, tuple[int, str]] = self._client.info_all("namespaces")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        # info_all returns {(host, port, None): (error_code, response_string), ...}
+        # response_string for 'namespaces' is a semicolon-separated list of namespace names
+        namespaces: set[str] = set()
+        for error_code, response in info_response.values():  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+            if error_code == 0 and response:  # pyright: ignore[reportUnknownArgumentType]
+                namespaces.update(response.split(";"))  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+        return list(namespaces)
+
     @override
     def _setup(self) -> None:
         """Connect to Aerospike and register cleanup."""
@@ -151,6 +201,13 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         # Register client cleanup if we own the client
         if not self._client_provided_by_user:
             self._exit_stack.callback(self._close_client)
+
+        # Verify namespace exists if auto_create is False
+        if not self._auto_create:
+            namespaces = self._get_namespaces()
+            if self._namespace not in namespaces:
+                msg = f"Namespace '{self._namespace}' does not exist. Either configure the namespace on the Aerospike server or set auto_create=True."
+                raise ValueError(msg)
 
     @override
     def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
