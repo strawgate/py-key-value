@@ -59,7 +59,7 @@ class TestAerospikeStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @override
     @pytest.fixture
-    async def store(self, setup_aerospike: None) -> "AerospikeStore":
+    async def store(self, setup_aerospike: None) -> AsyncGenerator["AerospikeStore", None]:
         import aerospike  # pyright: ignore[reportMissingImports]
 
         from key_value.aio.stores.aerospike import AerospikeStore
@@ -68,13 +68,18 @@ class TestAerospikeStore(ContextManagerStoreTestMixin, BaseStoreTests):
         client = aerospike.client(config)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
         client.connect()  # pyright: ignore[reportUnknownMemberType]
 
-        store = AerospikeStore(client=client, namespace=AEROSPIKE_NAMESPACE, set_name=AEROSPIKE_SET)  # pyright: ignore[reportUnknownArgumentType]
+        # Use a unique set name per test worker to avoid conflicts with parallel execution
+        import uuid
 
-        # Clean up the set before tests
+        unique_set = f"{AEROSPIKE_SET}-{uuid.uuid4().hex[:8]}"
+        store = AerospikeStore(client=client, namespace=AEROSPIKE_NAMESPACE, set_name=unique_set)  # pyright: ignore[reportUnknownArgumentType]
+
+        yield store
+
+        # Clean up the set after tests
         with contextlib.suppress(Exception):
-            client.truncate(AEROSPIKE_NAMESPACE, AEROSPIKE_SET, 0)  # pyright: ignore[reportUnknownMemberType]
-
-        return store
+            client.truncate(AEROSPIKE_NAMESPACE, unique_set, 0)  # pyright: ignore[reportUnknownMemberType]
+        client.close()  # pyright: ignore[reportUnknownMemberType]
 
     @pytest.fixture
     async def aerospike_store(self, store: "AerospikeStore") -> "AerospikeStore":
