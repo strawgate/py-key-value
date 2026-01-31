@@ -61,6 +61,37 @@ def sanitize_characters_in_string(value: str, allowed_characters: str, replace_w
     return new_value
 
 
+def _truncate_to_bytes(value: str, max_bytes: int, encoding: str = "utf-8") -> str:
+    """Truncate a string to fit within max_bytes when encoded, without splitting multi-byte characters.
+
+    Args:
+        value: The string to truncate.
+        max_bytes: The maximum number of bytes.
+        encoding: The encoding to use (default: utf-8).
+
+    Returns:
+        The truncated string that fits within max_bytes.
+    """
+    encoded = value.encode(encoding)
+    if len(encoded) <= max_bytes:
+        return value
+
+    # Binary search to find the longest substring that fits
+    left, right = 0, len(value)
+    result = ""
+
+    while left <= right:
+        mid = (left + right) // 2
+        candidate = value[:mid]
+        if len(candidate.encode(encoding)) <= max_bytes:
+            result = candidate
+            left = mid + 1
+        else:
+            right = mid - 1
+
+    return result
+
+
 @bear_enforce
 def sanitize_string(
     value: str,
@@ -70,6 +101,7 @@ def sanitize_string(
     hash_fragment_separator: str = DEFAULT_HASH_FRAGMENT_SEPARATOR,
     hash_fragment_mode: HashFragmentMode = HashFragmentMode.ONLY_IF_CHANGED,
     hash_fragment_length: int = DEFAULT_HASH_FRAGMENT_SIZE,
+    length_is_bytes: bool = False,
 ) -> str:
     """Sanitize the value, replacing characters and optionally adding a fragment a hash of the value if requested.
 
@@ -81,9 +113,10 @@ def sanitize_string(
     Args:
         value: The value to sanitize.
         allowed_characters: The allowed characters in the value.
-        max_length: The maximum length of the value (with the hash fragment added).
+        max_length: The maximum length of the value (with hash fragment). Interpreted as bytes if length_is_bytes is True.
         hash_fragment_separator: The separator to add between the value and the hash fragment.
         hash_fragment_mode: The mode to add the hash fragment.
+        length_is_bytes: If True, max_length is interpreted as bytes instead of characters.
     """
     if max_length < MINIMUM_MAX_LENGTH:
         msg = f"max_length must be greater than or equal to {MINIMUM_MAX_LENGTH}"
@@ -94,7 +127,11 @@ def sanitize_string(
         raise ValueError(msg)
 
     hash_fragment: str = generate_hash_fragment(value=value, size=hash_fragment_length)
-    hash_fragment_size_required: int = len(hash_fragment_separator) + len(hash_fragment)
+    hash_fragment_size_required: int = (
+        len((hash_fragment_separator + hash_fragment).encode("utf-8"))
+        if length_is_bytes
+        else len(hash_fragment_separator) + len(hash_fragment)
+    )
 
     sanitized_value: str = (
         sanitize_characters_in_string(value=value, allowed_characters=allowed_characters, replace_with=replacement_character)
@@ -106,8 +143,7 @@ def sanitize_string(
 
     if hash_fragment_mode == HashFragmentMode.ALWAYS:
         actual_max_length = max_length - hash_fragment_size_required
-
-        sanitized_value = sanitized_value[:actual_max_length]
+        sanitized_value = _truncate_to_bytes(sanitized_value, actual_max_length) if length_is_bytes else sanitized_value[:actual_max_length]
 
         if not sanitized_value:
             return hash_fragment
@@ -115,14 +151,13 @@ def sanitize_string(
         return sanitized_value + hash_fragment_separator + hash_fragment
 
     if hash_fragment_mode == HashFragmentMode.ONLY_IF_CHANGED:
-        sanitized_value = sanitized_value[:max_length]
+        sanitized_value = _truncate_to_bytes(sanitized_value, max_length) if length_is_bytes else sanitized_value[:max_length]
 
         if value == sanitized_value:
             return value
 
         actual_max_length = max_length - hash_fragment_size_required
-
-        sanitized_value = sanitized_value[:actual_max_length]
+        sanitized_value = _truncate_to_bytes(sanitized_value, actual_max_length) if length_is_bytes else sanitized_value[:actual_max_length]
 
         if not sanitized_value:
             return hash_fragment
@@ -133,18 +168,19 @@ def sanitize_string(
         msg = "Entire value was sanitized and hash_fragment_mode is HashFragmentMode.NEVER"
         raise ValueError(msg)
 
-    return sanitized_value
+    return _truncate_to_bytes(sanitized_value, max_length) if length_is_bytes else sanitized_value[:max_length]
 
 
 @bear_enforce
-def hash_excess_length(value: str, max_length: int) -> str:
+def hash_excess_length(value: str, max_length: int, length_is_bytes: bool = False) -> str:
     """Hash part of the value if it exceeds the maximum length. This operation
     will truncate the value to the maximum length minus 8 characters and will swap
     the last 8 characters with the first 8 characters of the generated hash.
 
     Args:
         value: The value to hash.
-        max_length: The maximum length of the value. Must be greater than 32.
+        max_length: The maximum length of the value. Must be greater than 16. If length_is_bytes is True, this is interpreted as bytes.
+        length_is_bytes: If True, max_length is interpreted as bytes instead of characters.
 
     Returns:
         The hashed value if the value exceeds the maximum length, otherwise the original value.
@@ -153,10 +189,13 @@ def hash_excess_length(value: str, max_length: int) -> str:
         msg = f"max_length must be greater than {MINIMUM_MAX_LENGTH}"
         raise ValueError(msg)
 
-    if len(value) <= max_length:
+    # Check if truncation is needed
+    current_length = len(value.encode("utf-8")) if length_is_bytes else len(value)
+    if current_length <= max_length:
         return value
 
-    truncated_value = value[: max_length - 8]
+    # Truncate to max_length - 8 to make room for hash
+    truncated_value = _truncate_to_bytes(value, max_length - 8) if length_is_bytes else value[: max_length - 8]
 
     hash_of_value = hashlib.sha256(value.encode()).hexdigest()
     first_eight_of_hash = hash_of_value[:8]

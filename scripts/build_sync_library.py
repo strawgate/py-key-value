@@ -54,12 +54,14 @@ EXCLUDE_FILES = [
 EXCLUDE_DIRECTORIES = [
     "key-value/key-value-aio/src/key_value/aio/stores/dynamodb",
     "key-value/key-value-aio/tests/stores/dynamodb",
-    "key-value/key-value-aio/src/key_value/aio/stores/memcached",
-    "key-value/key-value-aio/tests/stores/memcached",
     "key-value/key-value-aio/src/key_value/aio/stores/filetree",
     "key-value/key-value-aio/tests/stores/filetree",
+    "key-value/key-value-aio/src/key_value/aio/stores/memcached",
+    "key-value/key-value-aio/tests/stores/memcached",
     "key-value/key-value-aio/src/key_value/aio/stores/postgresql",
     "key-value/key-value-aio/tests/stores/postgresql",
+    "key-value/key-value-aio/src/key_value/aio/stores/s3",
+    "key-value/key-value-aio/tests/stores/s3",
     "key-value/key-value-aio/src/key_value/aio/wrappers/timeout",
     "key-value/key-value-aio/tests/wrappers/timeout",
 ]

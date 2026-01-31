@@ -53,6 +53,16 @@ AWS DynamoDB-backed key-value store.
       members:
         - __init__
 
+## S3 Store
+
+AWS S3-backed key-value store.
+
+::: key_value.aio.stores.s3.S3Store
+    options:
+      show_source: false
+      members:
+        - __init__
+
 ## Elasticsearch Store
 
 Elasticsearch-backed key-value store.
