@@ -131,11 +131,18 @@ def docker_rm(name: str, raise_on_error: bool = False) -> bool:
     return True
 
 
-def docker_run(name: str, image: str, ports: dict[str, int], environment: dict[str, str], raise_on_error: bool = False) -> bool:
+def docker_run(
+    name: str,
+    image: str,
+    ports: dict[str, int],
+    environment: dict[str, str],
+    raise_on_error: bool = False,
+    command: str | list[str] | None = None,
+) -> bool:
     logger.info(f"Running container {name} with image {image} and ports {ports}")
     client = get_docker_client()
     try:
-        client.containers.run(name=name, image=image, ports=ports, environment=environment, detach=True)
+        client.containers.run(name=name, image=image, ports=ports, environment=environment, command=command, detach=True)
     except Exception:
         logger.exception(f"Container {name} failed to run")
         if raise_on_error:
@@ -147,7 +154,12 @@ def docker_run(name: str, image: str, ports: dict[str, int], environment: dict[s
 
 @contextmanager
 def docker_container(
-    name: str, image: str, ports: dict[str, int], environment: dict[str, str] | None = None, raise_on_error: bool = True
+    name: str,
+    image: str,
+    ports: dict[str, int],
+    environment: dict[str, str] | None = None,
+    raise_on_error: bool = True,
+    command: str | list[str] | None = None,
 ) -> Iterator[None]:
     logger.info(f"Creating container {name} with image {image} and ports {ports}")
     try:
@@ -155,7 +167,7 @@ def docker_container(
         docker_stop(name=name, raise_on_error=False)
         docker_rm(name=name, raise_on_error=False)
         docker_wait_container_gone(name=name, max_tries=10, wait_time=1.0)
-        docker_run(name=name, image=image, ports=ports, environment=environment or {}, raise_on_error=True)
+        docker_run(name=name, image=image, ports=ports, environment=environment or {}, raise_on_error=True, command=command)
         logger.info(f"Container {name} created")
         yield
         docker_logs(name, print_logs=True, raise_on_error=False)

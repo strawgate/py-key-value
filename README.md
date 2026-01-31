@@ -1,10 +1,9 @@
 # Python Key-Value Libraries
 
-This monorepo contains two libraries:
+This monorepo contains:
 
-- `py-key-value-aio`: Async key-value store library (supported).
-- `py-key-value-sync`: Sync key-value store library (under development;
-  generated from the async API).
+- `py-key-value-aio`: Async key-value store library (primary and supported).
+- `py-key-value-sync`: Sync version (no longer planned; async-only focus).
 
 ## Documentation
 
@@ -31,11 +30,11 @@ This monorepo contains two libraries:
 While key-value storage is valuable for individual projects, its true power
 emerges when framework authors use it as a **pluggable abstraction layer**.
 
-By coding your framework against the `AsyncKeyValue` protocol (or `KeyValue`
-for sync), you enable your users to choose their own storage backend without
-changing a single line of your framework code. Users can seamlessly switch
-between local caching (memory, disk) for development and distributed storage
-(Redis, DynamoDB, MongoDB) for production.
+By coding your framework against the `AsyncKeyValue` protocol, you enable your
+users to choose their own storage backend without changing a single line of
+your framework code. Users can seamlessly switch between local caching
+(memory, disk) for development and distributed storage (Redis, DynamoDB,
+MongoDB) for production.
 
 ### Real-World Example: FastMCP
 
@@ -101,8 +100,8 @@ needs while keeping your framework code clean and backend-agnostic.
 
 ## Why not use this library?
 
-- **Async-only**: While a code-gen'd synchronous library is under development,
-  the async library is the primary focus at the moment.
+- **Async-only**: This library focuses exclusively on async/await patterns.
+  A synchronous wrapper library is not currently planned.
 - **Managed Entries**: Raw values are not stored in backends, a wrapper object
   is stored instead. This wrapper object contains the value, sometimes metadata
   like the TTL, and the creation timestamp. Most often it is serialized to and
@@ -164,8 +163,6 @@ asyncio.run(main())
   `get/put/delete/ttl` and bulk variants; optional protocol segments for
   culling, destroying stores/collections, and enumerating keys/collections
   implemented by capable stores.
-- **Sync**: `key_value.sync.protocols.KeyValue` — sync mirror of the async
-  protocol, generated from the async library.
 
 The protocols offer a simple interface for your application to interact with
 the store:
@@ -346,12 +343,6 @@ async def main(key_value: AsyncKeyValue):
 
 asyncio.run(main(key_value=single_collection))
 ```
-
-## Sync library status
-
-The sync library is under development and mirrors the async library. The goal
-is to code gen the vast majority of the syncronous library from the async
-library.
 
 ## Project links
 

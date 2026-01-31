@@ -13,7 +13,7 @@ from key_value.aio.stores.base import SEED_DATA_TYPE, BaseContextManagerStore, B
 try:
     import duckdb
 except ImportError as e:
-    msg = "DuckDBStore requires the duckdb extra. Install with: pip install 'py-key-value-aio[duckdb]'"
+    msg = "DuckDBStore requires py-key-value-aio[duckdb]"
     raise ImportError(msg) from e
 
 
