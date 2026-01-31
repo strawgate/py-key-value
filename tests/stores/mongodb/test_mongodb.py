@@ -1,13 +1,10 @@
-import contextlib
 from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
 import pytest
 from bson import ObjectId
 from dirty_equals import IsDatetime, IsFloat, IsInstance
 from inline_snapshot import snapshot
-from pymongo import AsyncMongoClient
 from testcontainers.mongodb import MongoDbContainer
 from typing_extensions import override
 
@@ -16,6 +13,8 @@ from key_value.aio.stores.mongodb import MongoDBStore
 from key_value.aio.stores.mongodb.store import (
     MongoDBSerializationAdapter,
     MongoDBV1CollectionSanitizationStrategy,
+    _create_mongodb_client,
+    _mongodb_drop_database,
 )
 from key_value.shared.managed_entry import ManagedEntry
 from key_value.shared.wait import async_wait_for_true
@@ -35,7 +34,7 @@ MONGODB_VERSIONS_TO_TEST = [
 
 async def ping_mongodb(mongodb_url: str) -> bool:
     try:
-        client: AsyncMongoClient[Any] = AsyncMongoClient[Any](mongodb_url)
+        client = _create_mongodb_client(url=mongodb_url)
         _ = await client.list_database_names()
         await client.close()
     except Exception:
@@ -76,8 +75,7 @@ def test_managed_entry_document_conversion():
 
 
 async def clean_mongodb_database(store: MongoDBStore) -> None:
-    with contextlib.suppress(Exception):
-        _ = await store._client.drop_database(name_or_database=store._db.name)  # pyright: ignore[reportPrivateUsage]
+    await _mongodb_drop_database(client=store._client, db_name=store._db.name)  # pyright: ignore[reportPrivateUsage]
 
 
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")

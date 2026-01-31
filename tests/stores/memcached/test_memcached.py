@@ -11,6 +11,12 @@ from typing_extensions import override
 
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.memcached import MemcachedStore, MemcachedV1KeySanitizationStrategy
+from key_value.aio.stores.memcached.store import (
+    _create_memcached_client,
+    _memcached_close,
+    _memcached_flush_all,
+    _memcached_stats,
+)
 from key_value.shared.wait import async_wait_for_true
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
@@ -27,16 +33,16 @@ MEMCACHED_VERSIONS_TO_TEST = [
 
 
 async def ping_memcached(host: str, port: int) -> bool:
-    client = Client(host=host, port=port)
+    client = _create_memcached_client(host=host, port=port)
     try:
-        await client.stats()
+        await _memcached_stats(client=client)
     except Exception:
         return False
     else:
         return True
     finally:
         with contextlib.suppress(Exception):
-            await client.close()
+            await _memcached_close(client=client)
 
 
 class MemcachedFailedToStartError(Exception):
@@ -72,7 +78,7 @@ class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture
     async def store(self, setup_memcached: None, memcached_host: str, memcached_port: int) -> MemcachedStore:
         store = MemcachedStore(host=memcached_host, port=memcached_port)
-        _ = await store._client.flush_all()  # pyright: ignore[reportPrivateUsage]
+        _ = await _memcached_flush_all(client=store._client)  # pyright: ignore[reportPrivateUsage]
         return store
 
     @pytest.fixture
@@ -82,7 +88,7 @@ class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
             port=memcached_port,
             key_sanitization_strategy=MemcachedV1KeySanitizationStrategy(),
         )
-        _ = await store._client.flush_all()  # pyright: ignore[reportPrivateUsage]
+        _ = await _memcached_flush_all(client=store._client)  # pyright: ignore[reportPrivateUsage]
         return store
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")

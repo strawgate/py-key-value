@@ -16,10 +16,53 @@ try:
     from pymongo import AsyncMongoClient, UpdateOne
     from pymongo.asynchronous.collection import AsyncCollection
     from pymongo.asynchronous.database import AsyncDatabase
-    from pymongo.results import DeleteResult  # noqa: TC002
+    from pymongo.results import BulkWriteResult, DeleteResult
 except ImportError as e:
     msg = "MongoDBStore requires py-key-value-aio[mongodb]"
     raise ImportError(msg) from e
+
+
+# Module-level helper functions for MongoDB client operations
+
+
+def _create_mongodb_client(url: str | None = None) -> AsyncMongoClient[dict[str, Any]]:
+    """Create a MongoDB async client.
+
+    Args:
+        url: Optional MongoDB connection URL. If not provided, uses localhost.
+
+    Returns:
+        An AsyncMongoClient instance.
+    """
+    if url:
+        return AsyncMongoClient(url)
+    return AsyncMongoClient()
+
+
+async def _mongodb_bulk_write(
+    collection: AsyncCollection[dict[str, Any]],
+    operations: list[UpdateOne],
+) -> BulkWriteResult:
+    """Execute a bulk write operation on a MongoDB collection.
+
+    Args:
+        collection: The MongoDB collection to write to.
+        operations: List of UpdateOne operations to execute.
+
+    Returns:
+        The BulkWriteResult from the operation.
+    """
+    return await collection.bulk_write(operations)  # pyright: ignore[reportUnknownMemberType]
+
+
+async def _mongodb_drop_database(client: AsyncMongoClient[dict[str, Any]], db_name: str) -> None:  # pyright: ignore[reportUnusedFunction] - Used by tests
+    """Drop a MongoDB database.
+
+    Args:
+        client: The MongoDB client.
+        db_name: The name of the database to drop.
+    """
+    _ = await client.drop_database(name_or_database=db_name)
 
 
 DEFAULT_DB = "kv-store-adapter"
@@ -181,11 +224,8 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
 
         if client:
             self._client = client
-        elif url:
-            self._client = AsyncMongoClient(url)
         else:
-            # Defaults to localhost
-            self._client = AsyncMongoClient()
+            self._client = _create_mongodb_client(url=url)
 
         db_name = db_name or DEFAULT_DB
         coll_name = coll_name or DEFAULT_COLLECTION
@@ -321,7 +361,7 @@ class MongoDBStore(BaseDestroyCollectionStore, BaseContextManagerStore, BaseStor
                 )
             )
 
-        _ = await self._collections_by_name[collection].bulk_write(operations)  # pyright: ignore[reportUnknownMemberType]
+        _ = await _mongodb_bulk_write(collection=self._collections_by_name[collection], operations=operations)
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
