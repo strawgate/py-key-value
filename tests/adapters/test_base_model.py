@@ -153,7 +153,7 @@ class TestBaseModelAdapter:
         assert cached_products == [SAMPLE_PRODUCT, SAMPLE_PRODUCT]
 
         # We need to ensure our memory store doesnt hold an entry with an array
-        raw_collection = store._cache.get(TEST_COLLECTION)  # pyright: ignore[reportPrivateUsage]
+        raw_collection = store._cache.get(TEST_COLLECTION)
         assert raw_collection is not None
 
         raw_entry = raw_collection.get(TEST_KEY)

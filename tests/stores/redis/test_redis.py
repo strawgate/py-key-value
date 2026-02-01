@@ -30,7 +30,7 @@ class RedisFailedToStartError(Exception):
 
 
 def get_client_from_store(store: RedisStore) -> Redis:
-    return store._client  # pyright: ignore[reportPrivateUsage]
+    return store._client
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
@@ -72,7 +72,7 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         """Create a Redis store for testing."""
         # Create the store with test database
         redis_store = RedisStore(host=redis_host, port=redis_port, db=REDIS_DB)
-        _ = await get_client_from_store(store=redis_store).flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
+        _ = await get_client_from_store(store=redis_store).flushdb()  # pyright: ignore[reportUnknownMemberType, reportAny]
         return redis_store
 
     @pytest.fixture
@@ -83,7 +83,7 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         """Test Redis store creation with URL."""
         redis_url = f"redis://{redis_host}:{redis_port}/{REDIS_DB}"
         store = RedisStore(url=redis_url)
-        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
+        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType, reportAny]
         await store.put(collection="test", key="url_test", value={"test": "value"})
         result = await store.get(collection="test", key="url_test")
         assert result == {"test": "value"}
@@ -95,7 +95,7 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         client = _create_redis_client(host=redis_host, port=redis_port, db=REDIS_DB)
         store = RedisStore(client=client)
 
-        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
+        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType, reportAny]
         await store.put(collection="test", key="client_test", value={"test": "value"})
         result = await store.get(collection="test", key="client_test")
         assert result == {"test": "value"}

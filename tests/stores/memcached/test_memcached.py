@@ -78,7 +78,7 @@ class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture
     async def store(self, setup_memcached: None, memcached_host: str, memcached_port: int) -> MemcachedStore:
         store = MemcachedStore(host=memcached_host, port=memcached_port)
-        _ = await _memcached_flush_all(client=store._client)  # pyright: ignore[reportPrivateUsage]
+        _ = await _memcached_flush_all(client=store._client)
         return store
 
     @pytest.fixture
@@ -88,7 +88,7 @@ class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
             port=memcached_port,
             key_sanitization_strategy=MemcachedV1KeySanitizationStrategy(),
         )
-        _ = await _memcached_flush_all(client=store._client)  # pyright: ignore[reportPrivateUsage]
+        _ = await _memcached_flush_all(client=store._client)
         return store
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
@@ -115,7 +115,7 @@ class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @pytest.fixture
     async def memcached_client(self, store: MemcachedStore) -> Client:
-        return store._client  # pyright: ignore[reportPrivateUsage]
+        return store._client
 
     async def test_value_stored(self, store: MemcachedStore, memcached_client: Client):
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})

@@ -20,14 +20,14 @@ class TestDiskStore(ContextManagerStoreTestMixin, BaseStoreTests):
     async def store(self, per_test_temp_dir: Path) -> DiskStore:
         disk_store = DiskStore(directory=per_test_temp_dir, max_size=TEST_SIZE_LIMIT)
 
-        _disk_cache_clear(cache=disk_store._cache)  # pyright: ignore[reportPrivateUsage]
+        _disk_cache_clear(cache=disk_store._cache)
 
         return disk_store
 
     @pytest.fixture
     async def disk_cache(self, store: DiskStore) -> Cache:
         assert isinstance(store._cache, Cache)
-        return store._cache  # pyright: ignore[reportPrivateUsage]
+        return store._cache
 
     async def test_value_stored(self, store: DiskStore, disk_cache: Cache):
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})

@@ -75,7 +75,7 @@ def test_managed_entry_document_conversion():
 
 
 async def clean_mongodb_database(store: MongoDBStore) -> None:
-    await _mongodb_drop_database(client=store._client, db_name=store._db.name)  # pyright: ignore[reportPrivateUsage]
+    await _mongodb_drop_database(client=store._client, db_name=store._db.name)
 
 
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
@@ -159,9 +159,9 @@ class TestMongoDBStore(BaseMongoDBStoreTests):
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
         # Get the raw MongoDB document
-        await store._setup_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        sanitized_collection = store._sanitize_collection(collection="test")  # pyright: ignore[reportPrivateUsage]
-        collection = store._collections_by_name[sanitized_collection]  # pyright: ignore[reportPrivateUsage]
+        await store._setup_collection(collection="test")
+        sanitized_collection = store._sanitize_collection(collection="test")
+        collection = store._collections_by_name[sanitized_collection]
         doc = await collection.find_one({"key": "test_key"})
 
         assert doc == snapshot(

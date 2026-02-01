@@ -27,12 +27,12 @@ class TestMultiDiskStore(ContextManagerStoreTestMixin, BaseStoreTests):
         yield store
 
         # Wipe the store after returning it
-        for collection in store._cache:  # pyright: ignore[reportPrivateUsage]
-            _disk_cache_clear(cache=store._cache[collection])  # pyright: ignore[reportPrivateUsage]
+        for collection in store._cache:
+            _disk_cache_clear(cache=store._cache[collection])
 
     async def test_value_stored(self, store: MultiDiskStore):
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
-        disk_cache: Cache = store._cache["test"]  # pyright: ignore[reportPrivateUsage]
+        disk_cache: Cache = store._cache["test"]
 
         value = disk_cache.get(key="test_key")
         value_as_dict = json.loads(value)

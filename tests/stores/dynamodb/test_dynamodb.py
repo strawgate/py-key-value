@@ -60,7 +60,7 @@ def get_value_from_response(response: GetItemOutputTypeDef) -> dict[str, Any]:
 
 
 def get_dynamo_client_from_store(store: DynamoDBStore) -> DynamoDBClient:
-    return store._connected_client  # pyright: ignore[reportPrivateUsage]
+    return store._connected_client
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")

@@ -110,7 +110,7 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         assert isinstance(store, ValkeyStore)
 
-        valkey_client = store._connected_client  # pyright: ignore[reportPrivateUsage]
+        valkey_client = store._connected_client
         assert valkey_client is not None
         value = await valkey_client.get(key="test::test_key")
         assert value is not None

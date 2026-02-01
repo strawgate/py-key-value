@@ -77,7 +77,7 @@ class TestCompressionWrapper(BaseStoreTests):
         }
 
         # Should not try to compress again
-        result = compression_store._compress_value(value=compressed_value)  # pyright: ignore[reportPrivateUsage]
+        result = compression_store._compress_value(value=compressed_value)
         assert result == compressed_value
 
     async def test_decompression_handles_uncompressed_data(self, memory_store: MemoryStore):
