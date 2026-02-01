@@ -30,7 +30,7 @@ class RedisFailedToStartError(Exception):
 
 
 def get_client_from_store(store: RedisStore) -> Redis:
-    return store._client  # pyright: ignore[reportPrivateUsage]
+    return store._client
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
@@ -51,14 +51,16 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @pytest.fixture(autouse=True, scope="module")
     async def setup_redis(self, redis_container: RedisContainer, redis_host: str, redis_port: int) -> None:
+        from key_value.aio.stores.redis.store import _create_redis_client
+
         async def ping_redis() -> bool:
-            client: Redis = Redis(host=redis_host, port=redis_port, db=REDIS_DB, decode_responses=True)
+            client = _create_redis_client(host=redis_host, port=redis_port, db=REDIS_DB)
             try:
-                return await client.ping()  # pyright: ignore[reportUnknownMemberType, reportAny, reportReturnType, reportUnknownVariableType, reportGeneralTypeIssues]
+                return await client.ping()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportGeneralTypeIssues]
             except Exception:
                 return False
             finally:
-                await client.aclose()  # pyright: ignore[reportUnknownMemberType]
+                await client.aclose()
 
         if not await async_wait_for_true(bool_fn=ping_redis, tries=WAIT_FOR_REDIS_TIMEOUT, wait_time=1):
             msg = "Redis failed to start"
@@ -70,7 +72,7 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         """Create a Redis store for testing."""
         # Create the store with test database
         redis_store = RedisStore(host=redis_host, port=redis_port, db=REDIS_DB)
-        _ = await get_client_from_store(store=redis_store).flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
+        _ = await get_client_from_store(store=redis_store).flushdb()  # pyright: ignore[reportUnknownMemberType]
         return redis_store
 
     @pytest.fixture
@@ -81,19 +83,19 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         """Test Redis store creation with URL."""
         redis_url = f"redis://{redis_host}:{redis_port}/{REDIS_DB}"
         store = RedisStore(url=redis_url)
-        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
+        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
         await store.put(collection="test", key="url_test", value={"test": "value"})
         result = await store.get(collection="test", key="url_test")
         assert result == {"test": "value"}
 
     async def test_redis_client_connection(self, setup_redis: None, redis_host: str, redis_port: int):
         """Test Redis store creation with existing client."""
-        from redis.asyncio import Redis
+        from key_value.aio.stores.redis.store import _create_redis_client
 
-        client = Redis(host=redis_host, port=redis_port, db=REDIS_DB, decode_responses=True)
+        client = _create_redis_client(host=redis_host, port=redis_port, db=REDIS_DB)
         store = RedisStore(client=client)
 
-        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportPrivateUsage, reportUnknownMemberType, reportAny]
+        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
         await store.put(collection="test", key="client_test", value={"test": "value"})
         result = await store.get(collection="test", key="client_test")
         assert result == {"test": "value"}

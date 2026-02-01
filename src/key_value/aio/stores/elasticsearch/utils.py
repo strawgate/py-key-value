@@ -10,7 +10,7 @@ from elasticsearch import AsyncElasticsearch
 
 
 def get_body_from_response(response: ObjectApiResponse[Any]) -> dict[str, Any]:
-    if not (body := response.body):  # pyright: ignore[reportAny]
+    if not (body := response.body):
         return {}
 
     if not isinstance(body, dict) or not all(isinstance(key, str) for key in body):  # pyright: ignore[reportUnknownVariableType]
@@ -43,7 +43,7 @@ def get_aggregations_from_body(body: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_hits_from_response(response: ObjectApiResponse[Any]) -> list[dict[str, Any]]:
-    if not (body := response.body):  # pyright: ignore[reportAny]
+    if not (body := response.body):
         return []
 
     if not isinstance(body, dict) or not all(isinstance(key, str) for key in body):  # pyright: ignore[reportUnknownVariableType]
@@ -59,7 +59,7 @@ def get_hits_from_response(response: ObjectApiResponse[Any]) -> list[dict[str, A
     if not (hits_list := hits_dict.get("hits")):
         return []
 
-    if not all(isinstance(hit, dict) for hit in hits_list):  # pyright: ignore[reportAny]
+    if not all(isinstance(hit, dict) for hit in hits_list):
         return []
 
     hits_list_dict: list[dict[str, Any]] = cast("list[dict[str, Any]]", hits_list)
@@ -101,7 +101,7 @@ def get_values_from_field_in_hit(hit: dict[str, Any], field: str, value_type: ty
         msg = f"Field {field} is not in hit {hit}"
         raise TypeError(msg)
 
-    if not all(isinstance(item, value_type) for item in value):  # pyright: ignore[reportAny]
+    if not all(isinstance(item, value_type) for item in value):
         msg = f"Field {field} in hit {hit} is not a list of {value_type}"
         raise TypeError(msg)
 
@@ -153,7 +153,7 @@ class LessCapableNdjsonSerializer(NdjsonSerializer):
     compatibility_mimetype: ClassVar[str] = "application/vnd.elasticsearch+x-ndjson"
 
     def default(self, data: Any) -> Any:
-        return LessCapableJsonSerializer.default(self=self, data=data)  # pyright: ignore[reportCallIssue, reportUnknownVariableType, reportArgumentType]
+        return LessCapableJsonSerializer.default(self=self, data=data)  # pyright: ignore[reportArgumentType]
 
     @classmethod
     def install_serializer(cls, client: AsyncElasticsearch) -> None:

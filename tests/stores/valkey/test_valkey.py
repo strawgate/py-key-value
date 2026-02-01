@@ -36,13 +36,10 @@ class ValkeyFailedToStartError(Exception):
 @pytest.mark.skipif(detect_on_windows(), reason="Valkey is not supported on Windows")
 class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
     async def get_valkey_client(self, host: str, port: int):
-        from glide.glide_client import GlideClient
-        from glide_shared.config import GlideClientConfiguration, NodeAddress
+        from key_value.aio.stores.valkey.store import _create_valkey_client, _create_valkey_client_config
 
-        client_config: GlideClientConfiguration = GlideClientConfiguration(
-            addresses=[NodeAddress(host=host, port=port)], database_id=VALKEY_DB
-        )
-        return await GlideClient.create(config=client_config)
+        config = _create_valkey_client_config(host=host, port=port, db=VALKEY_DB)
+        return await _create_valkey_client(config)
 
     async def ping_valkey(self, host: str, port: int) -> bool:
         client = None
@@ -113,7 +110,7 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         assert isinstance(store, ValkeyStore)
 
-        valkey_client = store._connected_client  # pyright: ignore[reportPrivateUsage]
+        valkey_client = store._connected_client
         assert valkey_client is not None
         value = await valkey_client.get(key="test::test_key")
         assert value is not None

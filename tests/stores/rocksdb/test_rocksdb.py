@@ -63,7 +63,7 @@ class TestRocksDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @pytest.fixture
     async def rocksdb_client(self, store: RocksDBStore) -> Rdict:
-        return store._db  # pyright: ignore[reportPrivateUsage]
+        return store._db
 
     async def test_value_stored(self, store: RocksDBStore, rocksdb_client: Rdict):
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})

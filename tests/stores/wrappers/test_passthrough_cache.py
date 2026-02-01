@@ -26,5 +26,5 @@ class TestPassthroughCacheWrapper(BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self, primary_store: DiskStore, cache_store: MemoryStore) -> PassthroughCacheWrapper:
-        primary_store._cache.clear()  # pyright: ignore[reportPrivateUsage]
+        primary_store._cache.clear()
         return PassthroughCacheWrapper(primary_key_value=primary_store, cache_key_value=cache_store)

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import overload
+from typing import Any, overload
 
 from typing_extensions import override
 
@@ -13,6 +13,96 @@ try:
 except ImportError as e:
     msg = "DiskStore requires py-key-value-aio[disk]"
     raise ImportError(msg) from e
+
+
+# Module-level helper functions for DiskStore cache operations
+
+
+def _create_disk_cache(
+    directory: Path,
+    *,
+    max_size: int | None = None,
+) -> Cache:
+    """Create a diskcache Cache instance.
+
+    Args:
+        directory: The directory to use for the cache.
+        max_size: Optional maximum size limit. If None or 0, uses no eviction.
+
+    Returns:
+        A diskcache Cache instance.
+    """
+    if max_size is not None and max_size > 0:
+        return Cache(directory=directory, size_limit=max_size)
+    return Cache(directory=directory, eviction_policy="none")
+
+
+def _disk_cache_get_with_expire(cache: Cache, key: str) -> tuple[Any, float | None]:
+    """Get a value from the cache with its expiration time.
+
+    Args:
+        cache: The diskcache Cache instance.
+        key: The key to retrieve.
+
+    Returns:
+        Tuple of (value, expire_time). Value is None if key doesn't exist.
+    """
+    return cache.get(key=key, expire_time=True)
+
+
+def _disk_cache_set(
+    cache: Cache,
+    key: str,
+    value: str,
+    *,
+    expire: float | None = None,
+) -> bool:
+    """Set a value in the cache.
+
+    Args:
+        cache: The diskcache Cache instance.
+        key: The key to set.
+        value: The value to store.
+        expire: Optional expiration time in seconds.
+
+    Returns:
+        True if successful.
+    """
+    return cache.set(key=key, value=value, expire=expire)
+
+
+def _disk_cache_delete(cache: Cache, key: str) -> bool:
+    """Delete a key from the cache.
+
+    Args:
+        cache: The diskcache Cache instance.
+        key: The key to delete.
+
+    Returns:
+        True if the key was deleted, False if it didn't exist.
+    """
+    return cache.delete(key=key, retry=True)
+
+
+def _disk_cache_clear(cache: Cache) -> int:  # pyright: ignore[reportUnusedFunction] - Used by tests
+    """Clear all items from the cache.
+
+    Args:
+        cache: The diskcache Cache instance.
+
+    Returns:
+        Number of items removed.
+    """
+    return cache.clear()
+
+
+def _disk_cache_close(cache: Cache) -> None:
+    """Close the cache.
+
+    Args:
+        cache: The diskcache Cache instance.
+    """
+    cache.close()
 
 
 class DiskStore(BaseContextManagerStore, BaseStore):
@@ -88,10 +178,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
                     raise ValueError(msg)
                 directory.mkdir(parents=True, exist_ok=True)
 
-            if max_size is not None and max_size > 0:
-                self._cache = Cache(directory=directory, size_limit=max_size)
-            else:
-                self._cache = Cache(directory=directory, eviction_policy="none")
+            self._cache = _create_disk_cache(directory=directory, max_size=max_size)
 
         super().__init__(
             default_collection=default_collection,
@@ -103,7 +190,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
     async def _setup(self) -> None:
         """Register cache cleanup if we own the cache."""
         if not self._client_provided_by_user:
-            self._exit_stack.callback(self._cache.close)
+            self._exit_stack.callback(lambda: _disk_cache_close(cache=self._cache))
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -111,7 +198,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
 
         expire_epoch: float | None
 
-        managed_entry_str, expire_epoch = self._cache.get(key=combo_key, expire_time=True)
+        managed_entry_str, expire_epoch = _disk_cache_get_with_expire(cache=self._cache, key=combo_key)
 
         if not isinstance(managed_entry_str, str):
             return None
@@ -133,7 +220,8 @@ class DiskStore(BaseContextManagerStore, BaseStore):
     ) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        _ = self._cache.set(
+        _ = _disk_cache_set(
+            cache=self._cache,
             key=combo_key,
             value=self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection),
             expire=managed_entry.ttl,
@@ -143,8 +231,8 @@ class DiskStore(BaseContextManagerStore, BaseStore):
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        return self._cache.delete(key=combo_key, retry=True)
+        return _disk_cache_delete(cache=self._cache, key=combo_key)
 
     def __del__(self) -> None:
         if not getattr(self, "_client_provided_by_user", False) and hasattr(self, "_cache"):
-            self._cache.close()
+            _disk_cache_close(cache=self._cache)

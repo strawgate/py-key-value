@@ -125,7 +125,7 @@ class BaseEncryptionWrapper(BaseWrapper):
 
             json_str: str = json_bytes.decode(encoding="utf-8")
 
-            return json.loads(json_str)  # type: ignore[no-any-return]
+            return json.loads(json_str)
         except CorruptedDataError:
             if self.raise_on_decryption_error:
                 raise

@@ -6,6 +6,8 @@ This is safe because table names are validated in __init__ to be alphanumeric pl
 
 # ruff: noqa: S608
 
+from collections.abc import Awaitable, Callable
+from datetime import datetime
 from typing import overload
 
 from typing_extensions import override
@@ -57,6 +59,87 @@ def _validate_table_name(table_name: str) -> None:
         raise ValueError(msg)
 
 
+# Private helper functions to encapsulate asyncpg pool creation with type ignore comments
+# These are module-level functions (not methods) so they are not exported with the store class
+
+
+async def _create_postgresql_pool_from_url(url: str) -> asyncpg.Pool:
+    """Create an asyncpg pool from a connection URL."""
+    return await asyncpg.create_pool(url)  # pyright: ignore[reportUnknownMemberType]
+
+
+async def _create_postgresql_pool(
+    *,
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    database: str = DEFAULT_DATABASE,
+    user: str | None = None,
+    password: str | None = None,
+) -> asyncpg.Pool:
+    """Create an asyncpg pool from connection parameters."""
+    return await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType]
+        host=host,
+        port=port,
+        database=database,
+        user=user,
+        password=password,
+    )
+
+
+# Pool operation helpers with type ignores centralized here
+async def _postgresql_fetchval(
+    pool: asyncpg.Pool,
+    query: str,
+    *args: object,
+) -> object:
+    """Fetch a single value from the pool."""
+    return await pool.fetchval(query, *args)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+
+async def _postgresql_execute(
+    pool: asyncpg.Pool,
+    query: str,
+    *args: object,
+) -> str:
+    """Execute a query on the pool."""
+    return await pool.execute(query, *args)  # pyright: ignore[reportUnknownMemberType]
+
+
+async def _postgresql_fetchrow(
+    pool: asyncpg.Pool,
+    query: str,
+    *args: object,
+) -> asyncpg.Record | None:
+    """Fetch a single row from the pool."""
+    return await pool.fetchrow(query, *args)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+
+async def _postgresql_fetch(
+    pool: asyncpg.Pool,
+    query: str,
+    *args: object,
+) -> list[asyncpg.Record]:
+    """Fetch multiple rows from the pool."""
+    return await pool.fetch(query, *args)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+
+def _postgresql_pool_close_callback(
+    pool: asyncpg.Pool,
+) -> Callable[[], Awaitable[None]]:
+    """Get the pool close callback for the exit stack."""
+    return pool.close
+
+
+def _postgresql_row_get_str(row: asyncpg.Record, key: str) -> str:
+    """Get a string value from a PostgreSQL row."""
+    return row[key]
+
+
+def _postgresql_row_get_datetime(row: asyncpg.Record, key: str) -> datetime | None:
+    """Get a datetime value from a PostgreSQL row."""
+    return row[key]
+
+
 class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
     """PostgreSQL-based key-value store using asyncpg.
 
@@ -86,7 +169,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         ... )
     """
 
-    _pool: asyncpg.Pool | None  # type: ignore[type-arg]
+    _pool: asyncpg.Pool | None
     _url: str | None
     _host: str
     _port: int
@@ -100,7 +183,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
     def __init__(
         self,
         *,
-        pool: asyncpg.Pool,  # type: ignore[type-arg]
+        pool: asyncpg.Pool,
         table_name: str | None = None,
         default_collection: str | None = None,
         auto_create: bool = True,
@@ -161,7 +244,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
     def __init__(
         self,
         *,
-        pool: asyncpg.Pool | None = None,  # type: ignore[type-arg]
+        pool: asyncpg.Pool | None = None,
         url: str | None = None,
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
@@ -206,7 +289,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         super().__init__(default_collection=default_collection, client_provided_by_user=pool_provided)
 
     @property
-    def _initialized_pool(self) -> asyncpg.Pool:  # type: ignore[type-arg]
+    def _initialized_pool(self) -> asyncpg.Pool:
         """Get the initialized connection pool.
 
         Returns:
@@ -215,20 +298,20 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         Raises:
             RuntimeError: If the pool has not been initialized (setup() not called).
         """
-        if self._pool is None:  # pyright: ignore[reportUnknownMemberType]
+        if self._pool is None:
             msg = "Pool not initialized. Did you forget to use the context manager or call setup()?"
             raise RuntimeError(msg)
-        return self._pool  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        return self._pool
 
-    async def _create_pool(self) -> asyncpg.Pool:  # type: ignore[type-arg]
+    async def _create_pool(self) -> asyncpg.Pool:
         """Create a new connection pool.
 
         Returns:
             The newly created connection pool.
         """
         if self._url:
-            return await asyncpg.create_pool(self._url)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        return await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            return await _create_postgresql_pool_from_url(self._url)
+        return await _create_postgresql_pool(
             host=self._host,
             port=self._port,
             database=self._database,
@@ -245,14 +328,14 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         exit stack. Since all collections share the same table, we only need to set up the schema once.
         """
         # Create pool if not provided by user
-        if self._pool is None:  # pyright: ignore[reportUnknownMemberType]
-            self._pool = await self._create_pool()  # pyright: ignore[reportUnknownMemberType]
+        if self._pool is None:
+            self._pool = await self._create_pool()
 
         # Register pool cleanup if we own it (created it ourselves)
         if not self._client_provided_by_user:
-            self._exit_stack.push_async_callback(self._pool.close)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+            self._exit_stack.push_async_callback(_postgresql_pool_close_callback(self._pool))
 
-        pool = self._pool  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        pool = self._pool
 
         # Check if table exists
         table_exists_sql = """
@@ -261,7 +344,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
                 WHERE table_name = $1
             )
         """
-        table_exists = await pool.fetchval(table_exists_sql, self._table_name)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        table_exists = await _postgresql_fetchval(pool, table_exists_sql, self._table_name)
 
         if not table_exists:
             if not self._auto_create:
@@ -290,8 +373,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
 
             index_sql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {self._table_name}(expires_at) WHERE expires_at IS NOT NULL"
 
-            await pool.execute(table_sql)  # pyright: ignore[reportUnknownMemberType]
-            await pool.execute(index_sql)  # pyright: ignore[reportUnknownMemberType]
+            await _postgresql_execute(pool, table_sql)
+            await _postgresql_execute(pool, index_sql)
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -306,7 +389,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         """
         pool = self._initialized_pool
 
-        row = await pool.fetchrow(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        row = await _postgresql_fetchrow(
+            pool,
             f"SELECT value, ttl, created_at, expires_at FROM {self._table_name} WHERE collection = $1 AND key = $2",
             collection,
             key,
@@ -316,13 +400,13 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             return None
 
         # Parse the managed entry - asyncpg returns JSONB as JSON strings by default
-        value_data = row["value"]  # pyright: ignore[reportUnknownVariableType]
-        value = load_from_json(value_data)  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
+        value_data = _postgresql_row_get_str(row, "value")
+        value = load_from_json(value_data)
 
         return ManagedEntry(
-            value=value,  # pyright: ignore[reportUnknownArgumentType]
-            created_at=row["created_at"],  # pyright: ignore[reportUnknownArgumentType]
-            expires_at=row["expires_at"],  # pyright: ignore[reportUnknownArgumentType]
+            value=value,
+            created_at=_postgresql_row_get_datetime(row, "created_at"),
+            expires_at=_postgresql_row_get_datetime(row, "expires_at"),
         )
 
     @override
@@ -352,7 +436,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             "ON CONFLICT (collection, key) "
             "DO UPDATE SET value = EXCLUDED.value, ttl = EXCLUDED.ttl, expires_at = EXCLUDED.expires_at"
         )
-        await pool.execute(  # pyright: ignore[reportUnknownMemberType]
+        await _postgresql_execute(
+            pool,
             upsert_sql,
             collection,
             key,
@@ -375,7 +460,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         """
         pool = self._initialized_pool
 
-        result = await pool.execute(  # pyright: ignore[reportUnknownMemberType]
+        result = await _postgresql_execute(
+            pool,
             f"DELETE FROM {self._table_name} WHERE collection = $1 AND key = $2",
             collection,
             key,
@@ -399,12 +485,13 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
 
         pool = self._initialized_pool
 
-        rows = await pool.fetch(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        rows = await _postgresql_fetch(
+            pool,
             f"SELECT DISTINCT collection FROM {self._table_name} ORDER BY collection LIMIT $1",
             limit,
         )
 
-        return [row["collection"] for row in rows]  # pyright: ignore[reportUnknownVariableType]
+        return [_postgresql_row_get_str(row, "collection") for row in rows]
 
     @override
     async def _delete_collection(self, *, collection: str) -> bool:
@@ -418,7 +505,8 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         """
         pool = self._initialized_pool
 
-        result = await pool.execute(  # pyright: ignore[reportUnknownMemberType]
+        result = await _postgresql_execute(
+            pool,
             f"DELETE FROM {self._table_name} WHERE collection = $1",
             collection,
         )

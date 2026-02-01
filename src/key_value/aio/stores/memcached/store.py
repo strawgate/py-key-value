@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import overload
+from typing import Any, overload
 
 from typing_extensions import override
 
@@ -13,6 +13,53 @@ try:
 except ImportError as e:
     msg = "MemcachedStore requires py-key-value-aio[memcached]"
     raise ImportError(msg) from e
+
+
+# Module-level helper functions for Memcached client operations
+
+
+def _create_memcached_client(host: str = "127.0.0.1", port: int = 11211) -> Client:
+    """Create a Memcached client.
+
+    Args:
+        host: Memcached host. Defaults to 127.0.0.1.
+        port: Memcached port. Defaults to 11211.
+
+    Returns:
+        An aiomcache Client instance.
+    """
+    return Client(host=host, port=port)
+
+
+async def _memcached_flush_all(client: Client) -> None:
+    """Flush all keys from the Memcached server.
+
+    Args:
+        client: The Memcached client.
+    """
+    _ = await client.flush_all()
+
+
+async def _memcached_stats(client: Client) -> dict[bytes, Any]:  # pyright: ignore[reportUnusedFunction] - Used by tests
+    """Get stats from the Memcached server.
+
+    Args:
+        client: The Memcached client.
+
+    Returns:
+        Dictionary of stats.
+    """
+    return await client.stats()
+
+
+async def _memcached_close(client: Client) -> None:
+    """Close the Memcached client connection.
+
+    Args:
+        client: The Memcached client to close.
+    """
+    await client.close()
+
 
 MAX_KEY_LENGTH = 240
 
@@ -73,7 +120,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
         if client is not None:
             self._client = client
         else:
-            self._client = Client(host=host, port=port)
+            self._client = _create_memcached_client(host=host, port=port)
 
         super().__init__(
             default_collection=default_collection,
@@ -85,7 +132,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
     async def _setup(self) -> None:
         """Register client cleanup if we own the client."""
         if not self._client_provided_by_user:
-            self._exit_stack.push_async_callback(self._client.close)
+            self._exit_stack.push_async_callback(lambda: _memcached_close(client=self._client))
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
@@ -155,5 +202,5 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
 
     @override
     async def _delete_store(self) -> bool:
-        _ = await self._client.flush_all()
+        await _memcached_flush_all(client=self._client)
         return True

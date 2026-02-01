@@ -49,6 +49,38 @@ except ImportError as e:
 
 logger = logging.getLogger(__name__)
 
+
+# Private helper functions to encapsulate OpenSearch client operations with type ignore comments
+# These are module-level functions (not methods) so they are not exported with the store class
+
+
+async def _opensearch_index(
+    client: AsyncOpenSearch,
+    index: str,
+    document_id: str,
+    body: dict[str, Any],
+    *,
+    refresh: bool = True,
+) -> object:
+    """Index a document in OpenSearch."""
+    return await client.index(
+        index=index,
+        id=document_id,
+        body=body,
+        params={"refresh": "true"} if refresh else {},
+    )
+
+
+def _get_aggregation_buckets(aggregations: dict[str, Any], agg_name: str) -> list[Any]:
+    """Get buckets from an aggregation result."""
+    return aggregations[agg_name]["buckets"]
+
+
+def _get_bucket_key(bucket: Any) -> str:
+    """Get the key from an aggregation bucket."""
+    return bucket["key"]
+
+
 DEFAULT_INDEX_PREFIX = "opensearch_kv_store"
 
 DEFAULT_MAPPING = {
@@ -389,11 +421,12 @@ class OpenSearchStore(
         document: dict[str, Any] = self._serializer.dump_dict(entry=managed_entry, key=key, collection=collection)
 
         try:
-            _ = await self._client.index(  # type: ignore[reportUnknownVariableType]
-                index=index_name,
-                id=document_id,
-                body=document,
-                params={"refresh": "true"},
+            _ = await _opensearch_index(
+                self._client,
+                index_name,
+                document_id,
+                document,
+                refresh=True,
             )
         except OpenSearchSerializationError as e:
             msg = f"Failed to serialize document: {e}"
@@ -476,9 +509,9 @@ class OpenSearchStore(
         body: dict[str, Any] = get_body_from_response(response=search_response)
         aggregations: dict[str, Any] = get_aggregations_from_body(body=body)
 
-        buckets: list[Any] = aggregations["collections"]["buckets"]  # pyright: ignore[reportAny]
+        buckets = _get_aggregation_buckets(aggregations, "collections")
 
-        return [bucket["key"] for bucket in buckets]  # pyright: ignore[reportAny]
+        return [_get_bucket_key(bucket) for bucket in buckets]
 
     @override
     async def _delete_collection(self, *, collection: str) -> bool:

@@ -276,7 +276,7 @@ class ContextManagerStoreTestMixin:
     async def enter_exit_store(
         self, request: pytest.FixtureRequest, store: BaseContextManagerStore, per_test_temp_dir: Path
     ) -> AsyncGenerator[BaseContextManagerStore, None]:
-        context_manager = request.param  # pyright: ignore[reportAny]
+        context_manager = request.param
 
         if context_manager:
             async with store:

@@ -20,6 +20,39 @@ DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
 
 
+# Private helper functions to encapsulate Valkey/Glide client creation with type ignore comments
+# These are module-level functions (not methods) so they are not exported with the store class
+
+
+def _create_valkey_client_config(
+    *,
+    host: str = "localhost",
+    port: int = 6379,
+    db: int = 0,
+    username: str | None = None,
+    password: str | None = None,
+) -> GlideClientConfiguration:
+    """Create a Valkey client configuration."""
+    addresses: list[NodeAddress] = [NodeAddress(host=host, port=port)]
+    credentials: ServerCredentials | None = ServerCredentials(password=password, username=username) if password else None
+    return GlideClientConfiguration(addresses=addresses, database_id=db, credentials=credentials)
+
+
+async def _create_valkey_client(config: GlideClientConfiguration | GlideClusterClientConfiguration) -> GlideClient:
+    """Create a Valkey client from configuration."""
+    return await GlideClient.create(config=config)
+
+
+async def _valkey_mget(client: BaseClient, keys: list[str]) -> list[bytes | None]:
+    """Get multiple values from Valkey."""
+    return await client.mget(keys=keys)  # pyright: ignore[reportArgumentType]
+
+
+async def _valkey_delete(client: BaseClient, keys: list[str]) -> int:
+    """Delete one or more keys from Valkey."""
+    return await client.delete(keys=keys)  # pyright: ignore[reportArgumentType]
+
+
 class ValkeyStore(BaseContextManagerStore, BaseStore):
     """Valkey-based key-value store (Redis protocol compatible).
 
@@ -80,10 +113,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         if client is not None:
             self._connected_client = client
         else:
-            # redis client accepts URL
-            addresses: list[NodeAddress] = [NodeAddress(host=host, port=port)]
-            credentials: ServerCredentials | None = ServerCredentials(password=password, username=username) if password else None
-            self._client_config = GlideClientConfiguration(addresses=addresses, database_id=db, credentials=credentials)
+            self._client_config = _create_valkey_client_config(host=host, port=port, db=db, username=username, password=password)
             self._connected_client = None
 
         super().__init__(
@@ -100,7 +130,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
                 msg = "Client configuration is not set"
                 raise ValueError(msg)
 
-            self._connected_client = await GlideClient.create(config=self._client_config)
+            self._connected_client = await _create_valkey_client(self._client_config)
 
         # Register client cleanup if we own the client
         if not self._client_provided_by_user:
@@ -135,7 +165,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
 
         combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
 
-        responses: list[bytes | None] = await self._client.mget(keys=combo_keys)  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+        responses: list[bytes | None] = await _valkey_mget(self._client, combo_keys)
 
         entries: list[ManagedEntry | None] = []
         for response in responses:
@@ -175,6 +205,6 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
 
         combo_keys: list[str] = [compound_key(collection=collection, key=key) for key in keys]
 
-        deleted_count: int = await self._client.delete(keys=combo_keys)  # pyright: ignore[reportArgumentType]
+        deleted_count: int = await _valkey_delete(self._client, combo_keys)
 
         return deleted_count

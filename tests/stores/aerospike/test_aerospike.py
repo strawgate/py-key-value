@@ -28,13 +28,17 @@ AEROSPIKE_CONTAINER_PORT = 3000
 
 
 async def ping_aerospike(host: str, port: int) -> bool:
-    try:
-        import aerospike  # pyright: ignore[reportMissingImports]
+    from key_value.aio.stores.aerospike.store import (
+        _close_aerospike_client,
+        _connect_aerospike_client,
+        _create_aerospike_client,
+    )
 
+    try:
         config = {"hosts": [(host, port)]}
-        client = aerospike.client(config)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
-        client.connect()  # pyright: ignore[reportUnknownMemberType]
-        client.close()  # pyright: ignore[reportUnknownMemberType]
+        client = _create_aerospike_client(config)
+        _connect_aerospike_client(client)
+        _close_aerospike_client(client)
     except Exception:
         return False
     else:
@@ -84,26 +88,30 @@ class TestAerospikeStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self, setup_aerospike: None, aerospike_host: str, aerospike_port: int) -> AsyncGenerator["AerospikeStore", None]:
-        import aerospike  # pyright: ignore[reportMissingImports]
-
         from key_value.aio.stores.aerospike import AerospikeStore
+        from key_value.aio.stores.aerospike.store import (
+            _close_aerospike_client,
+            _connect_aerospike_client,
+            _create_aerospike_client,
+            _truncate_aerospike_set,
+        )
 
         config = {"hosts": [(aerospike_host, aerospike_port)]}
-        client = aerospike.client(config)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportAttributeAccessIssue]
-        client.connect()  # pyright: ignore[reportUnknownMemberType]
+        client = _create_aerospike_client(config)
+        _connect_aerospike_client(client)
 
         # Use a unique set name per test worker to avoid conflicts with parallel execution
         import uuid
 
         unique_set = f"{AEROSPIKE_SET}-{uuid.uuid4().hex[:8]}"
-        store = AerospikeStore(client=client, namespace=AEROSPIKE_NAMESPACE, set_name=unique_set)  # pyright: ignore[reportUnknownArgumentType]
+        store = AerospikeStore(client=client, namespace=AEROSPIKE_NAMESPACE, set_name=unique_set)
 
         yield store
 
         # Clean up the set after tests
         with contextlib.suppress(Exception):
-            client.truncate(AEROSPIKE_NAMESPACE, unique_set, 0)  # pyright: ignore[reportUnknownMemberType]
-        client.close()  # pyright: ignore[reportUnknownMemberType]
+            _truncate_aerospike_set(client, AEROSPIKE_NAMESPACE, unique_set)
+        _close_aerospike_client(client)
 
     @pytest.fixture
     async def aerospike_store(self, store: "AerospikeStore") -> "AerospikeStore":

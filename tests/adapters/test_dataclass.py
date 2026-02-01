@@ -135,7 +135,7 @@ class TestDataclassAdapter:
     ):
         """Test that validation errors raise DeserializationError when raise_on_validation_error is True."""
         await user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER)
-        updated_user_adapter._raise_on_validation_error = True  # pyright: ignore[reportPrivateUsage]
+        updated_user_adapter._raise_on_validation_error = True
         with pytest.raises(DeserializationError):
             await updated_user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
 
@@ -163,7 +163,7 @@ class TestDataclassAdapter:
         assert cached_products == [SAMPLE_PRODUCT, SAMPLE_PRODUCT]
 
         # We need to ensure our memory store doesn't hold an entry with an array
-        raw_collection = store._cache.get(TEST_COLLECTION)  # pyright: ignore[reportPrivateUsage]
+        raw_collection = store._cache.get(TEST_COLLECTION)
         assert raw_collection is not None
 
         raw_entry = raw_collection.get(TEST_KEY)
@@ -215,7 +215,7 @@ class TestDataclassAdapter:
     async def test_dataclass_validation_on_init(self, store: MemoryStore):
         """Test that non-dataclass types are rejected."""
         with pytest.raises(TypeError, match="is not a dataclass"):
-            DataclassAdapter[str](key_value=store, dataclass_type=str)  # type: ignore[type-var]
+            DataclassAdapter[str](key_value=store, dataclass_type=str)
 
     async def test_default_collection(self, store: MemoryStore):
         """Test that default collection is used when not specified."""
@@ -245,7 +245,7 @@ class TestDataclassAdapter:
 
     async def test_list_payload_missing_items_raises(self, product_list_adapter: DataclassAdapter[list[Product]], store: MemoryStore):
         """Test that list payload without 'items' wrapper raises DeserializationError when configured."""
-        product_list_adapter._raise_on_validation_error = True  # pyright: ignore[reportPrivateUsage]
+        product_list_adapter._raise_on_validation_error = True
         # Manually insert malformed payload without the 'items' wrapper
         malformed_payload: dict[str, Any] = {"wrong": []}
         await store.put(collection=TEST_COLLECTION, key=TEST_KEY, value=malformed_payload)

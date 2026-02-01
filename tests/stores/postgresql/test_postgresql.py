@@ -17,7 +17,7 @@ from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 try:
     import asyncpg
 except ImportError:
-    asyncpg = None  # type: ignore[assignment]
+    asyncpg = None
 
 # PostgreSQL test configuration
 POSTGRESQL_USER = "postgres"
@@ -97,9 +97,11 @@ class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture
     async def store(self, setup_postgresql: None, postgresql_host: str, postgresql_port: int) -> PostgreSQLStore:
         """Create a PostgreSQL store for testing."""
+        from key_value.aio.stores.postgresql.store import _create_postgresql_pool
+
         # Clean up the database before each test by dropping the table
         # The table will be recreated when the store is used via _setup()
-        pool = await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportOptionalMemberAccess]
+        pool = await _create_postgresql_pool(
             host=postgresql_host,
             port=postgresql_port,
             user=POSTGRESQL_USER,
@@ -109,7 +111,7 @@ class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
         async with pool.acquire() as conn:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             with contextlib.suppress(Exception):
                 await conn.execute("DROP TABLE IF EXISTS kv_store")  # pyright: ignore[reportUnknownMemberType]
-        await pool.close()  # pyright: ignore[reportUnknownMemberType]
+        await pool.close()
 
         return PostgreSQLStore(
             host=postgresql_host,
