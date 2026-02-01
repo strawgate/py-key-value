@@ -1,0 +1,2436 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A pluggable interface for Key-Value Stores">
+      
+      
+      
+        <link rel="canonical" href="https://strawgate.github.io/py-key-value/stores/">
+      
+      
+        <link rel="prev" href="../getting-started/">
+      
+      
+        <link rel="next" href="../wrappers/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.22">
+    
+    
+      
+        <title>Stores - py-key-value Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.84d31ad4.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#stores" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="py-key-value Documentation" class="md-header__button md-logo" aria-label="py-key-value Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            py-key-value Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Stores
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/strawgate/py-key-value" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    strawgate/py-key-value
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../getting-started/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Getting Started
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+    
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../api/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="py-key-value Documentation" class="md-nav__button md-logo" aria-label="py-key-value Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    py-key-value Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/strawgate/py-key-value" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    strawgate/py-key-value
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Home
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Getting Started
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    User Guide
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Stores
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Stores
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#store-categories" class="md-nav__link">
+    <span class="md-ellipsis">
+      Store Categories
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stability-levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      Stability Levels
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Local Stores
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Local Stores">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memorystore" class="md-nav__link">
+    <span class="md-ellipsis">
+      MemoryStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diskstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      DiskStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multidiskstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      MultiDiskStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filetreestore" class="md-nav__link">
+    <span class="md-ellipsis">
+      FileTreeStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#duckdbstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      DuckDBStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rocksdbstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      RocksDBStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windowsregistrystore" class="md-nav__link">
+    <span class="md-ellipsis">
+      WindowsRegistryStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nullstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      NullStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simplestore" class="md-nav__link">
+    <span class="md-ellipsis">
+      SimpleStore
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#secret-stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Secret Stores
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Secret Stores">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keyringstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      KeyringStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vaultstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      VaultStore
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#distributed-stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Distributed Stores
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Distributed Stores">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#aerospikestore" class="md-nav__link">
+    <span class="md-ellipsis">
+      AerospikeStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#redisstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      RedisStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#valkeystore" class="md-nav__link">
+    <span class="md-ellipsis">
+      ValkeyStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#firestorestore" class="md-nav__link">
+    <span class="md-ellipsis">
+      FirestoreStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamodbstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      DynamoDBStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#s3store" class="md-nav__link">
+    <span class="md-ellipsis">
+      S3Store
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elasticsearchstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      ElasticsearchStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#opensearchstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      OpenSearchStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mongodbstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      MongoDBStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#postgresqlstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      PostgreSQLStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memcachedstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      MemcachedStore
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-a-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      Choosing a Store
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choosing a Store">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#development" class="md-nav__link">
+    <span class="md-ellipsis">
+      Development
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#production-caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      Production Caching
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#long-term-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Long-Term Storage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sensitive-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sensitive Data
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#serverlesscloud" class="md-nav__link">
+    <span class="md-ellipsis">
+      Serverless/Cloud
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#store-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      Store Compatibility
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wrappers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Wrappers
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Adapters
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../api/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    API Reference
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Protocols
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/stores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Stores
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/wrappers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Wrappers
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/adapters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Adapters
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#store-categories" class="md-nav__link">
+    <span class="md-ellipsis">
+      Store Categories
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stability-levels" class="md-nav__link">
+    <span class="md-ellipsis">
+      Stability Levels
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Local Stores
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Local Stores">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#memorystore" class="md-nav__link">
+    <span class="md-ellipsis">
+      MemoryStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diskstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      DiskStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multidiskstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      MultiDiskStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#filetreestore" class="md-nav__link">
+    <span class="md-ellipsis">
+      FileTreeStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#duckdbstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      DuckDBStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rocksdbstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      RocksDBStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windowsregistrystore" class="md-nav__link">
+    <span class="md-ellipsis">
+      WindowsRegistryStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nullstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      NullStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#simplestore" class="md-nav__link">
+    <span class="md-ellipsis">
+      SimpleStore
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#secret-stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Secret Stores
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Secret Stores">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keyringstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      KeyringStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vaultstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      VaultStore
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#distributed-stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      Distributed Stores
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Distributed Stores">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#aerospikestore" class="md-nav__link">
+    <span class="md-ellipsis">
+      AerospikeStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#redisstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      RedisStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#valkeystore" class="md-nav__link">
+    <span class="md-ellipsis">
+      ValkeyStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#firestorestore" class="md-nav__link">
+    <span class="md-ellipsis">
+      FirestoreStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamodbstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      DynamoDBStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#s3store" class="md-nav__link">
+    <span class="md-ellipsis">
+      S3Store
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#elasticsearchstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      ElasticsearchStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#opensearchstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      OpenSearchStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mongodbstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      MongoDBStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#postgresqlstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      PostgreSQLStore
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#memcachedstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      MemcachedStore
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-a-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      Choosing a Store
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Choosing a Store">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#development" class="md-nav__link">
+    <span class="md-ellipsis">
+      Development
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#production-caching" class="md-nav__link">
+    <span class="md-ellipsis">
+      Production Caching
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#long-term-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Long-Term Storage
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sensitive-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      Sensitive Data
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#serverlesscloud" class="md-nav__link">
+    <span class="md-ellipsis">
+      Serverless/Cloud
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#store-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      Store Compatibility
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/strawgate/py-key-value/edit/main/docs/stores.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+    
+      
+    
+    <a href="https://github.com/strawgate/py-key-value/raw/main/docs/stores.md" title="View source of this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.2 8.2 0 0 1-1.23-2"/></svg>
+    </a>
+  
+
+
+<h1 id="stores">Stores<a class="headerlink" href="#stores" title="Permanent link">&para;</a></h1>
+<p>Stores are the core implementations of the <code>AsyncKeyValue</code> protocol. They provide
+the actual storage backend for your key-value data.</p>
+<h2 id="store-categories">Store Categories<a class="headerlink" href="#store-categories" title="Permanent link">&para;</a></h2>
+<p>Stores are organized into three categories based on their storage location and
+use case:</p>
+<ul>
+<li><strong>Local Stores</strong>: In-memory or on-disk storage local to the application</li>
+<li><strong>Secret Stores</strong>: Secure storage for sensitive data in OS secret stores</li>
+<li><strong>Distributed Stores</strong>: Network-based storage for multi-node applications</li>
+</ul>
+<h2 id="stability-levels">Stability Levels<a class="headerlink" href="#stability-levels" title="Permanent link">&para;</a></h2>
+<p>Each store has a stability rating that indicates the likelihood of
+backwards-incompatible changes to how data is stored:</p>
+<ul>
+<li><strong>Stable</strong>: No planned backwards-incompatible changes</li>
+<li><strong>Preview</strong>: Unlikely to change in backwards-incompatible ways</li>
+<li><strong>Unstable</strong>: May change in backwards-incompatible ways</li>
+<li><strong>N/A</strong>: Not applicable (e.g., in-memory stores)</li>
+</ul>
+<p>If you're using py-key-value for caching, stability may not matter. For
+long-term storage, prefer stable stores.</p>
+<h2 id="local-stores">Local Stores<a class="headerlink" href="#local-stores" title="Permanent link">&para;</a></h2>
+<p>Local stores are stored in memory or on disk, local to the application.</p>
+<table>
+<thead>
+<tr>
+<th>Store</th>
+<th style="text-align: center;">Stability</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Memory</td>
+<td style="text-align: center;">N/A</td>
+<td style="text-align: left;">Fast in-memory storage for development and caching</td>
+</tr>
+<tr>
+<td>Disk</td>
+<td style="text-align: center;">Stable</td>
+<td style="text-align: left;">Persistent file-based storage in a single file</td>
+</tr>
+<tr>
+<td>Disk (Per-Collection)</td>
+<td style="text-align: center;">Stable</td>
+<td style="text-align: left;">Persistent storage with separate files per collection</td>
+</tr>
+<tr>
+<td>DuckDB</td>
+<td style="text-align: center;">Unstable</td>
+<td style="text-align: left;">In-process SQL OLAP database with native JSON storage</td>
+</tr>
+<tr>
+<td>FileTree (test)</td>
+<td style="text-align: center;">Unstable</td>
+<td style="text-align: left;">Directory-based storage with JSON files for visual inspection</td>
+</tr>
+<tr>
+<td>Null (test)</td>
+<td style="text-align: center;">N/A</td>
+<td style="text-align: left;">No-op store for testing without side effects</td>
+</tr>
+<tr>
+<td>RocksDB</td>
+<td style="text-align: center;">Unstable</td>
+<td style="text-align: left;">High-performance embedded database</td>
+</tr>
+<tr>
+<td>Simple (test)</td>
+<td style="text-align: center;">N/A</td>
+<td style="text-align: left;">Simple in-memory store for testing</td>
+</tr>
+<tr>
+<td>Windows Registry</td>
+<td style="text-align: center;">Unstable</td>
+<td style="text-align: left;">Windows Registry-based storage</td>
+</tr>
+</tbody>
+</table>
+<h3 id="memorystore">MemoryStore<a class="headerlink" href="#memorystore" title="Permanent link">&para;</a></h3>
+<p>Fast in-memory storage ideal for development, testing, and caching.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.memory</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryStore</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">MemoryStore</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>memory<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Development and testing</li>
+<li>Fast caching</li>
+<li>Session storage</li>
+<li>Temporary data</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>No persistence (data lost on restart)</li>
+<li>Extremely fast</li>
+<li>No external dependencies</li>
+<li>Thread-safe</li>
+</ul>
+<hr />
+<h3 id="diskstore">DiskStore<a class="headerlink" href="#diskstore" title="Permanent link">&para;</a></h3>
+<p>Persistent file-based storage using a single JSON file.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.disk</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiskStore</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">DiskStore</span><span class="p">(</span><span class="n">directory</span><span class="o">=</span><span class="s2">&quot;./cache&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>disk<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Local caching with persistence</li>
+<li>Development environments</li>
+<li>Single-node applications</li>
+<li>Small datasets</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Persists across restarts</li>
+<li>Simple file format (JSON)</li>
+<li>Suitable for small to medium datasets</li>
+<li>All data in one file</li>
+</ul>
+<hr />
+<h3 id="multidiskstore">MultiDiskStore<a class="headerlink" href="#multidiskstore" title="Permanent link">&para;</a></h3>
+<p>Persistent storage with separate files per collection.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.multi_disk</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultiDiskStore</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">MultiDiskStore</span><span class="p">(</span><span class="n">directory</span><span class="o">=</span><span class="s2">&quot;./cache&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>disk<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Organizing data by collection</li>
+<li>Better performance with many collections</li>
+<li>Easier to manage individual collections</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>One file per collection</li>
+<li>Better suited for many collections</li>
+<li>Easier collection management</li>
+<li>JSON-based storage</li>
+</ul>
+<hr />
+<h3 id="filetreestore">FileTreeStore<a class="headerlink" href="#filetreestore" title="Permanent link">&para;</a></h3>
+<p>Directory-based storage for visual inspection and debugging.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.filetree</span><span class="w"> </span><span class="kn">import</span> <span class="n">FileTreeStore</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">FileTreeStore</span><span class="p">(</span><span class="n">directory</span><span class="o">=</span><span class="s2">&quot;./debug-store&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>filetree<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Visual inspection of store contents</li>
+<li>Debugging store behavior</li>
+<li>Development and testing</li>
+<li>Understanding data structure</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Collections as directories</li>
+<li>Keys as JSON files (<code>{key}.json</code>)</li>
+<li>Human-readable filesystem layout</li>
+<li>Easy to inspect and modify</li>
+<li><strong>NOT for production use</strong></li>
+</ul>
+<p><strong>Directory Structure:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>{base_directory}/
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  {collection_1}/
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    {key_1}.json
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    {key_2}.json
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>  {collection_2}/
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    {key_3}.json
+</code></pre></div>
+<p><strong>Important Limitations:</strong></p>
+<ul>
+<li>Poor performance with many keys</li>
+<li>No atomic operations</li>
+<li>No automatic cleanup of expired entries</li>
+<li>Filesystem path length constraints</li>
+<li>Subject to filesystem limitations</li>
+</ul>
+<p><strong>When to Use:</strong></p>
+<p>Use FileTreeStore when you need to:</p>
+<ul>
+<li>Visually inspect what's being stored</li>
+<li>Debug complex data structures</li>
+<li>Understand how the store organizes data</li>
+<li>Manually modify stored data for testing</li>
+</ul>
+<p><strong>When NOT to Use:</strong></p>
+<ul>
+<li>Production environments</li>
+<li>High-performance requirements</li>
+<li>Large datasets</li>
+<li>Concurrent access scenarios</li>
+</ul>
+<hr />
+<h3 id="duckdbstore">DuckDBStore<a class="headerlink" href="#duckdbstore" title="Permanent link">&para;</a></h3>
+<p>In-process SQL OLAP database with native JSON storage.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.duckdb</span><span class="w"> </span><span class="kn">import</span> <span class="n">DuckDBStore</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="c1"># In-memory database (default)</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">store</span> <span class="o">=</span> <span class="n">DuckDBStore</span><span class="p">()</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="c1"># Persistent database</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="n">store</span> <span class="o">=</span> <span class="n">DuckDBStore</span><span class="p">(</span><span class="n">database_path</span><span class="o">=</span><span class="s2">&quot;./my_store.duckdb&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="c1"># With existing connection</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="kn">import</span><span class="w"> </span><span class="nn">duckdb</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="n">connection</span> <span class="o">=</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;./my_store.duckdb&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="n">store</span> <span class="o">=</span> <span class="n">DuckDBStore</span><span class="p">(</span><span class="n">connection</span><span class="o">=</span><span class="n">connection</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>duckdb<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Analytics on stored key-value data</li>
+<li>Local development with SQL querying capabilities</li>
+<li>Applications needing both key-value and SQL access</li>
+<li>Data exploration and reporting</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Native JSON column support for queryable values</li>
+<li>In-memory or persistent storage</li>
+<li>Standard SQL access to stored data</li>
+<li>Efficient timestamp handling for TTL queries</li>
+<li>Stable storage format: <strong>Unstable</strong></li>
+</ul>
+<p><strong>Direct SQL Access:</strong></p>
+<p>DuckDB allows you to query your key-value data directly with SQL:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># After storing some data</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="k">await</span> <span class="n">store</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="s2">&quot;user:1&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Alice&quot;</span><span class="p">,</span> <span class="s2">&quot;age&quot;</span><span class="p">:</span> <span class="mi">30</span><span class="p">},</span> <span class="n">collection</span><span class="o">=</span><span class="s2">&quot;users&quot;</span><span class="p">)</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="k">await</span> <span class="n">store</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="s2">&quot;user:2&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Bob&quot;</span><span class="p">,</span> <span class="s2">&quot;age&quot;</span><span class="p">:</span> <span class="mi">25</span><span class="p">},</span> <span class="n">collection</span><span class="o">=</span><span class="s2">&quot;users&quot;</span><span class="p">)</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="c1"># Query directly via DuckDB</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="n">result</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">_connection</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="s2">    SELECT key, value-&gt;&gt;&#39;name&#39; as name</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="s2">    FROM kv_entries</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="s2">    WHERE collection = &#39;users&#39;</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="s2">&quot;&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">fetchall</span><span class="p">()</span>
+</code></pre></div>
+<hr />
+<h3 id="rocksdbstore">RocksDBStore<a class="headerlink" href="#rocksdbstore" title="Permanent link">&para;</a></h3>
+<p>High-performance embedded database using RocksDB.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.rocksdb</span><span class="w"> </span><span class="kn">import</span> <span class="n">RocksDBStore</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">RocksDBStore</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">&quot;./rocksdb&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>rocksdb<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>High-throughput applications</li>
+<li>Large datasets</li>
+<li>Performance-critical applications</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Very fast reads and writes</li>
+<li>Efficient storage</li>
+<li>Requires native dependencies</li>
+<li>Stable storage format: <strong>Unstable</strong></li>
+</ul>
+<hr />
+<h3 id="windowsregistrystore">WindowsRegistryStore<a class="headerlink" href="#windowsregistrystore" title="Permanent link">&para;</a></h3>
+<p>Storage using the Windows Registry.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">WindowsRegistryStore</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">WindowsRegistryStore</span><span class="p">(</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="n">hive</span><span class="o">=</span><span class="s2">&quot;HKEY_CURRENT_USER&quot;</span><span class="p">,</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    <span class="n">registry_path</span><span class="o">=</span><span class="s2">&quot;Software</span><span class="se">\\</span><span class="s2">py-key-value&quot;</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>registry<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Windows-specific applications</li>
+<li>System configuration storage</li>
+<li>Integration with Windows settings</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Windows-only</li>
+<li>Persists in registry</li>
+<li>Subject to registry limitations</li>
+<li>Stable storage format: <strong>Unstable</strong></li>
+</ul>
+<hr />
+<h3 id="nullstore">NullStore<a class="headerlink" href="#nullstore" title="Permanent link">&para;</a></h3>
+<p>No-op store that discards all data. Useful for testing.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.null</span><span class="w"> </span><span class="kn">import</span> <span class="n">NullStore</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">NullStore</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Testing without side effects</li>
+<li>Disabling storage temporarily</li>
+<li>Performance baseline testing</li>
+</ul>
+<hr />
+<h3 id="simplestore">SimpleStore<a class="headerlink" href="#simplestore" title="Permanent link">&para;</a></h3>
+<p>Simple in-memory store for testing.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.simple</span><span class="w"> </span><span class="kn">import</span> <span class="n">SimpleStore</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">SimpleStore</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Basic testing</li>
+<li>Minimal implementation reference</li>
+</ul>
+<hr />
+<h2 id="secret-stores">Secret Stores<a class="headerlink" href="#secret-stores" title="Permanent link">&para;</a></h2>
+<p>Secret stores provide secure storage for sensitive data, typically using
+operating system secret management facilities.</p>
+<table>
+<thead>
+<tr>
+<th>Store</th>
+<th style="text-align: center;">Stability</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Keyring</td>
+<td style="text-align: center;">Stable</td>
+<td style="text-align: left;">OS-level secure storage (Keychain, Credential Manager, etc.)</td>
+</tr>
+<tr>
+<td>Vault</td>
+<td style="text-align: center;">Unstable</td>
+<td style="text-align: left;">HashiCorp Vault integration for enterprise secrets</td>
+</tr>
+</tbody>
+</table>
+<h3 id="keyringstore">KeyringStore<a class="headerlink" href="#keyringstore" title="Permanent link">&para;</a></h3>
+<p>Secure storage using the operating system's keyring (macOS Keychain, Windows
+Credential Manager, Linux Secret Service).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.keyring</span><span class="w"> </span><span class="kn">import</span> <span class="n">KeyringStore</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">KeyringStore</span><span class="p">(</span><span class="n">service_name</span><span class="o">=</span><span class="s2">&quot;py-key-value&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>keyring<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Storing API keys and tokens</li>
+<li>User credentials</li>
+<li>Sensitive configuration</li>
+<li>Encrypted local storage</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>OS-level encryption</li>
+<li>Secure by default</li>
+<li>Cross-platform</li>
+<li><strong>Windows limitation</strong>: Strict value length limits</li>
+</ul>
+<p><strong>Important:</strong> Windows Keyring has strict limits on value length which may
+cause issues with large values.</p>
+<hr />
+<h3 id="vaultstore">VaultStore<a class="headerlink" href="#vaultstore" title="Permanent link">&para;</a></h3>
+<p>Integration with HashiCorp Vault for enterprise secret management.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.vault</span><span class="w"> </span><span class="kn">import</span> <span class="n">VaultStore</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">VaultStore</span><span class="p">(</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>    <span class="n">url</span><span class="o">=</span><span class="s2">&quot;http://localhost:8200&quot;</span><span class="p">,</span>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>    <span class="n">token</span><span class="o">=</span><span class="s2">&quot;your-token&quot;</span>
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>vault<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Enterprise secret management</li>
+<li>Multi-environment deployments</li>
+<li>Centralized secret rotation</li>
+<li>Audit logging</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Enterprise-grade security</li>
+<li>Centralized management</li>
+<li>Audit logging</li>
+<li>Stable storage format: <strong>Unstable</strong></li>
+</ul>
+<hr />
+<h2 id="distributed-stores">Distributed Stores<a class="headerlink" href="#distributed-stores" title="Permanent link">&para;</a></h2>
+<p>Distributed stores provide network-based storage for multi-node applications.</p>
+<table>
+<thead>
+<tr>
+<th>Store</th>
+<th style="text-align: center;">Stability</th>
+<th style="text-align: left;">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Aerospike</td>
+<td style="text-align: center;">Unstable</td>
+<td style="text-align: left;">High-performance distributed NoSQL database</td>
+</tr>
+<tr>
+<td>DynamoDB</td>
+<td style="text-align: center;">Unstable</td>
+<td style="text-align: left;">AWS DynamoDB key-value storage</td>
+</tr>
+<tr>
+<td>S3</td>
+<td style="text-align: center;">Unstable</td>
+<td style="text-align: left;">AWS S3 object storage</td>
+</tr>
+<tr>
+<td>Elasticsearch</td>
+<td style="text-align: center;">Unstable</td>
+<td style="text-align: left;">Full-text search with key-value capabilities</td>
+</tr>
+<tr>
+<td>Firestore</td>
+<td style="text-align: center;">Unstable</td>
+<td style="text-align: left;">Google Cloud Firestore key-value storage</td>
+</tr>
+<tr>
+<td>Memcached</td>
+<td style="text-align: center;">Unstable</td>
+<td style="text-align: left;">High-performance distributed memory cache</td>
+</tr>
+<tr>
+<td>MongoDB</td>
+<td style="text-align: center;">Unstable</td>
+<td style="text-align: left;">Document database used as key-value store</td>
+</tr>
+<tr>
+<td>OpenSearch</td>
+<td style="text-align: center;">Unstable</td>
+<td style="text-align: left;">OpenSearch search engine with key-value capabilities</td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td style="text-align: center;">Unstable</td>
+<td style="text-align: left;">PostgreSQL database with JSONB storage</td>
+</tr>
+<tr>
+<td>Redis</td>
+<td style="text-align: center;">Stable</td>
+<td style="text-align: left;">Popular in-memory data structure store</td>
+</tr>
+<tr>
+<td>Valkey</td>
+<td style="text-align: center;">Stable</td>
+<td style="text-align: left;">Open-source Redis fork</td>
+</tr>
+</tbody>
+</table>
+<h3 id="aerospikestore">AerospikeStore<a class="headerlink" href="#aerospikestore" title="Permanent link">&para;</a></h3>
+<p>High-performance distributed NoSQL database optimized for speed and scale.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.aerospike</span><span class="w"> </span><span class="kn">import</span> <span class="n">AerospikeStore</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="c1"># Using host list</span>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="n">store</span> <span class="o">=</span> <span class="n">AerospikeStore</span><span class="p">(</span>
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>    <span class="n">hosts</span><span class="o">=</span><span class="p">[(</span><span class="s2">&quot;localhost&quot;</span><span class="p">,</span> <span class="mi">3000</span><span class="p">)],</span>
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>    <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;test&quot;</span><span class="p">,</span>
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>    <span class="n">set_name</span><span class="o">=</span><span class="s2">&quot;kv-store&quot;</span>
+<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a><span class="p">)</span>
+<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a>
+<a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a><span class="c1"># Or with an existing client</span>
+<a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a><span class="kn">import</span><span class="w"> </span><span class="nn">aerospike</span>
+<a id="__codelineno-22-12" name="__codelineno-22-12" href="#__codelineno-22-12"></a><span class="n">client</span> <span class="o">=</span> <span class="n">aerospike</span><span class="o">.</span><span class="n">client</span><span class="p">({</span><span class="s2">&quot;hosts&quot;</span><span class="p">:</span> <span class="p">[(</span><span class="s2">&quot;localhost&quot;</span><span class="p">,</span> <span class="mi">3000</span><span class="p">)]})</span>
+<a id="__codelineno-22-13" name="__codelineno-22-13" href="#__codelineno-22-13"></a><span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+<a id="__codelineno-22-14" name="__codelineno-22-14" href="#__codelineno-22-14"></a><span class="n">store</span> <span class="o">=</span> <span class="n">AerospikeStore</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="n">client</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;test&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>aerospike<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>High-throughput applications</li>
+<li>Real-time data processing</li>
+<li>Large-scale distributed systems</li>
+<li>Low-latency caching</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Sub-millisecond latency</li>
+<li>Horizontal scaling</li>
+<li>Native TTL support</li>
+<li>Namespaces must be pre-configured on server</li>
+<li>Sets created automatically</li>
+<li>Stable storage format: <strong>Unstable</strong></li>
+</ul>
+<hr />
+<h3 id="redisstore">RedisStore<a class="headerlink" href="#redisstore" title="Permanent link">&para;</a></h3>
+<p>High-performance in-memory store using Redis.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.redis</span><span class="w"> </span><span class="kn">import</span> <span class="n">RedisStore</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">RedisStore</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;redis://localhost:6379/0&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>redis<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Distributed caching</li>
+<li>Session storage</li>
+<li>Real-time applications</li>
+<li>High-throughput systems</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Very fast (in-memory)</li>
+<li>Production-ready</li>
+<li>Rich feature set</li>
+<li>Horizontal scaling support</li>
+<li><strong>Stable storage format</strong></li>
+</ul>
+<hr />
+<h3 id="valkeystore">ValkeyStore<a class="headerlink" href="#valkeystore" title="Permanent link">&para;</a></h3>
+<p>Open-source Redis fork with similar performance characteristics.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.valkey</span><span class="w"> </span><span class="kn">import</span> <span class="n">ValkeyStore</span>
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">ValkeyStore</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s2">&quot;localhost&quot;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">6379</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>valkey<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Same as Redis</li>
+<li>Open-source preference</li>
+<li>Redis API compatibility</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Redis-compatible</li>
+<li>Open-source governance</li>
+<li>Production-ready</li>
+<li><strong>Stable storage format</strong></li>
+</ul>
+<hr />
+<h3 id="firestorestore">FirestoreStore<a class="headerlink" href="#firestorestore" title="Permanent link">&para;</a></h3>
+<p>Google Cloud Firestore used as a key-value store.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.firestore</span><span class="w"> </span><span class="kn">import</span> <span class="n">FirestoreStore</span>
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">FirestoreStore</span><span class="p">(</span><span class="n">credentials</span><span class="o">=</span><span class="n">google_credentials</span><span class="p">,</span> <span class="n">database</span><span class="o">=</span><span class="s2">&quot;firestore-db&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>firestore<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Google Cloud-native applications</li>
+<li>Serverless / managed infrastructure</li>
+<li>Existing Firestore deployments</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Managed cloud database</li>
+<li>Document/collection model</li>
+<li>Stable storage format: <strong>Unstable</strong></li>
+</ul>
+<hr />
+<h3 id="dynamodbstore">DynamoDBStore<a class="headerlink" href="#dynamodbstore" title="Permanent link">&para;</a></h3>
+<p>AWS DynamoDB integration for serverless and cloud-native applications.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.dynamodb</span><span class="w"> </span><span class="kn">import</span> <span class="n">DynamoDBStore</span>
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">DynamoDBStore</span><span class="p">(</span>
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>    <span class="n">table_name</span><span class="o">=</span><span class="s2">&quot;kv-store&quot;</span><span class="p">,</span>
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a>    <span class="n">region_name</span><span class="o">=</span><span class="s2">&quot;us-east-1&quot;</span>
+<a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>dynamodb<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>AWS-native applications</li>
+<li>Serverless architectures</li>
+<li>Global distribution</li>
+<li>Managed infrastructure</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Fully managed</li>
+<li>Auto-scaling</li>
+<li>Global tables</li>
+<li>Pay-per-use pricing</li>
+<li>Stable storage format: <strong>Unstable</strong></li>
+</ul>
+<hr />
+<h3 id="s3store">S3Store<a class="headerlink" href="#s3store" title="Permanent link">&para;</a></h3>
+<p>AWS S3 object storage for durable, scalable key-value storage.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.s3</span><span class="w"> </span><span class="kn">import</span> <span class="n">S3Store</span>
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">S3Store</span><span class="p">(</span>
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>    <span class="n">bucket_name</span><span class="o">=</span><span class="s2">&quot;my-kv-bucket&quot;</span><span class="p">,</span>
+<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a>    <span class="n">region_name</span><span class="o">=</span><span class="s2">&quot;us-east-1&quot;</span>
+<a id="__codelineno-32-6" name="__codelineno-32-6" href="#__codelineno-32-6"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>s3<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Large value storage (up to 5TB per object)</li>
+<li>Durable, long-term storage</li>
+<li>Cost-effective archival</li>
+<li>Multi-region replication</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>99.999999999% durability</li>
+<li>Automatic key sanitization for S3 path limits</li>
+<li>Supports lifecycle policies</li>
+<li>Pay-per-use pricing</li>
+<li>Stable storage format: <strong>Unstable</strong></li>
+</ul>
+<hr />
+<h3 id="elasticsearchstore">ElasticsearchStore<a class="headerlink" href="#elasticsearchstore" title="Permanent link">&para;</a></h3>
+<p>Full-text search engine used as a key-value store.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.elasticsearch</span><span class="w"> </span><span class="kn">import</span> <span class="n">ElasticsearchStore</span>
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>
+<a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">ElasticsearchStore</span><span class="p">(</span>
+<a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a>    <span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://localhost:9200&quot;</span><span class="p">,</span>
+<a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a>    <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;your-api-key&quot;</span><span class="p">,</span>
+<a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a>    <span class="n">index</span><span class="o">=</span><span class="s2">&quot;kv-store&quot;</span>
+<a id="__codelineno-34-7" name="__codelineno-34-7" href="#__codelineno-34-7"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>elasticsearch<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Applications already using Elasticsearch</li>
+<li>Need for search capabilities</li>
+<li>Analytics and logging</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Search capabilities</li>
+<li>Distributed by default</li>
+<li>Rich querying</li>
+<li>Stable storage format: <strong>Unstable</strong></li>
+</ul>
+<hr />
+<h3 id="opensearchstore">OpenSearchStore<a class="headerlink" href="#opensearchstore" title="Permanent link">&para;</a></h3>
+<p>OpenSearch search engine used as a key-value store. Collections are stored in
+separate indices with values in flattened fields.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.opensearch</span><span class="w"> </span><span class="kn">import</span> <span class="n">OpenSearchStore</span>
+<a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>
+<a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="c1"># Using URL and API key</span>
+<a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a><span class="n">store</span> <span class="o">=</span> <span class="n">OpenSearchStore</span><span class="p">(</span>
+<a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a>    <span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://localhost:9200&quot;</span><span class="p">,</span>
+<a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a>    <span class="n">api_key</span><span class="o">=</span><span class="s2">&quot;your-api-key&quot;</span><span class="p">,</span>
+<a id="__codelineno-36-7" name="__codelineno-36-7" href="#__codelineno-36-7"></a>    <span class="n">index_prefix</span><span class="o">=</span><span class="s2">&quot;kv_store&quot;</span>
+<a id="__codelineno-36-8" name="__codelineno-36-8" href="#__codelineno-36-8"></a><span class="p">)</span>
+<a id="__codelineno-36-9" name="__codelineno-36-9" href="#__codelineno-36-9"></a>
+<a id="__codelineno-36-10" name="__codelineno-36-10" href="#__codelineno-36-10"></a><span class="c1"># With existing client</span>
+<a id="__codelineno-36-11" name="__codelineno-36-11" href="#__codelineno-36-11"></a><span class="kn">from</span><span class="w"> </span><span class="nn">opensearchpy</span><span class="w"> </span><span class="kn">import</span> <span class="n">AsyncOpenSearch</span>
+<a id="__codelineno-36-12" name="__codelineno-36-12" href="#__codelineno-36-12"></a><span class="n">client</span> <span class="o">=</span> <span class="n">AsyncOpenSearch</span><span class="p">(</span><span class="n">hosts</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;https://localhost:9200&quot;</span><span class="p">])</span>
+<a id="__codelineno-36-13" name="__codelineno-36-13" href="#__codelineno-36-13"></a><span class="n">store</span> <span class="o">=</span> <span class="n">OpenSearchStore</span><span class="p">(</span>
+<a id="__codelineno-36-14" name="__codelineno-36-14" href="#__codelineno-36-14"></a>    <span class="n">opensearch_client</span><span class="o">=</span><span class="n">client</span><span class="p">,</span>
+<a id="__codelineno-36-15" name="__codelineno-36-15" href="#__codelineno-36-15"></a>    <span class="n">index_prefix</span><span class="o">=</span><span class="s2">&quot;kv_store&quot;</span>
+<a id="__codelineno-36-16" name="__codelineno-36-16" href="#__codelineno-36-16"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>opensearch<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Applications already using OpenSearch</li>
+<li>Need for search capabilities with AWS-managed service</li>
+<li>Analytics and logging</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Search capabilities</li>
+<li>Distributed by default</li>
+<li>Collections stored in separate indices</li>
+<li>Values stored in flat_object fields</li>
+<li>Stable storage format: <strong>Unstable</strong></li>
+</ul>
+<p><strong>Sanitization Strategies:</strong></p>
+<p>OpenSearch has specific restrictions on keys and index names. Use the built-in
+sanitization strategies to avoid issues:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.opensearch</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>    <span class="n">OpenSearchStore</span><span class="p">,</span>
+<a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>    <span class="n">OpenSearchV1KeySanitizationStrategy</span><span class="p">,</span>
+<a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a>    <span class="n">OpenSearchV1CollectionSanitizationStrategy</span><span class="p">,</span>
+<a id="__codelineno-38-5" name="__codelineno-38-5" href="#__codelineno-38-5"></a><span class="p">)</span>
+<a id="__codelineno-38-6" name="__codelineno-38-6" href="#__codelineno-38-6"></a>
+<a id="__codelineno-38-7" name="__codelineno-38-7" href="#__codelineno-38-7"></a><span class="n">store</span> <span class="o">=</span> <span class="n">OpenSearchStore</span><span class="p">(</span>
+<a id="__codelineno-38-8" name="__codelineno-38-8" href="#__codelineno-38-8"></a>    <span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://localhost:9200&quot;</span><span class="p">,</span>
+<a id="__codelineno-38-9" name="__codelineno-38-9" href="#__codelineno-38-9"></a>    <span class="n">index_prefix</span><span class="o">=</span><span class="s2">&quot;kv_store&quot;</span><span class="p">,</span>
+<a id="__codelineno-38-10" name="__codelineno-38-10" href="#__codelineno-38-10"></a>    <span class="n">key_sanitization_strategy</span><span class="o">=</span><span class="n">OpenSearchV1KeySanitizationStrategy</span><span class="p">(),</span>
+<a id="__codelineno-38-11" name="__codelineno-38-11" href="#__codelineno-38-11"></a>    <span class="n">collection_sanitization_strategy</span><span class="o">=</span><span class="n">OpenSearchV1CollectionSanitizationStrategy</span><span class="p">(),</span>
+<a id="__codelineno-38-12" name="__codelineno-38-12" href="#__codelineno-38-12"></a><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h3 id="mongodbstore">MongoDBStore<a class="headerlink" href="#mongodbstore" title="Permanent link">&para;</a></h3>
+<p>Document database used as a key-value store.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.mongodb</span><span class="w"> </span><span class="kn">import</span> <span class="n">MongoDBStore</span>
+<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>
+<a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">MongoDBStore</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;mongodb://localhost:27017/test&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>mongodb<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Applications already using MongoDB</li>
+<li>Document-oriented data</li>
+<li>Flexible schemas</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Document storage</li>
+<li>Rich querying</li>
+<li>Horizontal scaling</li>
+<li>Stable storage format: <strong>Unstable</strong></li>
+</ul>
+<hr />
+<h3 id="postgresqlstore">PostgreSQLStore<a class="headerlink" href="#postgresqlstore" title="Permanent link">&para;</a></h3>
+<p>PostgreSQL database with JSONB storage for flexible key-value data.</p>
+<p><strong>Note:</strong> PostgreSQL is async-only. This store uses <code>asyncpg</code> which
+provides native async/await operations.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.postgresql</span><span class="w"> </span><span class="kn">import</span> <span class="n">PostgreSQLStore</span>
+<a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>
+<a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a><span class="c1"># Using connection URL</span>
+<a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a><span class="n">store</span> <span class="o">=</span> <span class="n">PostgreSQLStore</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;postgresql://localhost:5432/mydb&quot;</span><span class="p">)</span>
+<a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a>
+<a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a><span class="c1"># Using connection parameters</span>
+<a id="__codelineno-41-7" name="__codelineno-41-7" href="#__codelineno-41-7"></a><span class="n">store</span> <span class="o">=</span> <span class="n">PostgreSQLStore</span><span class="p">(</span>
+<a id="__codelineno-41-8" name="__codelineno-41-8" href="#__codelineno-41-8"></a>    <span class="n">host</span><span class="o">=</span><span class="s2">&quot;localhost&quot;</span><span class="p">,</span>
+<a id="__codelineno-41-9" name="__codelineno-41-9" href="#__codelineno-41-9"></a>    <span class="n">port</span><span class="o">=</span><span class="mi">5432</span><span class="p">,</span>
+<a id="__codelineno-41-10" name="__codelineno-41-10" href="#__codelineno-41-10"></a>    <span class="n">database</span><span class="o">=</span><span class="s2">&quot;mydb&quot;</span><span class="p">,</span>
+<a id="__codelineno-41-11" name="__codelineno-41-11" href="#__codelineno-41-11"></a>    <span class="n">user</span><span class="o">=</span><span class="s2">&quot;myuser&quot;</span><span class="p">,</span>
+<a id="__codelineno-41-12" name="__codelineno-41-12" href="#__codelineno-41-12"></a>    <span class="n">password</span><span class="o">=</span><span class="s2">&quot;mypass&quot;</span>
+<a id="__codelineno-41-13" name="__codelineno-41-13" href="#__codelineno-41-13"></a><span class="p">)</span>
+<a id="__codelineno-41-14" name="__codelineno-41-14" href="#__codelineno-41-14"></a>
+<a id="__codelineno-41-15" name="__codelineno-41-15" href="#__codelineno-41-15"></a><span class="k">async</span> <span class="k">with</span> <span class="n">store</span><span class="p">:</span>
+<a id="__codelineno-41-16" name="__codelineno-41-16" href="#__codelineno-41-16"></a>    <span class="k">await</span> <span class="n">store</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="s2">&quot;user_1&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Alice&quot;</span><span class="p">},</span> <span class="n">collection</span><span class="o">=</span><span class="s2">&quot;users&quot;</span><span class="p">)</span>
+<a id="__codelineno-41-17" name="__codelineno-41-17" href="#__codelineno-41-17"></a>    <span class="n">user</span> <span class="o">=</span> <span class="k">await</span> <span class="n">store</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="s2">&quot;user_1&quot;</span><span class="p">,</span> <span class="n">collection</span><span class="o">=</span><span class="s2">&quot;users&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>postgresql<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Applications already using PostgreSQL</li>
+<li>Need for SQL querying on stored data</li>
+<li>ACID transaction requirements</li>
+<li>Complex data relationships</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>JSONB storage for efficient querying</li>
+<li>TTL support via expiration timestamps</li>
+<li>Single table design (collections as column values)</li>
+<li>Async-only (uses asyncpg)</li>
+<li>Stable storage format: <strong>Unstable</strong></li>
+</ul>
+<hr />
+<h3 id="memcachedstore">MemcachedStore<a class="headerlink" href="#memcachedstore" title="Permanent link">&para;</a></h3>
+<p>High-performance distributed memory caching system.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.memcached</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemcachedStore</span>
+<a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>
+<a id="__codelineno-43-3" name="__codelineno-43-3" href="#__codelineno-43-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">MemcachedStore</span><span class="p">(</span><span class="n">host</span><span class="o">=</span><span class="s2">&quot;127.0.0.1&quot;</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="mi">11211</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Installation:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>pip<span class="w"> </span>install<span class="w"> </span>py-key-value-aio<span class="o">[</span>memcached<span class="o">]</span>
+</code></pre></div>
+<p><strong>Use Cases:</strong></p>
+<ul>
+<li>Distributed caching</li>
+<li>Session storage</li>
+<li>High-throughput caching</li>
+</ul>
+<p><strong>Characteristics:</strong></p>
+<ul>
+<li>Very fast</li>
+<li>Simple protocol</li>
+<li>Distributed by design</li>
+<li>No persistence</li>
+<li>Stable storage format: <strong>Unstable</strong></li>
+</ul>
+<hr />
+<h2 id="choosing-a-store">Choosing a Store<a class="headerlink" href="#choosing-a-store" title="Permanent link">&para;</a></h2>
+<h3 id="development">Development<a class="headerlink" href="#development" title="Permanent link">&para;</a></h3>
+<p><strong>Recommended:</strong> <code>MemoryStore</code> or <code>DiskStore</code></p>
+<ul>
+<li>Fast iteration</li>
+<li>No setup required</li>
+<li>Easy debugging</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a><span class="c1"># Development</span>
+<a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.memory</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryStore</span>
+<a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">MemoryStore</span><span class="p">()</span>
+</code></pre></div>
+<h3 id="production-caching">Production Caching<a class="headerlink" href="#production-caching" title="Permanent link">&para;</a></h3>
+<p><strong>Recommended:</strong> <code>RedisStore</code> or <code>ValkeyStore</code></p>
+<ul>
+<li>High performance</li>
+<li>Distributed</li>
+<li>Production-ready</li>
+<li>Stable storage format</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a><span class="c1"># Production caching</span>
+<a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.redis</span><span class="w"> </span><span class="kn">import</span> <span class="n">RedisStore</span>
+<a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">RedisStore</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;redis://localhost:6379/0&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="long-term-storage">Long-Term Storage<a class="headerlink" href="#long-term-storage" title="Permanent link">&para;</a></h3>
+<p><strong>Recommended:</strong> Stores with <strong>Stable</strong> stability rating</p>
+<ul>
+<li><code>RedisStore</code></li>
+<li><code>ValkeyStore</code></li>
+<li><code>DiskStore</code></li>
+<li><code>MultiDiskStore</code></li>
+<li><code>KeyringStore</code></li>
+</ul>
+<p>Avoid unstable stores for data you can't afford to lose or migrate.</p>
+<h3 id="sensitive-data">Sensitive Data<a class="headerlink" href="#sensitive-data" title="Permanent link">&para;</a></h3>
+<p><strong>Recommended:</strong> <code>KeyringStore</code> or <code>VaultStore</code></p>
+<ul>
+<li>OS-level encryption</li>
+<li>Secure by default</li>
+<li>Audit logging (Vault)</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a><span class="c1"># Sensitive data</span>
+<a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.keyring</span><span class="w"> </span><span class="kn">import</span> <span class="n">KeyringStore</span>
+<a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">KeyringStore</span><span class="p">(</span><span class="n">service_name</span><span class="o">=</span><span class="s2">&quot;my-app&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="serverlesscloud">Serverless/Cloud<a class="headerlink" href="#serverlesscloud" title="Permanent link">&para;</a></h3>
+<p><strong>Recommended:</strong> <code>DynamoDBStore</code> (AWS)</p>
+<ul>
+<li>Fully managed</li>
+<li>Auto-scaling</li>
+<li>No servers to maintain</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a><span class="c1"># AWS Lambda</span>
+<a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">key_value.aio.stores.dynamodb</span><span class="w"> </span><span class="kn">import</span> <span class="n">DynamoDBStore</span>
+<a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a><span class="n">store</span> <span class="o">=</span> <span class="n">DynamoDBStore</span><span class="p">(</span><span class="n">table_name</span><span class="o">=</span><span class="s2">&quot;kv-store&quot;</span><span class="p">,</span> <span class="n">region_name</span><span class="o">=</span><span class="s2">&quot;us-east-1&quot;</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="store-compatibility">Store Compatibility<a class="headerlink" href="#store-compatibility" title="Permanent link">&para;</a></h2>
+<p>All stores implement the same protocol, making it easy to switch:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a><span class="c1"># Development</span>
+<a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a><span class="n">store</span> <span class="o">=</span> <span class="n">MemoryStore</span><span class="p">()</span>
+<a id="__codelineno-49-3" name="__codelineno-49-3" href="#__codelineno-49-3"></a>
+<a id="__codelineno-49-4" name="__codelineno-49-4" href="#__codelineno-49-4"></a><span class="c1"># Production</span>
+<a id="__codelineno-49-5" name="__codelineno-49-5" href="#__codelineno-49-5"></a><span class="n">store</span> <span class="o">=</span> <span class="n">RedisStore</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;redis://localhost:6379/0&quot;</span><span class="p">)</span>
+<a id="__codelineno-49-6" name="__codelineno-49-6" href="#__codelineno-49-6"></a>
+<a id="__codelineno-49-7" name="__codelineno-49-7" href="#__codelineno-49-7"></a><span class="c1"># Your code works with both!</span>
+<a id="__codelineno-49-8" name="__codelineno-49-8" href="#__codelineno-49-8"></a><span class="k">await</span> <span class="n">store</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="s2">&quot;user:123&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Alice&quot;</span><span class="p">},</span> <span class="n">collection</span><span class="o">=</span><span class="s2">&quot;users&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>See the <a href="../api/stores/">API Reference</a> for complete store documentation.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../getting-started/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Getting Started">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Getting Started
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../wrappers/" class="md-footer__link md-footer__link--next" aria-label="Next: Wrappers">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Wrappers
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      <script id="__config" type="application/json">{"base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.tracking", "navigation.instant", "navigation.path", "navigation.indexes", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.action.edit", "content.action.view"], "search": "../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.f55a23d4.min.js"></script>
+      
+    
+  </body>
+</html>
