@@ -30,6 +30,9 @@ pip install py-key-value-aio[elasticsearch]
 # MongoDB support
 pip install py-key-value-aio[mongodb]
 
+# Firestore support
+pip install py-key-value-aio[firestore]
+
 # All backends
 pip install py-key-value-aio[all]
 ```
