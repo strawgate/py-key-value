@@ -16,7 +16,10 @@ from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 if TYPE_CHECKING:
     from key_value.aio.stores.aerospike import AerospikeStore
 
-pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="Aerospike is not supported on Windows")
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(sys.platform == "win32", reason="Aerospike is not supported on Windows"),
+]
 
 # Aerospike test configuration
 AEROSPIKE_NAMESPACE = "test"

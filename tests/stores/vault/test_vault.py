@@ -9,6 +9,8 @@ from tests.stores.base import (
     BaseStoreTests,
 )
 
+pytestmark = pytest.mark.integration
+
 # Vault test configuration
 VAULT_TOKEN = "dev-root-token"
 VAULT_MOUNT_POINT = "secret"
