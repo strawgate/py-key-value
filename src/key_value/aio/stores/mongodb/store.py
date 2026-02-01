@@ -52,7 +52,7 @@ async def _mongodb_bulk_write(
     Returns:
         The BulkWriteResult from the operation.
     """
-    return await collection.bulk_write(operations)  
+    return await collection.bulk_write(operations)
 
 
 async def _mongodb_drop_database(client: AsyncMongoClient[dict[str, Any]], db_name: str) -> None:  # pyright: ignore[reportUnusedFunction] - Used by tests

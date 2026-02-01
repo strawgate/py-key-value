@@ -117,7 +117,7 @@ class BasePydanticAdapter(Generic[T], ABC):
             if self._needs_wrapping:
                 return {"items": self._type_adapter.dump_python(value, mode="json")}
 
-            return self._type_adapter.dump_python(value, mode="json")  
+            return self._type_adapter.dump_python(value, mode="json")
         except PydanticSerializationError as e:
             msg = f"Invalid {self._get_model_type_name()}: {e}"
             raise SerializationError(msg) from e

@@ -63,17 +63,17 @@ async def _elasticsearch_bulk(
     refresh: bool = False,
 ) -> ObjectApiResponse[Any]:
     """Execute a bulk operation on Elasticsearch."""
-    return await client.bulk(operations=operations, refresh=refresh)  
+    return await client.bulk(operations=operations, refresh=refresh)
 
 
 def _get_aggregation_buckets(aggregations: dict[str, Any], agg_name: str) -> list[Any]:
     """Get buckets from an aggregation result."""
-    return aggregations[agg_name]["buckets"]  
+    return aggregations[agg_name]["buckets"]
 
 
-def _get_bucket_key(bucket: Any) -> str:  
+def _get_bucket_key(bucket: Any) -> str:
     """Get the key from an aggregation bucket."""
-    return bucket["key"]  
+    return bucket["key"]
 
 
 DEFAULT_INDEX_PREFIX = "kv_store"

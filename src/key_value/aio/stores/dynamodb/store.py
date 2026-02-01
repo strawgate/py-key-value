@@ -46,7 +46,7 @@ def _create_dynamodb_session(
     )
 
 
-def _create_dynamodb_client_context(session: Session, *, endpoint_url: str | None = None) -> Any:  
+def _create_dynamodb_client_context(session: Session, *, endpoint_url: str | None = None) -> Any:
     """Create a DynamoDB client context manager from a session."""
     return session.client(service_name="dynamodb", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
@@ -58,8 +58,8 @@ async def _describe_dynamodb_table(client: DynamoDBClient, table_name: str) -> b
         True if the table exists, False otherwise.
     """
     try:
-        await client.describe_table(TableName=table_name)  
-    except client.exceptions.ResourceNotFoundException:  
+        await client.describe_table(TableName=table_name)
+    except client.exceptions.ResourceNotFoundException:
         return False
     else:
         return True
@@ -92,11 +92,11 @@ async def _create_dynamodb_table(client: DynamoDBClient, table_name: str, *, tab
         }
     )
 
-    await client.create_table(**create_table_params)  
+    await client.create_table(**create_table_params)
 
     # Wait for table to be active
-    waiter = client.get_waiter("table_exists")  
-    await waiter.wait(TableName=table_name)  
+    waiter = client.get_waiter("table_exists")
+    await waiter.wait(TableName=table_name)
 
 
 async def _describe_dynamodb_ttl(client: DynamoDBClient, table_name: str) -> str | None:
@@ -105,15 +105,13 @@ async def _describe_dynamodb_ttl(client: DynamoDBClient, table_name: str) -> str
     Returns:
         The TTL status string, or None if not available.
     """
-    ttl_response = await client.describe_time_to_live(  
-        TableName=table_name
-    )
-    return ttl_response.get("TimeToLiveDescription", {}).get("TimeToLiveStatus")  
+    ttl_response = await client.describe_time_to_live(TableName=table_name)
+    return ttl_response.get("TimeToLiveDescription", {}).get("TimeToLiveStatus")
 
 
 async def _enable_dynamodb_ttl(client: DynamoDBClient, table_name: str, attribute_name: str = "ttl") -> None:
     """Enable TTL on a DynamoDB table."""
-    await client.update_time_to_live(  
+    await client.update_time_to_live(
         TableName=table_name,
         TimeToLiveSpecification={
             "Enabled": True,
@@ -124,7 +122,7 @@ async def _enable_dynamodb_ttl(client: DynamoDBClient, table_name: str, attribut
 
 async def _put_dynamodb_item(client: DynamoDBClient, table_name: str, item: dict[str, Any]) -> None:
     """Put an item into a DynamoDB table."""
-    await client.put_item(  
+    await client.put_item(
         TableName=table_name,
         Item=item,
     )
@@ -136,12 +134,12 @@ async def _delete_dynamodb_item(client: DynamoDBClient, table_name: str, key: di
     Returns:
         The deleted item attributes if ReturnValues=ALL_OLD was used, or None.
     """
-    response = await client.delete_item(  
+    response = await client.delete_item(
         TableName=table_name,
         Key=key,
         ReturnValues="ALL_OLD",
     )
-    return response.get("Attributes")  
+    return response.get("Attributes")
 
 
 class DynamoDBStore(BaseContextManagerStore, BaseStore):
@@ -152,7 +150,7 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     - key (sort key)
     """
 
-    _session: aioboto3.Session  
+    _session: aioboto3.Session
     _table_name: str
     _endpoint_url: str | None
     _raw_client: Any  # DynamoDB client from aioboto3

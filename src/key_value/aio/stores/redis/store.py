@@ -72,32 +72,32 @@ def _create_redis_client_from_url(
 
 async def _redis_get(client: Redis, name: str) -> Any:
     """Get a value from Redis."""
-    return await client.get(name=name)  
+    return await client.get(name=name)
 
 
 async def _redis_mget(client: Redis, keys: list[str]) -> list[Any]:
     """Get multiple values from Redis."""
-    return await client.mget(keys=keys)  
+    return await client.mget(keys=keys)
 
 
 async def _redis_set(client: Redis, name: str, value: str) -> None:
     """Set a value in Redis without TTL."""
-    _ = await client.set(name=name, value=value)  
+    _ = await client.set(name=name, value=value)
 
 
 async def _redis_setex(client: Redis, name: str, time: int, value: str) -> None:
     """Set a value in Redis with TTL."""
-    _ = await client.setex(name=name, time=time, value=value)  
+    _ = await client.setex(name=name, time=time, value=value)
 
 
-async def _redis_pipeline_execute(pipeline: Any) -> None:  
+async def _redis_pipeline_execute(pipeline: Any) -> None:
     """Execute a Redis pipeline."""
-    await pipeline.execute()  
+    await pipeline.execute()
 
 
 async def _redis_delete(client: Redis, *keys: str) -> int:
     """Delete one or more keys from Redis."""
-    return await client.delete(*keys)  
+    return await client.delete(*keys)
 
 
 async def _redis_scan(client: Redis, cursor: int, match: str, count: int) -> tuple[int, list[str]]:

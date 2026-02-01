@@ -9,7 +9,7 @@ from key_value.shared.managed_entry import ManagedEntry
 from key_value.shared.serialization import BasicSerializationAdapter
 
 try:
-    import aerospike  
+    import aerospike
 except ImportError as e:
     msg = "AerospikeStore requires py-key-value-aio[aerospike]"
     raise ImportError(msg) from e
@@ -24,18 +24,18 @@ PAGE_LIMIT = 10000
 # These are module-level functions (not methods) so they are not exported with the store class
 
 
-def _create_aerospike_client(config: dict[str, Any]) -> aerospike.Client:  
+def _create_aerospike_client(config: dict[str, Any]) -> aerospike.Client:
     """Create an Aerospike client."""
     return aerospike.client(config)  # pyright: ignore[reportUnknownMemberType]
 
 
-def _connect_aerospike_client(client: aerospike.Client) -> None:  
+def _connect_aerospike_client(client: aerospike.Client) -> None:
     """Connect the Aerospike client."""
-    client.connect()  
+    client.connect()
 
 
 def _get_aerospike_record(
-    client: aerospike.Client,  
+    client: aerospike.Client,
     aerospike_key: tuple[str, str, str],
 ) -> tuple[Any, Any, dict[str, Any]] | None:
     """Get a record from Aerospike.
@@ -50,7 +50,7 @@ def _get_aerospike_record(
 
 
 def _put_aerospike_record(
-    client: aerospike.Client,  
+    client: aerospike.Client,
     aerospike_key: tuple[str, str, str],
     bins: dict[str, Any],
     meta: dict[str, Any] | None = None,
@@ -63,7 +63,7 @@ def _put_aerospike_record(
 
 
 def _remove_aerospike_record(
-    client: aerospike.Client,  
+    client: aerospike.Client,
     aerospike_key: tuple[str, str, str],
 ) -> bool:
     """Remove a record from Aerospike.
@@ -80,18 +80,18 @@ def _remove_aerospike_record(
 
 
 def _scan_aerospike_set(
-    client: aerospike.Client,  
+    client: aerospike.Client,
     namespace: str,
     set_name: str,
-    callback: Any,  
+    callback: Any,
 ) -> None:
     """Scan the entire set with a callback function."""
-    scan = client.scan(namespace, set_name)  
+    scan = client.scan(namespace, set_name)
     scan.foreach(callback)  # pyright: ignore[reportUnknownMemberType]
 
 
 def _truncate_aerospike_set(
-    client: aerospike.Client,  
+    client: aerospike.Client,
     namespace: str,
     set_name: str,
 ) -> None:
@@ -99,12 +99,12 @@ def _truncate_aerospike_set(
     client.truncate(namespace, set_name, 0)  # pyright: ignore[reportUnknownMemberType]
 
 
-def _close_aerospike_client(client: aerospike.Client) -> None:  
+def _close_aerospike_client(client: aerospike.Client) -> None:
     """Close the Aerospike client connection."""
-    client.close()  
+    client.close()
 
 
-def _get_aerospike_namespaces(client: aerospike.Client) -> list[str]:  
+def _get_aerospike_namespaces(client: aerospike.Client) -> list[str]:
     """Get the list of available namespaces from the cluster.
 
     Returns:
@@ -114,9 +114,9 @@ def _get_aerospike_namespaces(client: aerospike.Client) -> list[str]:
     # info_all returns {(host, port, None): (error_code, response_string), ...}
     # response_string for 'namespaces' is a semicolon-separated list of namespace names
     namespaces: set[str] = set()
-    for error_code, response in info_response.values():  
-        if error_code == 0 and response:  
-            namespaces.update(response.split(";"))  
+    for error_code, response in info_response.values():
+        if error_code == 0 and response:
+            namespaces.update(response.split(";"))
     return list(namespaces)
 
 
@@ -130,7 +130,7 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
     during setup and raise a ValueError if it doesn't.
     """
 
-    _client: aerospike.Client  
+    _client: aerospike.Client
     _namespace: str
     _set: str
     _auto_create: bool
@@ -139,12 +139,12 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
     def __init__(
         self,
         *,
-        client: aerospike.Client,  
+        client: aerospike.Client,
         namespace: str = DEFAULT_NAMESPACE,
         set_name: str = DEFAULT_SET,
         default_collection: str | None = None,
         auto_create: bool = True,
-    ) -> None:  
+    ) -> None:
         """Initialize the Aerospike store.
 
         Args:
@@ -180,13 +180,13 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
     def __init__(
         self,
         *,
-        client: aerospike.Client | None = None,  
+        client: aerospike.Client | None = None,
         hosts: list[tuple[str, int]] | None = None,
         namespace: str = DEFAULT_NAMESPACE,
         set_name: str = DEFAULT_SET,
         default_collection: str | None = None,
         auto_create: bool = True,
-    ) -> None:  
+    ) -> None:
         """Initialize the Aerospike store.
 
         Args:
@@ -208,7 +208,7 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         else:
             hosts = hosts or [("localhost", 3000)]
             config = {"hosts": hosts}
-            self._client = _create_aerospike_client(config)  
+            self._client = _create_aerospike_client(config)
 
         self._namespace = namespace
         self._set = set_name
@@ -296,10 +296,10 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
 
         keys: list[str] = []
 
-        def callback(record: tuple[Any, Any, Any]) -> None:  
+        def callback(record: tuple[Any, Any, Any]) -> None:
             # Aerospike scan callback receives a 3-tuple: (key_tuple, metadata, bins)
             # The key_tuple itself is (namespace, set, primary_key)
-            (key_tuple, _metadata, _bins) = record  
+            (key_tuple, _metadata, _bins) = record
             primary_key = key_tuple[2]  # Extract primary_key from the key_tuple
             if isinstance(primary_key, str) and primary_key.startswith(pattern):
                 keys.append(primary_key)
