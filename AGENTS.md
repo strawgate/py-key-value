@@ -47,19 +47,8 @@ scripts/
 
 ## Code Style & Conventions
 
-### Python
-
-- **Formatter/Linter**: Ruff (configured in `pyproject.toml`)
-- **Line length**: 140 characters
-- **Type checker**: Basedpyright (strict mode)
-- **Runtime type checking**: Beartype (can be disabled via
-  `PY_KEY_VALUE_DISABLE_BEARTYPE=true`)
-- **Python version**: 3.10+
-
-### Markdown
-
-- **Linter**: markdownlint (`.markdownlint.jsonc`)
-- **Line length**: 80 characters (excluding code blocks and tables)
+Run `make precommit` to check formatting and types. See
+[CODE_STYLE.md](CODE_STYLE.md) for conventions not enforced by tooling.
 
 ## Common Pitfalls
 
@@ -312,6 +301,8 @@ make bump-version-dry VERSION=1.2.3    # Dry run
 ## Getting Help
 
 - For human developer documentation, see [DEVELOPING.md](DEVELOPING.md)
+- For contribution guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md)
+- For code style conventions, see [CODE_STYLE.md](CODE_STYLE.md)
 - For library usage documentation, see [README.md](README.md)
 
 ## Radical Honesty
