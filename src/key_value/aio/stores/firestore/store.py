@@ -113,13 +113,13 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
         if not self._auto_create:
             # Check if collection exists by trying to list documents
             # Firestore creates collections implicitly, so we check if any documents exist
-            col_ref = self._client.collection(collection)  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
+            col_ref = self._client.collection(collection)
             # Get just one document to see if collection has any data
-            docs = col_ref.limit(1).stream()  # pyright: ignore[reportUnknownMemberType]
+            docs = col_ref.limit(1).stream()
 
             # Check if any documents exist
             has_documents = False
-            async for _ in docs:  # pyright: ignore[reportUnknownMemberType]
+            async for _ in docs:
                 has_documents = True
                 break
 
@@ -133,8 +133,8 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
     async def _get_managed_entry(self, *, key: str, collection: str | None = None) -> ManagedEntry | None:
         """Get a managed entry from Firestore."""
         collection = collection or self.default_collection
-        response = await self._client.collection(collection).document(key).get()  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
-        doc = response.to_dict()  # pyright: ignore[reportUnknownMemberType]
+        response = await self._client.collection(collection).document(key).get()  # pyright: ignore[reportUnknownMemberType]
+        doc = response.to_dict()
         if doc is None:
             return None
         return self._serialization_adapter.load_dict(data=doc)
@@ -144,7 +144,7 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
         """Store a managed entry in Firestore."""
         collection = collection or self.default_collection
         item = self._serialization_adapter.dump_dict(entry=managed_entry)
-        await self._client.collection(collection).document(key).set(item)  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
+        await self._client.collection(collection).document(key).set(item)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str | None = None) -> bool:
@@ -154,11 +154,11 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
         """
         collection = collection or self.default_collection
         # Check if document exists before deleting
-        doc_ref = self._client.collection(collection).document(key)  # pyright: ignore[reportUnknownMemberType,reportOptionalMemberAccess]
+        doc_ref = self._client.collection(collection).document(key)
         doc_snapshot = await doc_ref.get()  # pyright: ignore[reportUnknownMemberType]
-        exists: bool = doc_snapshot.exists  # pyright: ignore[reportUnknownMemberType]
+        exists: bool = doc_snapshot.exists
 
         # Always perform the delete operation (idempotent)
-        await doc_ref.delete()  # pyright: ignore[reportUnknownMemberType]
+        await doc_ref.delete()
 
         return bool(exists)
