@@ -111,7 +111,7 @@ class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
         async with pool.acquire() as conn:  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             with contextlib.suppress(Exception):
                 await conn.execute("DROP TABLE IF EXISTS kv_store")  # pyright: ignore[reportUnknownMemberType]
-        await pool.close()  # pyright: ignore]
+        await pool.close()  
 
         return PostgreSQLStore(
             host=postgresql_host,

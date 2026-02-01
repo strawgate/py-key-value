@@ -51,14 +51,14 @@ def _create_s3_session(
     )
 
 
-def _create_s3_client_context(session: Session, *, endpoint_url: str | None = None) -> Any:  # pyright: ignore]
+def _create_s3_client_context(session: Session, *, endpoint_url: str | None = None) -> Any:  
     """Create an S3 client context manager from a session."""
     return session.client(service_name="s3", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
 
 async def _head_s3_bucket(client: S3Client, bucket_name: str) -> None:
     """Check if an S3 bucket exists."""
-    await client.head_bucket(Bucket=bucket_name)  # pyright: ignore]
+    await client.head_bucket(Bucket=bucket_name)  
 
 
 async def _create_s3_bucket(client: S3Client, bucket_name: str, *, region_name: str | None = None) -> None:
@@ -71,14 +71,14 @@ async def _create_s3_bucket(client: S3Client, bucket_name: str, *, region_name: 
     """
     import contextlib
 
-    with contextlib.suppress(client.exceptions.BucketAlreadyOwnedByYou):  # pyright: ignore]
+    with contextlib.suppress(client.exceptions.BucketAlreadyOwnedByYou):  
         create_params: dict[str, Any] = {"Bucket": bucket_name}
 
         # For regions other than us-east-1, specify LocationConstraint
         if region_name and region_name != "us-east-1":
             create_params["CreateBucketConfiguration"] = {"LocationConstraint": region_name}
 
-        await client.create_bucket(**create_params)  # pyright: ignore]
+        await client.create_bucket(**create_params)  
 
 
 async def _get_s3_object(client: S3Client, bucket_name: str, key: str) -> bytes | None:
@@ -88,14 +88,14 @@ async def _get_s3_object(client: S3Client, bucket_name: str, key: str) -> bytes 
         The object body as bytes, or None if not found.
     """
     try:
-        response = await client.get_object(  # pyright: ignore]
+        response = await client.get_object(  
             Bucket=bucket_name,
             Key=key,
         )
 
-        async with response["Body"] as stream:  # pyright: ignore]
-            return await stream.read()  # pyright: ignore]
-    except client.exceptions.NoSuchKey:  # pyright: ignore]
+        async with response["Body"] as stream:  
+            return await stream.read()  
+    except client.exceptions.NoSuchKey:  
         return None
 
 
@@ -109,7 +109,7 @@ async def _put_s3_object(
     metadata: dict[str, str] | None = None,
 ) -> None:
     """Put an object into S3."""
-    await client.put_object(  # pyright: ignore]
+    await client.put_object(  
         Bucket=bucket_name,
         Key=key,
         Body=body,
@@ -120,7 +120,7 @@ async def _put_s3_object(
 
 async def _delete_s3_object(client: S3Client, bucket_name: str, key: str) -> None:
     """Delete an object from S3."""
-    await client.delete_object(  # pyright: ignore]
+    await client.delete_object(  
         Bucket=bucket_name,
         Key=key,
     )
@@ -135,7 +135,7 @@ async def _head_s3_object(client: S3Client, bucket_name: str, key: str) -> bool:
     from botocore.exceptions import ClientError
 
     try:
-        await client.head_object(  # pyright: ignore]
+        await client.head_object(  
             Bucket=bucket_name,
             Key=key,
         )
@@ -155,7 +155,7 @@ async def _head_s3_object(client: S3Client, bucket_name: str, key: str) -> bool:
 
 def _get_s3_client_region(client: S3Client) -> str | None:
     """Get the region name from an S3 client."""
-    return getattr(client.meta, "region_name", None)  # pyright: ignore]
+    return getattr(client.meta, "region_name", None)  
 
 
 def _get_botocore_error_code(e: Exception) -> str:

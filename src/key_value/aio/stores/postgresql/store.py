@@ -127,17 +127,17 @@ def _postgresql_pool_close_callback(
     pool: asyncpg.Pool,
 ) -> Callable[[], Awaitable[None]]:
     """Get the pool close callback for the exit stack."""
-    return pool.close  # pyright: ignore]
+    return pool.close  
 
 
 def _postgresql_row_get_str(row: asyncpg.Record, key: str) -> str:
     """Get a string value from a PostgreSQL row."""
-    return row[key]  # pyright: ignore]
+    return row[key]  
 
 
 def _postgresql_row_get_datetime(row: asyncpg.Record, key: str) -> datetime | None:
     """Get a datetime value from a PostgreSQL row."""
-    return row[key]  # pyright: ignore]
+    return row[key]  
 
 
 class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):

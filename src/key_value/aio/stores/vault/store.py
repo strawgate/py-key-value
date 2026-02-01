@@ -44,7 +44,7 @@ def _read_vault_secret(kv_v2: KvV2, path: str, mount_point: str) -> dict[str, st
     except Exception:
         return None
 
-    if response is None or "data" not in response or "data" not in response["data"]:  # pyright: ignore]
+    if response is None or "data" not in response or "data" not in response["data"]:  
         return None
 
     # Vault KV v2 returns data in response['data']['data']

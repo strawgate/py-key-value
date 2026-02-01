@@ -40,7 +40,7 @@ def _create_valkey_client_config(
 
 async def _create_valkey_client(config: GlideClientConfiguration | GlideClusterClientConfiguration) -> GlideClient:
     """Create a Valkey client from configuration."""
-    return await GlideClient.create(config=config)  # pyright: ignore]
+    return await GlideClient.create(config=config)  
 
 
 async def _valkey_mget(client: BaseClient, keys: list[str]) -> list[bytes | None]:

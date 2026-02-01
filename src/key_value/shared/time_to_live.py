@@ -37,7 +37,7 @@ def now_plus(seconds: float) -> datetime:
     return datetime.now(tz=timezone.utc) + timedelta(seconds=seconds)
 
 
-def try_parse_datetime_str(value: Any) -> datetime | None:  # pyright: ignore]
+def try_parse_datetime_str(value: Any) -> datetime | None:  
     """Try to parse a datetime string, returning None on failure."""
     try:
         if isinstance(value, str):
