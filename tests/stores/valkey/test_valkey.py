@@ -15,6 +15,8 @@ from tests.stores.base import (
     ContextManagerStoreTestMixin,
 )
 
+pytestmark = pytest.mark.integration
+
 # Valkey test configuration
 VALKEY_DB = 15
 VALKEY_CONTAINER_PORT = 6379
