@@ -21,6 +21,13 @@ Raw values are **never** stored directly in backends. All values are wrapped in
 metadata like creation timestamp and TTL. This is intentional - don't try to
 "fix" it.
 
+When implementing or debugging stores, remember that what's stored is not
+the raw value but a `ManagedEntry` containing:
+
+- The actual value
+- Creation timestamp
+- TTL metadata
+
 ### Async Patterns
 
 - **Production stores**: Use actual async I/O. Avoid `asyncio.sleep()` for
@@ -44,6 +51,11 @@ between internally-created and externally-provided connections.
 - Use `ContextManagerStoreTestMixin` for store tests to ensure consistency
 - Ensure tests clean up resources and don't interfere with each other
 - Use context managers and proper teardown
+
+### Type Safety
+
+This project uses strict type checking (Basedpyright). Address type annotation
+issues to maintain type safety guarantees.
 
 ## Markdown Conventions
 
