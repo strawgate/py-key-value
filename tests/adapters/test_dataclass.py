@@ -215,7 +215,7 @@ class TestDataclassAdapter:
     async def test_dataclass_validation_on_init(self, store: MemoryStore):
         """Test that non-dataclass types are rejected."""
         with pytest.raises(TypeError, match="is not a dataclass"):
-            DataclassAdapter[str](key_value=store, dataclass_type=str)  # type: ignore[type-var]
+            DataclassAdapter[str](key_value=store, dataclass_type=str)
 
     async def test_default_collection(self, store: MemoryStore):
         """Test that default collection is used when not specified."""

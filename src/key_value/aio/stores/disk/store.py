@@ -47,7 +47,7 @@ def _disk_cache_get_with_expire(cache: Cache, key: str) -> tuple[Any, float | No
     Returns:
         Tuple of (value, expire_time). Value is None if key doesn't exist.
     """
-    return cache.get(key=key, expire_time=True)  # pyright: ignore[reportReturnType]
+    return cache.get(key=key, expire_time=True)  # pyright: ignore]
 
 
 def _disk_cache_set(

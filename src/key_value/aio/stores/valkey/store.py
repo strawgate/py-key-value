@@ -40,12 +40,12 @@ def _create_valkey_client_config(
 
 async def _create_valkey_client(config: GlideClientConfiguration | GlideClusterClientConfiguration) -> GlideClient:
     """Create a Valkey client from configuration."""
-    return await GlideClient.create(config=config)  # pyright: ignore[reportArgumentType]
+    return await GlideClient.create(config=config)  # pyright: ignore]
 
 
 async def _valkey_mget(client: BaseClient, keys: list[str]) -> list[bytes | None]:
     """Get multiple values from Valkey."""
-    return await client.mget(keys=keys)  # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+    return await client.mget(keys=keys)  # pyright: ignore[reportArgumentType]
 
 
 async def _valkey_delete(client: BaseClient, keys: list[str]) -> int:

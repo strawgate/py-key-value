@@ -63,7 +63,7 @@ async def _opensearch_index(
     refresh: bool = True,
 ) -> object:
     """Index a document in OpenSearch."""
-    return await client.index(  # type: ignore[reportUnknownVariableType]
+    return await client.index(
         index=index,
         id=document_id,
         body=body,
@@ -73,12 +73,12 @@ async def _opensearch_index(
 
 def _get_aggregation_buckets(aggregations: dict[str, Any], agg_name: str) -> list[Any]:
     """Get buckets from an aggregation result."""
-    return aggregations[agg_name]["buckets"]  # pyright: ignore[reportAny]
+    return aggregations[agg_name]["buckets"]  # pyright: ignore]
 
 
-def _get_bucket_key(bucket: Any) -> str:  # pyright: ignore[reportAny]
+def _get_bucket_key(bucket: Any) -> str:  # pyright: ignore]
     """Get the key from an aggregation bucket."""
-    return bucket["key"]  # pyright: ignore[reportAny]
+    return bucket["key"]  # pyright: ignore]
 
 
 DEFAULT_INDEX_PREFIX = "opensearch_kv_store"

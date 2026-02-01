@@ -63,9 +63,9 @@ def _validate_table_name(table_name: str) -> None:
 # These are module-level functions (not methods) so they are not exported with the store class
 
 
-async def _create_postgresql_pool_from_url(url: str) -> asyncpg.Pool:  # type: ignore[type-arg]
+async def _create_postgresql_pool_from_url(url: str) -> asyncpg.Pool:
     """Create an asyncpg pool from a connection URL."""
-    return await asyncpg.create_pool(url)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    return await asyncpg.create_pool(url)  # pyright: ignore[reportUnknownMemberType]
 
 
 async def _create_postgresql_pool(
@@ -75,9 +75,9 @@ async def _create_postgresql_pool(
     database: str = DEFAULT_DATABASE,
     user: str | None = None,
     password: str | None = None,
-) -> asyncpg.Pool:  # type: ignore[type-arg]
+) -> asyncpg.Pool:
     """Create an asyncpg pool from connection parameters."""
-    return await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    return await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType]
         host=host,
         port=port,
         database=database,
@@ -88,7 +88,7 @@ async def _create_postgresql_pool(
 
 # Pool operation helpers with type ignores centralized here
 async def _postgresql_fetchval(
-    pool: asyncpg.Pool,  # type: ignore[type-arg]
+    pool: asyncpg.Pool,
     query: str,
     *args: object,
 ) -> object:
@@ -97,7 +97,7 @@ async def _postgresql_fetchval(
 
 
 async def _postgresql_execute(
-    pool: asyncpg.Pool,  # type: ignore[type-arg]
+    pool: asyncpg.Pool,
     query: str,
     *args: object,
 ) -> str:
@@ -106,7 +106,7 @@ async def _postgresql_execute(
 
 
 async def _postgresql_fetchrow(
-    pool: asyncpg.Pool,  # type: ignore[type-arg]
+    pool: asyncpg.Pool,
     query: str,
     *args: object,
 ) -> asyncpg.Record | None:
@@ -115,7 +115,7 @@ async def _postgresql_fetchrow(
 
 
 async def _postgresql_fetch(
-    pool: asyncpg.Pool,  # type: ignore[type-arg]
+    pool: asyncpg.Pool,
     query: str,
     *args: object,
 ) -> list[asyncpg.Record]:
@@ -124,20 +124,20 @@ async def _postgresql_fetch(
 
 
 def _postgresql_pool_close_callback(
-    pool: asyncpg.Pool,  # type: ignore[type-arg]
+    pool: asyncpg.Pool,
 ) -> Callable[[], Awaitable[None]]:
     """Get the pool close callback for the exit stack."""
-    return pool.close  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType, reportReturnType]
+    return pool.close  # pyright: ignore]
 
 
 def _postgresql_row_get_str(row: asyncpg.Record, key: str) -> str:
     """Get a string value from a PostgreSQL row."""
-    return row[key]  # pyright: ignore[reportUnknownVariableType, reportReturnType]
+    return row[key]  # pyright: ignore]
 
 
 def _postgresql_row_get_datetime(row: asyncpg.Record, key: str) -> datetime | None:
     """Get a datetime value from a PostgreSQL row."""
-    return row[key]  # pyright: ignore[reportUnknownVariableType, reportReturnType]
+    return row[key]  # pyright: ignore]
 
 
 class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
@@ -169,7 +169,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         ... )
     """
 
-    _pool: asyncpg.Pool | None  # type: ignore[type-arg]
+    _pool: asyncpg.Pool | None
     _url: str | None
     _host: str
     _port: int
@@ -183,7 +183,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
     def __init__(
         self,
         *,
-        pool: asyncpg.Pool,  # type: ignore[type-arg]
+        pool: asyncpg.Pool,
         table_name: str | None = None,
         default_collection: str | None = None,
         auto_create: bool = True,
@@ -244,7 +244,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
     def __init__(
         self,
         *,
-        pool: asyncpg.Pool | None = None,  # type: ignore[type-arg]
+        pool: asyncpg.Pool | None = None,
         url: str | None = None,
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
@@ -289,7 +289,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         super().__init__(default_collection=default_collection, client_provided_by_user=pool_provided)
 
     @property
-    def _initialized_pool(self) -> asyncpg.Pool:  # type: ignore[type-arg]
+    def _initialized_pool(self) -> asyncpg.Pool:
         """Get the initialized connection pool.
 
         Returns:
@@ -303,7 +303,7 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
             raise RuntimeError(msg)
         return self._pool
 
-    async def _create_pool(self) -> asyncpg.Pool:  # type: ignore[type-arg]
+    async def _create_pool(self) -> asyncpg.Pool:
         """Create a new connection pool.
 
         Returns:

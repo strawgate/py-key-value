@@ -28,7 +28,7 @@ def _create_vault_client(url: str = "http://localhost:8200", token: str | None =
 
 def _get_vault_kv_v2(client: hvac.Client) -> KvV2:
     """Get the KV v2 secrets engine from a Vault client."""
-    return client.secrets.kv.v2  # pyright: ignore[reportUnknownMemberType,reportUnknownReturnType,reportUnknownVariableType]
+    return client.secrets.kv.v2  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
 
 
 def _read_vault_secret(kv_v2: KvV2, path: str, mount_point: str) -> dict[str, str] | None:
@@ -44,7 +44,7 @@ def _read_vault_secret(kv_v2: KvV2, path: str, mount_point: str) -> dict[str, st
     except Exception:
         return None
 
-    if response is None or "data" not in response or "data" not in response["data"]:  # pyright: ignore[reportUnknownVariableType]
+    if response is None or "data" not in response or "data" not in response["data"]:  # pyright: ignore]
         return None
 
     # Vault KV v2 returns data in response['data']['data']

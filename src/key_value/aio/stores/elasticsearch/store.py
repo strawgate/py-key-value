@@ -63,17 +63,17 @@ async def _elasticsearch_bulk(
     refresh: bool = False,
 ) -> ObjectApiResponse[Any]:
     """Execute a bulk operation on Elasticsearch."""
-    return await client.bulk(operations=operations, refresh=refresh)  # pyright: ignore[reportUnknownMemberType]
+    return await client.bulk(operations=operations, refresh=refresh)  # pyright: ignore]
 
 
 def _get_aggregation_buckets(aggregations: dict[str, Any], agg_name: str) -> list[Any]:
     """Get buckets from an aggregation result."""
-    return aggregations[agg_name]["buckets"]  # pyright: ignore[reportAny]
+    return aggregations[agg_name]["buckets"]  # pyright: ignore]
 
 
-def _get_bucket_key(bucket: Any) -> str:  # pyright: ignore[reportAny]
+def _get_bucket_key(bucket: Any) -> str:  # pyright: ignore]
     """Get the key from an aggregation bucket."""
-    return bucket["key"]  # pyright: ignore[reportAny]
+    return bucket["key"]  # pyright: ignore]
 
 
 DEFAULT_INDEX_PREFIX = "kv_store"

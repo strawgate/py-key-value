@@ -83,7 +83,7 @@ def dump_to_json(obj: dict[str, Any]) -> str:
 def load_from_json(json_str: str) -> dict[str, Any]:
     """Deserialize a JSON string to a dictionary."""
     try:
-        return verify_dict(obj=json.loads(json_str))  # pyright: ignore[reportAny]
+        return verify_dict(obj=json.loads(json_str))  # pyright: ignore]
 
     except (json.JSONDecodeError, TypeError) as e:
         msg: str = f"Failed to deserialize JSON string: {e}"

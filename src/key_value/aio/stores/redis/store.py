@@ -72,42 +72,42 @@ def _create_redis_client_from_url(
 
 async def _redis_get(client: Redis, name: str) -> Any:
     """Get a value from Redis."""
-    return await client.get(name=name)  # pyright: ignore[reportAny]
+    return await client.get(name=name)  # pyright: ignore]
 
 
 async def _redis_mget(client: Redis, keys: list[str]) -> list[Any]:
     """Get multiple values from Redis."""
-    return await client.mget(keys=keys)  # pyright: ignore[reportAny]
+    return await client.mget(keys=keys)  # pyright: ignore]
 
 
 async def _redis_set(client: Redis, name: str, value: str) -> None:
     """Set a value in Redis without TTL."""
-    _ = await client.set(name=name, value=value)  # pyright: ignore[reportAny]
+    _ = await client.set(name=name, value=value)  # pyright: ignore]
 
 
 async def _redis_setex(client: Redis, name: str, time: int, value: str) -> None:
     """Set a value in Redis with TTL."""
-    _ = await client.setex(name=name, time=time, value=value)  # pyright: ignore[reportAny]
+    _ = await client.setex(name=name, time=time, value=value)  # pyright: ignore]
 
 
-async def _redis_pipeline_execute(pipeline: Any) -> None:  # pyright: ignore[reportAny]
+async def _redis_pipeline_execute(pipeline: Any) -> None:  # pyright: ignore]
     """Execute a Redis pipeline."""
-    await pipeline.execute()  # pyright: ignore[reportAny]
+    await pipeline.execute()  # pyright: ignore]
 
 
 async def _redis_delete(client: Redis, *keys: str) -> int:
     """Delete one or more keys from Redis."""
-    return await client.delete(*keys)  # pyright: ignore[reportAny]
+    return await client.delete(*keys)  # pyright: ignore]
 
 
 async def _redis_scan(client: Redis, cursor: int, match: str, count: int) -> tuple[int, list[str]]:
     """Scan Redis keys matching a pattern."""
-    return await client.scan(cursor=cursor, match=match, count=count)  # pyright: ignore[reportUnknownMemberType, reportAny]
+    return await client.scan(cursor=cursor, match=match, count=count)  # pyright: ignore[reportUnknownMemberType]
 
 
 async def _redis_flushdb(client: Redis) -> bool:
     """Flush the current Redis database."""
-    return await client.flushdb()  # pyright: ignore[reportUnknownMemberType, reportAny]
+    return await client.flushdb()  # pyright: ignore[reportUnknownMemberType]
 
 
 class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):

@@ -62,7 +62,7 @@ def get_hits_from_response(response: Any) -> list[dict[str, Any]]:
     if not (hits_list := hits_dict.get("hits")):
         return []
 
-    if not all(isinstance(hit, dict) for hit in hits_list):  # pyright: ignore[reportAny]
+    if not all(isinstance(hit, dict) for hit in hits_list):  # pyright: ignore]
         return []
 
     hits_list_dict: list[dict[str, Any]] = cast("list[dict[str, Any]]", hits_list)
@@ -104,7 +104,7 @@ def get_values_from_field_in_hit(hit: dict[str, Any], field: str, value_type: ty
         msg = f"Field {field} is not in hit {hit}"
         raise TypeError(msg)
 
-    if not all(isinstance(item, value_type) for item in value):  # pyright: ignore[reportAny]
+    if not all(isinstance(item, value_type) for item in value):  # pyright: ignore]
         msg = f"Field {field} in hit {hit} is not a list of {value_type}"
         raise TypeError(msg)
 
@@ -126,11 +126,11 @@ def new_bulk_action(action: str, index: str, document_id: str) -> dict[str, Any]
 class LessCapableJsonSerializer(JSONSerializer):
     """A JSON Serializer that doesnt try to be smart with datetime, floats, etc."""
 
-    def default(self, data: Any) -> Any:  # type: ignore[reportIncompatibleMethodOverride]
+    def default(self, data: Any) -> Any:
         msg = f"Unable to serialize to JSON: {data!r} (type: {type(data).__name__})"
         raise TypeError(msg)
 
     @classmethod
     def install_serializer(cls, client: AsyncOpenSearch) -> None:
         # OpenSearch uses a different serializer architecture
-        client.transport.serializer = cls()  # type: ignore[reportUnknownMemberType]
+        client.transport.serializer = cls()

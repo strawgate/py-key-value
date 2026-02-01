@@ -44,7 +44,7 @@ async def ping_dynamodb(endpoint_url: str) -> bool:
             region_name="us-east-1",
         )
         async with _create_dynamodb_client_context(session, endpoint_url=endpoint_url) as client:
-            await client.list_tables()  # type: ignore[union-attr]
+            await client.list_tables()
     except Exception:
         return False
     else:
@@ -114,10 +114,10 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         )
         async with _create_dynamodb_client_context(session, endpoint_url=dynamodb_endpoint) as client:
             with contextlib.suppress(Exception):
-                await client.delete_table(TableName=DYNAMODB_TEST_TABLE)  # type: ignore[union-attr]
+                await client.delete_table(TableName=DYNAMODB_TEST_TABLE)
                 # Wait for table to be deleted
-                waiter = client.get_waiter("table_not_exists")  # type: ignore[union-attr]
-                await waiter.wait(TableName=DYNAMODB_TEST_TABLE)  # type: ignore[union-attr]
+                waiter = client.get_waiter("table_not_exists")
+                await waiter.wait(TableName=DYNAMODB_TEST_TABLE)
 
         return store
 
@@ -183,9 +183,9 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         )
         async with _create_dynamodb_client_context(session, endpoint_url=dynamodb_endpoint) as client:
             with contextlib.suppress(Exception):
-                await client.delete_table(TableName=table_name)  # type: ignore[union-attr]
-                waiter = client.get_waiter("table_not_exists")  # type: ignore[union-attr]
-                await waiter.wait(TableName=table_name)  # type: ignore[union-attr]
+                await client.delete_table(TableName=table_name)
+                waiter = client.get_waiter("table_not_exists")
+                await waiter.wait(TableName=table_name)
 
         # Create store with SSE configuration
         store = DynamoDBStore(
@@ -205,7 +205,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         async with store:
             # Verify table was created successfully
             async with _create_dynamodb_client_context(session, endpoint_url=dynamodb_endpoint) as client:
-                table_description = await client.describe_table(TableName=table_name)  # type: ignore[union-attr]
+                table_description = await client.describe_table(TableName=table_name)
 
                 # DynamoDB Local might not fully support SSE, but we can verify the store accepts the config
                 # The important thing is that the store doesn't error when table_config is provided
@@ -230,9 +230,9 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         )
         async with _create_dynamodb_client_context(session, endpoint_url=dynamodb_endpoint) as client:
             with contextlib.suppress(Exception):
-                await client.delete_table(TableName=table_name)  # type: ignore[union-attr]
-                waiter = client.get_waiter("table_not_exists")  # type: ignore[union-attr]
-                await waiter.wait(TableName=table_name)  # type: ignore[union-attr]
+                await client.delete_table(TableName=table_name)
+                waiter = client.get_waiter("table_not_exists")
+                await waiter.wait(TableName=table_name)
 
         # Create store with auto_create=False
         store = DynamoDBStore(
@@ -263,9 +263,9 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         )
         async with _create_dynamodb_client_context(session, endpoint_url=dynamodb_endpoint) as client:
             with contextlib.suppress(Exception):
-                await client.delete_table(TableName=table_name)  # type: ignore[union-attr]
-                waiter = client.get_waiter("table_not_exists")  # type: ignore[union-attr]
-                await waiter.wait(TableName=table_name)  # type: ignore[union-attr]
+                await client.delete_table(TableName=table_name)
+                waiter = client.get_waiter("table_not_exists")
+                await waiter.wait(TableName=table_name)
 
         # Create store with auto_create=True (default)
         store = DynamoDBStore(
@@ -285,5 +285,5 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
             # Verify table was actually created
             async with _create_dynamodb_client_context(session, endpoint_url=dynamodb_endpoint) as client:
-                table_description = await client.describe_table(TableName=table_name)  # type: ignore[union-attr]
+                table_description = await client.describe_table(TableName=table_name)
                 assert table_description is not None

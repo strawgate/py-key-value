@@ -36,7 +36,7 @@ async def ping_s3(endpoint_url: str) -> bool:
             region_name="us-east-1",
         )
         async with _create_s3_client_context(session, endpoint_url=endpoint_url) as client:
-            await client.list_buckets()  # type: ignore[union-attr]
+            await client.list_buckets()
     except Exception:
         return False
     else:
@@ -108,19 +108,19 @@ class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
                     list_kwargs = {"Bucket": S3_TEST_BUCKET}
                     if continuation_token:
                         list_kwargs["ContinuationToken"] = continuation_token
-                    response = await client.list_objects_v2(**list_kwargs)  # type: ignore[union-attr]
+                    response = await client.list_objects_v2(**list_kwargs)
 
                     # Delete objects from this page
-                    for obj in response.get("Contents", []):  # type: ignore[union-attr]
-                        await client.delete_object(Bucket=S3_TEST_BUCKET, Key=obj["Key"])  # type: ignore[union-attr]
+                    for obj in response.get("Contents", []):
+                        await client.delete_object(Bucket=S3_TEST_BUCKET, Key=obj["Key"])
 
                     # Check if there are more pages
-                    continuation_token = response.get("NextContinuationToken")  # type: ignore[union-attr]
+                    continuation_token = response.get("NextContinuationToken")
                     if not continuation_token:
                         break
 
                 # Delete the bucket
-                await client.delete_bucket(Bucket=S3_TEST_BUCKET)  # type: ignore[union-attr]
+                await client.delete_bucket(Bucket=S3_TEST_BUCKET)
 
         return store
 

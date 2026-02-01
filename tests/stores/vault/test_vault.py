@@ -37,7 +37,7 @@ class TestVaultStore(BaseStoreTests):
     async def ping_vault(self, vault_url: str) -> bool:
         try:
             client = self.get_vault_client(vault_url)
-            return client.sys.is_initialized()  # pyright: ignore[reportUnknownMemberType,reportUnknownReturnType,reportUnknownVariableType]
+            return client.sys.is_initialized()  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
         except Exception:
             return False
 
@@ -87,7 +87,7 @@ class TestVaultStore(BaseStoreTests):
             # List all secrets and delete them
             secrets_list = kv_v2.list_secrets(path="", mount_point=VAULT_MOUNT_POINT)  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
             if secrets_list and "data" in secrets_list and "keys" in secrets_list["data"]:
-                for key in secrets_list["data"]["keys"]:  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
+                for key in secrets_list["data"]["keys"]:  # pyright: ignore[reportUnknownVariableType]
                     # Best effort cleanup - ignore individual deletion failures
                     kv_v2.delete_metadata_and_all_versions(path=key.rstrip("/"), mount_point=VAULT_MOUNT_POINT)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
         except Exception:  # noqa: S110
