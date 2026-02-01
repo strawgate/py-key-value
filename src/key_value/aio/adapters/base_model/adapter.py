@@ -61,7 +61,7 @@ class BaseModelAdapter(BasePydanticAdapter[T]):
                 msg = f"List element type must be a BaseModel subclass, got {inner}"
                 raise TypeError(msg)
         # Validate single model type
-        elif not issubclass(pydantic_model, BaseModel):  # type: ignore[arg-type]
+        elif not issubclass(pydantic_model, BaseModel):
             msg = f"pydantic_model must be a BaseModel subclass, got {pydantic_model}"
             raise TypeError(msg)
 

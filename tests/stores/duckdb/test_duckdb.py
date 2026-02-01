@@ -13,7 +13,7 @@ from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 
 def get_client_from_store(store: DuckDBStore) -> DuckDBPyConnection:
-    return store._connection  # pyright: ignore[reportPrivateUsage]
+    return store._connection
 
 
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
@@ -77,7 +77,7 @@ class TestDuckDBStoreSpecific:
             ORDER BY key
         """)
             .fetchall()
-        )  # pyright: ignore[reportPrivateUsage]
+        )
 
         assert len(result) == 2
         assert result[0][0] == "item1"
@@ -93,7 +93,7 @@ class TestDuckDBStoreSpecific:
             WHERE expires_at > now() OR expires_at IS NULL
         """)
             .fetchone()
-        )  # pyright: ignore[reportPrivateUsage]
+        )
 
         assert count_result is not None
         assert count_result[0] == 3  # All 3 entries should not be expired

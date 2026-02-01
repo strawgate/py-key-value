@@ -156,6 +156,7 @@ typeCheckingMode = "strict"
 reportExplicitAny = false
 reportMissingTypeStubs = false
 reportPrivateUsage = false
+reportUnnecessaryTypeIgnoreComment = true
 include = [
     "src",
     "tests"

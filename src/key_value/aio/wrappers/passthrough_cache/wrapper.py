@@ -102,7 +102,7 @@ class PassthroughCacheWrapper(BaseWrapper):
 
     @override
     async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
-        key_to_value: dict[str, tuple[dict[str, Any] | None, float | None]] = dict.fromkeys(keys, (None, None))  # type: ignore
+        key_to_value: dict[str, tuple[dict[str, Any] | None, float | None]] = dict.fromkeys(keys, (None, None))
 
         # First check the cache store for the entries
         cached_entries: list[tuple[dict[str, Any] | None, float | None]] = await self.cache_key_value.ttl_many(

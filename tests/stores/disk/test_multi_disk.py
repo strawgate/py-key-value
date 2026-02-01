@@ -9,6 +9,7 @@ from inline_snapshot import snapshot
 from typing_extensions import override
 
 from key_value.aio.stores.disk.multi_store import MultiDiskStore
+from key_value.aio.stores.disk.store import _disk_cache_clear
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 if TYPE_CHECKING:
@@ -26,12 +27,12 @@ class TestMultiDiskStore(ContextManagerStoreTestMixin, BaseStoreTests):
         yield store
 
         # Wipe the store after returning it
-        for collection in store._cache:  # pyright: ignore[reportPrivateUsage]
-            store._cache[collection].clear()  # pyright: ignore[reportPrivateUsage]
+        for collection in store._cache:
+            _disk_cache_clear(cache=store._cache[collection])
 
     async def test_value_stored(self, store: MultiDiskStore):
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
-        disk_cache: Cache = store._cache["test"]  # pyright: ignore[reportPrivateUsage]
+        disk_cache: Cache = store._cache["test"]
 
         value = disk_cache.get(key="test_key")
         value_as_dict = json.loads(value)

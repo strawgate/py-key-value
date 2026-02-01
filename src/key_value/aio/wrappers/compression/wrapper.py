@@ -104,7 +104,7 @@ class CompressionWrapper(BaseWrapper):
 
             # Parse JSON
             json_str = json_bytes.decode("utf-8")
-            return json.loads(json_str)  # type: ignore[no-any-return]
+            return json.loads(json_str)
         except Exception:
             # If decompression fails, return the original value
             # This handles cases where data might be corrupted

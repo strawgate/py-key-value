@@ -187,8 +187,8 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         """Verify values are stored as f objects, not JSON strings"""
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30})
 
-        index_name = store._get_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        doc_id = store._get_document_id(key="test_key")  # pyright: ignore[reportPrivateUsage]
+        index_name = store._get_index_name(collection="test")
+        doc_id = store._get_document_id(key="test_key")
 
         response = await opensearch_client.get(index=index_name, id=doc_id)
         assert response["_source"] == snapshot(

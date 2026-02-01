@@ -182,8 +182,8 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         # Check raw Elasticsearch document using public sanitization methods
         # Note: We need to access these internal methods for testing the storage format
-        index_name = store._get_index_name(collection="test")  # pyright: ignore[reportPrivateUsage]
-        doc_id = store._get_document_id(key="test_key")  # pyright: ignore[reportPrivateUsage]
+        index_name = store._get_index_name(collection="test")
+        doc_id = store._get_document_id(key="test_key")
 
         response = await es_client.get(index=index_name, id=doc_id)
         assert response.body["_source"] == snapshot(

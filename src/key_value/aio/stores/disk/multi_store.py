@@ -6,6 +6,13 @@ from typing import overload
 from typing_extensions import override
 
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
+from key_value.aio.stores.disk.store import (
+    _create_disk_cache,
+    _disk_cache_close,
+    _disk_cache_delete,
+    _disk_cache_get_with_expire,
+    _disk_cache_set,
+)
 from key_value.shared.managed_entry import ManagedEntry, datetime
 from key_value.shared.serialization import BasicSerializationAdapter
 
@@ -103,10 +110,7 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
                     raise ValueError(msg)
                 cache_directory.mkdir(parents=True, exist_ok=True)
 
-            if max_size is not None and max_size > 0:
-                return Cache(directory=cache_directory, size_limit=max_size)
-
-            return Cache(directory=cache_directory, eviction_policy="none")
+            return _create_disk_cache(directory=cache_directory, max_size=max_size)
 
         self._disk_cache_factory = disk_cache_factory or default_disk_cache_factory
 
@@ -130,9 +134,9 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
-        expire_epoch: float
+        expire_epoch: float | None
 
-        managed_entry_str, expire_epoch = self._cache[collection].get(key=key, expire_time=True)  # pyright: ignore[reportAny]
+        managed_entry_str, expire_epoch = _disk_cache_get_with_expire(cache=self._cache[collection], key=key)
 
         if not isinstance(managed_entry_str, str):
             return None
@@ -152,7 +156,8 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
-        _ = self._cache[collection].set(
+        _ = _disk_cache_set(
+            cache=self._cache[collection],
             key=key,
             value=self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection),
             expire=managed_entry.ttl,
@@ -160,11 +165,11 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        return self._cache[collection].delete(key=key, retry=True)
+        return _disk_cache_delete(cache=self._cache[collection], key=key)
 
     def _sync_close(self) -> None:
         for cache in self._cache.values():
-            cache.close()
+            _disk_cache_close(cache=cache)
 
     def __del__(self) -> None:
         self._sync_close()

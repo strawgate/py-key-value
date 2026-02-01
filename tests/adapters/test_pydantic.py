@@ -135,7 +135,7 @@ class TestPydanticAdapter:
         self, user_adapter: PydanticAdapter[User], updated_user_adapter: PydanticAdapter[UpdatedUser]
     ):
         await user_adapter.put(collection=TEST_COLLECTION, key=TEST_KEY, value=SAMPLE_USER)
-        updated_user_adapter._raise_on_validation_error = True  # pyright: ignore[reportPrivateUsage]
+        updated_user_adapter._raise_on_validation_error = True
         with pytest.raises(DeserializationError):
             await updated_user_adapter.get(collection=TEST_COLLECTION, key=TEST_KEY)
 
@@ -152,7 +152,7 @@ class TestPydanticAdapter:
         assert cached_products == [SAMPLE_PRODUCT, SAMPLE_PRODUCT]
 
         # We need to ensure our memory store doesnt hold an entry with an array
-        raw_collection = store._cache.get(TEST_COLLECTION)  # pyright: ignore[reportPrivateUsage]
+        raw_collection = store._cache.get(TEST_COLLECTION)
         assert raw_collection is not None
 
         raw_entry = raw_collection.get(TEST_KEY)
