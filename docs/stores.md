@@ -454,6 +454,7 @@ Distributed stores provide network-based storage for multi-node applications.
 | DynamoDB | Unstable | AWS DynamoDB key-value storage |
 | S3 | Unstable | AWS S3 object storage |
 | Elasticsearch | Unstable | Full-text search with key-value capabilities |
+| Firestore | Unstable | Google Cloud Firestore key-value storage |
 | Memcached | Unstable | High-performance distributed memory cache |
 | MongoDB | Unstable | Document database used as key-value store |
 | OpenSearch | Unstable | OpenSearch search engine with key-value capabilities |
@@ -567,6 +568,36 @@ pip install py-key-value-aio[valkey]
 - Open-source governance
 - Production-ready
 - **Stable storage format**
+
+---
+
+### FirestoreStore
+
+Google Cloud Firestore used as a key-value store.
+
+```python
+from key_value.aio.stores.firestore import FirestoreStore
+
+store = FirestoreStore(credentials=google_credentials, database="firestore-db")
+```
+
+**Installation:**
+
+```bash
+pip install py-key-value-aio[firestore]
+```
+
+**Use Cases:**
+
+- Google Cloud-native applications
+- Serverless / managed infrastructure
+- Existing Firestore deployments
+
+**Characteristics:**
+
+- Managed cloud database
+- Document/collection model
+- Stable storage format: **Unstable**
 
 ---
 
