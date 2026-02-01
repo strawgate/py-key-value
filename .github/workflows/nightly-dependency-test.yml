@@ -23,9 +23,6 @@ jobs:
             windows-2022,
             windows-latest,
           ]
-        project:
-          - "key-value/key-value-aio"
-          - "key-value/key-value-shared"
 
     runs-on: ${{ matrix.platform }}
 
@@ -48,19 +45,15 @@ jobs:
 
       - name: "Install latest dependencies (unpinned)"
         run: uv sync --group dev --python ${{ matrix.python-version }}
-        working-directory: ${{ matrix.project }}
 
       - name: "Show installed versions"
         run: uv pip list
-        working-directory: ${{ matrix.project }}
 
       - name: "Test with latest dependencies"
-        run: uv run pytest tests . -vv -n ${{ steps.pytest-workers.outputs.count }}
-        working-directory: ${{ matrix.project }}
+        run: uv run pytest tests -vv -n ${{ steps.pytest-workers.outputs.count }}
 
       - name: "Build"
         run: uv build .
-        working-directory: ${{ matrix.project }}
 
   create_issue_on_failure:
     needs: test_latest_dependencies
