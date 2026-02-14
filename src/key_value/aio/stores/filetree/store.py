@@ -111,7 +111,11 @@ async def check_no_symlink_escape(path: AsyncPath, root_directory: AsyncPath) ->
 
     # Check each component of the path for symlinks
     current_path = root_directory
-    path_parts = path.relative_to(root_directory).parts if str(path).startswith(str(root_directory)) else path.parts
+    try:
+        path_parts = path.relative_to(root_directory).parts
+    except ValueError:
+        # Path is not relative to root_directory, use path.parts directly
+        path_parts = path.parts
 
     for part in path_parts:
         current_path = current_path / part
@@ -153,19 +157,20 @@ async def write_file_atomic(file: AsyncPath, text: str) -> None:
     fd, temp_path_str = tempfile.mkstemp(dir=str(dir_path), suffix=".tmp")
     temp_path = Path(temp_path_str)
 
+    # Close the fd immediately after mkstemp to avoid Windows file locking issues
+    # and to prevent double-close errors. We'll reopen with aopen for async writing.
+    os.close(fd)
+
     try:
         # Write content to the temporary file
         async with aopen(file_specifier=temp_path_str, mode="w", encoding="utf-8") as f:
             await f.write(data=text)
 
-        # Close the file descriptor from mkstemp
-        os.close(fd)
-
         # Atomically replace the target file with the temporary file
         temp_path.replace(Path(file))
     except BaseException:
         # Clean up the temporary file on any error
-        os.close(fd)
+        # fd is already closed, so we just need to remove the temp file
         with contextlib.suppress(OSError):
             temp_path.unlink()
         raise
