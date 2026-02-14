@@ -35,7 +35,7 @@ from key_value.shared.errors.key_value import (
     SerializationError,
     ValueTooLargeError,
 )
-from key_value.shared.errors.store import KeyValueStoreError, StoreConnectionError, StoreSetupError
+from key_value.shared.errors.store import KeyValueStoreError, PathSecurityError, StoreConnectionError, StoreSetupError
 from key_value.shared.errors.wrappers import (
     CorruptedDataError,
     DecryptionError,
@@ -61,6 +61,7 @@ __all__ = [
     "KeyValueOperationError",
     "KeyValueStoreError",
     "MissingKeyError",
+    "PathSecurityError",
     "ReadOnlyError",
     "SerializationError",
     "StoreConnectionError",
