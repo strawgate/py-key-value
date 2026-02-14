@@ -165,6 +165,9 @@ async def write_file_atomic(file: AsyncPath, text: str) -> None:
         # Write content to the temporary file
         async with aopen(file_specifier=temp_path_str, mode="w", encoding="utf-8") as f:
             await f.write(data=text)
+            # Flush Python buffers to OS and fsync to disk for durability
+            await f.flush()
+            os.fsync(f.file.fileno())
 
         # Atomically replace the target file with the temporary file
         temp_path.replace(Path(file))
