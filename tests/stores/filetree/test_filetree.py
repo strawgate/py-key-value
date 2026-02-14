@@ -12,7 +12,7 @@ from key_value.aio.stores.filetree import (
     FileTreeV1CollectionSanitizationStrategy,
     FileTreeV1KeySanitizationStrategy,
 )
-from key_value.shared.errors import PathSecurityError
+from key_value.shared.errors import PathSecurityError, StoreSetupError
 from key_value.shared.sanitization import PassthroughStrategy
 from tests.stores.base import BaseStoreTests
 
@@ -62,12 +62,15 @@ class TestFileTreeStorePathTraversal:
 
     async def test_path_traversal_in_collection_blocked(self, unsanitized_store: FileTreeStore):
         """Test that path traversal in collection names is blocked."""
-        with pytest.raises(PathSecurityError):
+        # Collection path traversal is caught during setup, which wraps in StoreSetupError
+        with pytest.raises(StoreSetupError) as exc_info:
             await unsanitized_store.put(
                 collection="../../../../tmp/evil",
                 key="test_key",
                 value={"pwned": True},
             )
+        # Verify the underlying cause is PathSecurityError
+        assert isinstance(exc_info.value.__cause__, PathSecurityError)
 
     async def test_path_traversal_get_blocked(self, unsanitized_store: FileTreeStore):
         """Test that path traversal in get operations is blocked."""

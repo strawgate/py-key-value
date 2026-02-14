@@ -539,6 +539,11 @@ class FileTreeStore(BaseStore):
         # Create the collection directory under the data directory
         data_directory: AsyncPath = AsyncPath(self._data_directory / sanitized_collection)
 
+        # Security validation BEFORE creating any directories
+        # This prevents path traversal attacks where malicious collection names like
+        # "../../../../tmp/evil" could create directories outside the data root
+        await validate_path_within_directory(path=data_directory, root_directory=self._data_directory)
+
         if not await data_directory.exists():
             if not self._auto_create:
                 msg = f"Directory '{data_directory}' does not exist. Either create the directory manually or set auto_create=True."
