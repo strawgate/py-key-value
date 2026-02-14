@@ -1,10 +1,12 @@
 """FileTreeStore implementation using async filesystem operations."""
 
+import hashlib
 import os
 import tempfile
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +19,7 @@ from key_value.aio.stores.base import (
 )
 from key_value.shared.errors import PathSecurityError
 from key_value.shared.managed_entry import ManagedEntry, dump_to_json, load_from_json
-from key_value.shared.sanitization import HybridSanitizationStrategy, SanitizationStrategy
+from key_value.shared.sanitization import SanitizationStrategy
 from key_value.shared.sanitize import ALPHANUMERIC_CHARACTERS
 from key_value.shared.serialization import BasicSerializationAdapter, SerializationAdapter
 from key_value.shared.time_to_live import now
@@ -65,11 +67,36 @@ def get_max_file_name_length(root: Path | AsyncPath) -> int:
     return MAX_FILE_NAME_LENGTH
 
 
+@lru_cache(maxsize=1024)
+def _validate_resolved_path_within_directory(resolved_path_str: str, resolved_root_str: str) -> bool:
+    """Validate that a resolved path is within the resolved root directory (cached).
+
+    This is a synchronous helper function that can be cached with LRU cache.
+    The actual resolution is done by the async caller, and the resolved strings
+    are passed here for the security check.
+
+    Args:
+        resolved_path_str: The resolved path as a string.
+        resolved_root_str: The resolved root directory as a string.
+
+    Returns:
+        True if the path is within the root directory.
+
+    Note:
+        This function returns bool rather than raising to allow caching of valid paths.
+        The caller is responsible for raising PathSecurityError if this returns False.
+    """
+    # Ensure the path is within the root directory
+    # We add os.sep to avoid matching partial directory names (e.g., /data vs /data2)
+    return resolved_path_str == resolved_root_str or resolved_path_str.startswith(resolved_root_str + os.sep)
+
+
 async def validate_path_within_directory(path: AsyncPath, root_directory: AsyncPath) -> None:
     """Validate that a path is within the root directory.
 
     This prevents path traversal attacks where malicious keys like '../../../etc/passwd'
-    could escape the data directory.
+    could escape the data directory. The validation uses `resolve()` which also follows
+    symlinks, so this catches symlink-based escapes as well.
 
     Args:
         path: The path to validate.
@@ -78,58 +105,18 @@ async def validate_path_within_directory(path: AsyncPath, root_directory: AsyncP
     Raises:
         PathSecurityError: If the path escapes the root directory.
     """
+    # Resolve paths first (follows symlinks)
     resolved_path = await path.resolve()
     resolved_root = await root_directory.resolve()
 
-    # Check if the resolved path starts with the resolved root
-    # We need to check the string representation to handle edge cases
+    # Convert to strings for the cached validation
     resolved_path_str = str(resolved_path)
     resolved_root_str = str(resolved_root)
 
-    # Ensure the path is within the root directory
-    # We add os.sep to avoid matching partial directory names (e.g., /data vs /data2)
-    if not (resolved_path_str == resolved_root_str or resolved_path_str.startswith(resolved_root_str + os.sep)):
+    # Use the cached validation function
+    if not _validate_resolved_path_within_directory(resolved_path_str, resolved_root_str):
         msg = f"Path '{path}' resolves outside the allowed directory '{root_directory}'"
         raise PathSecurityError(message=msg)
-
-
-async def check_no_symlink_escape(path: AsyncPath, root_directory: AsyncPath) -> None:
-    """Check that a path does not contain symlinks that escape the root directory.
-
-    This prevents symlink attacks where an attacker creates a symlink pointing
-    outside the data directory.
-
-    Args:
-        path: The path to check.
-        root_directory: The root directory that all symlink targets must be within.
-
-    Raises:
-        PathSecurityError: If a symlink points outside the root directory.
-    """
-    resolved_root = await root_directory.resolve()
-    resolved_root_str = str(resolved_root)
-
-    # Check each component of the path for symlinks
-    current_path = root_directory
-    try:
-        path_parts = path.relative_to(root_directory).parts
-    except ValueError:
-        # Path is not relative to root_directory, use path.parts directly
-        path_parts = path.parts
-
-    for part in path_parts:
-        current_path = current_path / part
-
-        # Check if this component exists and is a symlink
-        if await current_path.is_symlink():
-            # Resolve the symlink target
-            target = await current_path.resolve()
-            target_str = str(target)
-
-            # Verify the target is within the root directory
-            if not (target_str == resolved_root_str or target_str.startswith(resolved_root_str + os.sep)):
-                msg = f"Symlink at '{current_path}' points outside the allowed directory"
-                raise PathSecurityError(message=msg)
 
 
 async def write_file_atomic(file: AsyncPath, text: str) -> None:
@@ -179,11 +166,12 @@ async def write_file_atomic(file: AsyncPath, text: str) -> None:
         raise
 
 
-class FileTreeV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
+class FileTreeV1CollectionSanitizationStrategy(SanitizationStrategy):
     """V1 sanitization strategy for FileTreeStore collections.
 
-    This strategy sanitizes collection names to comply with filesystem directory naming requirements.
-    It replaces invalid characters with underscores and truncates to fit within directory name length limits.
+    This strategy ensures collection names are safe for filesystem use:
+    - Alphanumeric values (plus underscore) are kept as-is for readability
+    - Non-alphanumeric values are hashed to prevent path traversal attacks
 
     Collection names (directories) are subject to the same length limit as file names (typically 255 bytes).
     The sanitized name is also used for the collection info file (with `-info.json` suffix), so we need
@@ -197,19 +185,36 @@ class FileTreeV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
         # Leave room for `-info.json` suffix (10 chars) that's added to the metadata file name
         suffix_length = 10
 
-        super().__init__(
-            replacement_character="_",
-            max_length=max_name_length - suffix_length,
-            allowed_characters=DIRECTORY_ALLOWED_CHARACTERS,
-        )
+        self._max_length = max_name_length - suffix_length
+        self._allowed_characters = DIRECTORY_ALLOWED_CHARACTERS
+
+    def _is_safe(self, value: str) -> bool:
+        """Check if a value contains only safe characters."""
+        return all(char in self._allowed_characters for char in value) and len(value) <= self._max_length
+
+    def sanitize(self, value: str) -> str:
+        """Sanitize a collection name for filesystem use.
+
+        If the value contains only alphanumeric characters and underscores,
+        it is returned as-is for readability. Otherwise, it is hashed.
+        """
+        if self._is_safe(value):
+            return value
+
+        # Hash the value for safety - use enough characters for uniqueness
+        # but stay within max length
+        return hashlib.sha256(value.encode()).hexdigest()[: self._max_length]
+
+    def validate(self, value: str) -> None:
+        """No validation needed - all values are accepted and sanitized."""
 
 
-class FileTreeV1KeySanitizationStrategy(HybridSanitizationStrategy):
+class FileTreeV1KeySanitizationStrategy(SanitizationStrategy):
     """V1 sanitization strategy for FileTreeStore keys.
 
-    This strategy sanitizes key names to comply with filesystem file naming requirements.
-    It replaces invalid characters with underscores and truncates to fit within both path
-    length limits and filename length limits.
+    This strategy ensures key names are safe for filesystem use:
+    - Alphanumeric values (plus underscore) are kept as-is for readability
+    - Non-alphanumeric values are hashed to prevent path traversal attacks
     """
 
     def __init__(self, directory: Path | AsyncPath) -> None:
@@ -222,13 +227,28 @@ class FileTreeV1KeySanitizationStrategy(HybridSanitizationStrategy):
         max_file_name_length: int = get_max_file_name_length(root=directory) - 5  # 5 for .json extension
 
         # We need to stay under both limits
-        max_length = min(remaining_length, max_file_name_length)
+        self._max_length = min(remaining_length, max_file_name_length)
+        self._allowed_characters = FILE_NAME_ALLOWED_CHARACTERS
 
-        super().__init__(
-            replacement_character="_",
-            max_length=max_length,
-            allowed_characters=FILE_NAME_ALLOWED_CHARACTERS,
-        )
+    def _is_safe(self, value: str) -> bool:
+        """Check if a value contains only safe characters."""
+        return all(char in self._allowed_characters for char in value) and len(value) <= self._max_length
+
+    def sanitize(self, value: str) -> str:
+        """Sanitize a key name for filesystem use.
+
+        If the value contains only alphanumeric characters and underscores,
+        it is returned as-is for readability. Otherwise, it is hashed.
+        """
+        if self._is_safe(value):
+            return value
+
+        # Hash the value for safety - use enough characters for uniqueness
+        # but stay within max length
+        return hashlib.sha256(value.encode()).hexdigest()[: self._max_length]
+
+    def validate(self, value: str) -> None:
+        """No validation needed - all values are accepted and sanitized."""
 
 
 @dataclass(kw_only=True)
@@ -248,7 +268,10 @@ class DiskCollectionInfo:
     key_sanitization_strategy: SanitizationStrategy
 
     async def _validate_path_security(self, path: AsyncPath) -> None:
-        """Validate that a path is secure (within root directory and no symlink escapes).
+        """Validate that a path is secure (within root directory).
+
+        The validation uses `resolve()` which follows symlinks, so this catches
+        symlink-based escapes as well as path traversal attacks.
 
         Args:
             path: The path to validate.
@@ -257,7 +280,6 @@ class DiskCollectionInfo:
             PathSecurityError: If the path violates security boundaries.
         """
         await validate_path_within_directory(path=path, root_directory=self.root_directory)
-        await check_no_symlink_escape(path=path, root_directory=self.root_directory)
 
     async def _list_file_paths(self) -> AsyncGenerator[AsyncPath]:
         async for item_path in AsyncPath(self.directory).iterdir():
