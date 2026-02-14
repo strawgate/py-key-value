@@ -1,6 +1,6 @@
 """FileTreeStore implementation using async filesystem operations."""
 
-import hashlib
+import contextlib
 import os
 import tempfile
 from collections.abc import AsyncGenerator
@@ -19,7 +19,7 @@ from key_value.aio.stores.base import (
 )
 from key_value.shared.errors import PathSecurityError
 from key_value.shared.managed_entry import ManagedEntry, dump_to_json, load_from_json
-from key_value.shared.sanitization import SanitizationStrategy
+from key_value.shared.sanitization import HashFragmentMode, HybridSanitizationStrategy, SanitizationStrategy
 from key_value.shared.sanitize import ALPHANUMERIC_CHARACTERS
 from key_value.shared.serialization import BasicSerializationAdapter, SerializationAdapter
 from key_value.shared.time_to_live import now
@@ -86,9 +86,11 @@ def _validate_resolved_path_within_directory(resolved_path_str: str, resolved_ro
         This function returns bool rather than raising to allow caching of valid paths.
         The caller is responsible for raising PathSecurityError if this returns False.
     """
-    # Ensure the path is within the root directory
-    # We add os.sep to avoid matching partial directory names (e.g., /data vs /data2)
-    return resolved_path_str == resolved_root_str or resolved_path_str.startswith(resolved_root_str + os.sep)
+    # Use is_relative_to for proper path containment check
+    # Both paths are already resolved (symlinks followed, .. resolved) by the caller
+    resolved_path = Path(resolved_path_str)
+    resolved_root = Path(resolved_root_str)
+    return resolved_path == resolved_root or resolved_path.is_relative_to(resolved_root)
 
 
 async def validate_path_within_directory(path: AsyncPath, root_directory: AsyncPath) -> None:
@@ -131,14 +133,13 @@ async def write_file_atomic(file: AsyncPath, text: str) -> None:
     Args:
         file: The target file path to write to.
         text: The text content to write.
-    """
-    import contextlib
 
+    Note:
+        The parent directory must exist before calling this function.
+        Directory creation is handled by the collection setup logic.
+    """
     # Get the directory of the target file
     dir_path = file.parent
-
-    # Ensure the directory exists
-    await dir_path.mkdir(parents=True, exist_ok=True)
 
     # Create a temporary file in the same directory (required for atomic rename)
     fd, temp_path_str = tempfile.mkstemp(dir=str(dir_path), suffix=".tmp")
@@ -166,12 +167,13 @@ async def write_file_atomic(file: AsyncPath, text: str) -> None:
         raise
 
 
-class FileTreeV1CollectionSanitizationStrategy(SanitizationStrategy):
+class FileTreeV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
     """V1 sanitization strategy for FileTreeStore collections.
 
     This strategy ensures collection names are safe for filesystem use:
     - Alphanumeric values (plus underscore) are kept as-is for readability
-    - Non-alphanumeric values are hashed to prevent path traversal attacks
+    - Invalid characters are replaced with underscores
+    - A hash fragment is added when sanitization occurs to prevent collisions
 
     Collection names (directories) are subject to the same length limit as file names (typically 255 bytes).
     The sanitized name is also used for the collection info file (with `-info.json` suffix), so we need
@@ -185,36 +187,21 @@ class FileTreeV1CollectionSanitizationStrategy(SanitizationStrategy):
         # Leave room for `-info.json` suffix (10 chars) that's added to the metadata file name
         suffix_length = 10
 
-        self._max_length = max_name_length - suffix_length
-        self._allowed_characters = DIRECTORY_ALLOWED_CHARACTERS
-
-    def _is_safe(self, value: str) -> bool:
-        """Check if a value contains only safe characters."""
-        return all(char in self._allowed_characters for char in value) and len(value) <= self._max_length
-
-    def sanitize(self, value: str) -> str:
-        """Sanitize a collection name for filesystem use.
-
-        If the value contains only alphanumeric characters and underscores,
-        it is returned as-is for readability. Otherwise, it is hashed.
-        """
-        if self._is_safe(value):
-            return value
-
-        # Hash the value for safety - use enough characters for uniqueness
-        # but stay within max length
-        return hashlib.sha256(value.encode()).hexdigest()[: self._max_length]
-
-    def validate(self, value: str) -> None:
-        """No validation needed - all values are accepted and sanitized."""
+        super().__init__(
+            max_length=max_name_length - suffix_length,
+            allowed_characters=DIRECTORY_ALLOWED_CHARACTERS,
+            replacement_character="_",
+            hash_fragment_mode=HashFragmentMode.ONLY_IF_CHANGED,
+        )
 
 
-class FileTreeV1KeySanitizationStrategy(SanitizationStrategy):
+class FileTreeV1KeySanitizationStrategy(HybridSanitizationStrategy):
     """V1 sanitization strategy for FileTreeStore keys.
 
     This strategy ensures key names are safe for filesystem use:
     - Alphanumeric values (plus underscore) are kept as-is for readability
-    - Non-alphanumeric values are hashed to prevent path traversal attacks
+    - Invalid characters are replaced with underscores
+    - A hash fragment is added when sanitization occurs to prevent collisions
     """
 
     def __init__(self, directory: Path | AsyncPath) -> None:
@@ -227,28 +214,12 @@ class FileTreeV1KeySanitizationStrategy(SanitizationStrategy):
         max_file_name_length: int = get_max_file_name_length(root=directory) - 5  # 5 for .json extension
 
         # We need to stay under both limits
-        self._max_length = min(remaining_length, max_file_name_length)
-        self._allowed_characters = FILE_NAME_ALLOWED_CHARACTERS
-
-    def _is_safe(self, value: str) -> bool:
-        """Check if a value contains only safe characters."""
-        return all(char in self._allowed_characters for char in value) and len(value) <= self._max_length
-
-    def sanitize(self, value: str) -> str:
-        """Sanitize a key name for filesystem use.
-
-        If the value contains only alphanumeric characters and underscores,
-        it is returned as-is for readability. Otherwise, it is hashed.
-        """
-        if self._is_safe(value):
-            return value
-
-        # Hash the value for safety - use enough characters for uniqueness
-        # but stay within max length
-        return hashlib.sha256(value.encode()).hexdigest()[: self._max_length]
-
-    def validate(self, value: str) -> None:
-        """No validation needed - all values are accepted and sanitized."""
+        super().__init__(
+            max_length=min(remaining_length, max_file_name_length),
+            allowed_characters=FILE_NAME_ALLOWED_CHARACTERS,
+            replacement_character="_",
+            hash_fragment_mode=HashFragmentMode.ONLY_IF_CHANGED,
+        )
 
 
 @dataclass(kw_only=True)
@@ -449,20 +420,20 @@ class FileTreeStore(BaseStore):
 
     Security:
         This store includes the following security measures:
-        - Path validation: All file paths are validated to stay within the data directory
-        - Symlink protection: Symlinks that point outside the data directory are rejected
-        - Atomic writes: Files are written atomically using write-to-temp-then-rename
+        - Path validation: All file paths are validated to stay within the data directory.
+          The validation uses `resolve()` which follows symlinks, so symlink-based escapes
+          are also detected and blocked.
+        - Atomic writes: Files are written atomically using write-to-temp-then-rename with
+          fsync for durability. This ensures data is not corrupted on system crash.
 
-    Warning:
-        This store is intended for development and testing purposes only.
-        It is not suitable for production use due to:
-        - Poor performance with many keys
-        - No built-in cleanup of expired entries
-        - No file locking for multi-process safety
-        - Filesystem limitations on file names and directory sizes
-
-    The store does NOT automatically clean up expired entries from disk. Expired entries
-    are only filtered out when read via get() or similar methods.
+    Limitations:
+        - No file locking: Concurrent writes to the same key from multiple processes may
+          cause data loss (last write wins). Single-writer or external locking is recommended
+          for multi-process scenarios.
+        - No built-in cleanup of expired entries. Expired entries are only filtered out when
+          read via get() or similar methods.
+        - Performance may degrade with very large numbers of keys per collection due to
+          filesystem directory entry limits.
     """
 
     _data_directory: AsyncPath
