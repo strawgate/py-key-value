@@ -13,3 +13,12 @@ class StoreSetupError(KeyValueStoreError):
 
 class StoreConnectionError(KeyValueStoreError):
     """Raised when unable to connect to or communicate with the underlying store."""
+
+
+class PathSecurityError(KeyValueStoreError):
+    """Raised when a path operation would violate security boundaries.
+
+    This includes:
+    - Path traversal attempts (e.g., using '../' to escape the data directory)
+    - Symlink attacks (symlinks pointing outside the data directory)
+    """

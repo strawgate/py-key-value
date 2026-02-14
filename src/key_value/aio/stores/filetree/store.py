@@ -1,6 +1,7 @@
 """FileTreeStore implementation using async filesystem operations."""
 
 import os
+import tempfile
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from datetime import datetime
@@ -14,6 +15,7 @@ from typing_extensions import Self, override
 from key_value.aio.stores.base import (
     BaseStore,
 )
+from key_value.shared.errors import PathSecurityError
 from key_value.shared.managed_entry import ManagedEntry, dump_to_json, load_from_json
 from key_value.shared.sanitization import HybridSanitizationStrategy, SanitizationStrategy
 from key_value.shared.sanitize import ALPHANUMERIC_CHARACTERS
@@ -61,6 +63,112 @@ def get_max_file_name_length(root: Path | AsyncPath) -> int:
         return reported_max_length
 
     return MAX_FILE_NAME_LENGTH
+
+
+async def validate_path_within_directory(path: AsyncPath, root_directory: AsyncPath) -> None:
+    """Validate that a path is within the root directory.
+
+    This prevents path traversal attacks where malicious keys like '../../../etc/passwd'
+    could escape the data directory.
+
+    Args:
+        path: The path to validate.
+        root_directory: The root directory that path must be within.
+
+    Raises:
+        PathSecurityError: If the path escapes the root directory.
+    """
+    resolved_path = await path.resolve()
+    resolved_root = await root_directory.resolve()
+
+    # Check if the resolved path starts with the resolved root
+    # We need to check the string representation to handle edge cases
+    resolved_path_str = str(resolved_path)
+    resolved_root_str = str(resolved_root)
+
+    # Ensure the path is within the root directory
+    # We add os.sep to avoid matching partial directory names (e.g., /data vs /data2)
+    if not (resolved_path_str == resolved_root_str or resolved_path_str.startswith(resolved_root_str + os.sep)):
+        msg = f"Path '{path}' resolves outside the allowed directory '{root_directory}'"
+        raise PathSecurityError(message=msg)
+
+
+async def check_no_symlink_escape(path: AsyncPath, root_directory: AsyncPath) -> None:
+    """Check that a path does not contain symlinks that escape the root directory.
+
+    This prevents symlink attacks where an attacker creates a symlink pointing
+    outside the data directory.
+
+    Args:
+        path: The path to check.
+        root_directory: The root directory that all symlink targets must be within.
+
+    Raises:
+        PathSecurityError: If a symlink points outside the root directory.
+    """
+    resolved_root = await root_directory.resolve()
+    resolved_root_str = str(resolved_root)
+
+    # Check each component of the path for symlinks
+    current_path = root_directory
+    path_parts = path.relative_to(root_directory).parts if str(path).startswith(str(root_directory)) else path.parts
+
+    for part in path_parts:
+        current_path = current_path / part
+
+        # Check if this component exists and is a symlink
+        if await current_path.is_symlink():
+            # Resolve the symlink target
+            target = await current_path.resolve()
+            target_str = str(target)
+
+            # Verify the target is within the root directory
+            if not (target_str == resolved_root_str or target_str.startswith(resolved_root_str + os.sep)):
+                msg = f"Symlink at '{current_path}' points outside the allowed directory"
+                raise PathSecurityError(message=msg)
+
+
+async def write_file_atomic(file: AsyncPath, text: str) -> None:
+    """Write a file atomically using the write-to-temp-then-rename pattern.
+
+    This ensures that the file is either fully written or not written at all,
+    preventing data corruption on crash.
+
+    The temporary file is created in the same directory as the target file
+    to ensure the rename operation is atomic (same filesystem).
+
+    Args:
+        file: The target file path to write to.
+        text: The text content to write.
+    """
+    import contextlib
+
+    # Get the directory of the target file
+    dir_path = file.parent
+
+    # Ensure the directory exists
+    await dir_path.mkdir(parents=True, exist_ok=True)
+
+    # Create a temporary file in the same directory (required for atomic rename)
+    fd, temp_path_str = tempfile.mkstemp(dir=str(dir_path), suffix=".tmp")
+    temp_path = Path(temp_path_str)
+
+    try:
+        # Write content to the temporary file
+        async with aopen(file_specifier=temp_path_str, mode="w", encoding="utf-8") as f:
+            await f.write(data=text)
+
+        # Close the file descriptor from mkstemp
+        os.close(fd)
+
+        # Atomically replace the target file with the temporary file
+        temp_path.replace(Path(file))
+    except BaseException:
+        # Clean up the temporary file on any error
+        os.close(fd)
+        with contextlib.suppress(OSError):
+            temp_path.unlink()
+        raise
 
 
 class FileTreeV1CollectionSanitizationStrategy(HybridSanitizationStrategy):
@@ -123,10 +231,25 @@ class DiskCollectionInfo:
 
     directory: AsyncPath
 
+    # Root directory for security validation (path containment checks)
+    root_directory: AsyncPath
+
     created_at: datetime
 
     serialization_adapter: SerializationAdapter
     key_sanitization_strategy: SanitizationStrategy
+
+    async def _validate_path_security(self, path: AsyncPath) -> None:
+        """Validate that a path is secure (within root directory and no symlink escapes).
+
+        Args:
+            path: The path to validate.
+
+        Raises:
+            PathSecurityError: If the path violates security boundaries.
+        """
+        await validate_path_within_directory(path=path, root_directory=self.root_directory)
+        await check_no_symlink_escape(path=path, root_directory=self.root_directory)
 
     async def _list_file_paths(self) -> AsyncGenerator[AsyncPath]:
         async for item_path in AsyncPath(self.directory).iterdir():
@@ -140,6 +263,9 @@ class DiskCollectionInfo:
         sanitized_key = self.key_sanitization_strategy.sanitize(value=key)
         key_path: AsyncPath = AsyncPath(self.directory / f"{sanitized_key}.json")
 
+        # Security validation
+        await self._validate_path_security(path=key_path)
+
         if not await key_path.exists():
             return None
 
@@ -150,11 +276,18 @@ class DiskCollectionInfo:
     async def put_entry(self, *, key: str, data: ManagedEntry) -> None:
         sanitized_key = self.key_sanitization_strategy.sanitize(value=key)
         key_path: AsyncPath = AsyncPath(self.directory / f"{sanitized_key}.json")
-        await write_file(file=key_path, text=self.serialization_adapter.dump_json(entry=data))
+
+        # Security validation
+        await self._validate_path_security(path=key_path)
+
+        await write_file_atomic(file=key_path, text=self.serialization_adapter.dump_json(entry=data))
 
     async def delete_entry(self, *, key: str) -> bool:
         sanitized_key = self.key_sanitization_strategy.sanitize(value=key)
         key_path: AsyncPath = AsyncPath(self.directory / f"{sanitized_key}.json")
+
+        # Security validation
+        await self._validate_path_security(path=key_path)
 
         if not await key_path.exists():
             return False
@@ -176,12 +309,18 @@ class DiskCollectionInfo:
 
     @classmethod
     def from_dict(
-        cls, *, data: dict[str, Any], serialization_adapter: SerializationAdapter, key_sanitization_strategy: SanitizationStrategy
+        cls,
+        *,
+        data: dict[str, Any],
+        root_directory: AsyncPath,
+        serialization_adapter: SerializationAdapter,
+        key_sanitization_strategy: SanitizationStrategy,
     ) -> Self:
         return cls(
             version=data["version"],
             collection=data["collection"],
             directory=AsyncPath(data["directory"]),
+            root_directory=root_directory,
             created_at=datetime.fromisoformat(data["created_at"]),
             serialization_adapter=serialization_adapter,
             key_sanitization_strategy=key_sanitization_strategy,
@@ -189,13 +328,21 @@ class DiskCollectionInfo:
 
     @classmethod
     async def from_file(
-        cls, *, file: AsyncPath, serialization_adapter: SerializationAdapter, key_sanitization_strategy: SanitizationStrategy
+        cls,
+        *,
+        file: AsyncPath,
+        root_directory: AsyncPath,
+        serialization_adapter: SerializationAdapter,
+        key_sanitization_strategy: SanitizationStrategy,
     ) -> Self:
         if data := await read_file(file=file):
             resolved_directory = await AsyncPath(data["directory"]).resolve()
             data["directory"] = str(resolved_directory)
             return cls.from_dict(
-                data=data, serialization_adapter=serialization_adapter, key_sanitization_strategy=key_sanitization_strategy
+                data=data,
+                root_directory=root_directory,
+                serialization_adapter=serialization_adapter,
+                key_sanitization_strategy=key_sanitization_strategy,
             )
 
         msg = f"File {file} not found"
@@ -208,6 +355,7 @@ class DiskCollectionInfo:
         *,
         data_directory: AsyncPath,
         metadata_directory: AsyncPath,
+        root_directory: AsyncPath,
         collection: str,
         sanitized_collection: str,
         serialization_adapter: SerializationAdapter,
@@ -217,18 +365,22 @@ class DiskCollectionInfo:
 
         if await info_file.exists():
             return await cls.from_file(
-                file=info_file, serialization_adapter=serialization_adapter, key_sanitization_strategy=key_sanitization_strategy
+                file=info_file,
+                root_directory=root_directory,
+                serialization_adapter=serialization_adapter,
+                key_sanitization_strategy=key_sanitization_strategy,
             )
 
         info = cls(
             collection=collection,
             directory=data_directory,
+            root_directory=root_directory,
             created_at=now(),
             serialization_adapter=serialization_adapter,
             key_sanitization_strategy=key_sanitization_strategy,
         )
 
-        await write_file(file=info_file, text=info.to_json())
+        await write_file_atomic(file=info_file, text=info.to_json())
         return info
 
 
@@ -265,12 +417,18 @@ class FileTreeStore(BaseStore):
     To avoid issues, you may want to consider leveraging the `FileTreeV1CollectionSanitizationStrategy`
     and `FileTreeV1KeySanitizationStrategy` strategies.
 
+    Security:
+        This store includes the following security measures:
+        - Path validation: All file paths are validated to stay within the data directory
+        - Symlink protection: Symlinks that point outside the data directory are rejected
+        - Atomic writes: Files are written atomically using write-to-temp-then-rename
+
     Warning:
         This store is intended for development and testing purposes only.
         It is not suitable for production use due to:
         - Poor performance with many keys
-        - No atomic operations
         - No built-in cleanup of expired entries
+        - No file locking for multi-process safety
         - Filesystem limitations on file names and directory sizes
 
     The store does NOT automatically clean up expired entries from disk. Expired entries
@@ -354,6 +512,7 @@ class FileTreeStore(BaseStore):
         async for entry in self._get_metadata_entries():
             collection_info: DiskCollectionInfo = await DiskCollectionInfo.from_file(
                 file=entry,
+                root_directory=self._data_directory,
                 serialization_adapter=self._serialization_adapter,
                 key_sanitization_strategy=self._key_sanitization_strategy,
             )
@@ -384,6 +543,7 @@ class FileTreeStore(BaseStore):
         self._collection_infos[collection] = await DiskCollectionInfo.create_or_get_info(
             data_directory=data_directory,
             metadata_directory=self._metadata_directory,
+            root_directory=self._data_directory,
             collection=collection,
             sanitized_collection=sanitized_collection,
             serialization_adapter=self._serialization_adapter,
