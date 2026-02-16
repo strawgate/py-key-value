@@ -1,6 +1,6 @@
 [project]
 name = "py-key-value-aio"
-version = "0.4.3"
+version = "0.4.4"
 description = "Async Key-Value Store - A pluggable interface for KV Stores"
 readme = "README.md"
 requires-python = ">=3.10"

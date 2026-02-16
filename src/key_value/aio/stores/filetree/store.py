@@ -485,13 +485,12 @@ class FileTreeStore(BaseStore):
         self._collection_infos = {}
         self._auto_create = auto_create
 
-        self._stable_api = True
-
         super().__init__(
             serialization_adapter=serialization_adapter or BasicSerializationAdapter(),
             key_sanitization_strategy=key_sanitization_strategy,
             collection_sanitization_strategy=collection_sanitization_strategy,
             default_collection=default_collection,
+            stable_api=True,
         )
 
     async def _get_data_directories(self) -> AsyncGenerator[AsyncPath]:
