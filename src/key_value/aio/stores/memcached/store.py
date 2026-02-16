@@ -3,10 +3,10 @@ from typing import Any, overload
 
 from typing_extensions import override
 
+from key_value.aio._utils.compound import compound_key
+from key_value.aio._utils.managed_entry import ManagedEntry
+from key_value.aio._utils.sanitization import HashExcessLengthStrategy, SanitizationStrategy
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseStore
-from key_value.shared.compound import compound_key
-from key_value.shared.managed_entry import ManagedEntry
-from key_value.shared.sanitization import HashExcessLengthStrategy, SanitizationStrategy
 
 try:
     from aiomcache import Client

@@ -1,6 +1,6 @@
-"""Shared utilities and types for key-value store implementations.
+"""Internal utilities and types for key-value store implementations.
 
-This package provides shared utilities used across store implementations:
+This package provides internal utilities used across store implementations:
 
 - beartype: Type checking decorators using beartype
 - compound: Key/collection compounding and prefixing utilities
@@ -15,6 +15,6 @@ This package provides shared utilities used across store implementations:
 """
 
 # Re-export commonly used items for convenience
-from key_value.shared.managed_entry import ManagedEntry
+from key_value.aio._utils.managed_entry import ManagedEntry
 
 __all__ = ["ManagedEntry"]

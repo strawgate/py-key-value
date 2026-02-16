@@ -7,8 +7,8 @@ from pydantic import ValidationError
 from pydantic.type_adapter import TypeAdapter
 from pydantic_core import PydanticSerializationError
 
+from key_value.aio.errors import DeserializationError, SerializationError
 from key_value.aio.protocols.key_value import AsyncKeyValue
-from key_value.shared.errors import DeserializationError, SerializationError
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 from typing_extensions import override
 
+from key_value.aio._utils.managed_entry import ManagedEntry
 from key_value.aio.stores.base import BaseStore
-from key_value.shared.managed_entry import ManagedEntry
 
 
 class NullStore(BaseStore):

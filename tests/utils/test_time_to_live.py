@@ -4,8 +4,8 @@ from typing import Any
 
 import pytest
 
-from key_value.shared.errors import InvalidTTLError
-from key_value.shared.time_to_live import prepare_ttl
+from key_value.aio._utils.time_to_live import prepare_ttl
+from key_value.aio.errors import InvalidTTLError
 
 FIXED_DATETIME = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 

@@ -1,7 +1,7 @@
 import pytest
 from inline_snapshot import snapshot
 
-from key_value.shared.sanitize import (
+from key_value.aio._utils.sanitize import (
     ALPHANUMERIC_CHARACTERS,
     LOWERCASE_ALPHABET,
     NUMBERS,

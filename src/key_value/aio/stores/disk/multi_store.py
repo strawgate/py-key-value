@@ -1,10 +1,12 @@
 from collections.abc import Callable
-from datetime import timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import overload
 
 from typing_extensions import override
 
+from key_value.aio._utils.managed_entry import ManagedEntry
+from key_value.aio._utils.serialization import BasicSerializationAdapter
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
 from key_value.aio.stores.disk.store import (
     _create_disk_cache,
@@ -13,8 +15,6 @@ from key_value.aio.stores.disk.store import (
     _disk_cache_get_with_expire,
     _disk_cache_set,
 )
-from key_value.shared.managed_entry import ManagedEntry, datetime
-from key_value.shared.serialization import BasicSerializationAdapter
 
 try:
     from diskcache import Cache

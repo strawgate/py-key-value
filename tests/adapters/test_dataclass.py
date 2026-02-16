@@ -6,8 +6,8 @@ import pytest
 from inline_snapshot import snapshot
 
 from key_value.aio.adapters.dataclass import DataclassAdapter
+from key_value.aio.errors import DeserializationError
 from key_value.aio.stores.memory.store import MemoryStore
-from key_value.shared.errors import DeserializationError
 
 
 @dataclass

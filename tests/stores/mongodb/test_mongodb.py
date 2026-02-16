@@ -8,6 +8,8 @@ from inline_snapshot import snapshot
 from testcontainers.mongodb import MongoDbContainer
 from typing_extensions import override
 
+from key_value.aio._utils.managed_entry import ManagedEntry
+from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.mongodb import MongoDBStore
 from key_value.aio.stores.mongodb.store import (
@@ -16,8 +18,6 @@ from key_value.aio.stores.mongodb.store import (
     _create_mongodb_client,
     _mongodb_drop_database,
 )
-from key_value.shared.managed_entry import ManagedEntry
-from key_value.shared.wait import async_wait_for_true
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 

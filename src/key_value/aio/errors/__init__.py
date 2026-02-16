@@ -25,8 +25,8 @@ Exception Hierarchy:
         └── StoreConnectionError
 """
 
-from key_value.shared.errors.base import BaseKeyValueError, ExtraInfoType
-from key_value.shared.errors.key_value import (
+from key_value.aio.errors.base import BaseKeyValueError, ExtraInfoType
+from key_value.aio.errors.key_value import (
     DeserializationError,
     InvalidKeyError,
     InvalidTTLError,
@@ -35,8 +35,8 @@ from key_value.shared.errors.key_value import (
     SerializationError,
     ValueTooLargeError,
 )
-from key_value.shared.errors.store import KeyValueStoreError, PathSecurityError, StoreConnectionError, StoreSetupError
-from key_value.shared.errors.wrappers import (
+from key_value.aio.errors.store import KeyValueStoreError, PathSecurityError, StoreConnectionError, StoreSetupError
+from key_value.aio.errors.wrappers import (
     CorruptedDataError,
     DecryptionError,
     EncryptionError,

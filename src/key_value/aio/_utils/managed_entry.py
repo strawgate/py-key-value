@@ -12,9 +12,9 @@ from typing import Any, SupportsFloat
 
 from typing_extensions import Self
 
-from key_value.shared.beartype import bear_enforce
-from key_value.shared.errors import DeserializationError, SerializationError
-from key_value.shared.time_to_live import now, now_plus, seconds_to
+from key_value.aio._utils.beartype import bear_enforce
+from key_value.aio._utils.time_to_live import now, now_plus, seconds_to
+from key_value.aio.errors import DeserializationError, SerializationError
 
 
 @dataclass(kw_only=True)

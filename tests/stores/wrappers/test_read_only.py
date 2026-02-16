@@ -1,9 +1,9 @@
 import pytest
 from typing_extensions import override
 
+from key_value.aio.errors import ReadOnlyError
 from key_value.aio.stores.memory.store import MemoryStore
 from key_value.aio.wrappers.read_only import ReadOnlyWrapper
-from key_value.shared.errors import ReadOnlyError
 
 
 class TestReadOnlyWrapper:
