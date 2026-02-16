@@ -6,9 +6,9 @@ from typing import Any, SupportsFloat
 
 from typing_extensions import override
 
+from key_value.aio._shared.managed_entry import estimate_serialized_size
 from key_value.aio.protocols.key_value import AsyncKeyValue
 from key_value.aio.wrappers.base import BaseWrapper
-from key_value.shared.managed_entry import estimate_serialized_size
 
 # Special keys used to store compressed data
 _COMPRESSED_DATA_KEY = "__compressed_data__"

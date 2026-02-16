@@ -1,24 +1,18 @@
-"""Store-level error classes."""
+"""Store-level error classes.
 
-from key_value.shared.errors.base import BaseKeyValueError
+This module re-exports from key_value.aio._shared for backwards compatibility.
+"""
 
+from key_value.aio._shared.errors.store import (
+    KeyValueStoreError,
+    PathSecurityError,
+    StoreConnectionError,
+    StoreSetupError,
+)
 
-class KeyValueStoreError(BaseKeyValueError):
-    """Base exception for all Key-Value store errors."""
-
-
-class StoreSetupError(KeyValueStoreError):
-    """Raised when a store setup fails."""
-
-
-class StoreConnectionError(KeyValueStoreError):
-    """Raised when unable to connect to or communicate with the underlying store."""
-
-
-class PathSecurityError(KeyValueStoreError):
-    """Raised when a path operation would violate security boundaries.
-
-    This includes:
-    - Path traversal attempts (e.g., using '../' to escape the data directory)
-    - Symlink attacks (symlinks pointing outside the data directory)
-    """
+__all__ = [
+    "KeyValueStoreError",
+    "PathSecurityError",
+    "StoreConnectionError",
+    "StoreSetupError",
+]

@@ -1,8 +1,6 @@
 """Error classes for key-value store operations.
 
-This module provides a hierarchy of exception classes used throughout the key-value
-store implementations. The hierarchy allows for fine-grained error handling while
-maintaining backwards compatibility through base classes.
+This module re-exports from key_value.aio._shared for backwards compatibility.
 
 Exception Hierarchy:
     BaseKeyValueError (base for all KV errors)
@@ -25,25 +23,27 @@ Exception Hierarchy:
         └── StoreConnectionError
 """
 
-from key_value.shared.errors.base import BaseKeyValueError, ExtraInfoType
-from key_value.shared.errors.key_value import (
-    DeserializationError,
-    InvalidKeyError,
-    InvalidTTLError,
-    KeyValueOperationError,
-    MissingKeyError,
-    SerializationError,
-    ValueTooLargeError,
-)
-from key_value.shared.errors.store import KeyValueStoreError, PathSecurityError, StoreConnectionError, StoreSetupError
-from key_value.shared.errors.wrappers import (
+from key_value.aio._shared.errors import (
+    BaseKeyValueError,
     CorruptedDataError,
     DecryptionError,
+    DeserializationError,
     EncryptionError,
     EncryptionVersionError,
     EntryTooLargeError,
     EntryTooSmallError,
+    ExtraInfoType,
+    InvalidKeyError,
+    InvalidTTLError,
+    KeyValueOperationError,
+    KeyValueStoreError,
+    MissingKeyError,
+    PathSecurityError,
     ReadOnlyError,
+    SerializationError,
+    StoreConnectionError,
+    StoreSetupError,
+    ValueTooLargeError,
 )
 
 __all__ = [

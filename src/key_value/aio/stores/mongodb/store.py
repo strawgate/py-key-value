@@ -5,12 +5,12 @@ from typing import Any, overload
 from bson.errors import InvalidDocument
 from typing_extensions import override
 
+from key_value.aio._shared.errors import DeserializationError, SerializationError
+from key_value.aio._shared.managed_entry import ManagedEntry
+from key_value.aio._shared.sanitization import HybridSanitizationStrategy, SanitizationStrategy
+from key_value.aio._shared.sanitize import ALPHANUMERIC_CHARACTERS
+from key_value.aio._shared.serialization import SerializationAdapter
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseStore
-from key_value.shared.errors import DeserializationError, SerializationError
-from key_value.shared.managed_entry import ManagedEntry
-from key_value.shared.sanitization import HybridSanitizationStrategy, SanitizationStrategy
-from key_value.shared.sanitize import ALPHANUMERIC_CHARACTERS
-from key_value.shared.serialization import SerializationAdapter
 
 try:
     from pymongo import AsyncMongoClient, UpdateOne

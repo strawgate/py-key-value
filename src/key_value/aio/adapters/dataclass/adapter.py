@@ -4,9 +4,9 @@ from typing import Any, TypeVar, get_args, get_origin
 
 from pydantic.type_adapter import TypeAdapter
 
+from key_value.aio._shared.beartype import bear_spray
 from key_value.aio.adapters.pydantic.base import BasePydanticAdapter
 from key_value.aio.protocols.key_value import AsyncKeyValue
-from key_value.shared.beartype import bear_spray
 
 T = TypeVar("T")
 

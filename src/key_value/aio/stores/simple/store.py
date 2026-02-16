@@ -5,15 +5,15 @@ from datetime import datetime
 
 from typing_extensions import override
 
+from key_value.aio._shared.compound import compound_key, get_collections_from_compound_keys, get_keys_from_compound_keys
+from key_value.aio._shared.managed_entry import ManagedEntry
+from key_value.aio._shared.serialization import BasicSerializationAdapter
 from key_value.aio.stores.base import (
     BaseDestroyStore,
     BaseEnumerateCollectionsStore,
     BaseEnumerateKeysStore,
     BaseStore,
 )
-from key_value.shared.compound import compound_key, get_collections_from_compound_keys, get_keys_from_compound_keys
-from key_value.shared.managed_entry import ManagedEntry
-from key_value.shared.serialization import BasicSerializationAdapter
 
 
 @dataclass

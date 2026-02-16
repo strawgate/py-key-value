@@ -5,12 +5,12 @@ from urllib.parse import urlparse
 
 from typing_extensions import override
 
+from key_value.aio._shared.beartype import bear_spray
+from key_value.aio._shared.compound import compound_key, get_keys_from_compound_keys
+from key_value.aio._shared.errors import DeserializationError
+from key_value.aio._shared.managed_entry import ManagedEntry
+from key_value.aio._shared.serialization import BasicSerializationAdapter, SerializationAdapter
 from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseEnumerateKeysStore, BaseStore
-from key_value.shared.beartype import bear_spray
-from key_value.shared.compound import compound_key, get_keys_from_compound_keys
-from key_value.shared.errors import DeserializationError
-from key_value.shared.managed_entry import ManagedEntry
-from key_value.shared.serialization import BasicSerializationAdapter, SerializationAdapter
 
 try:
     from redis.asyncio import Redis

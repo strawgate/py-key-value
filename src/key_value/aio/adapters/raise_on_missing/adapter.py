@@ -1,8 +1,8 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, SupportsFloat, overload
 
+from key_value.aio._shared.errors import MissingKeyError
 from key_value.aio.protocols.key_value import AsyncKeyValue
-from key_value.shared.errors import MissingKeyError
 
 
 class RaiseOnMissingAdapter:

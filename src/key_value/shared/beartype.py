@@ -1,35 +1,24 @@
 """Beartype configuration and decorators for runtime type checking.
 
-This module provides decorators for controlling beartype's runtime type checking
-behavior. Use `bear_enforce` when you want type violations to raise exceptions
-rather than warnings.
+This module re-exports from key_value.aio._shared for backwards compatibility.
 """
 
-from collections.abc import Callable
+from key_value.aio._shared.beartype import (
+    bear_enforce,
+    bear_spray,
+    enforce_bear_type,
+    enforce_bear_type_conf,
+    no_bear_type,
+    no_bear_type_check,
+    no_bear_type_check_conf,
+)
 
-from beartype import BeartypeConf, BeartypeStrategy, beartype
-from typing_extensions import ParamSpec, TypeVar
-
-no_bear_type_check_conf = BeartypeConf(strategy=BeartypeStrategy.O0)
-
-no_bear_type = beartype(conf=no_bear_type_check_conf)
-
-enforce_bear_type_conf = BeartypeConf(strategy=BeartypeStrategy.O1, violation_type=TypeError)
-enforce_bear_type = beartype(conf=enforce_bear_type_conf)
-
-P = ParamSpec(name="P")
-R = TypeVar(name="R")
-
-
-def no_bear_type_check(func: Callable[P, R]) -> Callable[P, R]:
-    """Disable beartype checking for a function."""
-    return no_bear_type(func)
-
-
-def bear_enforce(func: Callable[P, R]) -> Callable[P, R]:
-    """Enforce beartype with exceptions instead of warnings."""
-    return enforce_bear_type(func)
-
-
-# Legacy alias
-bear_spray = no_bear_type_check
+__all__ = [
+    "bear_enforce",
+    "bear_spray",
+    "enforce_bear_type",
+    "enforce_bear_type_conf",
+    "no_bear_type",
+    "no_bear_type_check",
+    "no_bear_type_check_conf",
+]

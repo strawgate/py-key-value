@@ -3,11 +3,11 @@ from typing import TYPE_CHECKING, Any, overload
 
 from typing_extensions import override
 
+from key_value.aio._shared.managed_entry import ManagedEntry
 from key_value.aio.stores.base import (
     BaseContextManagerStore,
     BaseStore,
 )
-from key_value.shared.managed_entry import ManagedEntry
 
 try:
     import aioboto3

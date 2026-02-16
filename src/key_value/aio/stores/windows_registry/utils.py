@@ -1,7 +1,7 @@
 import contextlib
 import winreg
 
-from key_value.shared.errors import StoreSetupError
+from key_value.aio._shared.errors import StoreSetupError
 
 HiveType = int
 
