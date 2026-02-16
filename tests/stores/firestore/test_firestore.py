@@ -11,8 +11,8 @@ from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
+from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
-from key_value.shared.wait import async_wait_for_true
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 

@@ -4,22 +4,22 @@ from typing import Any, overload
 
 from typing_extensions import override
 
-from key_value.aio._shared.errors import DeserializationError, SerializationError
-from key_value.aio._shared.managed_entry import ManagedEntry
-from key_value.aio._shared.sanitization import (
+from key_value.aio._utils.managed_entry import ManagedEntry
+from key_value.aio._utils.sanitization import (
     AlwaysHashStrategy,
     HashFragmentMode,
     HybridSanitizationStrategy,
     SanitizationStrategy,
 )
-from key_value.aio._shared.sanitize import (
+from key_value.aio._utils.sanitize import (
     ALPHANUMERIC_CHARACTERS,
     LOWERCASE_ALPHABET,
     NUMBERS,
     UPPERCASE_ALPHABET,
 )
-from key_value.aio._shared.serialization import SerializationAdapter
-from key_value.aio._shared.time_to_live import now_as_epoch
+from key_value.aio._utils.serialization import SerializationAdapter
+from key_value.aio._utils.time_to_live import now_as_epoch
+from key_value.aio.errors import DeserializationError, SerializationError
 from key_value.aio.stores.base import (
     BaseContextManagerStore,
     BaseCullStore,

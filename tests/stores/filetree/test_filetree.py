@@ -6,14 +6,14 @@ from pathlib import Path
 import pytest
 from typing_extensions import override
 
+from key_value.aio._utils.sanitization import PassthroughStrategy
+from key_value.aio.errors import PathSecurityError, StoreSetupError
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.filetree import (
     FileTreeStore,
     FileTreeV1CollectionSanitizationStrategy,
     FileTreeV1KeySanitizationStrategy,
 )
-from key_value.shared.errors import PathSecurityError, StoreSetupError
-from key_value.shared.sanitization import PassthroughStrategy
 from tests.stores.base import BaseStoreTests
 
 

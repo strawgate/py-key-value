@@ -5,9 +5,9 @@ from typing import Any, overload
 
 from typing_extensions import override
 
-from key_value.aio._shared.errors import DeserializationError
-from key_value.aio._shared.managed_entry import ManagedEntry
-from key_value.aio._shared.serialization import SerializationAdapter
+from key_value.aio._utils.managed_entry import ManagedEntry
+from key_value.aio._utils.serialization import SerializationAdapter
+from key_value.aio.errors import DeserializationError
 from key_value.aio.stores.base import SEED_DATA_TYPE, BaseContextManagerStore, BaseStore
 
 try:

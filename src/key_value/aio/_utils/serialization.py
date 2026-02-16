@@ -9,9 +9,9 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Literal, TypeVar
 
-from key_value.aio._shared.beartype import bear_enforce
-from key_value.aio._shared.errors import DeserializationError, SerializationError
-from key_value.aio._shared.managed_entry import ManagedEntry, dump_to_json, load_from_json, verify_dict
+from key_value.aio._utils.beartype import bear_enforce
+from key_value.aio._utils.managed_entry import ManagedEntry, dump_to_json, load_from_json, verify_dict
+from key_value.aio.errors import DeserializationError, SerializationError
 
 T = TypeVar("T")
 

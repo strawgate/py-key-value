@@ -1,8 +1,8 @@
 import pytest
 
 from key_value.aio.adapters.raise_on_missing import RaiseOnMissingAdapter
+from key_value.aio.errors import MissingKeyError
 from key_value.aio.stores.memory.store import MemoryStore
-from key_value.shared.errors import MissingKeyError
 
 
 @pytest.fixture

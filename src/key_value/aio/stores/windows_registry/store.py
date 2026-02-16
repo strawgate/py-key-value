@@ -5,9 +5,9 @@ from winreg import HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE
 
 from typing_extensions import override
 
-from key_value.aio._shared.managed_entry import ManagedEntry
-from key_value.aio._shared.sanitization import HybridSanitizationStrategy, SanitizationStrategy
-from key_value.aio._shared.sanitize import ALPHANUMERIC_CHARACTERS
+from key_value.aio._utils.managed_entry import ManagedEntry
+from key_value.aio._utils.sanitization import HybridSanitizationStrategy, SanitizationStrategy
+from key_value.aio._utils.sanitize import ALPHANUMERIC_CHARACTERS
 from key_value.aio.stores.base import BaseStore
 
 try:

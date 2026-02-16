@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from key_value.shared.managed_entry import dump_to_json, load_from_json
+from key_value.aio._utils.managed_entry import dump_to_json, load_from_json
 from tests.shared.cases import SIMPLE_CASES, PositiveCases
 
 FIXED_DATETIME = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)

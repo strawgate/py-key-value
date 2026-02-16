@@ -9,6 +9,7 @@ from inline_snapshot import snapshot
 from testcontainers.memcached import MemcachedContainer
 from typing_extensions import override
 
+from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.memcached import MemcachedStore, MemcachedV1KeySanitizationStrategy
 from key_value.aio.stores.memcached.store import (
@@ -17,7 +18,6 @@ from key_value.aio.stores.memcached.store import (
     _memcached_flush_all,
     _memcached_stats,
 )
-from key_value.shared.wait import async_wait_for_true
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 

@@ -3,7 +3,7 @@ from typing import Any, SupportsFloat
 
 from typing_extensions import override
 
-from key_value.aio._shared.beartype import bear_enforce
+from key_value.aio._utils.beartype import bear_enforce
 from key_value.aio.protocols.key_value import AsyncKeyValue
 
 

@@ -3,8 +3,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from inline_snapshot import snapshot
 
-from key_value.shared.managed_entry import ManagedEntry
-from key_value.shared.serialization import BasicSerializationAdapter
+from key_value.aio._utils.managed_entry import ManagedEntry
+from key_value.aio._utils.serialization import BasicSerializationAdapter
 
 FIXED_DATETIME_ONE = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 FIXED_DATETIME_ONE_ISOFORMAT = FIXED_DATETIME_ONE.isoformat()

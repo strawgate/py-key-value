@@ -14,12 +14,12 @@ from aiofile import async_open as aopen
 from anyio import Path as AsyncPath
 from typing_extensions import Self, override
 
-from key_value.aio._shared.errors import PathSecurityError
-from key_value.aio._shared.managed_entry import ManagedEntry, dump_to_json, load_from_json
-from key_value.aio._shared.sanitization import HashFragmentMode, HybridSanitizationStrategy, SanitizationStrategy
-from key_value.aio._shared.sanitize import ALPHANUMERIC_CHARACTERS
-from key_value.aio._shared.serialization import BasicSerializationAdapter, SerializationAdapter
-from key_value.aio._shared.time_to_live import now
+from key_value.aio._utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
+from key_value.aio._utils.sanitization import HashFragmentMode, HybridSanitizationStrategy, SanitizationStrategy
+from key_value.aio._utils.sanitize import ALPHANUMERIC_CHARACTERS
+from key_value.aio._utils.serialization import BasicSerializationAdapter, SerializationAdapter
+from key_value.aio._utils.time_to_live import now
+from key_value.aio.errors import PathSecurityError
 from key_value.aio.stores.base import (
     BaseStore,
 )

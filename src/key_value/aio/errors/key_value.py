@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from key_value.aio._shared.errors.base import BaseKeyValueError, ExtraInfoType
+from key_value.aio.errors.base import BaseKeyValueError, ExtraInfoType
 
 
 class KeyValueOperationError(BaseKeyValueError):
