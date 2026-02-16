@@ -20,9 +20,10 @@ import importlib.abc
 import importlib.machinery
 import sys
 import warnings
-from types import ModuleType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from types import ModuleType
 
 # Mapping of old shared module paths to their new locations
 _SHARED_MODULE_REDIRECTS: dict[str, str] = {
@@ -118,8 +119,7 @@ def __getattr__(name: str) -> Any:
     if name == "shared":
         # Handle `from key_value import shared` or `key_value.shared`
         warnings.warn(
-            "Accessing 'key_value.shared' is deprecated. "
-            "Please use 'key_value.aio._utils' or 'key_value.aio.errors' instead.",
+            "Accessing 'key_value.shared' is deprecated. Please use 'key_value.aio._utils' or 'key_value.aio.errors' instead.",
             DeprecationWarning,
             stacklevel=2,
         )
