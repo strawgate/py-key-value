@@ -1,0 +1,10 @@
+# Qodo Merge (PR-Agent) Configuration
+# https://qodo-merge-docs.qodo.ai/usage-guide/additional_configurations/
+
+[config]
+# Disable automatic review on PR open - reviews can still be triggered manually with /review
+auto_review = false
+
+# Ignore workflow files from analysis (they're simple trigger configs)
+[ignore]
+glob = ['.github/workflows/trigger-*.yml']
