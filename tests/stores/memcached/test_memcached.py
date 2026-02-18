@@ -21,6 +21,8 @@ from key_value.aio.stores.memcached.store import (
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
+pytestmark = pytest.mark.integration
+
 # Memcached test configuration
 MEMCACHED_CONTAINER_PORT = 11211
 

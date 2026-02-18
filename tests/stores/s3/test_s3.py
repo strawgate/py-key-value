@@ -12,6 +12,8 @@ from key_value.aio.stores.s3 import S3Store
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
+pytestmark = pytest.mark.integration
+
 # S3 test configuration (using LocalStack)
 S3_TEST_BUCKET = "kv-store-test"
 

@@ -20,6 +20,8 @@ from key_value.aio.stores.dynamodb import DynamoDBStore
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
+pytestmark = pytest.mark.integration
+
 # DynamoDB test configuration
 DYNAMODB_TEST_TABLE = "kv-store-test"
 

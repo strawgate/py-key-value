@@ -21,6 +21,8 @@ from key_value.aio.stores.mongodb.store import (
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
+pytestmark = pytest.mark.integration
+
 # MongoDB test configuration
 MONGODB_TEST_DB = "kv-store-adapter-tests"
 

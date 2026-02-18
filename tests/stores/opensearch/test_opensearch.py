@@ -23,6 +23,8 @@ from key_value.aio.stores.opensearch.store import (
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
+pytestmark = pytest.mark.integration
+
 TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
 
 OPENSEARCH_CONTAINER_PORT = 9200

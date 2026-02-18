@@ -1,5 +1,5 @@
 .PHONY: bump-version bump-version-dry lint typecheck sync precommit test build help
-.PHONY: install test-concise docs-serve docs-build docs-deploy
+.PHONY: install test-concise test-unit test-integration docs-serve docs-build docs-deploy
 
 # Default target - show help
 .DEFAULT_GOAL := help
@@ -13,6 +13,8 @@ help:
 	@echo "  make lint              - Run linters (Python + Markdown)"
 	@echo "  make typecheck         - Run type checking"
 	@echo "  make test              - Run all tests (verbose)"
+	@echo "  make test-unit         - Run unit tests only (no Docker)"
+	@echo "  make test-integration  - Run integration tests only (requires Docker)"
 	@echo "  make test-concise      - Run all tests (concise output for AI agents)"
 	@echo "  make build             - Build package"
 	@echo "  make precommit         - Run pre-commit checks (lint + typecheck)"
@@ -59,6 +61,16 @@ install: sync
 test:
 	@echo "Running tests..."
 	@uv run pytest tests -vv
+
+# Unit tests only (no Docker required)
+test-unit:
+	@echo "Running unit tests..."
+	@uv run pytest tests -vv -m "not integration"
+
+# Integration tests only (requires Docker)
+test-integration:
+	@echo "Running integration tests..."
+	@uv run pytest tests -vv -m "integration"
 
 # Concise test output for AI agents
 test-concise:

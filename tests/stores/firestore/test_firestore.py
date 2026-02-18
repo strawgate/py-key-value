@@ -16,6 +16,8 @@ from key_value.aio.stores.base import BaseStore
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
+pytestmark = pytest.mark.integration
+
 warnings.filterwarnings(
     "ignore",
     message=r"You are using a Python version .* google\.api_core",

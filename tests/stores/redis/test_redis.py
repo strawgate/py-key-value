@@ -14,6 +14,8 @@ from key_value.aio.stores.redis import RedisStore
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
+pytestmark = pytest.mark.integration
+
 # Redis test configuration
 REDIS_DB = 15  # Use a separate database for tests
 

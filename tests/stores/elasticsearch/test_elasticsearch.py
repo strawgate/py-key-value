@@ -22,6 +22,8 @@ from key_value.aio.stores.elasticsearch.store import (
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
+pytestmark = pytest.mark.integration
+
 if TYPE_CHECKING:
     from elastic_transport._response import ObjectApiResponse
 
