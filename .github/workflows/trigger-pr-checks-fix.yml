@@ -17,6 +17,7 @@ jobs:
       toJSON(github.event.workflow_run.pull_requests) != '[]'
     uses: elastic/ai-github-actions/.github/workflows/gh-aw-pr-checks-fix.lock.yml@workflow-dispatch
     with:
+      setup-commands: make setup
       messages-footer: |
         ---
         [From workflow: ${{ github.workflow }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})

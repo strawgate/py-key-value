@@ -15,6 +15,7 @@ jobs:
       !contains(github.event.pull_request.labels.*.name, 'skip-auto-pr-review')
     uses: elastic/ai-github-actions/.github/workflows/gh-aw-pr-review.lock.yml@workflow-dispatch
     with:
+      setup-commands: make setup
       messages-footer: |
         ---
         [From workflow: ${{ github.workflow }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
