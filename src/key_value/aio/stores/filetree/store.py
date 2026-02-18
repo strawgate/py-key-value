@@ -44,9 +44,7 @@ def get_max_path_length(root: Path | AsyncPath) -> int:
         return MAX_PATH_LENGTH  # MAX_PATH on Windows
 
     reported_max_length = os.pathconf(path=Path(root), name="PC_PATH_MAX")
-    if reported_max_length > 0:
-        return reported_max_length
-    return MAX_PATH_LENGTH
+    return reported_max_length if reported_max_length > 0 else MAX_PATH_LENGTH
 
 
 def get_max_file_name_length(root: Path | AsyncPath) -> int:
@@ -60,11 +58,7 @@ def get_max_file_name_length(root: Path | AsyncPath) -> int:
         return MAX_FILE_NAME_LENGTH  # Maximum filename length on Windows (NTFS, FAT32, etc.)
 
     reported_max_length = os.pathconf(path=Path(root), name="PC_NAME_MAX")
-
-    if reported_max_length > 0:
-        return reported_max_length
-
-    return MAX_FILE_NAME_LENGTH
+    return reported_max_length if reported_max_length > 0 else MAX_FILE_NAME_LENGTH
 
 
 @lru_cache(maxsize=1024)
