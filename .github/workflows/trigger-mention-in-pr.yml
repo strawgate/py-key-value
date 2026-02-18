@@ -1,0 +1,26 @@
+name: Mention in PR
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  run:
+    if: >-
+      startsWith(github.event.comment.body, '/ai') &&
+      (github.event.issue.pull_request != null || github.event_name == 'pull_request_review_comment')
+    uses: elastic/ai-github-actions/.github/workflows/gh-aw-mention-in-pr.lock.yml@workflow-dispatch
+    with:
+      messages-footer: |
+        ---
+        [From workflow: ${{ github.workflow }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+        Give us feedback! React with 🚀 if perfect, 👍 if helpful, 👎 if not.
+    secrets:
+      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}

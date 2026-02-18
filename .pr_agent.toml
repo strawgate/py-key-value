@@ -1,0 +1,7 @@
+# Qodo Merge (PR-Agent) Configuration
+# https://qodo-merge-docs.qodo.ai/usage-guide/additional_configurations/
+
+[github_action_config]
+# Disable all automatic commands on PR open
+auto_describe = false
+auto_improve = false
