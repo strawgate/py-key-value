@@ -13,6 +13,7 @@ jobs:
   run:
     uses: elastic/ai-github-actions/.github/workflows/gh-aw-test-improvement.lock.yml@workflow-dispatch
     with:
+      setup-commands: make setup
       messages-footer: |
         ---
         [From workflow: ${{ github.workflow }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})

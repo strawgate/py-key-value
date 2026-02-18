@@ -1,5 +1,5 @@
 .PHONY: bump-version bump-version-dry lint typecheck sync precommit test build help
-.PHONY: install test-concise docs-serve docs-build docs-deploy
+.PHONY: install test-concise docs-serve docs-build docs-deploy setup
 
 # Default target - show help
 .DEFAULT_GOAL := help
@@ -10,6 +10,7 @@ help:
 	@echo "  make help              - Show this help message"
 	@echo "  make sync              - Install all dependencies"
 	@echo "  make install           - Alias for sync"
+	@echo "  make setup             - Setup environment (installs uv if needed)"
 	@echo "  make lint              - Run linters (Python + Markdown)"
 	@echo "  make typecheck         - Run type checking"
 	@echo "  make test              - Run all tests (verbose)"
@@ -54,6 +55,11 @@ sync:
 
 # Install is an alias for sync
 install: sync
+
+# Setup environment (installs uv if needed, then syncs)
+setup:
+	@command -v uv >/dev/null 2>&1 || pip install uv
+	@uv sync --group dev
 
 # Test target
 test:
