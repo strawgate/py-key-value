@@ -54,7 +54,8 @@ async def test_async_retry_operation_retries(monkeypatch: pytest.MonkeyPatch) ->
     async def operation() -> str:
         if attempts["count"] < 2:
             attempts["count"] += 1
-            raise ValueError("fail")
+            message = "fail"
+            raise ValueError(message)
         return "ok"
 
     result = await async_retry_operation(
@@ -75,7 +76,8 @@ async def test_async_retry_operation_exhausted(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(asyncio, "sleep", recorder)
 
     async def operation() -> str:
-        raise ValueError("fail")
+        message = "fail"
+        raise ValueError(message)
 
     with pytest.raises(ValueError, match="fail"):
         await async_retry_operation(
@@ -95,7 +97,8 @@ async def test_async_retry_operation_no_retry_on_other_exception(monkeypatch: py
     monkeypatch.setattr(asyncio, "sleep", recorder)
 
     async def operation() -> str:
-        raise TypeError("bad")
+        message = "bad"
+        raise TypeError(message)
 
     with pytest.raises(TypeError, match="bad"):
         await async_retry_operation(
