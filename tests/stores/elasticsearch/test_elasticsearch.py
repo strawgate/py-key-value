@@ -47,10 +47,34 @@ async def ping_elasticsearch(es_url: str) -> bool:
         return status.body.get("status") == "green"
 
 
-async def cleanup_elasticsearch_indices(elasticsearch_client: AsyncElasticsearch):
+async def _get_test_index_names(elasticsearch_client: AsyncElasticsearch) -> list[str]:
     indices = await elasticsearch_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
-    for index in indices:
-        _ = await elasticsearch_client.options(ignore_status=404).indices.delete(index=index)
+    if not indices.body:
+        return []
+    return [str(index_name) for index_name in indices.body.keys()]
+
+
+async def _test_indices_deleted(elasticsearch_client: AsyncElasticsearch, index_names: list[str]) -> bool:
+    if not index_names:
+        return True
+    indices = await elasticsearch_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
+    if not indices.body:
+        return True
+    existing = {str(index_name) for index_name in indices.body.keys()}
+    return not any(index_name in existing for index_name in index_names)
+
+
+async def cleanup_elasticsearch_indices(elasticsearch_client: AsyncElasticsearch):
+    index_names = await _get_test_index_names(elasticsearch_client=elasticsearch_client)
+    if not index_names:
+        return
+    for index_name in index_names:
+        _ = await elasticsearch_client.options(ignore_status=404).indices.delete(index=index_name)
+    await async_wait_for_true(
+        bool_fn=lambda: _test_indices_deleted(elasticsearch_client, index_names),
+        tries=10,
+        wait_time=0.5,
+    )
 
 
 class ElasticsearchFailedToStartError(Exception):
@@ -137,8 +161,10 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True)
     async def cleanup_elasticsearch_indices(self, es_client: AsyncElasticsearch):
         await cleanup_elasticsearch_indices(elasticsearch_client=es_client)
+        await es_client.cluster.health(wait_for_status="yellow", timeout="10s")
         yield
         await cleanup_elasticsearch_indices(elasticsearch_client=es_client)
+        await es_client.cluster.health(wait_for_status="yellow", timeout="10s")
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
