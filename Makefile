@@ -1,6 +1,9 @@
 .PHONY: bump-version bump-version-dry lint typecheck sync precommit test build help
 .PHONY: install test-concise docs-serve docs-build docs-deploy setup
 
+# Use python -m uv for portability (works even when uv isn't in PATH)
+UV = python -m uv
+
 # Default target - show help
 .DEFAULT_GOAL := help
 
@@ -28,29 +31,29 @@ help:
 bump-version:
 	@if [ -z "$(VERSION)" ]; then echo "VERSION is required, usage: make bump-version VERSION=1.2.3"; exit 1; fi
 	@echo "Bumping version..."
-	@uv run python scripts/bump_versions.py $(VERSION)
+	@$(UV) run python scripts/bump_versions.py $(VERSION)
 
 bump-version-dry:
 	@if [ -z "$(VERSION)" ]; then echo "VERSION is required, usage: make bump-version-dry VERSION=1.2.3"; exit 1; fi
 	@echo "Bumping version (dry run)..."
-	@uv run python scripts/bump_versions.py $(VERSION) --dry-run
+	@$(UV) run python scripts/bump_versions.py $(VERSION) --dry-run
 
 # Lint target
 lint:
 	@echo "Linting..."
-	@uv run ruff format
-	@uv run ruff check --fix
+	@$(UV) run ruff format
+	@$(UV) run ruff check --fix
 	@markdownlint --fix -c .markdownlint.jsonc .
 
 # Type check target
 typecheck:
 	@echo "Type checking..."
-	@uv run basedpyright
+	@$(UV) run basedpyright
 
 # Sync target
 sync:
 	@echo "Syncing dependencies..."
-	@uv sync --group dev
+	@$(UV) sync --group dev
 	@npm install -g markdownlint-cli
 
 # Install is an alias for sync
@@ -58,35 +61,35 @@ install: sync
 
 # Setup environment (installs uv if needed, then syncs)
 setup:
-	@command -v uv >/dev/null 2>&1 || pip install uv
-	@uv sync --group dev
+	@$(UV) --version >/dev/null 2>&1 || pip install uv
+	@$(UV) sync --group dev
 
 # Test target
 test:
 	@echo "Running tests..."
-	@uv run pytest tests -vv
+	@$(UV) run pytest tests -vv
 
 # Concise test output for AI agents
 test-concise:
 	@echo "Running tests (concise output)..."
-	@uv run pytest tests -qq --tb=line --no-header
+	@$(UV) run pytest tests -qq --tb=line --no-header
 
 # Build target
 build:
 	@echo "Building package..."
-	@uv build
+	@$(UV) build
 
 precommit: lint typecheck
 
 # Documentation targets
 docs-serve:
 	@echo "Starting documentation server..."
-	@uv run --extra docs mkdocs serve
+	@$(UV) run --extra docs mkdocs serve
 
 docs-build:
 	@echo "Building documentation..."
-	@uv run --extra docs mkdocs build
+	@$(UV) run --extra docs mkdocs build
 
 docs-deploy:
 	@echo "Deploying documentation to GitHub Pages..."
-	@uv run --extra docs mkdocs gh-deploy --force
+	@$(UV) run --extra docs mkdocs gh-deploy --force
