@@ -83,7 +83,11 @@ class MemoryCollection:
         return self._cache.pop(key, None) is not None
 
     def keys(self, *, limit: int | None = None) -> list[str]:
-        limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
+        if limit is None:
+            limit = DEFAULT_PAGE_SIZE
+        limit = min(limit, PAGE_LIMIT)
+        if limit <= 0:
+            return []
         return list(self._cache.keys())[:limit]
 
 
@@ -185,7 +189,11 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
 
     @override
     async def _get_collection_names(self, *, limit: int | None = None) -> list[str]:
-        limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
+        if limit is None:
+            limit = DEFAULT_PAGE_SIZE
+        limit = min(limit, PAGE_LIMIT)
+        if limit <= 0:
+            return []
         return list(self._cache.keys())[:limit]
 
     @override
