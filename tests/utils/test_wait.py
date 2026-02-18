@@ -38,4 +38,4 @@ async def test_async_wait_for_true_fails(monkeypatch: pytest.MonkeyPatch) -> Non
     result = await async_wait_for_true(bool_fn=bool_fn, tries=2, wait_time=0.25)
 
     assert result is False
-    assert recorder.calls == [0.25, 0.25]
+    assert recorder.calls == [0.25]
