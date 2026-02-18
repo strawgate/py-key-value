@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   run:
-    uses: elastic/ai-github-actions/.github/workflows/gh-aw-code-simplifier.lock.yml@workflow-dispatch
+    uses: elastic/ai-github-actions/.github/workflows/gh-aw-code-simplifier.lock.yml@main
     with:
       setup-commands: make setup
       messages-footer: |

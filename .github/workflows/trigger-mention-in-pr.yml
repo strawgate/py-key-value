@@ -15,7 +15,7 @@ jobs:
     if: >-
       startsWith(github.event.comment.body, '/ai') &&
       (github.event.issue.pull_request != null || github.event_name == 'pull_request_review_comment')
-    uses: elastic/ai-github-actions/.github/workflows/gh-aw-mention-in-pr.lock.yml@workflow-dispatch
+    uses: elastic/ai-github-actions/.github/workflows/gh-aw-mention-in-pr.lock.yml@main
     with:
       setup-commands: make setup
       messages-footer: |
