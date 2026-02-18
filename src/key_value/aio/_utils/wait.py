@@ -24,8 +24,9 @@ async def async_wait_for_true(bool_fn: Callable[[], Awaitable[bool]], tries: int
         True if the function returned True within the allowed attempts,
         False otherwise.
     """
-    for _ in range(tries):
+    for attempt in range(tries):
         if await bool_fn():
             return True
-        await asyncio.sleep(float(wait_time))
+        if attempt < tries - 1:
+            await asyncio.sleep(float(wait_time))
     return False
