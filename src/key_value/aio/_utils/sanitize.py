@@ -158,11 +158,14 @@ def sanitize_string(
         else value
     )
 
+    def _truncate(value: str, max_length: int) -> str:
+        return _truncate_to_bytes(value, max_length) if length_is_bytes else value[:max_length]
+
     actual_max_length: int
 
     if hash_fragment_mode == HashFragmentMode.ALWAYS:
         actual_max_length = max_length - hash_fragment_size_required
-        sanitized_value = _truncate_to_bytes(sanitized_value, actual_max_length) if length_is_bytes else sanitized_value[:actual_max_length]
+        sanitized_value = _truncate(sanitized_value, actual_max_length)
 
         if not sanitized_value:
             return hash_fragment
@@ -170,13 +173,13 @@ def sanitize_string(
         return sanitized_value + hash_fragment_separator + hash_fragment
 
     if hash_fragment_mode == HashFragmentMode.ONLY_IF_CHANGED:
-        sanitized_value = _truncate_to_bytes(sanitized_value, max_length) if length_is_bytes else sanitized_value[:max_length]
+        sanitized_value = _truncate(sanitized_value, max_length)
 
         if value == sanitized_value:
             return value
 
         actual_max_length = max_length - hash_fragment_size_required
-        sanitized_value = _truncate_to_bytes(sanitized_value, actual_max_length) if length_is_bytes else sanitized_value[:actual_max_length]
+        sanitized_value = _truncate(sanitized_value, actual_max_length)
 
         if not sanitized_value:
             return hash_fragment
@@ -187,7 +190,7 @@ def sanitize_string(
         msg = "Entire value was sanitized and hash_fragment_mode is HashFragmentMode.NEVER"
         raise ValueError(msg)
 
-    return _truncate_to_bytes(sanitized_value, max_length) if length_is_bytes else sanitized_value[:max_length]
+    return _truncate(sanitized_value, max_length)
 
 
 @bear_enforce
