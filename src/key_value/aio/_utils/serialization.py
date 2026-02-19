@@ -73,17 +73,13 @@ class SerializationAdapter(ABC):
 
         managed_entry_proto: dict[str, Any] = {}
 
-        if self._date_format == "isoformat":
-            if created_at := key_must_be(data, key="created_at", expected_type=str):
-                managed_entry_proto["created_at"] = parse_datetime_str(value=created_at)
-            if expires_at := key_must_be(data, key="expires_at", expected_type=str):
-                managed_entry_proto["expires_at"] = parse_datetime_str(value=expires_at)
-
-        if self._date_format == "datetime":
-            if created_at := key_must_be(data, key="created_at", expected_type=datetime):
-                managed_entry_proto["created_at"] = created_at
-            if expires_at := key_must_be(data, key="expires_at", expected_type=datetime):
-                managed_entry_proto["expires_at"] = expires_at
+        if self._date_format in ("isoformat", "datetime"):
+            expected_type = str if self._date_format == "isoformat" else datetime
+            parser = parse_datetime_str if self._date_format == "isoformat" else (lambda value: value)
+            if created_at := key_must_be(data, key="created_at", expected_type=expected_type):
+                managed_entry_proto["created_at"] = parser(created_at)
+            if expires_at := key_must_be(data, key="expires_at", expected_type=expected_type):
+                managed_entry_proto["expires_at"] = parser(expires_at)
 
         if "value" not in data:
             msg = "Value field not found"
