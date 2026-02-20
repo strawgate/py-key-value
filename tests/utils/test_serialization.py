@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from inline_snapshot import snapshot
 
+from key_value.aio.errors import DeserializationError
 from key_value.aio._utils.managed_entry import ManagedEntry
 from key_value.aio._utils.serialization import BasicSerializationAdapter
 
@@ -80,3 +81,9 @@ class TestBasicSerializationAdapter:
 
         assert adapter.load_dict(data=adapter.dump_dict(entry=TEST_ENTRY_TWO)) == snapshot(TEST_ENTRY_TWO)
         assert adapter.load_json(json_str=adapter.dump_json(entry=TEST_ENTRY_TWO)) == snapshot(TEST_ENTRY_TWO)
+
+    @pytest.mark.parametrize("field", ["created_at", "expires_at"])
+    def test_rejects_empty_isoformat_datetime(self, adapter: BasicSerializationAdapter, field: str) -> None:
+        payload = {"value": {"x": 1}, field: ""}
+        with pytest.raises(DeserializationError):
+            adapter.load_dict(data=payload)
