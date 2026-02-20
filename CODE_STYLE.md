@@ -17,9 +17,9 @@ automated tooling**. For tool-enforced rules, just run `make lint` and
 ### ManagedEntry Wrapper
 
 Raw values are **never** stored directly in backends. All values are wrapped in
-`ManagedEntry` objects (from `key_value.shared.managed_entry`) which include
-metadata like creation timestamp and TTL. This is intentional - don't try to
-"fix" it.
+`ManagedEntry` objects (from `key_value.aio._utils.managed_entry`) which
+include metadata like creation timestamp and TTL. This is intentional -
+don't try to "fix" it.
 
 When implementing or debugging stores, remember that what's stored is not
 the raw value but a `ManagedEntry` containing:
