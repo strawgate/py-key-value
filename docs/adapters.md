@@ -592,7 +592,7 @@ error instead of returning `None` when a key is not found.
 ```python
 from key_value.aio.stores.memory import MemoryStore
 from key_value.aio.adapters.raise_on_missing import RaiseOnMissingAdapter
-from key_value.aio.errors import KeyNotFoundError
+from key_value.aio.errors import MissingKeyError
 
 adapter = RaiseOnMissingAdapter(
     key_value=MemoryStore()
