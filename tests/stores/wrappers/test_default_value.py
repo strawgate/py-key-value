@@ -38,6 +38,26 @@ class TestDefaultValueWrapper(BaseStoreTests):
             ({"key_2": "value_2"}, IsFloat(approx=200)),
         ]
 
+    async def test_default_value_returns_fresh_dicts(self, store: BaseStore):
+        first_result = await store.get(collection=TEST_COLLECTION, key=TEST_KEY_1)
+        assert first_result == DEFAULT_VALUE
+
+        assert first_result is not None
+        first_result["obj_key"] = "mutated"
+
+        second_result = await store.get(collection=TEST_COLLECTION, key=TEST_KEY_1)
+        assert second_result == DEFAULT_VALUE
+        assert second_result is not first_result
+
+    async def test_default_value_get_many_returns_independent_dicts(self, store: BaseStore):
+        results = await store.get_many(collection=TEST_COLLECTION, keys=[TEST_KEY_1, TEST_KEY_2])
+        assert results == [DEFAULT_VALUE, DEFAULT_VALUE]
+        assert results[0] is not None
+        assert results[1] is not None
+
+        results[0]["obj_key"] = "mutated"
+        assert results[1] == DEFAULT_VALUE
+
     @override
     @pytest.mark.skip
     async def test_empty_get(self, store: BaseStore): ...
