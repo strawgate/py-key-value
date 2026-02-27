@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform != 'win32'",
@@ -368,6 +368,32 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/6b/5c/685e6633917e101e5dcb62b9dd76946cbb57c26e133bae9e0cd36033c0a9/attrs-25.4.0.tar.gz", hash = "sha256:16d5969b87f0859ef33a48b35d55ac1be6e42ae49d5e853b597db70c35c57e11", size = 934251, upload-time = "2025-10-06T13:54:44.725Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3a/2a/7cc015f5b9f5db42b7d48157e23356022889fc354a2813c15934b7cb5c0e/attrs-25.4.0-py3-none-any.whl", hash = "sha256:adcf7e2a1fb3b36ac48d97835bb6d8ade15b8dcce26aba8bf1d14847b57a3373", size = 67615, upload-time = "2025-10-06T13:54:43.17Z" },
+]
+
+[[package]]
+name = "azure-core"
+version = "1.38.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/dc/1b/e503e08e755ea94e7d3419c9242315f888fc664211c90d032e40479022bf/azure_core-1.38.0.tar.gz", hash = "sha256:8194d2682245a3e4e3151a667c686464c3786fed7918b394d035bdcd61bb5993", size = 363033, upload-time = "2026-01-12T17:03:05.535Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fc/d8/b8fcba9464f02b121f39de2db2bf57f0b216fe11d014513d666e8634380d/azure_core-1.38.0-py3-none-any.whl", hash = "sha256:ab0c9b2cd71fecb1842d52c965c95285d3cfb38902f6766e4a471f1cd8905335", size = 217825, upload-time = "2026-01-12T17:03:07.291Z" },
+]
+
+[[package]]
+name = "azure-cosmos"
+version = "4.14.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-core" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ff/72/18cd698e5a748176bbc4e775a3f7b45e4252c0e694bed73818d5a75ec276/azure_cosmos-4.14.5.tar.gz", hash = "sha256:3239a605fe29c94b77391826773aa3d0d9bbe4b93903fce5b6434b0f32742ba7", size = 2055402, upload-time = "2026-01-16T01:51:50.025Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/48/1c/c46e4a2881ef86d09fabaf2246a39788d716d1fb88640784eac6ebe291c4/azure_cosmos-4.14.5-py3-none-any.whl", hash = "sha256:1a50d2019f81380b4cf35aff881290607ff1bf1287611abf067a965b9ea46f5d", size = 394833, upload-time = "2026-01-16T01:51:51.977Z" },
 ]
 
 [[package]]
@@ -2037,6 +2063,9 @@ dependencies = [
 aerospike = [
     { name = "aerospike" },
 ]
+cosmosdb = [
+    { name = "azure-cosmos" },
+]
 disk = [
     { name = "diskcache" },
     { name = "pathvalidate" },
@@ -2122,7 +2151,7 @@ dev = [
     { name = "docker" },
     { name = "inline-snapshot" },
     { name = "py-key-value-aio", extra = ["aerospike", "valkey"], marker = "sys_platform != 'win32'" },
-    { name = "py-key-value-aio", extra = ["disk", "duckdb", "dynamodb", "elasticsearch", "filetree", "firestore", "keyring", "memcached", "memory", "mongodb", "opensearch", "postgresql", "pydantic", "redis", "rocksdb", "s3", "vault", "wrappers-encryption"] },
+    { name = "py-key-value-aio", extra = ["cosmosdb", "disk", "duckdb", "dynamodb", "elasticsearch", "filetree", "firestore", "keyring", "memcached", "memory", "mongodb", "opensearch", "postgresql", "pydantic", "redis", "rocksdb", "s3", "vault", "wrappers-encryption"] },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-dotenv" },
@@ -2143,6 +2172,7 @@ requires-dist = [
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
     { name = "anyio", marker = "extra == 'filetree'", specifier = ">=4.4.0" },
     { name = "asyncpg", marker = "extra == 'postgresql'", specifier = ">=0.30.0" },
+    { name = "azure-cosmos", marker = "extra == 'cosmosdb'", specifier = ">=4.7.0" },
     { name = "beartype", specifier = ">=0.20.0" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=5.0.0" },
     { name = "cryptography", marker = "extra == 'wrappers-encryption'", specifier = ">=45.0.0" },
@@ -2173,7 +2203,7 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.15.0" },
     { name = "valkey-glide", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-provides-extras = ["memory", "disk", "filetree", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "opensearch", "dynamodb", "s3", "keyring", "keyring-linux", "pydantic", "aerospike", "rocksdb", "duckdb", "postgresql", "firestore", "wrappers-encryption", "docs"]
+provides-extras = ["memory", "disk", "filetree", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "opensearch", "dynamodb", "s3", "keyring", "keyring-linux", "pydantic", "aerospike", "rocksdb", "duckdb", "postgresql", "firestore", "cosmosdb", "wrappers-encryption", "docs"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2185,7 +2215,7 @@ dev = [
     { name = "inline-snapshot", specifier = ">=0.30.1" },
     { name = "py-key-value-aio", extras = ["aerospike"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extras = ["keyring"] },
-    { name = "py-key-value-aio", extras = ["memory", "disk", "filetree", "redis", "elasticsearch", "opensearch", "memcached", "mongodb", "vault", "dynamodb", "s3", "rocksdb", "duckdb", "firestore", "postgresql"] },
+    { name = "py-key-value-aio", extras = ["memory", "disk", "filetree", "redis", "elasticsearch", "opensearch", "memcached", "mongodb", "vault", "dynamodb", "s3", "rocksdb", "duckdb", "firestore", "postgresql", "cosmosdb"] },
     { name = "py-key-value-aio", extras = ["pydantic"] },
     { name = "py-key-value-aio", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extras = ["wrappers-encryption"] },
