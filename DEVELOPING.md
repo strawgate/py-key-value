@@ -56,10 +56,9 @@ src/
     │   ├── adapters/      # Type adapters (Pydantic, Dataclass, etc.)
     │   ├── protocols/     # Protocol definitions
     │   ├── stores/        # Backend implementations
-    │   └── wrappers/      # Store wrappers
-    └── shared/            # Shared utilities and errors
-        ├── errors/        # Error classes
-        └── ...            # Utility modules (beartype, compound, etc.)
+    │   ├── wrappers/      # Store wrappers
+    │   ├── _utils/        # Shared utilities (ManagedEntry, TTL, etc.)
+    │   └── errors/        # Shared error classes
 tests/                     # Test suite
 scripts/
 └── bump_versions.py       # Version management script

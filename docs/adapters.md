@@ -285,7 +285,7 @@ to raise an error instead:
 ```python
 from key_value.aio.stores.memory import MemoryStore
 from key_value.aio.adapters.pydantic import PydanticAdapter
-from key_value.shared.errors import DeserializationError
+from key_value.aio.errors import DeserializationError
 
 adapter = PydanticAdapter(
     key_value=MemoryStore(),
@@ -592,7 +592,7 @@ error instead of returning `None` when a key is not found.
 ```python
 from key_value.aio.stores.memory import MemoryStore
 from key_value.aio.adapters.raise_on_missing import RaiseOnMissingAdapter
-from key_value.shared.errors import KeyNotFoundError
+from key_value.aio.errors import MissingKeyError
 
 adapter = RaiseOnMissingAdapter(
     key_value=MemoryStore()
