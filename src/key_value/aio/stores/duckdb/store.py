@@ -370,6 +370,4 @@ class DuckDBStore(BaseContextManagerStore, BaseStore):
             [collection, key],
         )
 
-        # Check if any rows were deleted by counting returned rows
-        deleted_rows = result.fetchall()
-        return len(deleted_rows) > 0
+        return result.fetchone() is not None
