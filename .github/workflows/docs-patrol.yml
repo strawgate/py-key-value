@@ -1,19 +1,18 @@
-name: Bug Hunter
+name: Docs Patrol
 on:
   schedule:
-    - cron: "0 11 * * 1-5"
+    - cron: "0 10 * * 1-5"
   workflow_dispatch:
 
 permissions:
-  actions: read
   contents: read
   issues: write
   pull-requests: read
 
 jobs:
   run:
-    uses: elastic/ai-github-actions/.github/workflows/gh-aw-bug-hunter.lock.yml@main
+    uses: elastic/ai-github-actions/.github/workflows/gh-aw-docs-patrol.lock.yml@main
     with:
-      title-prefix: "[bug-hunter]"
+      title-prefix: "[docs-patrol]"
     secrets:
       COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
