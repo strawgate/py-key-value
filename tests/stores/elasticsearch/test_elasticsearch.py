@@ -51,7 +51,7 @@ async def _get_test_index_names(elasticsearch_client: AsyncElasticsearch) -> lis
     indices = await elasticsearch_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
     if not indices.body:
         return []
-    return [str(index_name) for index_name in indices.body.keys()]
+    return [str(index_name) for index_name in indices.body]
 
 
 async def _test_indices_deleted(elasticsearch_client: AsyncElasticsearch, index_names: list[str]) -> bool:
@@ -60,7 +60,7 @@ async def _test_indices_deleted(elasticsearch_client: AsyncElasticsearch, index_
     indices = await elasticsearch_client.options(ignore_status=404).indices.get(index="kv-store-e2e-test-*")
     if not indices.body:
         return True
-    existing = {str(index_name) for index_name in indices.body.keys()}
+    existing = {str(index_name) for index_name in indices.body}
     return not any(index_name in existing for index_name in index_names)
 
 
