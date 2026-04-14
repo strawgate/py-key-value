@@ -350,11 +350,14 @@ class TestRedisSSLStore(ContextManagerStoreTestMixin, BaseStoreTests):
         platform and Redis version. We use a short timeout to handle both.
         """
         store = RedisStore(host=redis_host, port=redis_port, db=REDIS_DB)
-        with pytest.raises((redis.exceptions.ConnectionError, asyncio.TimeoutError, TimeoutError)):
-            await asyncio.wait_for(
-                store.get(collection="test", key="should_fail"),
-                timeout=5.0,
-            )
+        try:
+            with pytest.raises((redis.exceptions.ConnectionError, asyncio.TimeoutError, TimeoutError)):
+                await asyncio.wait_for(
+                    store.get(collection="test", key="should_fail"),
+                    timeout=5.0,
+                )
+        finally:
+            await store.close()
 
     async def test_ssl_auto_enabled_by_cert_params(
         self,
