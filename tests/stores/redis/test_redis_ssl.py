@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import ipaddress
 import shutil
@@ -226,10 +227,13 @@ class TestRedisSSLStore(ContextManagerStoreTestMixin, BaseStoreTests):
         """Test that rediss:// URLs enable SSL automatically."""
         url = f"rediss://{redis_host}:{redis_port}/{REDIS_DB}"
         store = RedisStore(url=url, ssl_cert_reqs="none", ssl_check_hostname=False)
-        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
-        await store.put(collection="test", key="ssl_url_test", value={"ssl": True})
-        result = await store.get(collection="test", key="ssl_url_test")
-        assert result == {"ssl": True}
+        try:
+            _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
+            await store.put(collection="test", key="ssl_url_test", value={"ssl": True})
+            result = await store.get(collection="test", key="ssl_url_test")
+            assert result == {"ssl": True}
+        finally:
+            await store.close()
 
     async def test_ssl_host_port_with_params(
         self,
@@ -245,10 +249,13 @@ class TestRedisSSLStore(ContextManagerStoreTestMixin, BaseStoreTests):
             ssl=True,
             ssl_cert_reqs="none",
         )
-        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
-        await store.put(collection="test", key="ssl_host_test", value={"mode": "host_port"})
-        result = await store.get(collection="test", key="ssl_host_test")
-        assert result == {"mode": "host_port"}
+        try:
+            _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
+            await store.put(collection="test", key="ssl_host_test", value={"mode": "host_port"})
+            result = await store.get(collection="test", key="ssl_host_test")
+            assert result == {"mode": "host_port"}
+        finally:
+            await store.close()
 
     async def test_ssl_rediss_url_without_explicit_params(
         self,
@@ -264,10 +271,13 @@ class TestRedisSSLStore(ContextManagerStoreTestMixin, BaseStoreTests):
         """
         url = f"rediss://{redis_host}:{redis_port}/{REDIS_DB}"
         store = RedisStore(url=url, ssl_ca_certs=ca_cert_path, ssl_check_hostname=False)
-        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
-        await store.put(collection="test", key="rediss_default", value={"default_ssl": True})
-        result = await store.get(collection="test", key="rediss_default")
-        assert result == {"default_ssl": True}
+        try:
+            _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
+            await store.put(collection="test", key="rediss_default", value={"default_ssl": True})
+            result = await store.get(collection="test", key="rediss_default")
+            assert result == {"default_ssl": True}
+        finally:
+            await store.close()
 
     async def test_ssl_with_ca_verification(
         self,
@@ -291,10 +301,13 @@ class TestRedisSSLStore(ContextManagerStoreTestMixin, BaseStoreTests):
             ssl_check_hostname=False,
             ssl_cert_reqs="required",
         )
-        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
-        await store.put(collection="test", key="ca_verify", value={"verified": True})
-        result = await store.get(collection="test", key="ca_verify")
-        assert result == {"verified": True}
+        try:
+            _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
+            await store.put(collection="test", key="ca_verify", value={"verified": True})
+            result = await store.get(collection="test", key="ca_verify")
+            assert result == {"verified": True}
+        finally:
+            await store.close()
 
     async def test_plaintext_connection_fails_against_tls_server(
         self,
@@ -302,10 +315,18 @@ class TestRedisSSLStore(ContextManagerStoreTestMixin, BaseStoreTests):
         redis_host: str,
         redis_port: int,
     ):
-        """Test that a non-SSL connection to a TLS-only Redis server fails."""
+        """Test that a non-SSL connection to a TLS-only Redis server fails.
+
+        A plaintext client connecting to a TLS-only server may either get an
+        immediate ConnectionError or hang indefinitely, depending on the
+        platform and Redis version. We use a short timeout to handle both.
+        """
         store = RedisStore(host=redis_host, port=redis_port, db=REDIS_DB)
-        with pytest.raises(redis.exceptions.ConnectionError):
-            await store.get(collection="test", key="should_fail")
+        with pytest.raises((redis.exceptions.ConnectionError, asyncio.TimeoutError, TimeoutError)):
+            await asyncio.wait_for(
+                store.get(collection="test", key="should_fail"),
+                timeout=5.0,
+            )
 
     async def test_ssl_auto_enabled_by_cert_params(
         self,
@@ -322,10 +343,13 @@ class TestRedisSSLStore(ContextManagerStoreTestMixin, BaseStoreTests):
             ssl_ca_certs=ca_cert_path,
             ssl_check_hostname=False,
         )
-        _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
-        await store.put(collection="test", key="auto_ssl", value={"auto": True})
-        result = await store.get(collection="test", key="auto_ssl")
-        assert result == {"auto": True}
+        try:
+            _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
+            await store.put(collection="test", key="auto_ssl", value={"auto": True})
+            result = await store.get(collection="test", key="auto_ssl")
+            assert result == {"auto": True}
+        finally:
+            await store.close()
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
