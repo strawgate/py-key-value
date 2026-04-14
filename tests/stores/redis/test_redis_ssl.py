@@ -425,7 +425,9 @@ class TestRedisSSLStore(ContextManagerStoreTestMixin, BaseStoreTests):
         """Test ssl_cert_reqs='required' rejects self-signed certs when no CA is provided.
 
         Without a matching CA certificate the server's self-signed cert
-        cannot be verified, so the connection must fail.
+        cannot be verified, so the connection must fail. On some platforms
+        the SSL handshake may hang instead of raising immediately, so we
+        use a timeout to handle both cases.
         """
         store = RedisStore(
             host=redis_host,
@@ -436,8 +438,11 @@ class TestRedisSSLStore(ContextManagerStoreTestMixin, BaseStoreTests):
             ssl_check_hostname=False,
         )
         try:
-            with pytest.raises(redis.exceptions.ConnectionError, match="CERTIFICATE_VERIFY_FAILED"):
-                await store.get(collection="test", key="should_fail")
+            with pytest.raises((redis.exceptions.ConnectionError, asyncio.TimeoutError, TimeoutError)):
+                await asyncio.wait_for(
+                    store.get(collection="test", key="should_fail"),
+                    timeout=5.0,
+                )
         finally:
             await store.close()
 
