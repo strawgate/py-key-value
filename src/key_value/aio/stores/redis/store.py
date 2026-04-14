@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Any, overload
+from typing import Any, Literal, overload
 from urllib.parse import urlparse
 
 from typing_extensions import override
@@ -26,6 +26,39 @@ PAGE_LIMIT = 10000
 # These are module-level functions (not methods) so they are not exported with the store class
 
 
+def _build_ssl_kwargs(
+    *,
+    ssl_enabled: bool = False,
+    ssl_ca_certs: str | None = None,
+    ssl_certfile: str | None = None,
+    ssl_keyfile: str | None = None,
+    ssl_check_hostname: bool = True,
+    ssl_cert_reqs: Literal["required", "optional", "none"] | None = None,
+) -> dict[str, Any]:
+    """Build SSL keyword arguments for the Redis client.
+
+    Returns an empty dict if SSL is not needed, otherwise returns the
+    kwargs to spread into ``Redis()``.
+    """
+    has_ssl_params = any([ssl_ca_certs, ssl_certfile, ssl_keyfile, ssl_cert_reqs])
+
+    if not ssl_enabled and not has_ssl_params:
+        return {}
+
+    kwargs: dict[str, Any] = {"ssl": True, "ssl_check_hostname": ssl_check_hostname}
+
+    if ssl_ca_certs is not None:
+        kwargs["ssl_ca_certs"] = ssl_ca_certs
+    if ssl_certfile is not None:
+        kwargs["ssl_certfile"] = ssl_certfile
+    if ssl_keyfile is not None:
+        kwargs["ssl_keyfile"] = ssl_keyfile
+    if ssl_cert_reqs is not None:
+        kwargs["ssl_cert_reqs"] = ssl_cert_reqs
+
+    return kwargs
+
+
 def _create_redis_client(
     *,
     host: str = "localhost",
@@ -34,8 +67,23 @@ def _create_redis_client(
     username: str | None = None,
     password: str | None = None,
     decode_responses: bool = True,
+    ssl_enabled: bool = False,
+    ssl_ca_certs: str | None = None,
+    ssl_certfile: str | None = None,
+    ssl_keyfile: str | None = None,
+    ssl_check_hostname: bool = True,
+    ssl_cert_reqs: Literal["required", "optional", "none"] | None = None,
 ) -> Redis:
     """Create a Redis client with the given parameters."""
+    ssl_kwargs = _build_ssl_kwargs(
+        ssl_enabled=ssl_enabled,
+        ssl_ca_certs=ssl_ca_certs,
+        ssl_certfile=ssl_certfile,
+        ssl_keyfile=ssl_keyfile,
+        ssl_check_hostname=ssl_check_hostname,
+        ssl_cert_reqs=ssl_cert_reqs,
+    )
+
     return Redis(
         host=host,
         port=port,
@@ -43,6 +91,7 @@ def _create_redis_client(
         username=username,
         password=password,
         decode_responses=decode_responses,
+        **ssl_kwargs,
     )
 
 
@@ -51,15 +100,38 @@ def _create_redis_client_from_url(
     *,
     password: str | None = None,
     decode_responses: bool = True,
+    ssl_ca_certs: str | None = None,
+    ssl_certfile: str | None = None,
+    ssl_keyfile: str | None = None,
+    ssl_check_hostname: bool = True,
+    ssl_cert_reqs: Literal["required", "optional", "none"] | None = None,
 ) -> Redis:
     """Create a Redis client from a URL.
 
     Args:
-        url: Redis URL (e.g., redis://localhost:6379/0).
+        url: Redis URL (e.g., ``redis://localhost:6379/0`` or ``rediss://localhost:6380/0``).
+            URLs with the ``rediss://`` scheme automatically enable SSL/TLS.
         password: Override password (used if not in URL).
         decode_responses: Whether to decode responses. Defaults to True.
+        ssl_ca_certs: Path to a CA certificate file for server verification.
+        ssl_certfile: Path to a client certificate file for mutual TLS.
+        ssl_keyfile: Path to a client private key file for mutual TLS.
+        ssl_check_hostname: Whether to verify the server hostname. Defaults to True.
+        ssl_cert_reqs: Certificate verification mode (``"required"``, ``"optional"``,
+            or ``"none"``).
     """
     parsed_url = urlparse(url)
+    use_ssl = parsed_url.scheme == "rediss"
+
+    ssl_kwargs = _build_ssl_kwargs(
+        ssl_enabled=use_ssl,
+        ssl_ca_certs=ssl_ca_certs,
+        ssl_certfile=ssl_certfile,
+        ssl_keyfile=ssl_keyfile,
+        ssl_check_hostname=ssl_check_hostname,
+        ssl_cert_reqs=ssl_cert_reqs,
+    )
+
     return Redis(
         host=parsed_url.hostname or "localhost",
         port=parsed_url.port or 6379,
@@ -67,6 +139,7 @@ def _create_redis_client_from_url(
         username=parsed_url.username,
         password=parsed_url.password or password,
         decode_responses=decode_responses,
+        **ssl_kwargs,
     )
 
 
@@ -120,11 +193,33 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
     def __init__(self, *, client: Redis, default_collection: str | None = None) -> None: ...
 
     @overload
-    def __init__(self, *, url: str, default_collection: str | None = None) -> None: ...
+    def __init__(
+        self,
+        *,
+        url: str,
+        ssl_ca_certs: str | None = None,
+        ssl_certfile: str | None = None,
+        ssl_keyfile: str | None = None,
+        ssl_check_hostname: bool = True,
+        ssl_cert_reqs: Literal["required", "optional", "none"] | None = None,
+        default_collection: str | None = None,
+    ) -> None: ...
 
     @overload
     def __init__(
-        self, *, host: str = "localhost", port: int = 6379, db: int = 0, password: str | None = None, default_collection: str | None = None
+        self,
+        *,
+        host: str = "localhost",
+        port: int = 6379,
+        db: int = 0,
+        password: str | None = None,
+        ssl: bool = False,
+        ssl_ca_certs: str | None = None,
+        ssl_certfile: str | None = None,
+        ssl_keyfile: str | None = None,
+        ssl_check_hostname: bool = True,
+        ssl_cert_reqs: Literal["required", "optional", "none"] | None = None,
+        default_collection: str | None = None,
     ) -> None: ...
 
     @bear_spray
@@ -138,18 +233,39 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         port: int = 6379,
         db: int = 0,
         password: str | None = None,
+        ssl: bool = False,
+        ssl_ca_certs: str | None = None,
+        ssl_certfile: str | None = None,
+        ssl_keyfile: str | None = None,
+        ssl_check_hostname: bool = True,
+        ssl_cert_reqs: Literal["required", "optional", "none"] | None = None,
     ) -> None:
         """Initialize the Redis store.
 
         Args:
             client: An existing Redis client to use. If provided, the store will not manage
                 the client's lifecycle (will not close it). The caller is responsible for
-                managing the client's lifecycle.
-            url: Redis URL (e.g., redis://localhost:6379/0).
+                managing the client's lifecycle. When using a pre-configured client,
+                configure SSL/TLS directly on the client before passing it.
+            url: Redis URL (e.g., ``redis://localhost:6379/0`` or ``rediss://localhost:6380/0``).
+                URLs with the ``rediss://`` scheme automatically enable SSL/TLS.
             host: Redis host. Defaults to localhost.
             port: Redis port. Defaults to 6379.
             db: Redis database number. Defaults to 0.
             password: Redis password. Defaults to None.
+            ssl: Enable SSL/TLS for the connection. Defaults to False. Not needed
+                when using a ``rediss://`` URL (SSL is inferred from the scheme).
+            ssl_ca_certs: Path to a CA certificate file (PEM) used to verify the
+                server's certificate. If not provided, the system default CA bundle
+                is used when verification is enabled.
+            ssl_certfile: Path to a client certificate file (PEM) for mutual TLS (mTLS).
+            ssl_keyfile: Path to the client private key file (PEM) for mutual TLS (mTLS).
+            ssl_check_hostname: Whether to verify the server hostname matches the
+                certificate. Defaults to True.
+            ssl_cert_reqs: Certificate verification mode: ``"required"`` (default
+                when SSL is enabled), ``"optional"``, or ``"none"``. Set to
+                ``"none"`` to skip certificate verification (not recommended for
+                production).
             default_collection: The default collection to use if no collection is provided.
         """
         client_provided = client is not None
@@ -157,9 +273,28 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         if client:
             self._client = client
         elif url:
-            self._client = _create_redis_client_from_url(url, password=password)
+            self._client = _create_redis_client_from_url(
+                url,
+                password=password,
+                ssl_ca_certs=ssl_ca_certs,
+                ssl_certfile=ssl_certfile,
+                ssl_keyfile=ssl_keyfile,
+                ssl_check_hostname=ssl_check_hostname,
+                ssl_cert_reqs=ssl_cert_reqs,
+            )
         else:
-            self._client = _create_redis_client(host=host, port=port, db=db, password=password)
+            self._client = _create_redis_client(
+                host=host,
+                port=port,
+                db=db,
+                password=password,
+                ssl_enabled=ssl,
+                ssl_ca_certs=ssl_ca_certs,
+                ssl_certfile=ssl_certfile,
+                ssl_keyfile=ssl_keyfile,
+                ssl_check_hostname=ssl_check_hostname,
+                ssl_cert_reqs=ssl_cert_reqs,
+            )
 
         self._adapter = BasicSerializationAdapter(date_format="isoformat", value_format="dict")
 
