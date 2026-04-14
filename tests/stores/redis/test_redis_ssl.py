@@ -52,6 +52,10 @@ def _generate_self_signed_certs(cert_dir: str) -> tuple[str, str, str]:
         .not_valid_before(datetime.datetime.now(datetime.timezone.utc))
         .not_valid_after(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1))
         .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(ca_key.public_key()),
+            critical=False,
+        )
         .sign(ca_key, hashes.SHA256())
     )
 
@@ -71,6 +75,16 @@ def _generate_self_signed_certs(cert_dir: str) -> tuple[str, str, str]:
                     x509.DNSName("localhost"),
                     x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")),
                 ]
+            ),
+            critical=False,
+        )
+        .add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(server_key.public_key()),
+            critical=False,
+        )
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
+                ca_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
             ),
             critical=False,
         )
