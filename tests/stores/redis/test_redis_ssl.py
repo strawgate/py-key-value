@@ -382,6 +382,113 @@ class TestRedisSSLStore(ContextManagerStoreTestMixin, BaseStoreTests):
         finally:
             await store.close()
 
+    # ── Verification mode tests ───────────────────────────────────────
+
+    async def test_cert_reqs_optional_with_ca(
+        self,
+        setup_redis: None,
+        redis_host: str,
+        redis_port: int,
+        ca_cert_path: str,
+    ):
+        """Test ssl_cert_reqs='optional' with a CA cert succeeds.
+
+        In ``optional`` mode (:data:`ssl.CERT_OPTIONAL`) the server certificate
+        is verified if presented. Since Redis always presents its cert, we must
+        supply the CA so verification passes. The difference from ``required``
+        is that ``optional`` would allow the connection even if the server
+        chose not to present a certificate (which Redis never does).
+        """
+        store = RedisStore(
+            host=redis_host,
+            port=redis_port,
+            db=REDIS_DB,
+            ssl=True,
+            ssl_ca_certs=ca_cert_path,
+            ssl_cert_reqs="optional",
+            ssl_check_hostname=False,
+        )
+        try:
+            _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
+            await store.put(collection="test", key="optional_mode", value={"mode": "optional"})
+            result = await store.get(collection="test", key="optional_mode")
+            assert result == {"mode": "optional"}
+        finally:
+            await store.close()
+
+    async def test_cert_reqs_required_fails_without_ca(
+        self,
+        setup_redis: None,
+        redis_host: str,
+        redis_port: int,
+    ):
+        """Test ssl_cert_reqs='required' rejects self-signed certs when no CA is provided.
+
+        Without a matching CA certificate the server's self-signed cert
+        cannot be verified, so the connection must fail.
+        """
+        store = RedisStore(
+            host=redis_host,
+            port=redis_port,
+            db=REDIS_DB,
+            ssl=True,
+            ssl_cert_reqs="required",
+            ssl_check_hostname=False,
+        )
+        try:
+            with pytest.raises(redis.exceptions.ConnectionError, match="CERTIFICATE_VERIFY_FAILED"):
+                await store.get(collection="test", key="should_fail")
+        finally:
+            await store.close()
+
+    async def test_cert_reqs_required_succeeds_with_ca(
+        self,
+        setup_redis: None,
+        redis_host: str,
+        redis_port: int,
+        ca_cert_path: str,
+    ):
+        """Test ssl_cert_reqs='required' succeeds when the correct CA is provided."""
+        store = RedisStore(
+            host=redis_host,
+            port=redis_port,
+            db=REDIS_DB,
+            ssl=True,
+            ssl_ca_certs=ca_cert_path,
+            ssl_cert_reqs="required",
+            ssl_check_hostname=False,
+        )
+        try:
+            _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
+            await store.put(collection="test", key="required_ca", value={"mode": "required"})
+            result = await store.get(collection="test", key="required_ca")
+            assert result == {"mode": "required"}
+        finally:
+            await store.close()
+
+    async def test_cert_reqs_none_ignores_invalid_cert(
+        self,
+        setup_redis: None,
+        redis_host: str,
+        redis_port: int,
+    ):
+        """Test ssl_cert_reqs='none' connects without any certificate validation."""
+        store = RedisStore(
+            host=redis_host,
+            port=redis_port,
+            db=REDIS_DB,
+            ssl=True,
+            ssl_cert_reqs="none",
+            ssl_check_hostname=False,
+        )
+        try:
+            _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]
+            await store.put(collection="test", key="none_mode", value={"mode": "none"})
+            result = await store.get(collection="test", key="none_mode")
+            assert result == {"mode": "none"}
+        finally:
+            await store.close()
+
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
