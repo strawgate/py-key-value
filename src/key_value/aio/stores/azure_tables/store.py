@@ -14,6 +14,7 @@ checking ExpiresAt on read (lazy expire) and exposing an explicit
 ``cull()`` for full sweeps.
 """
 
+import hashlib
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, overload
 
@@ -40,6 +41,35 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Helper functions — module-level so they aren't part of the public surface.
 # ---------------------------------------------------------------------------
+
+# Azure Table Storage PartitionKey/RowKey constraints (per Microsoft docs):
+#   * Max 1024 chars
+#   * Cannot contain `/`, `\`, `#`, `?`, or control characters (< 0x20).
+_AZURE_PK_RK_MAX_LEN = 1024
+_AZURE_PK_RK_FORBIDDEN_CHARS = frozenset("/\\#?")
+
+
+def _is_safe_pk_or_rk(value: str) -> bool:
+    """Return True iff the value is a valid Azure Tables PartitionKey/RowKey."""
+    if len(value) > _AZURE_PK_RK_MAX_LEN:
+        return False
+    for ch in value:
+        if ch in _AZURE_PK_RK_FORBIDDEN_CHARS or ord(ch) < 0x20:
+            return False
+    return True
+
+
+def _safe_pk_or_rk(value: str) -> str:
+    """Sanitize a string for use as an Azure Tables PartitionKey/RowKey.
+
+    Returns the input unchanged when it satisfies Azure's constraints; otherwise
+    a deterministic SHA-256 hex digest of the original. The hash is stable, so
+    PUT/GET round-trips with the same caller-side string land on the same
+    storage key.
+    """
+    if _is_safe_pk_or_rk(value):
+        return value
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 def _account_url_from_name(account_name: str) -> str:
@@ -68,10 +98,18 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
     """Azure Table Storage-backed async key-value store.
 
     Schema:
-        PartitionKey -> collection
-        RowKey       -> key
+        PartitionKey -> collection (sanitized; see below)
+        RowKey       -> key (sanitized; see below)
         Value        -> JSON-serialized ManagedEntry (string)
         ExpiresAt    -> Unix epoch seconds (omitted when no TTL)
+
+    Azure Table Storage rejects PartitionKey/RowKey values that exceed 1024
+    chars or contain ``/``, ``\\``, ``#``, ``?``, or control characters. When
+    a caller-supplied collection or key violates those constraints, the store
+    silently substitutes a deterministic SHA-256 hex digest of the original.
+    Round-trips remain transparent (PUT and GET hash the same way), but
+    direct table inspection will show the digest rather than the source
+    string for those entries.
 
     Authentication patterns (mirrors DynamoDB's flexibility):
 
@@ -299,10 +337,12 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         """Retrieve a managed entry from Azure Tables."""
+        pk = _safe_pk_or_rk(collection)
+        rk = _safe_pk_or_rk(key)
         try:
             entity: dict[str, Any] = await self._connected_table_client.get_entity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
-                partition_key=collection,
-                row_key=key,
+                partition_key=pk,
+                row_key=rk,
             )
         except ResourceNotFoundError:
             return None
@@ -336,9 +376,11 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
             entry=managed_entry, key=key, collection=collection
         )
 
+        pk = _safe_pk_or_rk(collection)
+        rk = _safe_pk_or_rk(key)
         entity: dict[str, Any] = {
-            "PartitionKey": collection,
-            "RowKey": key,
+            "PartitionKey": pk,
+            "RowKey": rk,
             "Value": json_value,
         }
         if managed_entry.expires_at is not None:
@@ -360,10 +402,12 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         gives the AsyncKeyValue contract semantics — True iff we actually
         removed something.
         """
+        pk = _safe_pk_or_rk(collection)
+        rk = _safe_pk_or_rk(key)
         try:
             await self._connected_table_client.get_entity(  # pyright: ignore[reportUnknownMemberType]
-                partition_key=collection,
-                row_key=key,
+                partition_key=pk,
+                row_key=rk,
                 select=["PartitionKey"],  # tiny payload — we only care about existence
             )
         except ResourceNotFoundError:
@@ -371,8 +415,8 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
 
         try:
             await self._connected_table_client.delete_entity(
-                partition_key=collection,
-                row_key=key,
+                partition_key=pk,
+                row_key=rk,
             )
         except ResourceNotFoundError:
             # Race — another caller deleted the entity between our GET and
@@ -401,6 +445,9 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
             if not (isinstance(partition_key, str) and isinstance(row_key, str)):
                 continue
             try:
+                # PartitionKey/RowKey here come straight from a stored entity
+                # so they're already in their sanitized form — no need to
+                # re-apply _safe_pk_or_rk.
                 await self._connected_table_client.delete_entity(
                     partition_key=partition_key,
                     row_key=row_key,
