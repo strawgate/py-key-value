@@ -173,7 +173,7 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         async with TableServiceClient.from_connection_string(conn_str=azurite_connection_string) as service:
             table = service.get_table_client(table_name=AZURITE_TEST_TABLE)
-            entity = await table.get_entity(partition_key="test", row_key="test_key")  # pyright: ignore[reportUnknownMemberType]
+            entity: dict[str, Any] = await table.get_entity(partition_key="test", row_key="test_key")  # pyright: ignore[reportUnknownMemberType]
 
         assert _entity_value_payload(entity) == snapshot(
             {
