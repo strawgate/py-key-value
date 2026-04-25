@@ -162,7 +162,9 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
             default_collection: Default collection name. Defaults to
                 "default_collection".
             auto_create: If True, attempt to create the table during setup.
-                Existing tables are tolerated. Defaults to True.
+                Existing tables are tolerated. If False, a missing table at
+                setup time is reported as a ``StoreSetupError`` (wrapping a
+                ``ValueError``).
         """
 
     @overload
@@ -310,32 +312,47 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
 
     @override
     async def _setup(self) -> None:
-        """Setup the underlying clients and ensure the table exists."""
-        if self._client_provided_by_user:
-            # User-provided TableClient. Optionally create the table.
-            if self._auto_create:
-                try:
-                    await self._connected_table_client.create_table()
-                except ResourceExistsError:
-                    pass
-            return
+        """Setup the underlying clients and ensure the table exists.
 
-        # We constructed our own TableServiceClient. Enter its async context
-        # via the exit stack so cleanup happens on store close.
-        service = self._service
-        if service is None:
-            # Should be unreachable given __init__ validation.
-            msg = "AzureTablesStore: service client missing during setup"
-            raise RuntimeError(msg)
-
-        await self._exit_stack.enter_async_context(service)
+        Behavior:
+          * If we constructed our own service, enter its context and resolve
+            a TableClient against the configured table.
+          * If ``auto_create=True``, attempt to create the table; an existing
+            table is tolerated.
+          * If ``auto_create=False``, verify the table exists by attempting a
+            single-page entity listing. Missing-table is surfaced as a
+            ``ValueError`` (wrapped as ``StoreSetupError`` by the base class).
+        """
+        if not self._client_provided_by_user:
+            service = self._service
+            if service is None:
+                # Should be unreachable given __init__ validation.
+                msg = "AzureTablesStore: service client missing during setup"
+                raise RuntimeError(msg)
+            await self._exit_stack.enter_async_context(service)
+            self._table_client = service.get_table_client(table_name=self._table_name)
 
         if self._auto_create:
-            await service.create_table_if_not_exists(table_name=self._table_name)
+            try:
+                await self._connected_table_client.create_table()
+            except ResourceExistsError:
+                # Tolerated — the table already existed.
+                pass
+            return
 
-        # The TableClient returned here shares transport with the service, so
-        # we don't need to enter its context separately.
-        self._table_client = service.get_table_client(table_name=self._table_name)
+        # auto_create=False: verify the table exists. list_entities triggers a
+        # request on first iteration; ResourceNotFoundError means missing table.
+        try:
+            async for _ in self._connected_table_client.list_entities(  # pyright: ignore[reportUnknownMemberType]
+                results_per_page=1,
+            ):
+                break
+        except ResourceNotFoundError as e:
+            msg = (
+                f"Table '{self._table_name}' does not exist. "
+                "Either create the table manually or set auto_create=True."
+            )
+            raise ValueError(msg) from e
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
