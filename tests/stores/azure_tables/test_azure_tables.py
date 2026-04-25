@@ -73,7 +73,7 @@ class AzuriteFailedToStartError(Exception):
 
 def _entity_value_payload(entity: dict[str, Any]) -> dict[str, Any]:
     """Decode the JSON-serialized ManagedEntry stored in the Value property."""
-    raw = entity.get("Value")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    raw = entity.get("Value")
     assert isinstance(raw, str)
     return json.loads(raw)
 
@@ -185,7 +185,7 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 "version": 1,
             }
         )
-        expires_at_raw = entity.get("ExpiresAt")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        expires_at_raw = entity.get("ExpiresAt")
         assert isinstance(expires_at_raw, int), "ExpiresAt should be an epoch-second integer"
         now = datetime.now(timezone.utc)
         assert expires_at_raw > now.timestamp(), "ExpiresAt should be in the future"
