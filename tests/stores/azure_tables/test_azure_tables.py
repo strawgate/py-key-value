@@ -73,7 +73,7 @@ class AzuriteFailedToStartError(Exception):
 
 def _entity_value_payload(entity: dict[str, Any]) -> dict[str, Any]:
     """Decode the JSON-serialized ManagedEntry stored in the Value property."""
-    raw = entity.get("Value")
+    raw: Any = entity.get("Value")
     assert isinstance(raw, str)
     return json.loads(raw)
 
@@ -121,7 +121,7 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         async with TableServiceClient.from_connection_string(conn_str=connection_string) as service:
             with contextlib.suppress(Exception):
-                await service.delete_table(table_name=table_name)
+                await service.delete_table(table_name=table_name)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     @pytest.fixture
@@ -155,7 +155,7 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
         # No-TTL case
         async with TableServiceClient.from_connection_string(conn_str=azurite_connection_string) as service:
             table = service.get_table_client(table_name=AZURITE_TEST_TABLE)
-            entity: dict[str, Any] = await table.get_entity(partition_key="test", row_key="test_key")  # pyright: ignore[reportAssignmentType]
+            entity: dict[str, Any] = await table.get_entity(partition_key="test", row_key="test_key")  # pyright: ignore[reportUnknownMemberType]
 
         assert _entity_value_payload(entity) == snapshot(
             {
@@ -173,7 +173,7 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         async with TableServiceClient.from_connection_string(conn_str=azurite_connection_string) as service:
             table = service.get_table_client(table_name=AZURITE_TEST_TABLE)
-            entity = await table.get_entity(partition_key="test", row_key="test_key")  # pyright: ignore[reportAssignmentType]
+            entity = await table.get_entity(partition_key="test", row_key="test_key")  # pyright: ignore[reportUnknownMemberType]
 
         assert _entity_value_payload(entity) == snapshot(
             {
@@ -185,7 +185,7 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 "version": 1,
             }
         )
-        expires_at_raw = entity.get("ExpiresAt")
+        expires_at_raw: Any = entity.get("ExpiresAt")
         assert isinstance(expires_at_raw, int), "ExpiresAt should be an epoch-second integer"
         now = datetime.now(timezone.utc)
         assert expires_at_raw > now.timestamp(), "ExpiresAt should be in the future"
@@ -274,4 +274,4 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
     async def test_no_auth_args_rejected(self):
         """Constructor errors when no auth pattern was supplied."""
         with pytest.raises(ValueError, match="requires one of"):
-            AzureTablesStore(table_name="t")
+            AzureTablesStore(table_name="t")  # pyright: ignore[reportCallIssue]
