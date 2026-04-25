@@ -14,6 +14,7 @@ checking ExpiresAt on read (lazy expire) and exposing an explicit
 ``cull()`` for full sweeps.
 """
 
+import contextlib
 import hashlib
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, overload
@@ -50,16 +51,19 @@ if TYPE_CHECKING:
 # DCR client_ids ~32 chars, etc.) are well under this.
 _AZURE_PK_RK_MAX_LEN = 256
 _AZURE_PK_RK_FORBIDDEN_CHARS = frozenset("/\\#?")
+# ASCII chars below this code point are control characters. Used to filter
+# them out of PartitionKey/RowKey values per Azure Tables' documented limits.
+_CONTROL_CHAR_BOUNDARY = 0x20
 
 
 def _is_safe_pk_or_rk(value: str) -> bool:
     """Return True iff the value is a valid Azure Tables PartitionKey/RowKey."""
     if len(value) > _AZURE_PK_RK_MAX_LEN:
         return False
-    for ch in value:
-        if ch in _AZURE_PK_RK_FORBIDDEN_CHARS or ord(ch) < 0x20:
-            return False
-    return True
+    return all(
+        ch not in _AZURE_PK_RK_FORBIDDEN_CHARS and ord(ch) >= _CONTROL_CHAR_BOUNDARY
+        for ch in value
+    )
 
 
 def _safe_pk_or_rk(value: str) -> str:
@@ -333,11 +337,8 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
             self._table_client = service.get_table_client(table_name=self._table_name)
 
         if self._auto_create:
-            try:
+            with contextlib.suppress(ResourceExistsError):
                 await self._connected_table_client.create_table()
-            except ResourceExistsError:
-                # Tolerated — the table already existed.
-                pass
             return
 
         # auto_create=False: verify the table exists. list_entities triggers a
