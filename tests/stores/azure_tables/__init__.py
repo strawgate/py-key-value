@@ -1,0 +1,1 @@
+"""Azure Tables store tests."""
