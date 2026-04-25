@@ -6,7 +6,7 @@ collection/key model:
 
     PartitionKey = collection
     RowKey       = key
-    Value        = JSON-serialized ManagedEntry (string, ≤ 64 KB)
+    Value        = JSON-serialized ManagedEntry (string, <= 64 KB)
     ExpiresAt    = epoch seconds (set only for entries with TTL)
 
 Azure Table Storage has no native TTL; this store handles expiry by
@@ -17,7 +17,7 @@ checking ExpiresAt on read (lazy expire) and exposing an explicit
 import contextlib
 import hashlib
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, overload
+from typing import Any, overload
 
 from typing_extensions import override
 
@@ -28,6 +28,7 @@ from key_value.aio.stores.base import (
 )
 
 try:
+    from azure.core.credentials_async import AsyncTokenCredential
     from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
     from azure.data.tables import UpdateMode
     from azure.data.tables.aio import TableClient, TableServiceClient
@@ -35,12 +36,9 @@ except ImportError as e:
     msg = "AzureTablesStore requires py-key-value-aio[azure-tables]"
     raise ImportError(msg) from e
 
-if TYPE_CHECKING:
-    from azure.core.credentials_async import AsyncTokenCredential
-
 
 # ---------------------------------------------------------------------------
-# Helper functions — module-level so they aren't part of the public surface.
+# Helper functions - module-level so they aren't part of the public surface.
 # ---------------------------------------------------------------------------
 
 # Azure Table Storage docs allow up to 1024 chars per PartitionKey/RowKey, but
@@ -90,7 +88,7 @@ def _service_from_connection_string(connection_string: str) -> TableServiceClien
 
 
 def _service_from_endpoint_and_credential(
-    *, endpoint: str, credential: "AsyncTokenCredential"
+    *, endpoint: str, credential: AsyncTokenCredential
 ) -> TableServiceClient:
     """Create a TableServiceClient from an explicit endpoint + AsyncTokenCredential."""
     return TableServiceClient(endpoint=endpoint, credential=credential)
@@ -120,26 +118,26 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
 
     Authentication patterns (mirrors DynamoDB's flexibility):
 
-    1. Pre-constructed ``client: TableClient`` — caller manages lifecycle.
+    1. Pre-constructed ``client: TableClient`` - caller manages lifecycle.
        Useful when the calling app already has its own auth/transport setup
        (Managed Identity via DefaultAzureCredential, custom retry policies,
        etc.). The store will not enter or exit the client's context.
 
-    2. ``connection_string`` — simplest path for dev / shared-key scenarios.
+    2. ``connection_string`` - simplest path for dev / shared-key scenarios.
 
-    3. ``account_name`` + ``credential`` — recommended for production.
+    3. ``account_name`` + ``credential`` - recommended for production.
        ``credential`` should be an ``AsyncTokenCredential`` (e.g.
        ``ManagedIdentityCredential``, ``WorkloadIdentityCredential``,
        or ``DefaultAzureCredential`` from ``azure-identity``). Account URL
        is derived as ``https://{account_name}.table.core.windows.net``.
 
-    4. ``endpoint`` + ``credential`` — for Azurite (local emulator) or
+    4. ``endpoint`` + ``credential`` - for Azurite (local emulator) or
        sovereign clouds where the endpoint isn't ``*.table.core.windows.net``.
 
     TTL: Azure Table Storage has no native TTL. Two-pronged handling:
-      * Lazy expire on read — storage-side ExpiresAt is mirrored back onto
+      * Lazy expire on read - storage-side ExpiresAt is mirrored back onto
         the ManagedEntry so the base class's expiry logic applies as usual.
-      * Explicit ``cull()`` — implemented via BaseCullStore. Scans for
+      * Explicit ``cull()`` - implemented via BaseCullStore. Scans for
         entries with ``ExpiresAt < now`` and deletes them. Use on demand
         when the table accumulates stale entries; for low-write workloads
         like FastMCP OAuth state most callers won't need it.
@@ -161,7 +159,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         """Initialize from a pre-constructed TableClient.
 
         Args:
-            client: A TableClient. The caller owns its lifecycle — the store
+            client: A TableClient. The caller owns its lifecycle - the store
                 will neither enter nor exit its async context.
             default_collection: Default collection name. Defaults to
                 "default_collection".
@@ -194,7 +192,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         self,
         *,
         account_name: str,
-        credential: "AsyncTokenCredential",
+        credential: AsyncTokenCredential,
         table_name: str,
         endpoint: str | None = None,
         default_collection: str | None = None,
@@ -221,7 +219,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         self,
         *,
         endpoint: str,
-        credential: "AsyncTokenCredential",
+        credential: AsyncTokenCredential,
         table_name: str,
         default_collection: str | None = None,
         auto_create: bool = True,
@@ -229,7 +227,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         """Initialize from an explicit endpoint + AsyncTokenCredential.
 
         Useful when the endpoint isn't ``{account}.table.core.windows.net``
-        — Azurite, sovereign Azure clouds, custom DNS.
+        - Azurite, sovereign Azure clouds, custom DNS.
         """
 
     def __init__(
@@ -238,7 +236,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         client: TableClient | None = None,
         connection_string: str | None = None,
         account_name: str | None = None,
-        credential: "AsyncTokenCredential | None" = None,
+        credential: AsyncTokenCredential | None = None,
         endpoint: str | None = None,
         table_name: str | None = None,
         default_collection: str | None = None,
@@ -376,7 +374,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
 
         # Storage-side ExpiresAt takes precedence over what's encoded in the
         # serialized ManagedEntry, mirroring DynamoDB's behavior. This matters
-        # if a caller upserts the same key with a different TTL — the storage
+        # if a caller upserts the same key with a different TTL - the storage
         # property is the source of truth.
         expires_at_raw = entity.get("ExpiresAt")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         if isinstance(expires_at_raw, int):
@@ -422,7 +420,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         exist, this operation will succeed" behavior), so a naive
         ``except ResourceNotFoundError`` never fires. We GET first to detect
         existence, then DELETE if present. Costs one extra round-trip but
-        gives the AsyncKeyValue contract semantics — True iff we actually
+        gives the AsyncKeyValue contract semantics - True iff we actually
         removed something.
         """
         pk = _safe_pk_or_rk(collection)
@@ -431,7 +429,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
             await self._connected_table_client.get_entity(  # pyright: ignore[reportUnknownMemberType]
                 partition_key=pk,
                 row_key=rk,
-                select=["PartitionKey"],  # tiny payload — we only care about existence
+                select=["PartitionKey"],  # tiny payload - we only care about existence
             )
         except ResourceNotFoundError:
             return False
@@ -442,7 +440,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
                 row_key=rk,
             )
         except ResourceNotFoundError:
-            # Race — another caller deleted the entity between our GET and
+            # Race - another caller deleted the entity between our GET and
             # DELETE. Treat as "we didn't actually delete it" since they did.
             return False
         return True
@@ -469,13 +467,13 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
                 continue
             try:
                 # PartitionKey/RowKey here come straight from a stored entity
-                # so they're already in their sanitized form — no need to
+                # so they're already in their sanitized form - no need to
                 # re-apply _safe_pk_or_rk.
                 await self._connected_table_client.delete_entity(
                     partition_key=partition_key,
                     row_key=row_key,
                 )
             except ResourceNotFoundError:
-                # Race — already deleted by lazy-expire-on-read or another
+                # Race - already deleted by lazy-expire-on-read or another
                 # cull. Tolerable; cull's contract is best-effort cleanup.
                 continue
