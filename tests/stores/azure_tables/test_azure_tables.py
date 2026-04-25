@@ -185,7 +185,7 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 "version": 1,
             }
         )
-        expires_at_raw = ttl_entity.get("ExpiresAt")
+        expires_at_raw = ttl_entity.get("ExpiresAt")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         assert isinstance(expires_at_raw, int), "ExpiresAt should be an epoch-second integer"
         now = datetime.now(timezone.utc)
         assert expires_at_raw > now.timestamp(), "ExpiresAt should be in the future"
