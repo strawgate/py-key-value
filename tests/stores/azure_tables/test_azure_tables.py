@@ -155,9 +155,9 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
         # No-TTL case
         async with TableServiceClient.from_connection_string(conn_str=azurite_connection_string) as service:
             table = service.get_table_client(table_name=AZURITE_TEST_TABLE)
-            entity: dict[str, Any] = await table.get_entity(partition_key="test", row_key="test_key")  # pyright: ignore[reportUnknownMemberType]
+            no_ttl_entity: dict[str, Any] = await table.get_entity(partition_key="test", row_key="test_key")  # pyright: ignore[reportUnknownMemberType]
 
-        assert _entity_value_payload(entity) == snapshot(
+        assert _entity_value_payload(no_ttl_entity) == snapshot(
             {
                 "collection": "test",
                 "created_at": IsDatetime(iso_string=True),
@@ -166,16 +166,16 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 "version": 1,
             }
         )
-        assert "ExpiresAt" not in entity, "ExpiresAt should not be set without a TTL"
+        assert "ExpiresAt" not in no_ttl_entity, "ExpiresAt should not be set without a TTL"
 
         # TTL case
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
 
         async with TableServiceClient.from_connection_string(conn_str=azurite_connection_string) as service:
             table = service.get_table_client(table_name=AZURITE_TEST_TABLE)
-            entity: dict[str, Any] = await table.get_entity(partition_key="test", row_key="test_key")  # pyright: ignore[reportUnknownMemberType]
+            ttl_entity: dict[str, Any] = await table.get_entity(partition_key="test", row_key="test_key")  # pyright: ignore[reportUnknownMemberType]
 
-        assert _entity_value_payload(entity) == snapshot(
+        assert _entity_value_payload(ttl_entity) == snapshot(
             {
                 "collection": "test",
                 "created_at": IsDatetime(iso_string=True),
@@ -185,7 +185,7 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 "version": 1,
             }
         )
-        expires_at_raw = entity.get("ExpiresAt")
+        expires_at_raw = ttl_entity.get("ExpiresAt")
         assert isinstance(expires_at_raw, int), "ExpiresAt should be an epoch-second integer"
         now = datetime.now(timezone.utc)
         assert expires_at_raw > now.timestamp(), "ExpiresAt should be in the future"
