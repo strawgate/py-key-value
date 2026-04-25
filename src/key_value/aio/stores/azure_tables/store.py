@@ -338,7 +338,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
 
         if self._auto_create:
             with contextlib.suppress(ResourceExistsError):
-                await self._connected_table_client.create_table()
+                await self._connected_table_client.create_table()  # pyright: ignore[reportUnknownMemberType]
             return
 
         # auto_create=False: verify the table exists. list_entities triggers a
@@ -361,14 +361,14 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         pk = _safe_pk_or_rk(collection)
         rk = _safe_pk_or_rk(key)
         try:
-            entity: dict[str, Any] = await self._connected_table_client.get_entity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
+            entity: dict[str, Any] = await self._connected_table_client.get_entity(  # pyright: ignore[reportUnknownMemberType]
                 partition_key=pk,
                 row_key=rk,
             )
         except ResourceNotFoundError:
             return None
 
-        json_value = entity.get("Value")
+        json_value: Any = entity.get("Value")
         if not isinstance(json_value, str) or not json_value:
             return None
 
@@ -378,7 +378,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         # serialized ManagedEntry, mirroring DynamoDB's behavior. This matters
         # if a caller upserts the same key with a different TTL — the storage
         # property is the source of truth.
-        expires_at_raw = entity.get("ExpiresAt")
+        expires_at_raw: Any = entity.get("ExpiresAt")
         if isinstance(expires_at_raw, int):
             managed_entry.expires_at = datetime.fromtimestamp(expires_at_raw, tz=timezone.utc)
 
@@ -409,7 +409,9 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
 
         # REPLACE so put-after-put cleanly overwrites without merging stale
         # properties from a prior version of the entity.
-        await self._connected_table_client.upsert_entity(entity=entity, mode=UpdateMode.REPLACE)
+        await self._connected_table_client.upsert_entity(  # pyright: ignore[reportUnknownMemberType]
+            entity=entity, mode=UpdateMode.REPLACE
+        )
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
@@ -461,8 +463,8 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
             query_filter=query_filter,
             parameters=parameters,
         ):
-            partition_key = entity.get("PartitionKey")
-            row_key = entity.get("RowKey")
+            partition_key: Any = entity.get("PartitionKey")
+            row_key: Any = entity.get("RowKey")
             if not (isinstance(partition_key, str) and isinstance(row_key, str)):
                 continue
             try:
