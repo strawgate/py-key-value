@@ -42,10 +42,13 @@ if TYPE_CHECKING:
 # Helper functions — module-level so they aren't part of the public surface.
 # ---------------------------------------------------------------------------
 
-# Azure Table Storage PartitionKey/RowKey constraints (per Microsoft docs):
-#   * Max 1024 chars
-#   * Cannot contain `/`, `\`, `#`, `?`, or control characters (< 0x20).
-_AZURE_PK_RK_MAX_LEN = 1024
+# Azure Table Storage docs allow up to 1024 chars per PartitionKey/RowKey, but
+# the empirical limit on the resulting entity URL (which contains both keys
+# inline plus quoting and the full table-name path) is stricter. To stay safely
+# under that ceiling we cap each key at 256 chars before falling back to a
+# deterministic SHA-256 hash. Realistic keys (UUIDs ~36 chars, SHA-256 64 chars,
+# DCR client_ids ~32 chars, etc.) are well under this.
+_AZURE_PK_RK_MAX_LEN = 256
 _AZURE_PK_RK_FORBIDDEN_CHARS = frozenset("/\\#?")
 
 
@@ -103,13 +106,13 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         Value        -> JSON-serialized ManagedEntry (string)
         ExpiresAt    -> Unix epoch seconds (omitted when no TTL)
 
-    Azure Table Storage rejects PartitionKey/RowKey values that exceed 1024
-    chars or contain ``/``, ``\\``, ``#``, ``?``, or control characters. When
-    a caller-supplied collection or key violates those constraints, the store
-    silently substitutes a deterministic SHA-256 hex digest of the original.
-    Round-trips remain transparent (PUT and GET hash the same way), but
-    direct table inspection will show the digest rather than the source
-    string for those entries.
+    Azure Table Storage rejects PartitionKey/RowKey values that exceed its
+    URL/header limits or contain ``/``, ``\\``, ``#``, ``?``, or control
+    characters. When a caller-supplied collection or key violates those
+    constraints, the store silently substitutes a deterministic SHA-256 hex
+    digest of the original. Round-trips remain transparent (PUT and GET hash
+    the same way), but direct table inspection will show the digest rather
+    than the source string for those entries.
 
     Authentication patterns (mirrors DynamoDB's flexibility):
 
