@@ -368,7 +368,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         except ResourceNotFoundError:
             return None
 
-        json_value: Any = entity.get("Value")
+        json_value = entity.get("Value")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         if not isinstance(json_value, str) or not json_value:
             return None
 
@@ -378,7 +378,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         # serialized ManagedEntry, mirroring DynamoDB's behavior. This matters
         # if a caller upserts the same key with a different TTL — the storage
         # property is the source of truth.
-        expires_at_raw: Any = entity.get("ExpiresAt")
+        expires_at_raw = entity.get("ExpiresAt")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         if isinstance(expires_at_raw, int):
             managed_entry.expires_at = datetime.fromtimestamp(expires_at_raw, tz=timezone.utc)
 
@@ -463,8 +463,8 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
             query_filter=query_filter,
             parameters=parameters,
         ):
-            partition_key: Any = entity.get("PartitionKey")
-            row_key: Any = entity.get("RowKey")
+            partition_key = entity.get("PartitionKey")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            row_key = entity.get("RowKey")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             if not (isinstance(partition_key, str) and isinstance(row_key, str)):
                 continue
             try:
