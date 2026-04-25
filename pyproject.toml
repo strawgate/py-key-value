@@ -40,6 +40,7 @@ elasticsearch = ["elasticsearch>=8.0.0", "aiohttp>=3.12"]
 opensearch = ["opensearch-py[async]>=2.0.0"]
 dynamodb = ["aioboto3>=13.3.0", "types-aiobotocore-dynamodb>=2.16.0"]
 s3 = ["aioboto3>=13.3.0", "types-aiobotocore-s3>=2.16.0"]
+azure-tables = ["azure-data-tables>=12.4.0", "azure-core>=1.29.0"]
 keyring = ["keyring>=25.6.0"]
 keyring-linux = ["keyring>=25.6.0", "dbus-python>=1.4.0"]
 pydantic = ["pydantic>=2.11.9"]
@@ -61,7 +62,7 @@ docs = [
 
 [dependency-groups]
 dev = [
-    "py-key-value-aio[memory,disk,filetree,redis,elasticsearch,opensearch,memcached,mongodb,vault,dynamodb,s3,rocksdb,duckdb,firestore,postgresql]",
+    "py-key-value-aio[memory,disk,filetree,redis,elasticsearch,opensearch,memcached,mongodb,vault,dynamodb,s3,azure-tables,rocksdb,duckdb,firestore,postgresql]",
     "py-key-value-aio[valkey]; platform_system != 'Windows'",
     "py-key-value-aio[aerospike]; platform_system != 'Windows'",
     "py-key-value-aio[keyring]",
