@@ -350,13 +350,33 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
-        """Delete a managed entry. Returns True if an entity was actually deleted."""
+        """Delete a managed entry. Returns True iff an entity was actually deleted.
+
+        The Azure SDK's ``TableClient.delete_entity`` silently succeeds when
+        the entity is missing (per its documented "If the entity does not
+        exist, this operation will succeed" behavior), so a naive
+        ``except ResourceNotFoundError`` never fires. We GET first to detect
+        existence, then DELETE if present. Costs one extra round-trip but
+        gives the AsyncKeyValue contract semantics — True iff we actually
+        removed something.
+        """
+        try:
+            await self._connected_table_client.get_entity(  # pyright: ignore[reportUnknownMemberType]
+                partition_key=collection,
+                row_key=key,
+                select=["PartitionKey"],  # tiny payload — we only care about existence
+            )
+        except ResourceNotFoundError:
+            return False
+
         try:
             await self._connected_table_client.delete_entity(
                 partition_key=collection,
                 row_key=key,
             )
         except ResourceNotFoundError:
+            # Race — another caller deleted the entity between our GET and
+            # DELETE. Treat as "we didn't actually delete it" since they did.
             return False
         return True
 
@@ -386,6 +406,6 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
                     row_key=row_key,
                 )
             except ResourceNotFoundError:
-                # Race — another caller (or a lazy-expire on read) deleted the
-                # entity between query and delete. Tolerable.
+                # Race — already deleted by lazy-expire-on-read or another
+                # cull. Tolerable; cull's contract is best-effort cleanup.
                 continue
