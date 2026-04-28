@@ -35,6 +35,7 @@ Local stores are stored in memory or on disk, local to the application.
 | Disk | Stable | Persistent file-based storage in a single file |
 | Disk (Per-Collection) | Stable | Persistent storage with separate files per collection |
 | DuckDB | Unstable | In-process SQL OLAP database with native JSON storage |
+| chDB | Unstable | Embedded ClickHouse engine with SQL access to stored data |
 | FileTree (test) | Unstable | Directory-based storage with JSON files for visual inspection |
 | Null (test) | N/A | No-op store for testing without side effects |
 | RocksDB | Unstable | High-performance embedded database |
@@ -260,6 +261,48 @@ result = store._connection.execute("""
     WHERE collection = 'users'
 """).fetchall()
 ```
+
+---
+
+### ChDBStore
+
+Embedded ClickHouse engine ([chDB](https://clickhouse.com/chdb)) with SQL
+access to your key-value data.
+
+```python
+from key_value.aio.stores.chdb import ChDBStore
+
+# In-memory database (default)
+store = ChDBStore()
+
+# Persistent database (chDB stores data in a directory)
+store = ChDBStore(database_path="./my_store.chdb")
+
+# With an existing chDB session
+from chdb.session import Session
+session = Session("./my_store.chdb")
+store = ChDBStore(session=session)
+```
+
+**Installation:**
+
+```bash
+pip install py-key-value-aio[chdb]
+```
+
+**Use Cases:**
+
+- Analytics on stored key-value data with full ClickHouse SQL
+- Embedded OLAP workloads alongside cache-style usage
+- Applications needing both key-value access and ClickHouse functions
+
+**Characteristics:**
+
+- Embedded ClickHouse - no external server required
+- In-memory or persistent storage (single directory)
+- Full ClickHouse SQL on stored data
+- ReplacingMergeTree-backed schema (latest write wins via `FINAL`)
+- Stable storage format: **Unstable**
 
 ---
 

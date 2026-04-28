@@ -49,6 +49,7 @@ rocksdb = [
     "rocksdict>=0.3.2 ; python_version < '3.12'"
 ]
 duckdb = ["duckdb>=1.1.1", "pytz>=2025.2"]
+chdb = ["chdb>=4.0.0"]
 postgresql = ["asyncpg>=0.30.0"]
 firestore = ["google-cloud-firestore>=2.13.0", "google-auth>=2.24.0"]
 wrappers-encryption = ["cryptography>=45.0.0"]
@@ -61,7 +62,7 @@ docs = [
 
 [dependency-groups]
 dev = [
-    "py-key-value-aio[memory,disk,filetree,redis,elasticsearch,opensearch,memcached,mongodb,vault,dynamodb,s3,rocksdb,duckdb,firestore,postgresql]",
+    "py-key-value-aio[memory,disk,filetree,redis,elasticsearch,opensearch,memcached,mongodb,vault,dynamodb,s3,rocksdb,duckdb,chdb,firestore,postgresql]",
     "py-key-value-aio[valkey]; platform_system != 'Windows'",
     "py-key-value-aio[aerospike]; platform_system != 'Windows'",
     "py-key-value-aio[keyring]",
