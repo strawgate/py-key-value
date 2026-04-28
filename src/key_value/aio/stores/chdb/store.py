@@ -149,6 +149,11 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
         # via the adapter's truthy-check on load.
         self._adapter = BasicSerializationAdapter(date_format="isoformat", value_format="string")
 
+        # ClickHouse itself accepts any identifier when wrapped in backticks
+        # (digit-leading names, hyphens, unicode, etc.), but we embed the
+        # table name unquoted into SQL strings, so restrict it to a safe
+        # bare-identifier subset to avoid SQL injection. Quoting + backtick
+        # escaping would lift this restriction if needed later.
         if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", table_name):
             msg = "Table name must start with a letter or underscore and contain only letters, digits, or underscores"
             raise ValueError(msg)
