@@ -54,6 +54,11 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
     JSON-encoded values, ISO-8601 timestamp strings, and the document schema
     version are stored in plain ``String`` columns to keep parameterized
     inserts and reads simple.
+
+    Note: ClickHouse's lightweight ``DELETE`` does not report affected row
+    counts, so :py:meth:`delete` performs an existence check followed by the
+    delete and returns the existence result. The boolean is best-effort and
+    not strictly atomic with the actual removal.
     """
 
     _session: Session
