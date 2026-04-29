@@ -3,6 +3,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
+
+# Skip the whole module if chdb is unavailable (e.g., Windows has no wheels).
+pytest.importorskip("chdb")
+
 from chdb.session import Session
 from typing_extensions import override
 
