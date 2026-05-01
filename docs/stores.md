@@ -300,6 +300,7 @@ pip install py-key-value-aio[chdb]
 
 - Embedded ClickHouse — no external server required
 - In-memory or persistent storage (single directory)
+- Process-global singleton: only one `database_path` active per process at a time
 - Full ClickHouse SQL on stored data
 - ReplacingMergeTree-backed schema (latest write wins via `FINAL`)
 - Synchronous I/O (chDB has no async API; operations block the event loop)
