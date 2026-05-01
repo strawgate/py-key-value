@@ -1,3 +1,5 @@
+"""chDB (embedded ClickHouse) key-value store."""
+
 import json
 import re
 from pathlib import Path
@@ -55,10 +57,23 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
     version are stored in plain ``String`` columns to keep parameterized
     inserts and reads simple.
 
+    Note: The chDB library is synchronous, so operations block the running
+    event loop for the duration of each query. For latency-sensitive async
+    applications, consider wrapping calls with ``asyncio.to_thread`` or using
+    a store backed by a natively async driver.
+
     Note: ClickHouse's lightweight ``DELETE`` does not report affected row
     counts, so :py:meth:`delete` performs an existence check followed by the
     delete and returns the existence result. The boolean is best-effort and
     not strictly atomic with the actual removal.
+
+    Note: Expired entries (those past their ``expires_at`` timestamp) are
+    filtered on read but are **not** automatically culled from storage.
+    Applications that set TTLs on many entries should periodically run::
+
+        DELETE FROM <table> WHERE expires_at != '' AND expires_at < now()
+
+    to reclaim space.
     """
 
     _session: Session
@@ -170,6 +185,7 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
             seed=seed,
             client_provided_by_user=client_provided,
             stable_api=False,
+            serialization_adapter=self._adapter,
         )
 
     def _get_create_table_sql(self) -> str:
