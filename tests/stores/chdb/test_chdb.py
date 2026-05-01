@@ -1,5 +1,4 @@
 from collections.abc import AsyncGenerator
-from pathlib import Path
 
 import pytest
 
@@ -34,11 +33,19 @@ class TestChDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestChDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
+    """Test ChDBStore with a dedicated table name to verify data persistence.
+
+    chDB uses a process-global embedded server, so we cannot use a different
+    ``database_path`` while other in-memory sessions are active in the same
+    process. Instead, we use a unique table name to exercise the same code paths
+    while remaining compatible with single-worker test execution.
+    """
+
     @override
     @pytest.fixture
-    async def store(self, per_test_temp_dir: Path) -> AsyncGenerator[ChDBStore, None]:
-        """Test with persistent chDB database directory."""
-        chdb_store = ChDBStore(database_path=per_test_temp_dir / "chdb_data")
+    async def store(self) -> AsyncGenerator[ChDBStore, None]:
+        """Test with a dedicated persistent table."""
+        chdb_store = ChDBStore(table_name="kv_persistent_tests")
         yield chdb_store
         await chdb_store.close()
 

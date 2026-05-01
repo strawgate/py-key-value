@@ -8,7 +8,7 @@ from typing import Any, overload
 from typing_extensions import override
 
 from key_value.aio._utils.managed_entry import ManagedEntry
-from key_value.aio._utils.serialization import BasicSerializationAdapter, SerializationAdapter
+from key_value.aio._utils.serialization import BasicSerializationAdapter
 from key_value.aio.errors import DeserializationError
 from key_value.aio.stores.base import SEED_DATA_TYPE, BaseContextManagerStore, BaseStore
 
@@ -48,6 +48,13 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
     a SQL OLAP engine with optional persistence. This store can operate in
     memory-only mode or persist data to disk.
 
+    Important: chDB uses a **process-global** embedded ClickHouse server. Only
+    one ``database_path`` can be active per process at a time. Multiple sessions
+    with the *same* path (or multiple ``:memory:`` sessions) are fine, but
+    attempting to open a session with a different path while another is open
+    will raise ``RuntimeError``. Close all sessions/stores for the previous path
+    before switching.
+
     Entries are stored in a ``ReplacingMergeTree`` table keyed by
     ``(collection, key)``. The latest insert wins on read (via the ``FINAL``
     modifier) and old versions are reclaimed during background merges; calling
@@ -77,7 +84,6 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
     """
 
     _session: Session
-    _adapter: SerializationAdapter
     _table_name: str
     _auto_create: bool
 
@@ -117,7 +123,10 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
         """Initialize the chDB store with a database path.
 
         Args:
-            database_path: Path to the database directory. If None or ':memory:', uses in-memory database.
+            database_path: Path to the database directory. If None or ':memory:', uses in-memory
+                database. Note: chDB uses a process-global embedded server — only one path can
+                be active at a time. All stores/sessions for a previous path must be closed
+                before opening a different path.
             table_name: Name of the table to store key-value entries. Defaults to "kv_entries".
             default_collection: The default collection to use if no collection is provided.
             seed: Optional seed data to pre-populate the store.
@@ -140,7 +149,10 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
             session: An existing chDB session to use. If provided, the store will NOT
                 manage its lifecycle (will not close it). The caller is responsible for managing
                 the session's lifecycle.
-            database_path: Path to the database directory. If None or ':memory:', uses in-memory database.
+            database_path: Path to the database directory. If None or ':memory:', uses in-memory
+                database. Note: chDB uses a process-global embedded server — only one path can
+                be active at a time. All stores/sessions for a previous path must be closed
+                before opening a different path.
             table_name: Name of the table to store key-value entries. Defaults to "kv_entries".
             default_collection: The default collection to use if no collection is provided.
             seed: Optional seed data to pre-populate the store.
@@ -167,7 +179,7 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
         # Values are stored as JSON strings and dates as ISO-8601 strings in
         # ``String`` columns. Empty strings round-trip back to missing values
         # via the adapter's truthy-check on load.
-        self._adapter = BasicSerializationAdapter(date_format="isoformat", value_format="string")
+        adapter = BasicSerializationAdapter(date_format="isoformat", value_format="string")
 
         # ClickHouse itself accepts any identifier when wrapped in backticks
         # (digit-leading names, hyphens, unicode, etc.), but we embed the
@@ -185,7 +197,7 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
             seed=seed,
             client_provided_by_user=client_provided,
             stable_api=False,
-            serialization_adapter=self._adapter,
+            serialization_adapter=adapter,
         )
 
     def _get_create_table_sql(self) -> str:
@@ -298,7 +310,7 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
         }
 
         try:
-            return self._adapter.load_dict(data=document)
+            return self._serialization_adapter.load_dict(data=document)
         except DeserializationError:
             return None
 
@@ -313,7 +325,7 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
         # Ensure that the value is serializable to JSON
         _ = managed_entry.value_as_json
 
-        document = self._adapter.dump_dict(entry=managed_entry, key=key, collection=collection)
+        document = self._serialization_adapter.dump_dict(entry=managed_entry, key=key, collection=collection)
 
         self._execute(
             self._get_insert_sql(),
