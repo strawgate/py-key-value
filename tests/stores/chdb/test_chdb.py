@@ -1,6 +1,5 @@
 from collections.abc import AsyncGenerator
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import pytest
 
@@ -58,31 +57,88 @@ class TestChDBStoreSpecific:
         await chdb_store.close()
 
     async def test_database_path_initialization(self):
-        """Test that store can be initialized with different database path options."""
-        store1 = ChDBStore()
-        await store1.put(collection="test", key="key1", value={"test": "value1"})
-        assert await store1.get(collection="test", key="key1") == {"test": "value1"}
-        await store1.close()
+        """Test that different table names provide isolation within the same session."""
+        store1 = ChDBStore(table_name="store_one")
+        store2 = ChDBStore(table_name="store_two")
 
-        store2 = ChDBStore(database_path=":memory:")
-        await store2.put(collection="test", key="key2", value={"test": "value2"})
-        assert await store2.get(collection="test", key="key2") == {"test": "value2"}
+        # Write to store1 only
+        await store1.put(collection="test", key="key1", value={"from": "store1"})
+
+        # store2 should NOT see store1's data (different tables)
+        assert await store2.get(collection="test", key="key1") is None
+
+        # Each store works independently
+        await store2.put(collection="test", key="key2", value={"from": "store2"})
+        assert await store2.get(collection="test", key="key2") == {"from": "store2"}
+        assert await store1.get(collection="test", key="key2") is None
+
+        await store1.close()
         await store2.close()
 
     async def test_persistent_database(self):
-        """Test that data persists across store instances when using a directory database."""
-        with TemporaryDirectory() as temp_dir:
-            db_path = Path(temp_dir) / "persist_data"
+        """Test that data persists within the same chDB session across store instances.
 
-            store1 = ChDBStore(database_path=db_path)
-            await store1.put(collection="test", key="persist_key", value={"data": "persistent"})
-            await store1.close()
+        Note: chDB uses a process-global embedded server. We use a shared session
+        to show that data written by one store instance is visible to another.
+        """
+        from chdb.session import Session
 
-            store2 = ChDBStore(database_path=db_path)
-            result = await store2.get(collection="test", key="persist_key")
-            await store2.close()
+        session = Session(":memory:")
+        table = "persist_test_table"
 
-            assert result == {"data": "persistent"}
+        store1 = ChDBStore(session=session, table_name=table)
+        await store1.put(collection="test", key="persist_key", value={"data": "persistent"})
+        await store1.close()
+
+        # Second store instance with the same session can read the data
+        store2 = ChDBStore(session=session, table_name=table)
+        result = await store2.get(collection="test", key="persist_key")
+        await store2.close()
+
+        assert result == {"data": "persistent"}
+        session.close()
+
+    async def test_auto_create_false_raises_when_table_missing(self):
+        """Test that auto_create=False raises StoreSetupError when table doesn't exist."""
+        from key_value.aio.errors import StoreSetupError
+
+        store = ChDBStore(table_name="nonexistent_table_xyz", auto_create=False)
+        with pytest.raises(StoreSetupError, match="does not exist"):
+            await store.put(collection="test", key="k", value={"v": 1})
+
+    async def test_context_manager_usage(self):
+        """Test that the store works correctly as an async context manager."""
+        async with ChDBStore() as store:
+            await store.put(collection="test", key="ctx_key", value={"ctx": "value"})
+            result = await store.get(collection="test", key="ctx_key")
+            assert result == {"ctx": "value"}
+
+    async def test_native_sql_queryability(self):
+        """Test that users can query the database directly with SQL."""
+        store = ChDBStore()
+
+        await store.put(collection="products", key="item1", value={"name": "Widget", "price": 10.99}, ttl=3600)
+        await store.put(collection="products", key="item2", value={"name": "Gadget", "price": 25.50}, ttl=7200)
+        await store.put(collection="orders", key="order1", value={"total": 100.00, "items": 3})
+
+        # Query directly via SQL to verify native storage and access
+        rows = store._query_jsoneachrow(
+            f"SELECT key, value FROM {store._table_name} FINAL WHERE collection = {{collection:String}} ORDER BY key",  # noqa: S608
+            params={"collection": "products"},
+        )
+
+        assert len(rows) == 2
+        assert rows[0]["key"] == "item1"
+        assert rows[1]["key"] == "item2"
+
+        # Verify we can count entries per collection
+        count_rows = store._query_jsoneachrow(
+            f"SELECT count() as cnt FROM {store._table_name} FINAL WHERE collection = {{collection:String}}",  # noqa: S608
+            params={"collection": "products"},
+        )
+        assert int(count_rows[0]["cnt"]) == 2
+
+        await store.close()
 
     async def test_sql_injection_protection(self, store: ChDBStore):
         """Test that the store is protected against SQL injection attacks."""
@@ -162,5 +218,11 @@ class TestChDBStoreSpecific:
         await store.put(collection="c", key="k", value={"v": 3})
         assert await store.get(collection="c", key="k") == {"v": 3}
 
-    @pytest.mark.skip(reason="Local disk stores are unbounded")
-    async def test_not_unbounded(self, store: BaseStore): ...
+    async def test_large_data_storage(self, store: ChDBStore):
+        """Test storing and retrieving large data values."""
+        large_value = {"large_data": "x" * (1024 * 1024)}
+
+        await store.put(collection="test", key="large_key", value=large_value)
+        result = await store.get(collection="test", key="large_key")
+
+        assert result == large_value

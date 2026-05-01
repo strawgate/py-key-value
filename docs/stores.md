@@ -298,10 +298,12 @@ pip install py-key-value-aio[chdb]
 
 **Characteristics:**
 
-- Embedded ClickHouse - no external server required
+- Embedded ClickHouse — no external server required
 - In-memory or persistent storage (single directory)
 - Full ClickHouse SQL on stored data
 - ReplacingMergeTree-backed schema (latest write wins via `FINAL`)
+- Synchronous I/O (chDB has no async API; operations block the event loop)
+- Expired entries are not automatically culled — see class docstring for cleanup guidance
 - Stable storage format: **Unstable**
 
 ---
