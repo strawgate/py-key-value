@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform != 'win32'",
@@ -688,6 +688,38 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
+]
+
+[[package]]
+name = "couchbase"
+version = "4.5.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/73/2f/8f92e743a91c2f4e2ebad0bcfc31ef386c817c64415d89bf44e64dde227a/couchbase-4.5.0.tar.gz", hash = "sha256:fb74386ea5e807ae12cfa294fa6740fe6be3ecaf3bb9ce4fb9ea73706ed05982", size = 6562752, upload-time = "2025-09-30T01:27:37.423Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f4/75/7263ff900aa800c3c287423353b27de21ef047cf3d528186a002522b201d/couchbase-4.5.0-cp310-cp310-macosx_10_15_x86_64.whl", hash = "sha256:22bf113377c62c5a1b194e5fea3f27bf9df657cfe8fa0c2c2158ad5ce4c6b4cf", size = 5126777, upload-time = "2025-09-30T01:24:34.56Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/83/3e26209b7e1647fadf3925cfc96137d0ccddb5ea46b2fe87bfec601528d6/couchbase-4.5.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:5ce8a55c61d8995d44a638a23bfb78db74afc0af844884d25a6738ba71a85886", size = 4323516, upload-time = "2025-09-30T01:24:42.566Z" },
+    { url = "https://files.pythonhosted.org/packages/05/0c/3f7408f2bb97ae0ab125c7d3a857240bef8ff0ba69db04545a7f6a8faff9/couchbase-4.5.0-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:3a0e07ce01ad398bee19acf761f09ac5547fce8080bd92d38c6fa5318fa5a76c", size = 5181071, upload-time = "2025-09-30T01:24:51.2Z" },
+    { url = "https://files.pythonhosted.org/packages/82/07/66160fd17c05a4df02094988660f918329209dad4c1fb5f5c5a840f7a9f9/couchbase-4.5.0-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:76faaa7e4bd2ba20cf7e3982a600ba0bbfae680de16459021bc7086c05ae4624", size = 5442990, upload-time = "2025-09-30T01:24:56.424Z" },
+    { url = "https://files.pythonhosted.org/packages/c0/d6/2eacbb8e14401ee403159dd21829e221ce8094b1c0c59d221554ef9a9569/couchbase-4.5.0-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:d5268c985b1cf66a10ffd25d3e0e691e1b407e6831f43c42d438f1431f3332a2", size = 6108767, upload-time = "2025-09-30T01:25:02.975Z" },
+    { url = "https://files.pythonhosted.org/packages/46/2f/dd06826480efa9b0af7f16122a85b4a9ceb425e32415abbc22eab3654667/couchbase-4.5.0-cp310-cp310-win_amd64.whl", hash = "sha256:64ad98058a1264fa2243e2fc63a86ff338b5dd9bd7f45e74cb6f32d2624bc542", size = 4269260, upload-time = "2025-09-30T01:25:09.16Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/a7/ba28fcab4f211e570582990d9592d8a57566158a0712fbc9d0d9ac486c2a/couchbase-4.5.0-cp311-cp311-macosx_10_15_x86_64.whl", hash = "sha256:3d3258802baa87d9ffeccbb2b31dcabe2a4ef27c9be81e0d3d710fd7436da24a", size = 5037084, upload-time = "2025-09-30T01:25:16.748Z" },
+    { url = "https://files.pythonhosted.org/packages/85/38/f26912b56a41f22ab9606304014ef1435fc4bef76144382f91c1a4ce1d4c/couchbase-4.5.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:18b47f1f3a2007f88203f611570d96e62bb1fb9568dec0483a292a5e87f6d1df", size = 4323514, upload-time = "2025-09-30T01:25:22.628Z" },
+    { url = "https://files.pythonhosted.org/packages/35/a6/5ef140f8681a2488ed6eb2a2bc9fc918b6f11e9f71bbad75e4de73b8dbf3/couchbase-4.5.0-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:9c2a16830db9437aae92e31f9ceda6c7b70707e316152fc99552b866b09a1967", size = 5181111, upload-time = "2025-09-30T01:25:30.538Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/2e/1f0f06e920dbae07c3d8af6b2af3d5213e43d3825e0931c19564fe4d5c1b/couchbase-4.5.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:4a86774680e46488a7955c6eae8fba5200a1fd5f9de9ac0a34acb6c87dc2b513", size = 5442969, upload-time = "2025-09-30T01:25:37.976Z" },
+    { url = "https://files.pythonhosted.org/packages/9a/2e/6ece47df4d987dbeaae3fdcf7aa4d6a8154c949c28e925f01074dfd0b8b8/couchbase-4.5.0-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:b68dae005ab4c157930c76a3116e478df25aa1af00fa10cc1cc755df1831ad59", size = 6108562, upload-time = "2025-09-30T01:25:45.674Z" },
+    { url = "https://files.pythonhosted.org/packages/be/a7/2f84a1d117cf70ad30e8b08ae9b1c4a03c65146bab030ed6eb84f454045b/couchbase-4.5.0-cp311-cp311-win_amd64.whl", hash = "sha256:cbc50956fb68d42929d21d969f4512b38798259ae48c47cbf6d676cc3a01b058", size = 4269303, upload-time = "2025-09-30T01:25:49.341Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/bc/3b00403edd8b188a93f48b8231dbf7faf7b40d318d3e73bb0e68c4965bbd/couchbase-4.5.0-cp312-cp312-macosx_10_15_x86_64.whl", hash = "sha256:be1ac2bf7cbccf28eebd7fa8b1d7199fbe84c96b0f7f2c0d69963b1d6ce53985", size = 5128307, upload-time = "2025-09-30T01:25:53.615Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/52/2ccfa8c8650cc341813713a47eeeb8ad13a25e25b0f4747d224106602a24/couchbase-4.5.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:035c394d38297c484bd57fc92b27f6a571a36ab5675b4ec873fd15bf65e8f28e", size = 4326149, upload-time = "2025-09-30T01:25:57.524Z" },
+    { url = "https://files.pythonhosted.org/packages/32/80/fe3f074f321474c824ec67b97c5c4aa99047d45c777bb29353f9397c6604/couchbase-4.5.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:117685f6827abbc332e151625b0a9890c2fafe0d3c3d9e564b903d5c411abe5d", size = 5184623, upload-time = "2025-09-30T01:26:02.166Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/e5/86381f49e4cf1c6db23c397b6a32b532cd4df7b9975b0cd2da3db2ffe269/couchbase-4.5.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:632a918f81a7373832991b79b6ab429e56ef4ff68dfb3517af03f0e2be7e3e4f", size = 5446579, upload-time = "2025-09-30T01:26:09.39Z" },
+    { url = "https://files.pythonhosted.org/packages/c8/85/a68d04233a279e419062ceb1c6866b61852c016d1854cd09cde7f00bc53c/couchbase-4.5.0-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:67fc0fd1a4535b5be093f834116a70fb6609085399e6b63539241b919da737b7", size = 6104619, upload-time = "2025-09-30T01:26:15.525Z" },
+    { url = "https://files.pythonhosted.org/packages/56/8c/0511bac5dd2d998aeabcfba6a2804ecd9eb3d83f9d21cc3293a56fbc70a8/couchbase-4.5.0-cp312-cp312-win_amd64.whl", hash = "sha256:02199b4528f3106c231c00aaf85b7cc6723accbc654b903bb2027f78a04d12f4", size = 4274424, upload-time = "2025-09-30T01:26:21.484Z" },
+    { url = "https://files.pythonhosted.org/packages/70/6d/6f6c4ed72f7def240168e48da7c95a81dd45cfe5599bfaaab040ea55c481/couchbase-4.5.0-cp313-cp313-macosx_10_15_x86_64.whl", hash = "sha256:3ca889d708cf82743ec33b2a1cb09211cf55d353297a29e1147f78e6ae05c609", size = 5040068, upload-time = "2025-09-30T01:26:27.367Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/1f/e31c68a177cd13f8a83c3e52fc16cf42ede696e5cdaea0ad7e1d0781c9d8/couchbase-4.5.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:d8f69cf185426e5f68a239fb1ce395187b0f31a536e1b2624d20b5b3387fa5d8", size = 4326068, upload-time = "2025-09-30T01:26:32.027Z" },
+    { url = "https://files.pythonhosted.org/packages/7c/b2/365ce79459b2a462903698435d67417f5aa11bb8220d853979486dc03284/couchbase-4.5.0-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:3dddab6fbbe1e44283f41783031728030678e8c9065c2f7a726812e5699c66f5", size = 5184604, upload-time = "2025-09-30T01:26:36.439Z" },
+    { url = "https://files.pythonhosted.org/packages/6d/c2/30d395d01279f47813e4e323297380e8d9c431891529922f3bee407b3c15/couchbase-4.5.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:b52a554a36185bd94f04885c3e1822227058a49526d5378162dfa3f3e76fd17e", size = 5446707, upload-time = "2025-09-30T01:26:40.619Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/55/4f60cd09e009cbdc705354f9b29e57638a4dcefbf1b3f13d61e5881f5bf4/couchbase-4.5.0-cp313-cp313-musllinux_1_1_x86_64.whl", hash = "sha256:74d00d52128a34f75e908f3ebb16bd33edee82a6695453126a969e1d2c101a86", size = 6104769, upload-time = "2025-09-30T01:26:46.165Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/fc/ca70bb20c4a52b71504381c019fe742dcf46815fee3adef4b41a3885eff8/couchbase-4.5.0-cp313-cp313-win_amd64.whl", hash = "sha256:0891eca025a2078fb89389053ac925ef7fa9323631300b60eb749e8a71f9ec1c", size = 4270510, upload-time = "2025-09-30T01:26:50.227Z" },
 ]
 
 [[package]]
@@ -2037,6 +2069,9 @@ dependencies = [
 aerospike = [
     { name = "aerospike" },
 ]
+couchbase = [
+    { name = "couchbase" },
+]
 disk = [
     { name = "diskcache" },
     { name = "pathvalidate" },
@@ -2122,7 +2157,7 @@ dev = [
     { name = "docker" },
     { name = "inline-snapshot" },
     { name = "py-key-value-aio", extra = ["aerospike", "valkey"], marker = "sys_platform != 'win32'" },
-    { name = "py-key-value-aio", extra = ["disk", "duckdb", "dynamodb", "elasticsearch", "filetree", "firestore", "keyring", "memcached", "memory", "mongodb", "opensearch", "postgresql", "pydantic", "redis", "rocksdb", "s3", "vault", "wrappers-encryption"] },
+    { name = "py-key-value-aio", extra = ["couchbase", "disk", "duckdb", "dynamodb", "elasticsearch", "filetree", "firestore", "keyring", "memcached", "memory", "mongodb", "opensearch", "postgresql", "pydantic", "redis", "rocksdb", "s3", "vault", "wrappers-encryption"] },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-dotenv" },
@@ -2145,6 +2180,7 @@ requires-dist = [
     { name = "asyncpg", marker = "extra == 'postgresql'", specifier = ">=0.30.0" },
     { name = "beartype", specifier = ">=0.20.0" },
     { name = "cachetools", marker = "extra == 'memory'", specifier = ">=5.0.0" },
+    { name = "couchbase", marker = "extra == 'couchbase'", specifier = ">=4.3.0" },
     { name = "cryptography", marker = "extra == 'wrappers-encryption'", specifier = ">=45.0.0" },
     { name = "dbus-python", marker = "extra == 'keyring-linux'", specifier = ">=1.4.0" },
     { name = "diskcache", marker = "extra == 'disk'", specifier = ">=5.0.0" },
@@ -2173,7 +2209,7 @@ requires-dist = [
     { name = "typing-extensions", specifier = ">=4.15.0" },
     { name = "valkey-glide", marker = "extra == 'valkey'", specifier = ">=2.1.0" },
 ]
-provides-extras = ["memory", "disk", "filetree", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "opensearch", "dynamodb", "s3", "keyring", "keyring-linux", "pydantic", "aerospike", "rocksdb", "duckdb", "postgresql", "firestore", "wrappers-encryption", "docs"]
+provides-extras = ["memory", "disk", "filetree", "redis", "mongodb", "valkey", "vault", "memcached", "elasticsearch", "opensearch", "dynamodb", "s3", "keyring", "keyring-linux", "pydantic", "aerospike", "rocksdb", "duckdb", "postgresql", "firestore", "couchbase", "wrappers-encryption", "docs"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2185,7 +2221,7 @@ dev = [
     { name = "inline-snapshot", specifier = ">=0.30.1" },
     { name = "py-key-value-aio", extras = ["aerospike"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extras = ["keyring"] },
-    { name = "py-key-value-aio", extras = ["memory", "disk", "filetree", "redis", "elasticsearch", "opensearch", "memcached", "mongodb", "vault", "dynamodb", "s3", "rocksdb", "duckdb", "firestore", "postgresql"] },
+    { name = "py-key-value-aio", extras = ["memory", "disk", "filetree", "redis", "elasticsearch", "opensearch", "memcached", "mongodb", "vault", "dynamodb", "s3", "rocksdb", "duckdb", "firestore", "postgresql", "couchbase"] },
     { name = "py-key-value-aio", extras = ["pydantic"] },
     { name = "py-key-value-aio", extras = ["valkey"], marker = "sys_platform != 'win32'" },
     { name = "py-key-value-aio", extras = ["wrappers-encryption"] },
