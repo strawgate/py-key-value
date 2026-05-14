@@ -14,6 +14,7 @@ from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 
 def get_session_from_store(store: ChDBStore) -> Session:
+    """Return the underlying chDB session for direct SQL access in tests."""
     return store._session
 
 
@@ -27,13 +28,14 @@ class TestChDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         yield chdb_store
         await chdb_store.close()
 
-    @pytest.mark.skip(reason="Local disk stores are unbounded")
-    async def test_not_unbounded(self, store: BaseStore): ...
+    @pytest.mark.skip(reason="In-memory chDB store is unbounded")
+    async def test_not_unbounded(self, store: BaseStore):
+        """chDB does not enforce a per-store storage bound."""
 
 
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
-class TestChDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
-    """Test ChDBStore with a dedicated table name to verify data persistence.
+class TestChDBStoreCustomTable(ContextManagerStoreTestMixin, BaseStoreTests):
+    """Test ChDBStore with a non-default table name to exercise table-name isolation.
 
     chDB uses a process-global embedded server, so we cannot use a different
     ``database_path`` while other in-memory sessions are active in the same
@@ -44,13 +46,14 @@ class TestChDBStorePersistent(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self) -> AsyncGenerator[ChDBStore, None]:
-        """Test with a dedicated persistent table."""
-        chdb_store = ChDBStore(table_name="kv_persistent_tests")
+        """Test with a dedicated custom-named table."""
+        chdb_store = ChDBStore(table_name="kv_custom_table_tests")
         yield chdb_store
         await chdb_store.close()
 
-    @pytest.mark.skip(reason="Local disk stores are unbounded")
-    async def test_not_unbounded(self, store: BaseStore): ...
+    @pytest.mark.skip(reason="In-memory chDB store is unbounded")
+    async def test_not_unbounded(self, store: BaseStore):
+        """chDB does not enforce a per-store storage bound."""
 
 
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
@@ -59,6 +62,7 @@ class TestChDBStoreSpecific:
 
     @pytest.fixture
     async def store(self) -> AsyncGenerator[ChDBStore, None]:
+        """Provide an in-memory ChDBStore for chDB-specific tests."""
         chdb_store = ChDBStore()
         yield chdb_store
         await chdb_store.close()
@@ -122,30 +126,27 @@ class TestChDBStoreSpecific:
 
     async def test_native_sql_queryability(self):
         """Test that users can query the database directly with SQL."""
-        store = ChDBStore()
+        async with ChDBStore() as store:
+            await store.put(collection="products", key="item1", value={"name": "Widget", "price": 10.99}, ttl=3600)
+            await store.put(collection="products", key="item2", value={"name": "Gadget", "price": 25.50}, ttl=7200)
+            await store.put(collection="orders", key="order1", value={"total": 100.00, "items": 3})
 
-        await store.put(collection="products", key="item1", value={"name": "Widget", "price": 10.99}, ttl=3600)
-        await store.put(collection="products", key="item2", value={"name": "Gadget", "price": 25.50}, ttl=7200)
-        await store.put(collection="orders", key="order1", value={"total": 100.00, "items": 3})
+            # Query directly via SQL to verify native storage and access
+            rows = store._query_jsoneachrow(
+                f"SELECT key, value FROM {store._table_name} FINAL WHERE collection = {{collection:String}} ORDER BY key",  # noqa: S608
+                params={"collection": "products"},
+            )
 
-        # Query directly via SQL to verify native storage and access
-        rows = store._query_jsoneachrow(
-            f"SELECT key, value FROM {store._table_name} FINAL WHERE collection = {{collection:String}} ORDER BY key",  # noqa: S608
-            params={"collection": "products"},
-        )
+            assert len(rows) == 2
+            assert rows[0]["key"] == "item1"
+            assert rows[1]["key"] == "item2"
 
-        assert len(rows) == 2
-        assert rows[0]["key"] == "item1"
-        assert rows[1]["key"] == "item2"
-
-        # Verify we can count entries per collection
-        count_rows = store._query_jsoneachrow(
-            f"SELECT count() as cnt FROM {store._table_name} FINAL WHERE collection = {{collection:String}}",  # noqa: S608
-            params={"collection": "products"},
-        )
-        assert int(count_rows[0]["cnt"]) == 2
-
-        await store.close()
+            # Verify we can count entries per collection
+            count_rows = store._query_jsoneachrow(
+                f"SELECT count() as cnt FROM {store._table_name} FINAL WHERE collection = {{collection:String}}",  # noqa: S608
+                params={"collection": "products"},
+            )
+            assert int(count_rows[0]["cnt"]) == 2
 
     async def test_sql_injection_protection(self, store: ChDBStore):
         """Test that the store is protected against SQL injection attacks."""
@@ -205,10 +206,12 @@ class TestChDBStoreSpecific:
         await store.close()
 
     async def test_invalid_table_name_rejected(self):
+        """Test that table names containing unsafe characters are rejected at init."""
         with pytest.raises(ValueError, match="Table name"):
             ChDBStore(table_name="bad name; DROP TABLE")
 
     async def test_session_and_path_mutually_exclusive(self):
+        """Test that providing both ``session`` and ``database_path`` is an error."""
         from chdb.session import Session
 
         session = Session(":memory:")

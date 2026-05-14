@@ -38,6 +38,7 @@ _CHDB_STRING_ESCAPES = str.maketrans(
 
 
 def _escape_string_param(value: str) -> str:
+    """Escape a string before substitution into a chDB parameterized query."""
     return value.translate(_CHDB_STRING_ESCAPES)
 
 
@@ -221,6 +222,7 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
         """
 
     def _get_select_sql(self) -> str:
+        """SQL for selecting the latest entry by ``(collection, key)``."""
         return f"""
             SELECT value, created_at, expires_at, version
             FROM {self._table_name} FINAL
@@ -229,6 +231,7 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
         """  # noqa: S608
 
     def _get_insert_sql(self) -> str:
+        """SQL for inserting a new entry; ``ReplacingMergeTree`` deduplicates on read."""
         return f"""
             INSERT INTO {self._table_name}
                 (collection, key, value, created_at, expires_at, version)
@@ -238,12 +241,14 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
         """  # noqa: S608
 
     def _get_delete_sql(self) -> str:
+        """SQL for deleting an entry by ``(collection, key)``."""
         return f"""
             DELETE FROM {self._table_name}
             WHERE collection = {{collection:String}} AND key = {{key:String}}
         """  # noqa: S608
 
     def _get_exists_sql(self) -> str:
+        """SQL for checking whether an entry exists by ``(collection, key)``."""
         return f"""
             SELECT 1
             FROM {self._table_name} FINAL
@@ -268,6 +273,7 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
 
     @staticmethod
     def _escape_params(params: dict[str, Any] | None) -> dict[str, Any]:
+        """Apply chDB string-literal escaping to any string-typed parameter values."""
         if not params:
             return {}
         return {k: (_escape_string_param(v) if isinstance(v, str) else v) for k, v in params.items()}
@@ -293,6 +299,7 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
+        """Fetch and deserialize the latest entry for ``(collection, key)``."""
         rows = self._query_jsoneachrow(
             self._get_select_sql(),
             params={"collection": collection, "key": key},
@@ -322,6 +329,7 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
+        """Insert a new row for ``(collection, key)``; older rows are merged out by chDB."""
         # Ensure that the value is serializable to JSON
         _ = managed_entry.value_as_json
 
@@ -341,6 +349,7 @@ class ChDBStore(BaseContextManagerStore, BaseStore):
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
+        """Delete the entry for ``(collection, key)``, returning whether it existed."""
         # ClickHouse's lightweight DELETE does not report row counts, so check
         # existence first.
         exists_rows = self._query_jsoneachrow(
