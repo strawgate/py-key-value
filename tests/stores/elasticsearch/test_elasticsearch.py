@@ -1,20 +1,24 @@
 from collections.abc import AsyncGenerator, Generator
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from dirty_equals import IsFloat, IsStr
-from elasticsearch import AsyncElasticsearch
+from elastic_transport import ApiResponseMeta, HttpHeaders, NodeConfig
+from elasticsearch import AsyncElasticsearch, BadRequestError
 from inline_snapshot import snapshot
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio._utils.managed_entry import ManagedEntry
+from key_value.aio._utils.sanitization import PassthroughStrategy
 from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.elasticsearch import ElasticsearchStore
 from key_value.aio.stores.elasticsearch.store import (
+    DEFAULT_MAPPING,
     ElasticsearchSerializationAdapter,
     ElasticsearchV1CollectionSanitizationStrategy,
     ElasticsearchV1KeySanitizationStrategy,
@@ -79,6 +83,38 @@ async def cleanup_elasticsearch_indices(elasticsearch_client: AsyncElasticsearch
 
 class ElasticsearchFailedToStartError(Exception):
     pass
+
+
+def _bad_request_error(message: str) -> BadRequestError:
+    meta = ApiResponseMeta(
+        status=400,
+        http_version="1.1",
+        headers=HttpHeaders({}),
+        duration=0.0,
+        node=NodeConfig("http", "localhost", 9200),
+    )
+    return BadRequestError(message=message, meta=meta, body={"error": {"type": message}})
+
+
+@pytest.mark.parametrize("error_type", ["index_already_exists_exception", "resource_already_exists_exception"])
+async def test_setup_collection_treats_existing_index_errors_as_success(error_type: str):
+    create = AsyncMock(side_effect=_bad_request_error(error_type))
+    options_client = MagicMock()
+    options_client.indices.exists = AsyncMock(return_value=False)
+    options_client.indices.create = create
+
+    client = MagicMock()
+    client.options.return_value = options_client
+
+    store = object.__new__(ElasticsearchStore)
+    store._client = client
+    store._index_prefix = "kv-store-e2e-test"
+    store._auto_create = True
+    store._collection_sanitization_strategy = PassthroughStrategy()
+
+    await store._setup_collection(collection="test")
+
+    create.assert_awaited_once_with(index="kv-store-e2e-test-test", mappings=DEFAULT_MAPPING, settings={})
 
 
 def test_managed_entry_document_conversion():
