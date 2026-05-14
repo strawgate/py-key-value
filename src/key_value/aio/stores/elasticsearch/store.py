@@ -315,7 +315,8 @@ class ElasticsearchStore(
         try:
             _ = await self._client.options(ignore_status=404).indices.create(index=index_name, mappings=DEFAULT_MAPPING, settings={})
         except BadRequestError as e:
-            if "index_already_exists_exception" in str(e).lower():
+            error_message = str(e).lower()
+            if any(error in error_message for error in ("index_already_exists_exception", "resource_already_exists_exception")):
                 return
             raise
 
