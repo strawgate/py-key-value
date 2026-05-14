@@ -30,7 +30,7 @@ from key_value.aio.stores.base import (
 try:
     from azure.core.credentials_async import AsyncTokenCredential
     from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
-    from azure.data.tables import UpdateMode
+    from azure.data.tables import EdmType, EntityProperty, UpdateMode
     from azure.data.tables.aio import TableClient, TableServiceClient
 except ImportError as e:
     msg = "AzureTablesStore requires py-key-value-aio[azure-tables]"
@@ -58,10 +58,7 @@ def _is_safe_pk_or_rk(value: str) -> bool:
     """Return True iff the value is a valid Azure Tables PartitionKey/RowKey."""
     if len(value) > _AZURE_PK_RK_MAX_LEN:
         return False
-    return all(
-        ch not in _AZURE_PK_RK_FORBIDDEN_CHARS and ord(ch) >= _CONTROL_CHAR_BOUNDARY
-        for ch in value
-    )
+    return all(ch not in _AZURE_PK_RK_FORBIDDEN_CHARS and ord(ch) >= _CONTROL_CHAR_BOUNDARY for ch in value)
 
 
 def _safe_pk_or_rk(value: str) -> str:
@@ -70,11 +67,20 @@ def _safe_pk_or_rk(value: str) -> str:
     Returns the input unchanged when it satisfies Azure's constraints; otherwise
     a deterministic SHA-256 hex digest of the original. The hash is stable, so
     PUT/GET round-trips with the same caller-side string land on the same
-    storage key.
+    storage key. This is not a strict one-to-one mapping: a literal safe key can
+    still collide with the digest of a different unsafe key.
     """
     if _is_safe_pk_or_rk(value):
         return value
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _expires_at_from_entity(value: Any) -> datetime | None:
+    """Convert a stored ExpiresAt property into a UTC datetime if it is valid."""
+    raw_value = value.value if isinstance(value, EntityProperty) else value
+    if type(raw_value) is int:
+        return datetime.fromtimestamp(raw_value, tz=timezone.utc)
+    return None
 
 
 def _account_url_from_name(account_name: str) -> str:
@@ -87,9 +93,7 @@ def _service_from_connection_string(connection_string: str) -> TableServiceClien
     return TableServiceClient.from_connection_string(conn_str=connection_string)
 
 
-def _service_from_endpoint_and_credential(
-    *, endpoint: str, credential: AsyncTokenCredential
-) -> TableServiceClient:
+def _service_from_endpoint_and_credential(*, endpoint: str, credential: AsyncTokenCredential) -> TableServiceClient:
     """Create a TableServiceClient from an explicit endpoint + AsyncTokenCredential."""
     return TableServiceClient(endpoint=endpoint, credential=credential)
 
@@ -145,6 +149,9 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
 
     _service: TableServiceClient | None
     _table_client: TableClient | None
+    _connection_string: str | None
+    _endpoint: str | None
+    _credential: AsyncTokenCredential | None
     _table_name: str
     _auto_create: bool
 
@@ -244,14 +251,16 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
     ) -> None:
         """See the overloaded signatures above for argument documentation."""
         client_provided = client is not None
+        account_name_and_credential = account_name is not None and credential is not None
+        endpoint_and_credential_only = endpoint is not None and credential is not None and account_name is None
 
         # Validate that exactly one auth pattern was supplied.
         provided_patterns = sum(
             (
                 client is not None,
                 connection_string is not None,
-                account_name is not None,
-                endpoint is not None and credential is not None,
+                account_name_and_credential,
+                endpoint_and_credential_only,
             )
         )
         if provided_patterns == 0:
@@ -273,6 +282,9 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
             # Caller-managed lifecycle. table_name comes from the client itself.
             self._table_client = client
             self._service = None
+            self._connection_string = None
+            self._endpoint = None
+            self._credential = None
             self._table_name = client.table_name
         else:
             if not table_name:
@@ -280,23 +292,10 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
                 raise ValueError(msg)
             self._table_name = table_name
             self._table_client = None
-
-            if connection_string is not None:
-                self._service = _service_from_connection_string(connection_string)
-            else:
-                # account_name + credential, or endpoint + credential.
-                if credential is None:
-                    msg = "`credential` is required with `account_name` or `endpoint`"
-                    raise ValueError(msg)
-                resolved_endpoint = endpoint or (
-                    _account_url_from_name(account_name) if account_name else None
-                )
-                if resolved_endpoint is None:
-                    msg = "Could not resolve a Table endpoint from the given arguments"
-                    raise ValueError(msg)
-                self._service = _service_from_endpoint_and_credential(
-                    endpoint=resolved_endpoint, credential=credential
-                )
+            self._service = None
+            self._connection_string = connection_string
+            self._endpoint = endpoint or (_account_url_from_name(account_name) if account_name else None)
+            self._credential = credential
 
         self._auto_create = auto_create
 
@@ -328,9 +327,18 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         if not self._client_provided_by_user:
             service = self._service
             if service is None:
-                # Should be unreachable given __init__ validation.
-                msg = "AzureTablesStore: service client missing during setup"
-                raise RuntimeError(msg)
+                if self._connection_string is not None:
+                    service = _service_from_connection_string(self._connection_string)
+                elif self._endpoint is not None and self._credential is not None:
+                    service = _service_from_endpoint_and_credential(
+                        endpoint=self._endpoint,
+                        credential=self._credential,
+                    )
+                else:
+                    # Should be unreachable given __init__ validation.
+                    msg = "AzureTablesStore: service client missing during setup"
+                    raise RuntimeError(msg)
+                self._service = service
             await self._exit_stack.enter_async_context(service)
             self._table_client = service.get_table_client(table_name=self._table_name)
 
@@ -347,10 +355,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
             ):
                 break
         except ResourceNotFoundError as e:
-            msg = (
-                f"Table '{self._table_name}' does not exist. "
-                "Either create the table manually or set auto_create=True."
-            )
+            msg = f"Table '{self._table_name}' does not exist. Either create the table manually or set auto_create=True."
             raise ValueError(msg) from e
 
     @override
@@ -377,8 +382,8 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         # if a caller upserts the same key with a different TTL - the storage
         # property is the source of truth.
         expires_at_raw = entity.get("ExpiresAt")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        if isinstance(expires_at_raw, int):
-            managed_entry.expires_at = datetime.fromtimestamp(expires_at_raw, tz=timezone.utc)
+        if expires_at := _expires_at_from_entity(expires_at_raw):
+            managed_entry.expires_at = expires_at
 
         return managed_entry
 
@@ -391,9 +396,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         managed_entry: ManagedEntry,
     ) -> None:
         """Store a managed entry in Azure Tables (REPLACE semantics)."""
-        json_value: str = self._serialization_adapter.dump_json(
-            entry=managed_entry, key=key, collection=collection
-        )
+        json_value: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
         pk = _safe_pk_or_rk(collection)
         rk = _safe_pk_or_rk(key)
@@ -403,7 +406,10 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
             "Value": json_value,
         }
         if managed_entry.expires_at is not None:
-            entity["ExpiresAt"] = int(managed_entry.expires_at.timestamp())
+            entity["ExpiresAt"] = EntityProperty(
+                int(managed_entry.expires_at.timestamp()),
+                EdmType.INT64,
+            )
 
         # REPLACE so put-after-put cleanly overwrites without merging stale
         # properties from a prior version of the entity.

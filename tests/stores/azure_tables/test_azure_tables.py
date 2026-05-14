@@ -1,4 +1,3 @@
-import asyncio
 import contextlib
 import json
 from collections.abc import Generator
@@ -6,12 +5,16 @@ from datetime import datetime, timezone
 from typing import Any
 
 import pytest
+from azure.core.credentials import AccessToken
+from azure.core.credentials_async import AsyncTokenCredential
+from azure.data.tables import EdmType, EntityProperty, UpdateMode
 from dirty_equals import IsDatetime
 from inline_snapshot import snapshot
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
+from key_value.aio._utils.managed_entry import ManagedEntry
 from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.errors import StoreSetupError
 from key_value.aio.stores.azure_tables import AzureTablesStore
@@ -37,9 +40,7 @@ AZURITE_TABLE_PORT = 10002
 # Azurite's well-known dev account credentials. These are public, intentionally
 # non-secret, and come straight from Microsoft's Azurite docs.
 AZURITE_ACCOUNT_NAME = "devstoreaccount1"
-AZURITE_ACCOUNT_KEY = (
-    "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
-)
+AZURITE_ACCOUNT_KEY = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
 
 
 def _connection_string(host: str, port: int) -> str:
@@ -69,6 +70,11 @@ async def ping_azurite(connection_string: str) -> bool:
 
 class AzuriteFailedToStartError(Exception):
     pass
+
+
+class FakeAsyncTokenCredential(AsyncTokenCredential):
+    async def get_token(self, *_scopes: str, **_kwargs: Any) -> AccessToken:
+        return AccessToken("fake-token", 4_102_444_800)
 
 
 def _entity_value_payload(entity: dict[str, Any]) -> dict[str, Any]:
@@ -133,10 +139,6 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
             table_name=AZURITE_TEST_TABLE,
         )
 
-    @pytest.fixture
-    async def azure_tables_store(self, store: AzureTablesStore) -> AzureTablesStore:
-        return store
-
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
@@ -169,6 +171,7 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
         assert "ExpiresAt" not in no_ttl_entity, "ExpiresAt should not be set without a TTL"
 
         # TTL case
+        now_before_put = datetime.now(timezone.utc)
         await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
 
         async with TableServiceClient.from_connection_string(conn_str=azurite_connection_string) as service:
@@ -186,14 +189,13 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
             }
         )
         expires_at_raw = ttl_entity.get("ExpiresAt")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        assert isinstance(expires_at_raw, int), "ExpiresAt should be an epoch-second integer"
+        expires_at_value: object = expires_at_raw.value if isinstance(expires_at_raw, EntityProperty) else expires_at_raw  # pyright: ignore[reportUnknownVariableType]
+        assert isinstance(expires_at_value, int), "ExpiresAt should be an epoch-second integer"
         now = datetime.now(timezone.utc)
-        assert expires_at_raw > now.timestamp(), "ExpiresAt should be in the future"
-        assert expires_at_raw < now.timestamp() + 10 + 1, "ExpiresAt should be within the configured TTL window"
+        assert expires_at_value > now.timestamp(), "ExpiresAt should be in the future"
+        assert expires_at_value < now_before_put.timestamp() + 10 + 1, "ExpiresAt should be within the configured TTL window"
 
-    async def test_auto_create_false_raises_when_table_missing(
-        self, setup_azurite: None, azurite_connection_string: str
-    ):
+    async def test_auto_create_false_raises_when_table_missing(self, setup_azurite: None, azurite_connection_string: str):
         """auto_create=False must error when the table doesn't exist."""
         table_name = "kvstoretestautocreatefalse"
         await self._drop_table(azurite_connection_string, table_name)
@@ -208,9 +210,7 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
             async with store:
                 await store.put(collection="test", key="test_key", value={"message": "should not get here"})
 
-    async def test_auto_create_true_creates_table(
-        self, setup_azurite: None, azurite_connection_string: str
-    ):
+    async def test_auto_create_true_creates_table(self, setup_azurite: None, azurite_connection_string: str):
         """auto_create=True (default) creates the table on first use."""
         from azure.data.tables.aio import TableServiceClient
 
@@ -247,11 +247,29 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
             await store.put(collection="c", key="permanent", value={"v": 1})
             # Long TTL — should survive.
             await store.put(collection="c", key="long", value={"v": 2}, ttl=60)
-            # Tiny TTL — should be expired by the time we cull.
-            await store.put(collection="c", key="short", value={"v": 3}, ttl=1)
-
-            # Wait past the short TTL.
-            await asyncio.sleep(2)
+            # Already-expired row — should be removed without a timing wait.
+            expired_at = datetime.now(timezone.utc)
+            expired_entry = ManagedEntry(
+                value={"v": 3},
+                created_at=expired_at,
+                expires_at=expired_at,
+            )
+            await store._connected_table_client.upsert_entity(  # pyright: ignore[reportUnknownMemberType]
+                entity={
+                    "PartitionKey": "c",
+                    "RowKey": "short",
+                    "Value": store._serialization_adapter.dump_json(
+                        entry=expired_entry,
+                        key="short",
+                        collection="c",
+                    ),
+                    "ExpiresAt": EntityProperty(
+                        int(expired_at.timestamp()) - 1,
+                        EdmType.INT64,
+                    ),
+                },
+                mode=UpdateMode.REPLACE,
+            )
 
             await store.cull()
 
@@ -264,10 +282,10 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
     async def test_conflicting_auth_args_rejected(self):
         """Constructor rejects ambiguous auth-arg combinations."""
         with pytest.raises(ValueError, match="conflicting auth arguments"):
-            AzureTablesStore(
+            AzureTablesStore(  # pyright: ignore[reportCallIssue]
                 connection_string="UseDevelopmentStorage=true",
                 account_name="devstoreaccount1",
-                credential=None,  # type: ignore[arg-type]
+                credential=FakeAsyncTokenCredential(),
                 table_name="t",
             )
 
@@ -275,3 +293,14 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
         """Constructor errors when no auth pattern was supplied."""
         with pytest.raises(ValueError, match="requires one of"):
             AzureTablesStore(table_name="t")  # pyright: ignore[reportCallIssue]
+
+    async def test_account_name_plus_token_credential_endpoint_override(self):
+        """Constructor accepts the production token-credential auth path."""
+        store = AzureTablesStore(
+            account_name=AZURITE_ACCOUNT_NAME,
+            credential=FakeAsyncTokenCredential(),
+            endpoint="https://example.table.core.windows.net",
+            table_name="t",
+        )
+
+        assert store._table_name == "t"
