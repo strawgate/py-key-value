@@ -62,7 +62,7 @@ def test_firestore_key_sanitizer_hashes_oversized_keys():
     assert len(sanitized.encode("utf-8")) <= 1500
 
 
-@pytest.mark.parametrize("key", [".", "..", "____", "__id123__"])
+@pytest.mark.parametrize("key", ["", ".", "..", "____", "__id123__"])
 def test_firestore_key_sanitizer_handles_reserved_ids(key: str):
     strategy = FirestoreV1KeySanitizationStrategy()
 

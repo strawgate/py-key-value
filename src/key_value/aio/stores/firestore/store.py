@@ -37,7 +37,7 @@ def _utf8_truncate(value: str, max_bytes: int) -> str:
 
 
 def _requires_firestore_id_sanitization(value: str) -> bool:
-    return "/" in value or value in (".", "..") or FIRESTORE_RESERVED_ID_RE.fullmatch(value) is not None
+    return value == "" or "/" in value or value in (".", "..") or FIRESTORE_RESERVED_ID_RE.fullmatch(value) is not None
 
 
 class FirestoreV1KeySanitizationStrategy(SanitizationStrategy):
