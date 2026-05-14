@@ -110,6 +110,7 @@ ELASTICSEARCH_CONTAINER_PORT = 9200
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
+@pytest.mark.timeout(30)
 @pytest.mark.filterwarnings("ignore:A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.")
 class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="module", params=ELASTICSEARCH_VERSIONS_TO_TEST)
