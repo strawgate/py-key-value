@@ -183,6 +183,19 @@ class TestFirestoreStore(ContextManagerStoreTestMixin, BaseStoreTests):
             }
         )
 
+        await store.put(collection="test", key="document_format_test_2", value={"name": "Bob", "age": 25}, ttl=10)
+        raw_document = await get_raw_document(
+            emulator_host=emulator_host, project=firestore_project, collection="test", key="document_format_test_2"
+        )
+        assert raw_document == snapshot(
+            {
+                "version": 1,
+                "value": '{"age": 25, "name": "Bob"}',
+                "created_at": IsStr(min_length=20, max_length=40),
+                "expires_at": IsStr(min_length=20, max_length=40),
+            }
+        )
+
     async def test_sanitizing_store_handles_url_keys(self, setup_firestore: None, emulator_host: str, firestore_project: str):
         os.environ["FIRESTORE_EMULATOR_HOST"] = emulator_host
         store = FirestoreStore(
@@ -213,15 +226,22 @@ class TestFirestoreStore(ContextManagerStoreTestMixin, BaseStoreTests):
             }
         )
 
-        await store.put(collection="test", key="document_format_test_2", value={"name": "Bob", "age": 25}, ttl=10)
-        raw_document = await get_raw_document(
-            emulator_host=emulator_host, project=firestore_project, collection="test", key="document_format_test_2"
+    async def test_sanitizing_store_handles_batch_and_delete_paths(self, setup_firestore: None, emulator_host: str, firestore_project: str):
+        os.environ["FIRESTORE_EMULATOR_HOST"] = emulator_host
+        store = FirestoreStore(
+            credentials=AnonymousCredentials(),
+            project=firestore_project,
+            default_collection="test",
+            key_sanitization_strategy=FirestoreV1KeySanitizationStrategy(),
+            collection_sanitization_strategy=FirestoreV1CollectionSanitizationStrategy(),
         )
-        assert raw_document == snapshot(
-            {
-                "version": 1,
-                "value": '{"age": 25, "name": "Bob"}',
-                "created_at": IsStr(min_length=20, max_length=40),
-                "expires_at": IsStr(min_length=20, max_length=40),
-            }
-        )
+        collection = "batch/clients"
+        keys = ["client/one", ".", "é" * 751]
+
+        await store.put_many(collection=collection, keys=keys, values=[{"value": 1}, {"value": 2}, {"value": 3}])
+
+        assert await store.get_many(collection=collection, keys=keys) == [{"value": 1}, {"value": 2}, {"value": 3}]
+        assert await store.delete(collection=collection, key=keys[0]) is True
+        assert await store.get(collection=collection, key=keys[0]) is None
+        assert await store.delete_many(collection=collection, keys=keys) == 2
+        assert await store.get_many(collection=collection, keys=keys) == [None, None, None]
