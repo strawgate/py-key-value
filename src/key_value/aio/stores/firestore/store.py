@@ -1,4 +1,5 @@
 import hashlib
+import re
 from collections.abc import Sequence
 from datetime import datetime
 from typing import overload
@@ -27,11 +28,16 @@ FIRESTORE_HASH_LENGTH = 64
 FIRESTORE_HASH_PREFIX = "H_"
 FIRESTORE_SANITIZED_PREFIX = "S_"
 FIRESTORE_SANITIZED_HASH_LENGTH = 8
+FIRESTORE_RESERVED_ID_RE = re.compile(r"__.*__")
 
 
 def _utf8_truncate(value: str, max_bytes: int) -> str:
     encoded = value.encode("utf-8")[:max_bytes]
     return encoded.decode("utf-8", errors="ignore")
+
+
+def _requires_firestore_id_sanitization(value: str) -> bool:
+    return "/" in value or value in (".", "..") or FIRESTORE_RESERVED_ID_RE.fullmatch(value) is not None
 
 
 class FirestoreV1KeySanitizationStrategy(SanitizationStrategy):
@@ -43,7 +49,7 @@ class FirestoreV1KeySanitizationStrategy(SanitizationStrategy):
 
     def sanitize(self, value: str) -> str:
         """Sanitize a key for use as a Firestore document ID."""
-        changed = "/" in value or value in (".", "..") or (value.startswith("__") and value.endswith("__"))
+        changed = _requires_firestore_id_sanitization(value)
         if len(value.encode("utf-8")) > MAX_FIRESTORE_ID_BYTES:
             sha256_hash = hashlib.sha256(value.encode()).hexdigest()
             return f"{FIRESTORE_HASH_PREFIX}{sha256_hash[:FIRESTORE_HASH_LENGTH]}"

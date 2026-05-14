@@ -62,6 +62,36 @@ def test_firestore_key_sanitizer_hashes_oversized_keys():
     assert len(sanitized.encode("utf-8")) <= 1500
 
 
+@pytest.mark.parametrize("key", [".", "..", "____", "__id123__"])
+def test_firestore_key_sanitizer_handles_reserved_ids(key: str):
+    strategy = FirestoreV1KeySanitizationStrategy()
+
+    sanitized = strategy.sanitize(key)
+
+    assert sanitized.startswith("S_")
+    assert sanitized != key
+    assert "/" not in sanitized
+    assert sanitized not in (".", "..")
+    assert len(sanitized.encode("utf-8")) <= 1500
+
+
+def test_firestore_key_sanitizer_allows_non_reserved_double_underscore():
+    strategy = FirestoreV1KeySanitizationStrategy()
+
+    assert strategy.sanitize("__") == "__"
+
+
+def test_firestore_key_sanitizer_uses_utf8_byte_length_limit():
+    strategy = FirestoreV1KeySanitizationStrategy()
+
+    assert strategy.sanitize("é" * 750) == "é" * 750
+
+    sanitized = strategy.sanitize("é" * 751)
+
+    assert sanitized.startswith("H_")
+    assert len(sanitized.encode("utf-8")) <= 1500
+
+
 async def ping_firestore_emulator(emulator_host: str) -> bool:
     # Temporarily set the environment variable for the ping
     old_env = os.environ.get("FIRESTORE_EMULATOR_HOST")
