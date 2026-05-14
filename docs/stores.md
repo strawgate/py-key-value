@@ -576,9 +576,18 @@ pip install py-key-value-aio[valkey]
 Google Cloud Firestore used as a key-value store.
 
 ```python
-from key_value.aio.stores.firestore import FirestoreStore
+from key_value.aio.stores.firestore import (
+    FirestoreStore,
+    FirestoreV1CollectionSanitizationStrategy,
+    FirestoreV1KeySanitizationStrategy,
+)
 
-store = FirestoreStore(credentials=google_credentials, database="firestore-db")
+store = FirestoreStore(
+    credentials=google_credentials,
+    database="firestore-db",
+    key_sanitization_strategy=FirestoreV1KeySanitizationStrategy(),
+    collection_sanitization_strategy=FirestoreV1CollectionSanitizationStrategy(),
+)
 ```
 
 **Installation:**
@@ -597,6 +606,7 @@ pip install py-key-value-aio[firestore]
 
 - Managed cloud database
 - Document/collection model
+- Optional key and collection sanitization for Firestore ID constraints
 - Stable storage format: **Unstable**
 
 ---

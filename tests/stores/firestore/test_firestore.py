@@ -26,7 +26,11 @@ try:
     from google.auth.credentials import AnonymousCredentials
     from google.cloud.firestore import AsyncClient
 
-    from key_value.aio.stores.firestore import FirestoreStore
+    from key_value.aio.stores.firestore import (
+        FirestoreStore,
+        FirestoreV1CollectionSanitizationStrategy,
+        FirestoreV1KeySanitizationStrategy,
+    )
 except ImportError:  # pragma: no cover
     pytest.skip("Firestore dependencies not installed. Install with `py-key-value-aio[firestore]`.", allow_module_level=True)
 
@@ -37,6 +41,25 @@ FIRESTORE_IMAGE = "gcr.io/google.com/cloudsdktool/cloud-sdk:emulators"
 
 class FirestoreEmulatorFailedToStartError(Exception):
     pass
+
+
+def test_firestore_key_sanitizer_handles_url_keys():
+    strategy = FirestoreV1KeySanitizationStrategy()
+
+    sanitized = strategy.sanitize("https://claude.ai/oauth/claude-code-client-metadata")
+
+    assert "/" not in sanitized
+    assert sanitized.startswith("S_")
+    assert len(sanitized.encode("utf-8")) <= 1500
+
+
+def test_firestore_key_sanitizer_hashes_oversized_keys():
+    strategy = FirestoreV1KeySanitizationStrategy()
+
+    sanitized = strategy.sanitize("a" * 1501)
+
+    assert sanitized.startswith("H_")
+    assert len(sanitized.encode("utf-8")) <= 1500
 
 
 async def ping_firestore_emulator(emulator_host: str) -> bool:
@@ -126,6 +149,36 @@ class TestFirestoreStore(ContextManagerStoreTestMixin, BaseStoreTests):
             {
                 "version": 1,
                 "value": '{"age": 30, "name": "Alice"}',
+                "created_at": IsStr(min_length=20, max_length=40),
+            }
+        )
+
+    async def test_sanitizing_store_handles_url_keys(self, setup_firestore: None, emulator_host: str, firestore_project: str):
+        os.environ["FIRESTORE_EMULATOR_HOST"] = emulator_host
+        store = FirestoreStore(
+            credentials=AnonymousCredentials(),
+            project=firestore_project,
+            default_collection="test",
+            key_sanitization_strategy=FirestoreV1KeySanitizationStrategy(),
+            collection_sanitization_strategy=FirestoreV1CollectionSanitizationStrategy(),
+        )
+        key = "https://claude.ai/oauth/claude-code-client-metadata"
+
+        await store.put(collection="oauth/clients", key=key, value={"client": "claude-code"})
+
+        assert await store.get(collection="oauth/clients", key=key) == {"client": "claude-code"}
+        assert await store.get_many(collection="oauth/clients", keys=[key, "missing"]) == [{"client": "claude-code"}, None]
+
+        raw_document = await get_raw_document(
+            emulator_host=emulator_host,
+            project=firestore_project,
+            collection=FirestoreV1CollectionSanitizationStrategy().sanitize("oauth/clients"),
+            key=FirestoreV1KeySanitizationStrategy().sanitize(key),
+        )
+        assert raw_document == snapshot(
+            {
+                "version": 1,
+                "value": '{"client": "claude-code"}',
                 "created_at": IsStr(min_length=20, max_length=40),
             }
         )
