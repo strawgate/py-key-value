@@ -196,52 +196,56 @@ class TestFirestoreStore(ContextManagerStoreTestMixin, BaseStoreTests):
             }
         )
 
-    async def test_sanitizing_store_handles_url_keys(self, setup_firestore: None, emulator_host: str, firestore_project: str):
-        os.environ["FIRESTORE_EMULATOR_HOST"] = emulator_host
-        store = FirestoreStore(
+    async def test_sanitizing_store_handles_url_keys(
+        self, setup_firestore: None, emulator_host: str, firestore_project: str, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setenv("FIRESTORE_EMULATOR_HOST", emulator_host)
+        async with FirestoreStore(
             credentials=AnonymousCredentials(),
             project=firestore_project,
             default_collection="test",
             key_sanitization_strategy=FirestoreV1KeySanitizationStrategy(),
             collection_sanitization_strategy=FirestoreV1CollectionSanitizationStrategy(),
-        )
-        key = "https://claude.ai/oauth/claude-code-client-metadata"
+        ) as store:
+            key = "https://claude.ai/oauth/claude-code-client-metadata"
 
-        await store.put(collection="oauth/clients", key=key, value={"client": "claude-code"})
+            await store.put(collection="oauth/clients", key=key, value={"client": "claude-code"})
 
-        assert await store.get(collection="oauth/clients", key=key) == {"client": "claude-code"}
-        assert await store.get_many(collection="oauth/clients", keys=[key, "missing"]) == [{"client": "claude-code"}, None]
+            assert await store.get(collection="oauth/clients", key=key) == {"client": "claude-code"}
+            assert await store.get_many(collection="oauth/clients", keys=[key, "missing"]) == [{"client": "claude-code"}, None]
 
-        raw_document = await get_raw_document(
-            emulator_host=emulator_host,
-            project=firestore_project,
-            collection=FirestoreV1CollectionSanitizationStrategy().sanitize("oauth/clients"),
-            key=FirestoreV1KeySanitizationStrategy().sanitize(key),
-        )
-        assert raw_document == snapshot(
-            {
-                "version": 1,
-                "value": '{"client": "claude-code"}',
-                "created_at": IsStr(min_length=20, max_length=40),
-            }
-        )
+            raw_document = await get_raw_document(
+                emulator_host=emulator_host,
+                project=firestore_project,
+                collection=FirestoreV1CollectionSanitizationStrategy().sanitize("oauth/clients"),
+                key=FirestoreV1KeySanitizationStrategy().sanitize(key),
+            )
+            assert raw_document == snapshot(
+                {
+                    "version": 1,
+                    "value": '{"client": "claude-code"}',
+                    "created_at": IsStr(min_length=20, max_length=40),
+                }
+            )
 
-    async def test_sanitizing_store_handles_batch_and_delete_paths(self, setup_firestore: None, emulator_host: str, firestore_project: str):
-        os.environ["FIRESTORE_EMULATOR_HOST"] = emulator_host
-        store = FirestoreStore(
+    async def test_sanitizing_store_handles_batch_and_delete_paths(
+        self, setup_firestore: None, emulator_host: str, firestore_project: str, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setenv("FIRESTORE_EMULATOR_HOST", emulator_host)
+        async with FirestoreStore(
             credentials=AnonymousCredentials(),
             project=firestore_project,
             default_collection="test",
             key_sanitization_strategy=FirestoreV1KeySanitizationStrategy(),
             collection_sanitization_strategy=FirestoreV1CollectionSanitizationStrategy(),
-        )
-        collection = "batch/clients"
-        keys = ["client/one", ".", "é" * 751]
+        ) as store:
+            collection = "batch/clients"
+            keys = ["client/one", ".", "é" * 751]
 
-        await store.put_many(collection=collection, keys=keys, values=[{"value": 1}, {"value": 2}, {"value": 3}])
+            await store.put_many(collection=collection, keys=keys, values=[{"value": 1}, {"value": 2}, {"value": 3}])
 
-        assert await store.get_many(collection=collection, keys=keys) == [{"value": 1}, {"value": 2}, {"value": 3}]
-        assert await store.delete(collection=collection, key=keys[0]) is True
-        assert await store.get(collection=collection, key=keys[0]) is None
-        assert await store.delete_many(collection=collection, keys=keys) == 2
-        assert await store.get_many(collection=collection, keys=keys) == [None, None, None]
+            assert await store.get_many(collection=collection, keys=keys) == [{"value": 1}, {"value": 2}, {"value": 3}]
+            assert await store.delete(collection=collection, key=keys[0]) is True
+            assert await store.get(collection=collection, key=keys[0]) is None
+            assert await store.delete_many(collection=collection, keys=keys) == 2
+            assert await store.get_many(collection=collection, keys=keys) == [None, None, None]
