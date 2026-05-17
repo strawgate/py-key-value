@@ -271,21 +271,6 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         await self._drop_table(azurite_connection_string, table_name)
 
-    async def test_conflicting_auth_args_rejected(self):
-        """Constructor rejects ambiguous auth-arg combinations."""
-        with pytest.raises(ValueError, match="conflicting auth arguments"):
-            AzureTablesStore(  # pyright: ignore[reportCallIssue]
-                connection_string="UseDevelopmentStorage=true",
-                account_name="devstoreaccount1",
-                credential=FakeAsyncTokenCredential(),
-                table_name="t",
-            )
-
-    async def test_no_auth_args_rejected(self):
-        """Constructor errors when no auth pattern was supplied."""
-        with pytest.raises(ValueError, match="requires one of"):
-            AzureTablesStore(table_name="t")  # pyright: ignore[reportCallIssue]
-
     async def test_account_name_plus_token_credential_endpoint_override(self):
         """Constructor accepts the production token-credential auth path."""
         store = AzureTablesStore(

@@ -285,32 +285,6 @@ class AzureTablesStore(BaseContextManagerStore):
     ) -> None:
         """See the overloaded signatures above for argument documentation."""
         client_provided = client is not None
-        account_name_and_credential = account_name is not None and credential is not None
-        endpoint_and_credential_only = endpoint is not None and credential is not None and account_name is None
-
-        # Validate that exactly one auth pattern was supplied.
-        provided_patterns = sum(
-            (
-                client is not None,
-                connection_string is not None,
-                account_name_and_credential,
-                endpoint_and_credential_only,
-            )
-        )
-        if provided_patterns == 0:
-            msg = (
-                "AzureTablesStore requires one of: `client=`, "
-                "`connection_string=`, `account_name=` + `credential=`, or "
-                "`endpoint=` + `credential=`."
-            )
-            raise ValueError(msg)
-        if provided_patterns > 1:
-            msg = (
-                "AzureTablesStore was given conflicting auth arguments. "
-                "Pass exactly one of: `client`, `connection_string`, "
-                "`account_name`+`credential`, `endpoint`+`credential`."
-            )
-            raise ValueError(msg)
 
         if client is not None:
             # Caller-managed lifecycle. table_name comes from the client itself.
@@ -375,9 +349,8 @@ class AzureTablesStore(BaseContextManagerStore):
                         credential=self._credential,
                     )
                 else:
-                    # Should be unreachable given __init__ validation.
-                    msg = "AzureTablesStore: service client missing during setup"
-                    raise RuntimeError(msg)
+                    msg = "AzureTablesStore requires connection_string= or endpoint/account_name + credential when client is not provided."
+                    raise ValueError(msg)
                 self._service = service
             await self._exit_stack.enter_async_context(service)
             self._table_client = service.get_table_client(table_name=self._table_name)
