@@ -204,9 +204,9 @@ class AzureTablesStore(BaseContextManagerStore, BaseStore):
             default_collection: Default collection name. Defaults to
                 "default_collection".
             collection_sanitization_strategy: Strategy for Azure Tables
-                PartitionKey values. Defaults to AzureTablesSanitizationStrategy.
+                PartitionKey values. Defaults to no sanitization.
             key_sanitization_strategy: Strategy for Azure Tables RowKey values.
-                Defaults to AzureTablesSanitizationStrategy.
+                Defaults to no sanitization.
             auto_create: If True, attempt to create the table during setup.
                 Existing tables are tolerated. If False, a missing table at
                 setup time is reported as a ``StoreSetupError`` (wrapping a
@@ -231,9 +231,9 @@ class AzureTablesStore(BaseContextManagerStore, BaseStore):
             table_name: Table name.
             default_collection: Default collection name.
             collection_sanitization_strategy: Strategy for Azure Tables
-                PartitionKey values. Defaults to AzureTablesSanitizationStrategy.
+                PartitionKey values. Defaults to no sanitization.
             key_sanitization_strategy: Strategy for Azure Tables RowKey values.
-                Defaults to AzureTablesSanitizationStrategy.
+                Defaults to no sanitization.
             auto_create: Whether to create the table if missing.
         """
 
@@ -264,9 +264,9 @@ class AzureTablesStore(BaseContextManagerStore, BaseStore):
                 ``https://{account_name}.table.core.windows.net``.
             default_collection: Default collection name.
             collection_sanitization_strategy: Strategy for Azure Tables
-                PartitionKey values. Defaults to AzureTablesSanitizationStrategy.
+                PartitionKey values. Defaults to no sanitization.
             key_sanitization_strategy: Strategy for Azure Tables RowKey values.
-                Defaults to AzureTablesSanitizationStrategy.
+                Defaults to no sanitization.
             auto_create: Whether to create the table if missing.
         """
 
