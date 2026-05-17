@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import socket
 import sys
-from collections.abc import AsyncGenerator, Iterator
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from testcontainers.core.container import DockerContainer
@@ -9,10 +10,14 @@ from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio._utils.wait import async_wait_for_true
-from key_value.aio.stores.base import BaseStore
-from key_value.aio.stores.valkey import ValkeyStore
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Iterator
+
+    from key_value.aio.stores.base import BaseStore
+    from key_value.aio.stores.valkey import ValkeyStore
 
 pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="Valkey is not supported on Windows")
 
@@ -139,6 +144,8 @@ class TestValkeyClusterClientSupport:
         """Verify that ValkeyStore accepts a cluster configuration."""
         from glide_shared.config import GlideClusterClientConfiguration, NodeAddress
 
+        from key_value.aio.stores.valkey import ValkeyStore
+
         config = GlideClusterClientConfiguration(addresses=[NodeAddress("localhost", 6379)])
         store = ValkeyStore(config=config)
 
@@ -208,6 +215,8 @@ class TestValkeyClusterStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture
     async def store(self, setup_valkey_cluster: None, valkey_cluster_ports: list[int]) -> AsyncGenerator[ValkeyStore, None]:
         from glide.glide_client import GlideClusterClient
+
+        from key_value.aio.stores.valkey import ValkeyStore
 
         cleanup_client = await GlideClusterClient.create(config=_make_valkey_cluster_config(valkey_cluster_ports[0]))
         try:
