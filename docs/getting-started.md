@@ -151,6 +151,16 @@ from key_value.aio.stores.redis import RedisStore
 store = RedisStore(url="redis://localhost:6379/0")
 ```
 
+For Redis deployments that require TLS, use a `rediss://` URL or pass
+`ssl=True` with the certificate options your deployment requires:
+
+```python
+store = RedisStore(
+    url="rediss://redis.example.com:6380/0",
+    ssl_ca_certs="/etc/ssl/certs/redis-ca.pem",
+)
+```
+
 ### DynamoDB
 
 ```python
@@ -270,6 +280,14 @@ framework = YourFramework(cache=MemoryStore())
 # Production
 framework = YourFramework(
     cache=RedisStore(url="redis://localhost:6379/0")
+)
+
+# Production with Redis TLS
+framework = YourFramework(
+    cache=RedisStore(
+        url="rediss://redis.example.com:6380/0",
+        ssl_ca_certs="/etc/ssl/certs/redis-ca.pem",
+    )
 )
 ```
 

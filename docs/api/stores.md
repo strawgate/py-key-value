@@ -43,6 +43,11 @@ Redis-backed key-value store.
       members:
         - __init__
 
+Redis TLS is configured on `RedisStore.__init__`. Use a `rediss://` URL to
+enable TLS from the URL scheme, or pass `ssl=True` with `host` and `port`.
+Certificate options are exposed as `ssl_ca_certs`, `ssl_certfile`,
+`ssl_keyfile`, `ssl_check_hostname`, and `ssl_cert_reqs`.
+
 ## DynamoDB Store
 
 AWS DynamoDB-backed key-value store.
