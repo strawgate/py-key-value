@@ -159,6 +159,8 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
         return AzureTablesStore(
             connection_string=azurite_connection_string,
             table_name=AZURITE_TEST_TABLE,
+            collection_sanitization_strategy=AzureTablesSanitizationStrategy(),
+            key_sanitization_strategy=AzureTablesSanitizationStrategy(),
         )
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")

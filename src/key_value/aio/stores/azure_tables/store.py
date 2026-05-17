@@ -142,18 +142,17 @@ class AzureTablesStore(BaseContextManagerStore, BaseStore):
     """Azure Table Storage-backed async key-value store.
 
     Schema:
-        PartitionKey -> collection (sanitized; see below)
-        RowKey       -> key (sanitized; see below)
+        PartitionKey -> collection
+        RowKey       -> key
         Value        -> JSON-serialized ManagedEntry (string)
         ExpiresAt    -> Unix epoch seconds (omitted when no TTL)
 
     Azure Table Storage rejects PartitionKey/RowKey values that exceed its
     URL/header limits or contain ``/``, ``\\``, ``#``, ``?``, C0 control
-    characters, or C1 control characters. By default this store uses
-    ``AzureTablesSanitizationStrategy`` for collections and keys, so
-    out-of-spec values are replaced with deterministic SHA-256 digests.
-    Round-trips remain transparent (PUT and GET sanitize the same way), but
-    direct table inspection will show the sanitized values for those entries.
+    characters, or C1 control characters. Like other constrained stores in
+    this package, sanitization is opt-in: pass
+    ``AzureTablesSanitizationStrategy`` for collections and keys if callers may
+    use out-of-spec values.
 
     Authentication patterns (mirrors DynamoDB's flexibility):
 
@@ -329,8 +328,8 @@ class AzureTablesStore(BaseContextManagerStore, BaseStore):
 
         super().__init__(
             default_collection=default_collection,
-            collection_sanitization_strategy=collection_sanitization_strategy or AzureTablesSanitizationStrategy(),
-            key_sanitization_strategy=key_sanitization_strategy or AzureTablesSanitizationStrategy(),
+            collection_sanitization_strategy=collection_sanitization_strategy,
+            key_sanitization_strategy=key_sanitization_strategy,
             client_provided_by_user=client_provided,
         )
 

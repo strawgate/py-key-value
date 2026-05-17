@@ -678,12 +678,17 @@ pip install py-key-value-aio[firestore]
 Azure Table Storage integration for Azure-native applications.
 
 ```python
-from key_value.aio.stores.azure_tables import AzureTablesStore
+from key_value.aio.stores.azure_tables import (
+    AzureTablesSanitizationStrategy,
+    AzureTablesStore,
+)
 
 store = AzureTablesStore(
     account_name="mystorageaccount",
     credential=credential,
     table_name="kvstore",
+    collection_sanitization_strategy=AzureTablesSanitizationStrategy(),
+    key_sanitization_strategy=AzureTablesSanitizationStrategy(),
 )
 ```
 
@@ -706,7 +711,7 @@ pip install py-key-value-aio[azure-tables]
 - Fully managed
 - Pay-per-use pricing
 - No native background TTL; entries are lazily expired on read
-- Sanitizes PartitionKey/RowKey values for Azure Tables limits
+- Optional PartitionKey/RowKey sanitization for Azure Tables limits
 - Stable storage format: **Unstable**
 
 ---
