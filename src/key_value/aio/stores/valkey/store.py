@@ -128,8 +128,8 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
             password: Valkey password. Defaults to None.
 
         Note:
-            When using ``config`` or an existing ``client``, the host/port/db
-            parameters are ignored.
+            When using ``config`` or an existing ``client``, the host/port/db/
+            username/password parameters are ignored.
         """
         client_provided = client is not None
 

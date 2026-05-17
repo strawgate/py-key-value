@@ -3,6 +3,7 @@ from __future__ import annotations
 import socket
 import sys
 from typing import TYPE_CHECKING, cast
+from unittest.mock import MagicMock
 
 import pytest
 from testcontainers.core.container import DockerContainer
@@ -175,7 +176,7 @@ class TestValkeyClusterClientSupport:
 
         async def standalone_create(cls: type[GlideClient], config: GlideClientConfiguration) -> GlideClient:
             calls.append("standalone")
-            return cast("GlideClient", object())
+            return cast("GlideClient", MagicMock(spec=GlideClient))
 
         async def cluster_create(cls: type[GlideClusterClient], config: GlideClusterClientConfiguration) -> GlideClusterClient:
             calls.append("cluster")
