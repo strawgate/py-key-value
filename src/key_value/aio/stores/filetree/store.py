@@ -290,10 +290,10 @@ class DiskCollectionInfo:
         # Security validation
         await self._validate_path_security(path=key_path)
 
-        if not await key_path.exists():
+        try:
+            await key_path.unlink()
+        except FileNotFoundError:
             return False
-
-        await key_path.unlink()
 
         return True
 
