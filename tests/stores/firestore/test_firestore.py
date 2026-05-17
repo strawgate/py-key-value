@@ -1,7 +1,8 @@
 import os
 import uuid
 import warnings
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Generator
+from contextlib import contextmanager
 from typing import Any
 
 import pytest
@@ -12,6 +13,7 @@ from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio._utils.wait import async_wait_for_true
+from key_value.aio.errors import InvalidKeyError
 from key_value.aio.stores.base import BaseStore
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
@@ -26,7 +28,11 @@ try:
     from google.auth.credentials import AnonymousCredentials
     from google.cloud.firestore import AsyncClient
 
-    from key_value.aio.stores.firestore import FirestoreStore
+    from key_value.aio.stores.firestore import (
+        FirestoreStore,
+        FirestoreV1CollectionSanitizationStrategy,
+        FirestoreV1KeySanitizationStrategy,
+    )
 except ImportError:  # pragma: no cover
     pytest.skip("Firestore dependencies not installed. Install with `py-key-value-aio[firestore]`.", allow_module_level=True)
 
@@ -39,11 +45,106 @@ class FirestoreEmulatorFailedToStartError(Exception):
     pass
 
 
-async def ping_firestore_emulator(emulator_host: str) -> bool:
-    # Temporarily set the environment variable for the ping
+@contextmanager
+def firestore_emulator_host(emulator_host: str) -> Generator[None, None, None]:
+    """Set FIRESTORE_EMULATOR_HOST for the duration of a Firestore emulator call."""
     old_env = os.environ.get("FIRESTORE_EMULATOR_HOST")
     os.environ["FIRESTORE_EMULATOR_HOST"] = emulator_host
     try:
+        yield
+    finally:
+        if old_env is not None:
+            os.environ["FIRESTORE_EMULATOR_HOST"] = old_env
+        elif "FIRESTORE_EMULATOR_HOST" in os.environ:
+            del os.environ["FIRESTORE_EMULATOR_HOST"]
+
+
+def test_firestore_key_sanitizer_handles_url_keys():
+    """Sanitize URL-shaped keys into valid Firestore document IDs."""
+    strategy = FirestoreV1KeySanitizationStrategy()
+
+    sanitized = strategy.sanitize("https://claude.ai/oauth/claude-code-client-metadata")
+
+    assert "/" not in sanitized
+    assert sanitized.startswith("S_")
+    assert len(sanitized.encode("utf-8")) <= 1500
+
+
+def test_firestore_key_sanitizer_hashes_oversized_keys():
+    """Hash document IDs that exceed Firestore's UTF-8 byte limit."""
+    strategy = FirestoreV1KeySanitizationStrategy()
+
+    sanitized = strategy.sanitize("a" * 1501)
+
+    assert sanitized.startswith("H_")
+    assert len(sanitized.encode("utf-8")) <= 1500
+
+
+@pytest.mark.parametrize("key", ["", ".", "..", "____", "__id123__"])
+def test_firestore_key_sanitizer_handles_reserved_ids(key: str):
+    """Sanitize Firestore-reserved document IDs."""
+    strategy = FirestoreV1KeySanitizationStrategy()
+
+    sanitized = strategy.sanitize(key)
+
+    assert sanitized.startswith("S_")
+    assert sanitized != key
+    assert "/" not in sanitized
+    assert sanitized not in (".", "..")
+    assert len(sanitized.encode("utf-8")) <= 1500
+
+
+def test_firestore_key_sanitizer_allows_non_reserved_double_underscore():
+    """Allow double-underscore IDs that do not match Firestore's reserved pattern."""
+    strategy = FirestoreV1KeySanitizationStrategy()
+
+    assert strategy.sanitize("__") == "__"
+
+
+def test_firestore_key_sanitizer_uses_utf8_byte_length_limit():
+    """Apply Firestore's 1500 byte limit using UTF-8 bytes, not codepoints."""
+    strategy = FirestoreV1KeySanitizationStrategy()
+
+    assert strategy.sanitize("é" * 750) == "é" * 750
+
+    sanitized = strategy.sanitize("é" * 751)
+
+    assert sanitized.startswith("H_")
+    assert len(sanitized.encode("utf-8")) <= 1500
+
+
+def test_firestore_key_sanitizer_truncates_changed_values_by_utf8_bytes():
+    """Keep sanitized changed IDs under Firestore's byte limit."""
+    strategy = FirestoreV1KeySanitizationStrategy()
+
+    sanitized = strategy.sanitize(("é" * 749) + "/")
+
+    assert sanitized.startswith("S_")
+    assert "/" not in sanitized
+    assert len(sanitized.encode("utf-8")) <= 1500
+
+
+@pytest.mark.parametrize("value", ["H_something", "S_something"])
+def test_firestore_key_sanitizer_rejects_reserved_prefixes(value: str):
+    """Reject user keys that could collide with generated sanitizer prefixes."""
+    strategy = FirestoreV1KeySanitizationStrategy()
+
+    with pytest.raises(InvalidKeyError, match="reserved prefixes"):
+        strategy.validate(value)
+
+
+@pytest.mark.parametrize("value", ["H_collection", "S_collection"])
+def test_firestore_collection_sanitizer_rejects_reserved_prefixes(value: str):
+    """Reject user collections that could collide with generated sanitizer prefixes."""
+    strategy = FirestoreV1CollectionSanitizationStrategy()
+
+    with pytest.raises(InvalidKeyError, match="reserved prefixes"):
+        strategy.validate(value)
+
+
+async def ping_firestore_emulator(emulator_host: str) -> bool:
+    """Return True once the Firestore emulator responds to a simple read."""
+    with firestore_emulator_host(emulator_host):
         client = AsyncClient(credentials=AnonymousCredentials())
         try:
             await client.collection("ping").document("ping").get()  # pyright: ignore[reportUnknownMemberType]
@@ -52,28 +153,17 @@ async def ping_firestore_emulator(emulator_host: str) -> bool:
         finally:
             client.close()
         return True
-    finally:
-        if old_env is not None:
-            os.environ["FIRESTORE_EMULATOR_HOST"] = old_env
-        elif "FIRESTORE_EMULATOR_HOST" in os.environ:
-            del os.environ["FIRESTORE_EMULATOR_HOST"]
 
 
 async def get_raw_document(*, emulator_host: str, project: str, collection: str, key: str) -> dict[str, Any] | None:
-    old_env = os.environ.get("FIRESTORE_EMULATOR_HOST")
-    os.environ["FIRESTORE_EMULATOR_HOST"] = emulator_host
-    try:
+    """Fetch a raw Firestore document bypassing the store serialization layer."""
+    with firestore_emulator_host(emulator_host):
         client = AsyncClient(project=project, credentials=AnonymousCredentials())
         try:
             snapshot = await client.collection(collection).document(key).get()  # pyright: ignore[reportUnknownMemberType]
             return snapshot.to_dict()
         finally:
             client.close()
-    finally:
-        if old_env is not None:
-            os.environ["FIRESTORE_EMULATOR_HOST"] = old_env
-        elif "FIRESTORE_EMULATOR_HOST" in os.environ:
-            del os.environ["FIRESTORE_EMULATOR_HOST"]
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
@@ -107,10 +197,10 @@ class TestFirestoreStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @override
     @pytest.fixture
-    async def store(self, setup_firestore: None, emulator_host: str, firestore_project: str) -> FirestoreStore:
-        # Set the emulator host environment variable for the store
-        os.environ["FIRESTORE_EMULATOR_HOST"] = emulator_host
-        return FirestoreStore(credentials=AnonymousCredentials(), project=firestore_project, default_collection="test")
+    async def store(self, setup_firestore: None, emulator_host: str, firestore_project: str) -> AsyncGenerator[FirestoreStore, None]:
+        with firestore_emulator_host(emulator_host):
+            async with FirestoreStore(credentials=AnonymousCredentials(), project=firestore_project, default_collection="test") as store:
+                yield store
 
     @override
     @pytest.mark.skip(reason="Distributed cloud stores are unbounded")
@@ -142,3 +232,53 @@ class TestFirestoreStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 "expires_at": IsStr(min_length=20, max_length=40),
             }
         )
+
+    async def test_sanitizing_store_handles_url_keys(self, setup_firestore: None, emulator_host: str, firestore_project: str):
+        with firestore_emulator_host(emulator_host):
+            async with FirestoreStore(
+                credentials=AnonymousCredentials(),
+                project=firestore_project,
+                default_collection="test",
+                key_sanitization_strategy=FirestoreV1KeySanitizationStrategy(),
+                collection_sanitization_strategy=FirestoreV1CollectionSanitizationStrategy(),
+            ) as store:
+                key = "https://claude.ai/oauth/claude-code-client-metadata"
+
+                await store.put(collection="oauth/clients", key=key, value={"client": "claude-code"})
+
+                assert await store.get(collection="oauth/clients", key=key) == {"client": "claude-code"}
+                assert await store.get_many(collection="oauth/clients", keys=[key, "missing"]) == [{"client": "claude-code"}, None]
+
+                raw_document = await get_raw_document(
+                    emulator_host=emulator_host,
+                    project=firestore_project,
+                    collection=FirestoreV1CollectionSanitizationStrategy().sanitize("oauth/clients"),
+                    key=FirestoreV1KeySanitizationStrategy().sanitize(key),
+                )
+                assert raw_document == snapshot(
+                    {
+                        "version": 1,
+                        "value": '{"client": "claude-code"}',
+                        "created_at": IsStr(min_length=20, max_length=40),
+                    }
+                )
+
+    async def test_sanitizing_store_handles_batch_and_delete_paths(self, setup_firestore: None, emulator_host: str, firestore_project: str):
+        with firestore_emulator_host(emulator_host):
+            async with FirestoreStore(
+                credentials=AnonymousCredentials(),
+                project=firestore_project,
+                default_collection="test",
+                key_sanitization_strategy=FirestoreV1KeySanitizationStrategy(),
+                collection_sanitization_strategy=FirestoreV1CollectionSanitizationStrategy(),
+            ) as store:
+                collection = "batch/clients"
+                keys = ["client/one", ".", "é" * 751]
+
+                await store.put_many(collection=collection, keys=keys, values=[{"value": 1}, {"value": 2}, {"value": 3}])
+
+                assert await store.get_many(collection=collection, keys=keys) == [{"value": 1}, {"value": 2}, {"value": 3}]
+                assert await store.delete(collection=collection, key=keys[0]) is True
+                assert await store.get(collection=collection, key=keys[0]) is None
+                assert await store.delete_many(collection=collection, keys=keys) == 2
+                assert await store.get_many(collection=collection, keys=keys) == [None, None, None]
