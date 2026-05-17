@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import pytest
+from anyio import Path as AsyncPath
 from typing_extensions import override
 
 from key_value.aio._utils.sanitization import PassthroughStrategy
@@ -37,6 +38,27 @@ class TestFileTreeStore(BaseStoreTests):
     async def test_not_unbounded(self, store: BaseStore):
         """FileTreeStore is unbounded, so skip this test."""
         pytest.skip("FileTreeStore is unbounded and does not evict old entries")
+
+    async def test_delete_returns_false_when_file_disappears_before_unlink(
+        self,
+        store: FileTreeStore,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        """delete should remain idempotent when another actor removes the file first."""
+        await store.put(collection="test", key="race_key", value={"data": "value"})
+
+        original_unlink = AsyncPath.unlink
+
+        async def unlink_after_external_removal(path: AsyncPath) -> None:
+            if Path(path).name == "race_key.json":
+                Path(path).unlink()
+                raise FileNotFoundError(Path(path))
+            await original_unlink(path)
+
+        monkeypatch.setattr(AsyncPath, "unlink", unlink_after_external_removal)
+
+        assert await store.delete(collection="test", key="race_key") is False
+        assert await store.get(collection="test", key="race_key") is None
 
 
 class TestFileTreeStorePathTraversal:
