@@ -6,7 +6,7 @@ collection/key model:
 
     PartitionKey = collection
     RowKey       = key
-    Value        = JSON-serialized ManagedEntry (string, <= 64 KB)
+    Value        = JSON-serialized ManagedEntry (string)
     ExpiresAt    = epoch seconds (set only for entries with TTL)
 
 Azure Table Storage has no native TTL; this store handles expiry by
@@ -49,12 +49,10 @@ else:
 # Helper functions - module-level so they aren't part of the public surface.
 # ---------------------------------------------------------------------------
 
-# Azure Table Storage docs allow up to 1024 chars per PartitionKey/RowKey, but
-# the empirical limit on the resulting entity URL (which contains both keys
-# inline plus quoting and the full table-name path) is stricter. To stay safely
-# under that ceiling we cap each key at 256 chars before falling back to a
-# deterministic SHA-256 hash. Realistic keys (UUIDs ~36 chars, SHA-256 64 chars,
-# DCR client_ids ~32 chars, etc.) are well under this.
+# Azure Table Storage docs allow up to 1024 characters per PartitionKey/RowKey.
+# We intentionally cap lower so sanitized values stay comfortably below service
+# limits after URL encoding and quoting. Realistic keys (UUIDs, SHA-256 hashes,
+# DCR client_ids, etc.) are well under this.
 _AZURE_PK_RK_MAX_LEN = 256
 _AZURE_PK_RK_FORBIDDEN_CHARS = frozenset("/\\#?")
 # Azure Tables disallows control characters in both ASCII control ranges.
