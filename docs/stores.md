@@ -607,7 +607,8 @@ pip install py-key-value-aio[firestore]
 - Managed cloud database
 - Document/collection model
 - Optional key and collection sanitization for Firestore ID constraints
-- Firestore sanitizer reserves `H_` and `S_` prefixes to prevent collisions
+- Firestore sanitizers reserve `H_` and `S_` prefixes for keys and
+  collections to prevent collisions
 - Stable storage format: **Unstable**
 
 ---

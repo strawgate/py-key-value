@@ -13,6 +13,7 @@ from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio._utils.wait import async_wait_for_true
+from key_value.aio.errors import InvalidKeyError
 from key_value.aio.stores.base import BaseStore
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
@@ -46,6 +47,7 @@ class FirestoreEmulatorFailedToStartError(Exception):
 
 @contextmanager
 def firestore_emulator_host(emulator_host: str) -> Generator[None, None, None]:
+    """Set FIRESTORE_EMULATOR_HOST for the duration of a Firestore emulator call."""
     old_env = os.environ.get("FIRESTORE_EMULATOR_HOST")
     os.environ["FIRESTORE_EMULATOR_HOST"] = emulator_host
     try:
@@ -58,6 +60,7 @@ def firestore_emulator_host(emulator_host: str) -> Generator[None, None, None]:
 
 
 def test_firestore_key_sanitizer_handles_url_keys():
+    """Sanitize URL-shaped keys into valid Firestore document IDs."""
     strategy = FirestoreV1KeySanitizationStrategy()
 
     sanitized = strategy.sanitize("https://claude.ai/oauth/claude-code-client-metadata")
@@ -68,6 +71,7 @@ def test_firestore_key_sanitizer_handles_url_keys():
 
 
 def test_firestore_key_sanitizer_hashes_oversized_keys():
+    """Hash document IDs that exceed Firestore's UTF-8 byte limit."""
     strategy = FirestoreV1KeySanitizationStrategy()
 
     sanitized = strategy.sanitize("a" * 1501)
@@ -78,6 +82,7 @@ def test_firestore_key_sanitizer_hashes_oversized_keys():
 
 @pytest.mark.parametrize("key", ["", ".", "..", "____", "__id123__"])
 def test_firestore_key_sanitizer_handles_reserved_ids(key: str):
+    """Sanitize Firestore-reserved document IDs."""
     strategy = FirestoreV1KeySanitizationStrategy()
 
     sanitized = strategy.sanitize(key)
@@ -90,12 +95,14 @@ def test_firestore_key_sanitizer_handles_reserved_ids(key: str):
 
 
 def test_firestore_key_sanitizer_allows_non_reserved_double_underscore():
+    """Allow double-underscore IDs that do not match Firestore's reserved pattern."""
     strategy = FirestoreV1KeySanitizationStrategy()
 
     assert strategy.sanitize("__") == "__"
 
 
 def test_firestore_key_sanitizer_uses_utf8_byte_length_limit():
+    """Apply Firestore's 1500 byte limit using UTF-8 bytes, not codepoints."""
     strategy = FirestoreV1KeySanitizationStrategy()
 
     assert strategy.sanitize("é" * 750) == "é" * 750
@@ -106,7 +113,26 @@ def test_firestore_key_sanitizer_uses_utf8_byte_length_limit():
     assert len(sanitized.encode("utf-8")) <= 1500
 
 
+@pytest.mark.parametrize("value", ["H_something", "S_something"])
+def test_firestore_key_sanitizer_rejects_reserved_prefixes(value: str):
+    """Reject user keys that could collide with generated sanitizer prefixes."""
+    strategy = FirestoreV1KeySanitizationStrategy()
+
+    with pytest.raises(InvalidKeyError, match="reserved prefixes"):
+        strategy.validate(value)
+
+
+@pytest.mark.parametrize("value", ["H_collection", "S_collection"])
+def test_firestore_collection_sanitizer_rejects_reserved_prefixes(value: str):
+    """Reject user collections that could collide with generated sanitizer prefixes."""
+    strategy = FirestoreV1CollectionSanitizationStrategy()
+
+    with pytest.raises(InvalidKeyError, match="reserved prefixes"):
+        strategy.validate(value)
+
+
 async def ping_firestore_emulator(emulator_host: str) -> bool:
+    """Return True once the Firestore emulator responds to a simple read."""
     with firestore_emulator_host(emulator_host):
         client = AsyncClient(credentials=AnonymousCredentials())
         try:
@@ -119,6 +145,7 @@ async def ping_firestore_emulator(emulator_host: str) -> bool:
 
 
 async def get_raw_document(*, emulator_host: str, project: str, collection: str, key: str) -> dict[str, Any] | None:
+    """Fetch a raw Firestore document bypassing the store serialization layer."""
     with firestore_emulator_host(emulator_host):
         client = AsyncClient(project=project, credentials=AnonymousCredentials())
         try:

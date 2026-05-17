@@ -32,11 +32,13 @@ FIRESTORE_RESERVED_ID_RE = re.compile(r"__.*__")
 
 
 def _utf8_truncate(value: str, max_bytes: int) -> str:
+    """Truncate a string to a UTF-8 byte limit without splitting codepoints."""
     encoded = value.encode("utf-8")[:max_bytes]
     return encoded.decode("utf-8", errors="ignore")
 
 
 def _requires_firestore_id_sanitization(value: str) -> bool:
+    """Return True when a value violates Firestore collection/document ID rules."""
     return value == "" or "/" in value or value in (".", "..") or FIRESTORE_RESERVED_ID_RE.fullmatch(value) is not None
 
 
@@ -66,7 +68,7 @@ class FirestoreV1KeySanitizationStrategy(SanitizationStrategy):
     def validate(self, value: str) -> None:
         """Validate that the user value does not use reserved sanitizer prefixes."""
         if value.startswith((FIRESTORE_HASH_PREFIX, FIRESTORE_SANITIZED_PREFIX)):
-            msg = f"Keys cannot start with reserved prefixes '{FIRESTORE_HASH_PREFIX}' or '{FIRESTORE_SANITIZED_PREFIX}': {value}"
+            msg = f"Firestore IDs cannot start with reserved prefixes '{FIRESTORE_HASH_PREFIX}' or '{FIRESTORE_SANITIZED_PREFIX}': {value}"
             raise InvalidKeyError(msg)
 
 
@@ -159,7 +161,7 @@ class FirestoreStore(BaseContextManagerStore, BaseStore):
         self._database = database
         serialization_adapter = BasicSerializationAdapter(value_format="string")
 
-        if client:
+        if client is not None:
             self._client = client
             client_provided_by_user = True
         else:
