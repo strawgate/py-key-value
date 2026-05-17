@@ -113,6 +113,17 @@ def test_firestore_key_sanitizer_uses_utf8_byte_length_limit():
     assert len(sanitized.encode("utf-8")) <= 1500
 
 
+def test_firestore_key_sanitizer_truncates_changed_values_by_utf8_bytes():
+    """Keep sanitized changed IDs under Firestore's byte limit."""
+    strategy = FirestoreV1KeySanitizationStrategy()
+
+    sanitized = strategy.sanitize(("é" * 749) + "/")
+
+    assert sanitized.startswith("S_")
+    assert "/" not in sanitized
+    assert len(sanitized.encode("utf-8")) <= 1500
+
+
 @pytest.mark.parametrize("value", ["H_something", "S_something"])
 def test_firestore_key_sanitizer_rejects_reserved_prefixes(value: str):
     """Reject user keys that could collide with generated sanitizer prefixes."""
@@ -188,7 +199,8 @@ class TestFirestoreStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture
     async def store(self, setup_firestore: None, emulator_host: str, firestore_project: str) -> AsyncGenerator[FirestoreStore, None]:
         with firestore_emulator_host(emulator_host):
-            yield FirestoreStore(credentials=AnonymousCredentials(), project=firestore_project, default_collection="test")
+            async with FirestoreStore(credentials=AnonymousCredentials(), project=firestore_project, default_collection="test") as store:
+                yield store
 
     @override
     @pytest.mark.skip(reason="Distributed cloud stores are unbounded")
