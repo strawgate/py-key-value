@@ -37,9 +37,12 @@ except ImportError as e:
     raise ImportError(msg) from e
 
 if TYPE_CHECKING:
+    from azure.core.credentials import AzureNamedKeyCredential, AzureSasCredential
     from azure.core.credentials_async import AsyncTokenCredential
+
+    _AzureTablesCredential = AzureNamedKeyCredential | AzureSasCredential | AsyncTokenCredential
 else:
-    AsyncTokenCredential = Any
+    _AzureTablesCredential = Any
 
 
 # ---------------------------------------------------------------------------
@@ -54,18 +57,20 @@ else:
 # DCR client_ids ~32 chars, etc.) are well under this.
 _AZURE_PK_RK_MAX_LEN = 256
 _AZURE_PK_RK_FORBIDDEN_CHARS = frozenset("/\\#?")
-# ASCII chars below this code point are control characters. Used to filter
-# them out of PartitionKey/RowKey values per Azure Tables' documented limits.
-_CONTROL_CHAR_BOUNDARY = 0x20
+# Azure Tables disallows control characters in both ASCII control ranges.
+_C0_CONTROL_CHAR_BOUNDARY = 0x20
+_C1_CONTROL_CHAR_START = 0x7F
+_C1_CONTROL_CHAR_END = 0x9F
 
 
 class AzureTablesSanitizationStrategy(SanitizationStrategy):
     """Sanitize values for Azure Tables PartitionKey and RowKey fields.
 
     Azure Table Storage rejects PartitionKey/RowKey values that exceed its
-    URL/header limits or contain ``/``, ``\\``, ``#``, ``?``, or control
-    characters. Values that violate those constraints are replaced with a
-    deterministic ``H_``-prefixed SHA-256 digest.
+    URL/header limits or contain ``/``, ``\\``, ``#``, ``?``, C0 control
+    characters, or C1 control characters. Values that violate those
+    constraints are replaced with a deterministic ``H_``-prefixed SHA-256
+    digest.
 
     The reserved ``H_``/``S_`` prefixes match the repo's other sanitization
     strategies and prevent collisions between caller-provided safe strings and
@@ -93,7 +98,16 @@ class AzureTablesSanitizationStrategy(SanitizationStrategy):
     def _is_safe(self, value: str) -> bool:
         if len(value) > _AZURE_PK_RK_MAX_LEN:
             return False
-        return all(ch not in _AZURE_PK_RK_FORBIDDEN_CHARS and ord(ch) >= _CONTROL_CHAR_BOUNDARY for ch in value)
+        return all(_is_safe_key_character(ch) for ch in value)
+
+
+def _is_safe_key_character(value: str) -> bool:
+    code_point = ord(value)
+    return (
+        value not in _AZURE_PK_RK_FORBIDDEN_CHARS
+        and code_point >= _C0_CONTROL_CHAR_BOUNDARY
+        and not (_C1_CONTROL_CHAR_START <= code_point <= _C1_CONTROL_CHAR_END)
+    )
 
 
 def _expires_at_from_entity(value: Any) -> datetime | None:
@@ -114,8 +128,8 @@ def _service_from_connection_string(connection_string: str) -> TableServiceClien
     return TableServiceClient.from_connection_string(conn_str=connection_string)
 
 
-def _service_from_endpoint_and_credential(*, endpoint: str, credential: Any) -> TableServiceClient:
-    """Create a TableServiceClient from an explicit endpoint + AsyncTokenCredential."""
+def _service_from_endpoint_and_credential(*, endpoint: str, credential: _AzureTablesCredential) -> TableServiceClient:
+    """Create a TableServiceClient from an explicit endpoint + Azure credential."""
     return TableServiceClient(endpoint=endpoint, credential=credential)
 
 
@@ -134,8 +148,8 @@ class AzureTablesStore(BaseContextManagerStore, BaseStore):
         ExpiresAt    -> Unix epoch seconds (omitted when no TTL)
 
     Azure Table Storage rejects PartitionKey/RowKey values that exceed its
-    URL/header limits or contain ``/``, ``\\``, ``#``, ``?``, or control
-    characters. By default this store uses
+    URL/header limits or contain ``/``, ``\\``, ``#``, ``?``, C0 control
+    characters, or C1 control characters. By default this store uses
     ``AzureTablesSanitizationStrategy`` for collections and keys, so
     out-of-spec values are replaced with deterministic SHA-256 digests.
     Round-trips remain transparent (PUT and GET sanitize the same way), but
@@ -151,10 +165,11 @@ class AzureTablesStore(BaseContextManagerStore, BaseStore):
     2. ``connection_string`` - simplest path for dev / shared-key scenarios.
 
     3. ``account_name`` + ``credential`` - recommended for production.
-       ``credential`` should be an ``AsyncTokenCredential`` (e.g.
-       ``ManagedIdentityCredential``, ``WorkloadIdentityCredential``,
-       or ``DefaultAzureCredential`` from ``azure-identity``). Account URL
-       is derived as ``https://{account_name}.table.core.windows.net``.
+       ``credential`` may be ``AzureNamedKeyCredential``,
+       ``AzureSasCredential``, or an ``AsyncTokenCredential`` (e.g.
+       ``ManagedIdentityCredential``, ``WorkloadIdentityCredential``, or
+       ``DefaultAzureCredential`` from ``azure-identity``). Account URL is
+       derived as ``https://{account_name}.table.core.windows.net``.
 
     4. ``endpoint`` + ``credential`` - for Azurite (local emulator) or
        sovereign clouds where the endpoint isn't ``*.table.core.windows.net``.
@@ -168,7 +183,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseStore):
     _table_client: TableClient | None
     _connection_string: str | None
     _endpoint: str | None
-    _credential: AsyncTokenCredential | None
+    _credential: _AzureTablesCredential | None
     _table_name: str
     _auto_create: bool
 
@@ -228,7 +243,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseStore):
         self,
         *,
         account_name: str,
-        credential: AsyncTokenCredential,
+        credential: _AzureTablesCredential,
         table_name: str,
         endpoint: str | None = None,
         default_collection: str | None = None,
@@ -236,13 +251,13 @@ class AzureTablesStore(BaseContextManagerStore, BaseStore):
         key_sanitization_strategy: SanitizationStrategy | None = None,
         auto_create: bool = True,
     ) -> None:
-        """Initialize from an account name + AsyncTokenCredential.
+        """Initialize from an account name + Azure credential.
 
         Args:
             account_name: Storage account name (used to derive endpoint
                 unless ``endpoint`` is explicitly passed).
-            credential: An ``AsyncTokenCredential`` (e.g.
-                ``ManagedIdentityCredential``).
+            credential: An ``AzureNamedKeyCredential``,
+                ``AzureSasCredential``, or ``AsyncTokenCredential``.
             table_name: Table name.
             endpoint: Optional explicit endpoint. Use for Azurite (e.g.
                 ``http://127.0.0.1:10002/devstoreaccount1``) or sovereign
@@ -261,14 +276,14 @@ class AzureTablesStore(BaseContextManagerStore, BaseStore):
         self,
         *,
         endpoint: str,
-        credential: AsyncTokenCredential,
+        credential: _AzureTablesCredential,
         table_name: str,
         default_collection: str | None = None,
         collection_sanitization_strategy: SanitizationStrategy | None = None,
         key_sanitization_strategy: SanitizationStrategy | None = None,
         auto_create: bool = True,
     ) -> None:
-        """Initialize from an explicit endpoint + AsyncTokenCredential.
+        """Initialize from an explicit endpoint + Azure credential.
 
         Useful when the endpoint isn't ``{account}.table.core.windows.net``
         - Azurite, sovereign Azure clouds, custom DNS.
@@ -280,7 +295,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseStore):
         client: TableClient | None = None,
         connection_string: str | None = None,
         account_name: str | None = None,
-        credential: AsyncTokenCredential | None = None,
+        credential: _AzureTablesCredential | None = None,
         endpoint: str | None = None,
         table_name: str | None = None,
         default_collection: str | None = None,

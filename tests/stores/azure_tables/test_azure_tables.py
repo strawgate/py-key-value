@@ -85,11 +85,12 @@ def test_azure_tables_sanitization_strategy_hashes_unsafe_values() -> None:
 
     assert strategy.sanitize("safe_key") == "safe_key"
 
-    sanitized = strategy.sanitize("unsafe/key")
-    assert sanitized.startswith("H_")
-    assert len(sanitized) == 66
-    assert strategy.sanitize("unsafe/key") == sanitized
-    assert strategy.try_unsanitize(sanitized) is None
+    for unsafe in ("unsafe/key", "bad\x1fkey", "bad\x7fkey", "bad\u0085key"):
+        sanitized = strategy.sanitize(unsafe)
+        assert sanitized.startswith("H_")
+        assert len(sanitized) == 66
+        assert strategy.sanitize(unsafe) == sanitized
+        assert strategy.try_unsanitize(sanitized) is None
 
 
 def test_azure_tables_sanitization_strategy_rejects_reserved_prefixes() -> None:
