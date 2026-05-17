@@ -16,7 +16,7 @@ checking ExpiresAt on read (lazy expire).
 import contextlib
 import hashlib
 from datetime import datetime, timezone
-from typing import Any, overload
+from typing import TYPE_CHECKING, Any, overload
 
 from typing_extensions import override
 
@@ -25,16 +25,21 @@ from key_value.aio._utils.sanitization import SanitizationStrategy
 from key_value.aio.errors import InvalidKeyError
 from key_value.aio.stores.base import (
     BaseContextManagerStore,
+    BaseStore,
 )
 
 try:
-    from azure.core.credentials_async import AsyncTokenCredential
     from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
     from azure.data.tables import EdmType, EntityProperty, UpdateMode
     from azure.data.tables.aio import TableClient, TableServiceClient
 except ImportError as e:
     msg = "AzureTablesStore requires py-key-value-aio[azure-tables]"
     raise ImportError(msg) from e
+
+if TYPE_CHECKING:
+    from azure.core.credentials_async import AsyncTokenCredential
+else:
+    AsyncTokenCredential = Any
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +114,7 @@ def _service_from_connection_string(connection_string: str) -> TableServiceClien
     return TableServiceClient.from_connection_string(conn_str=connection_string)
 
 
-def _service_from_endpoint_and_credential(*, endpoint: str, credential: AsyncTokenCredential) -> TableServiceClient:
+def _service_from_endpoint_and_credential(*, endpoint: str, credential: Any) -> TableServiceClient:
     """Create a TableServiceClient from an explicit endpoint + AsyncTokenCredential."""
     return TableServiceClient(endpoint=endpoint, credential=credential)
 
@@ -119,7 +124,7 @@ def _service_from_endpoint_and_credential(*, endpoint: str, credential: AsyncTok
 # ---------------------------------------------------------------------------
 
 
-class AzureTablesStore(BaseContextManagerStore):
+class AzureTablesStore(BaseContextManagerStore, BaseStore):
     """Azure Table Storage-backed async key-value store.
 
     Schema:

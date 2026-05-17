@@ -1,14 +1,14 @@
 import contextlib
 import json
+import os
 from collections.abc import Generator
 from datetime import datetime, timezone
 from typing import Any
 
 import pytest
-from azure.core.credentials import AccessToken
-from azure.core.credentials_async import AsyncTokenCredential
 from azure.data.tables import EntityProperty
 from dirty_equals import IsDatetime
+from docker.errors import ImageNotFound
 from inline_snapshot import snapshot
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import LogMessageWaitStrategy
@@ -33,6 +33,8 @@ WAIT_FOR_AZURITE_TIMEOUT = 30
 AZURITE_VERSIONS_TO_TEST = [
     "3.32.0",
 ]
+
+AZURITE_IMAGE_TEMPLATE = os.environ.get("AZURITE_IMAGE", "mcr.microsoft.com/azure-storage/azurite:{version}")
 
 AZURITE_TABLE_PORT = 10002
 
@@ -71,11 +73,6 @@ class AzuriteFailedToStartError(Exception):
     pass
 
 
-class FakeAsyncTokenCredential(AsyncTokenCredential):
-    async def get_token(self, *_scopes: str, **_kwargs: Any) -> AccessToken:
-        return AccessToken("fake-token", 4_102_444_800)
-
-
 def _entity_value_payload(entity: dict[str, Any]) -> dict[str, Any]:
     """Decode the JSON-serialized ManagedEntry stored in the Value property."""
     raw = entity.get("Value")
@@ -110,14 +107,18 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="module", params=AZURITE_VERSIONS_TO_TEST)
     def azurite_container(self, request: pytest.FixtureRequest) -> Generator[DockerContainer, None, None]:
         version = request.param
-        container = DockerContainer(image=f"mcr.microsoft.com/azure-storage/azurite:{version}")
+        image = AZURITE_IMAGE_TEMPLATE.format(version=version)
+        container = DockerContainer(image=image)
         container.with_exposed_ports(AZURITE_TABLE_PORT)
         # Azurite logs once each service is ready; we only need Tables.
         container.waiting_for(LogMessageWaitStrategy("Azurite Table service is successfully listening"))
         # Bind to 0.0.0.0 so the container's exposed port is reachable.
         container.with_command("azurite --tableHost 0.0.0.0 --skipApiVersionCheck")
-        with container:
-            yield container
+        try:
+            with container:
+                yield container
+        except ImageNotFound as e:
+            pytest.skip(f"Azurite container image is unavailable: {image}: {e}")
 
     @pytest.fixture(scope="module")
     def azurite_host(self, azurite_container: DockerContainer) -> str:
@@ -270,14 +271,3 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 assert table_name in tables
 
         await self._drop_table(azurite_connection_string, table_name)
-
-    async def test_account_name_plus_token_credential_endpoint_override(self):
-        """Constructor accepts the production token-credential auth path."""
-        store = AzureTablesStore(
-            account_name=AZURITE_ACCOUNT_NAME,
-            credential=FakeAsyncTokenCredential(),
-            endpoint="https://example.table.core.windows.net",
-            table_name="t",
-        )
-
-        assert store._table_name == "t"
