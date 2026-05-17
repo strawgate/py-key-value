@@ -699,12 +699,14 @@ pip install py-key-value-aio[azure-tables]
 - Serverless / managed infrastructure
 - Low-cost persistent state
 - Managed Identity authentication
+- OAuth/session state on Azure Container Apps
 
 **Characteristics:**
 
 - Fully managed
 - Pay-per-use pricing
-- No native TTL; use lazy expiry and explicit `cull()`
+- No native background TTL; entries are lazily expired on read
+- Sanitizes PartitionKey/RowKey values for Azure Tables limits
 - Stable storage format: **Unstable**
 
 ---

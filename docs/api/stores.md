@@ -68,6 +68,13 @@ Azure Table Storage-backed key-value store.
       members:
         - __init__
 
+::: key_value.aio.stores.azure_tables.AzureTablesSanitizationStrategy
+    options:
+      show_source: false
+      members:
+        - sanitize
+        - validate
+
 ## S3 Store
 
 AWS S3-backed key-value store.

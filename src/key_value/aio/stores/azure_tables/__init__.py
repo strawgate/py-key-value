@@ -1,3 +1,3 @@
-from key_value.aio.stores.azure_tables.store import AzureTablesStore
+from key_value.aio.stores.azure_tables.store import AzureTablesSanitizationStrategy, AzureTablesStore
 
-__all__ = ["AzureTablesStore"]
+__all__ = ["AzureTablesSanitizationStrategy", "AzureTablesStore"]

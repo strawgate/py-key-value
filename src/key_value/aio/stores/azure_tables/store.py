@@ -10,8 +10,7 @@ collection/key model:
     ExpiresAt    = epoch seconds (set only for entries with TTL)
 
 Azure Table Storage has no native TTL; this store handles expiry by
-checking ExpiresAt on read (lazy expire) and exposing an explicit
-``cull()`` for full sweeps.
+checking ExpiresAt on read (lazy expire).
 """
 
 import contextlib
@@ -22,9 +21,10 @@ from typing import Any, overload
 from typing_extensions import override
 
 from key_value.aio._utils.managed_entry import ManagedEntry
+from key_value.aio._utils.sanitization import SanitizationStrategy
+from key_value.aio.errors import InvalidKeyError
 from key_value.aio.stores.base import (
     BaseContextManagerStore,
-    BaseCullStore,
 )
 
 try:
@@ -54,25 +54,41 @@ _AZURE_PK_RK_FORBIDDEN_CHARS = frozenset("/\\#?")
 _CONTROL_CHAR_BOUNDARY = 0x20
 
 
-def _is_safe_pk_or_rk(value: str) -> bool:
-    """Return True iff the value is a valid Azure Tables PartitionKey/RowKey."""
-    if len(value) > _AZURE_PK_RK_MAX_LEN:
-        return False
-    return all(ch not in _AZURE_PK_RK_FORBIDDEN_CHARS and ord(ch) >= _CONTROL_CHAR_BOUNDARY for ch in value)
+class AzureTablesSanitizationStrategy(SanitizationStrategy):
+    """Sanitize values for Azure Tables PartitionKey and RowKey fields.
 
+    Azure Table Storage rejects PartitionKey/RowKey values that exceed its
+    URL/header limits or contain ``/``, ``\\``, ``#``, ``?``, or control
+    characters. Values that violate those constraints are replaced with a
+    deterministic ``H_``-prefixed SHA-256 digest.
 
-def _safe_pk_or_rk(value: str) -> str:
-    """Sanitize a string for use as an Azure Tables PartitionKey/RowKey.
-
-    Returns the input unchanged when it satisfies Azure's constraints; otherwise
-    a deterministic SHA-256 hex digest of the original. The hash is stable, so
-    PUT/GET round-trips with the same caller-side string land on the same
-    storage key. This is not a strict one-to-one mapping: a literal safe key can
-    still collide with the digest of a different unsafe key.
+    The reserved ``H_``/``S_`` prefixes match the repo's other sanitization
+    strategies and prevent collisions between caller-provided safe strings and
+    generated sanitized keys.
     """
-    if _is_safe_pk_or_rk(value):
+
+    def sanitize(self, value: str) -> str:
+        """Return the original value if safe, otherwise a stable hashed key."""
+        if self._is_safe(value):
+            return value
+        return "H_" + hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+    def validate(self, value: str) -> None:
+        """Reject values that could collide with generated sanitized keys."""
+        if value.startswith(("H_", "S_")):
+            msg = f"Azure Tables keys cannot start with reserved prefixes 'H_' or 'S_': {value}"
+            raise InvalidKeyError(msg)
+
+    def try_unsanitize(self, value: str) -> str | None:
+        """Return unchanged safe values; hashed values are not reversible."""
+        if value.startswith(("H_", "S_")):
+            return None
         return value
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+    def _is_safe(self, value: str) -> bool:
+        if len(value) > _AZURE_PK_RK_MAX_LEN:
+            return False
+        return all(ch not in _AZURE_PK_RK_FORBIDDEN_CHARS and ord(ch) >= _CONTROL_CHAR_BOUNDARY for ch in value)
 
 
 def _expires_at_from_entity(value: Any) -> datetime | None:
@@ -103,7 +119,7 @@ def _service_from_endpoint_and_credential(*, endpoint: str, credential: AsyncTok
 # ---------------------------------------------------------------------------
 
 
-class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
+class AzureTablesStore(BaseContextManagerStore):
     """Azure Table Storage-backed async key-value store.
 
     Schema:
@@ -114,11 +130,11 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
 
     Azure Table Storage rejects PartitionKey/RowKey values that exceed its
     URL/header limits or contain ``/``, ``\\``, ``#``, ``?``, or control
-    characters. When a caller-supplied collection or key violates those
-    constraints, the store silently substitutes a deterministic SHA-256 hex
-    digest of the original. Round-trips remain transparent (PUT and GET hash
-    the same way), but direct table inspection will show the digest rather
-    than the source string for those entries.
+    characters. By default this store uses
+    ``AzureTablesSanitizationStrategy`` for collections and keys, so
+    out-of-spec values are replaced with deterministic SHA-256 digests.
+    Round-trips remain transparent (PUT and GET sanitize the same way), but
+    direct table inspection will show the sanitized values for those entries.
 
     Authentication patterns (mirrors DynamoDB's flexibility):
 
@@ -138,13 +154,9 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
     4. ``endpoint`` + ``credential`` - for Azurite (local emulator) or
        sovereign clouds where the endpoint isn't ``*.table.core.windows.net``.
 
-    TTL: Azure Table Storage has no native TTL. Two-pronged handling:
-      * Lazy expire on read - storage-side ExpiresAt is mirrored back onto
-        the ManagedEntry so the base class's expiry logic applies as usual.
-      * Explicit ``cull()`` - implemented via BaseCullStore. Scans for
-        entries with ``ExpiresAt < now`` and deletes them. Use on demand
-        when the table accumulates stale entries; for low-write workloads
-        like FastMCP OAuth state most callers won't need it.
+    TTL: Azure Table Storage has no native TTL. Storage-side ExpiresAt is
+    mirrored back onto the ManagedEntry on read so the base class's expiry
+    logic applies as usual.
     """
 
     _service: TableServiceClient | None
@@ -161,6 +173,8 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         *,
         client: TableClient,
         default_collection: str | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
         auto_create: bool = True,
     ) -> None:
         """Initialize from a pre-constructed TableClient.
@@ -170,6 +184,10 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
                 will neither enter nor exit its async context.
             default_collection: Default collection name. Defaults to
                 "default_collection".
+            collection_sanitization_strategy: Strategy for Azure Tables
+                PartitionKey values. Defaults to AzureTablesSanitizationStrategy.
+            key_sanitization_strategy: Strategy for Azure Tables RowKey values.
+                Defaults to AzureTablesSanitizationStrategy.
             auto_create: If True, attempt to create the table during setup.
                 Existing tables are tolerated. If False, a missing table at
                 setup time is reported as a ``StoreSetupError`` (wrapping a
@@ -183,6 +201,8 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         connection_string: str,
         table_name: str,
         default_collection: str | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
         auto_create: bool = True,
     ) -> None:
         """Initialize from a connection string.
@@ -191,6 +211,10 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
             connection_string: Azure Storage connection string.
             table_name: Table name.
             default_collection: Default collection name.
+            collection_sanitization_strategy: Strategy for Azure Tables
+                PartitionKey values. Defaults to AzureTablesSanitizationStrategy.
+            key_sanitization_strategy: Strategy for Azure Tables RowKey values.
+                Defaults to AzureTablesSanitizationStrategy.
             auto_create: Whether to create the table if missing.
         """
 
@@ -203,6 +227,8 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         table_name: str,
         endpoint: str | None = None,
         default_collection: str | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
         auto_create: bool = True,
     ) -> None:
         """Initialize from an account name + AsyncTokenCredential.
@@ -218,6 +244,10 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
                 clouds. Defaults to
                 ``https://{account_name}.table.core.windows.net``.
             default_collection: Default collection name.
+            collection_sanitization_strategy: Strategy for Azure Tables
+                PartitionKey values. Defaults to AzureTablesSanitizationStrategy.
+            key_sanitization_strategy: Strategy for Azure Tables RowKey values.
+                Defaults to AzureTablesSanitizationStrategy.
             auto_create: Whether to create the table if missing.
         """
 
@@ -229,6 +259,8 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         credential: AsyncTokenCredential,
         table_name: str,
         default_collection: str | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
         auto_create: bool = True,
     ) -> None:
         """Initialize from an explicit endpoint + AsyncTokenCredential.
@@ -247,6 +279,8 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         endpoint: str | None = None,
         table_name: str | None = None,
         default_collection: str | None = None,
+        collection_sanitization_strategy: SanitizationStrategy | None = None,
+        key_sanitization_strategy: SanitizationStrategy | None = None,
         auto_create: bool = True,
     ) -> None:
         """See the overloaded signatures above for argument documentation."""
@@ -301,6 +335,8 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
 
         super().__init__(
             default_collection=default_collection,
+            collection_sanitization_strategy=collection_sanitization_strategy or AzureTablesSanitizationStrategy(),
+            key_sanitization_strategy=key_sanitization_strategy or AzureTablesSanitizationStrategy(),
             client_provided_by_user=client_provided,
         )
 
@@ -310,6 +346,10 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
             msg = "Table client is not connected. Use the store as an async context manager or call setup()."
             raise ValueError(msg)
         return self._table_client
+
+    def _get_destination(self, *, collection: str, key: str) -> tuple[str, str]:
+        """Return sanitized Azure Tables PartitionKey and RowKey values."""
+        return self._sanitize_collection_and_key(collection=collection, key=key)
 
     @override
     async def _setup(self) -> None:
@@ -361,8 +401,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:
         """Retrieve a managed entry from Azure Tables."""
-        pk = _safe_pk_or_rk(collection)
-        rk = _safe_pk_or_rk(key)
+        pk, rk = self._get_destination(collection=collection, key=key)
         try:
             entity: dict[str, Any] = await self._connected_table_client.get_entity(  # pyright: ignore[reportUnknownMemberType]
                 partition_key=pk,
@@ -398,8 +437,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         """Store a managed entry in Azure Tables (REPLACE semantics)."""
         json_value: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
-        pk = _safe_pk_or_rk(collection)
-        rk = _safe_pk_or_rk(key)
+        pk, rk = self._get_destination(collection=collection, key=key)
         entity: dict[str, Any] = {
             "PartitionKey": pk,
             "RowKey": rk,
@@ -429,8 +467,7 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
         gives the AsyncKeyValue contract semantics - True iff we actually
         removed something.
         """
-        pk = _safe_pk_or_rk(collection)
-        rk = _safe_pk_or_rk(key)
+        pk, rk = self._get_destination(collection=collection, key=key)
         try:
             await self._connected_table_client.get_entity(  # pyright: ignore[reportUnknownMemberType]
                 partition_key=pk,
@@ -450,36 +487,3 @@ class AzureTablesStore(BaseContextManagerStore, BaseCullStore):
             # DELETE. Treat as "we didn't actually delete it" since they did.
             return False
         return True
-
-    @override
-    async def _cull(self) -> None:
-        """Scan and delete entries whose ExpiresAt is in the past.
-
-        Azure Table Storage has no native TTL, so this is a manual sweep.
-        Use on demand when the table accumulates stale entries. Low-write
-        workloads (e.g. OAuth state) typically don't need it.
-        """
-        now_epoch = int(datetime.now(tz=timezone.utc).timestamp())
-        query_filter = "ExpiresAt lt @now"
-        parameters: dict[str, Any] = {"now": now_epoch}
-
-        async for entity in self._connected_table_client.query_entities(  # pyright: ignore[reportUnknownMemberType]
-            query_filter=query_filter,
-            parameters=parameters,
-        ):
-            partition_key = entity.get("PartitionKey")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            row_key = entity.get("RowKey")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            if not (isinstance(partition_key, str) and isinstance(row_key, str)):
-                continue
-            try:
-                # PartitionKey/RowKey here come straight from a stored entity
-                # so they're already in their sanitized form - no need to
-                # re-apply _safe_pk_or_rk.
-                await self._connected_table_client.delete_entity(
-                    partition_key=partition_key,
-                    row_key=row_key,
-                )
-            except ResourceNotFoundError:
-                # Race - already deleted by lazy-expire-on-read or another
-                # cull. Tolerable; cull's contract is best-effort cleanup.
-                continue

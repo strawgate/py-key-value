@@ -7,17 +7,16 @@ from typing import Any
 import pytest
 from azure.core.credentials import AccessToken
 from azure.core.credentials_async import AsyncTokenCredential
-from azure.data.tables import EdmType, EntityProperty, UpdateMode
+from azure.data.tables import EntityProperty
 from dirty_equals import IsDatetime
 from inline_snapshot import snapshot
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
-from key_value.aio._utils.managed_entry import ManagedEntry
 from key_value.aio._utils.wait import async_wait_for_true
-from key_value.aio.errors import StoreSetupError
-from key_value.aio.stores.azure_tables import AzureTablesStore
+from key_value.aio.errors import InvalidKeyError, StoreSetupError
+from key_value.aio.stores.azure_tables import AzureTablesSanitizationStrategy, AzureTablesStore
 from key_value.aio.stores.base import BaseStore
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
@@ -82,6 +81,27 @@ def _entity_value_payload(entity: dict[str, Any]) -> dict[str, Any]:
     raw = entity.get("Value")
     assert isinstance(raw, str)
     return json.loads(raw)
+
+
+def test_azure_tables_sanitization_strategy_hashes_unsafe_values() -> None:
+    strategy = AzureTablesSanitizationStrategy()
+
+    assert strategy.sanitize("safe_key") == "safe_key"
+
+    sanitized = strategy.sanitize("unsafe/key")
+    assert sanitized.startswith("H_")
+    assert len(sanitized) == 66
+    assert strategy.sanitize("unsafe/key") == sanitized
+    assert strategy.try_unsanitize(sanitized) is None
+
+
+def test_azure_tables_sanitization_strategy_rejects_reserved_prefixes() -> None:
+    strategy = AzureTablesSanitizationStrategy()
+
+    with pytest.raises(InvalidKeyError):
+        strategy.validate("H_user_provided")
+    with pytest.raises(InvalidKeyError):
+        strategy.validate("S_user_provided")
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")
@@ -195,6 +215,25 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
         assert expires_at_value > now.timestamp(), "ExpiresAt should be in the future"
         assert expires_at_value < now_before_put.timestamp() + 10 + 1, "ExpiresAt should be within the configured TTL window"
 
+    async def test_sanitized_collection_and_key_are_stored(self, store: AzureTablesStore, azurite_connection_string: str):
+        """Out-of-spec collection/key values use the Azure Tables sanitization strategy."""
+        from azure.data.tables.aio import TableServiceClient
+
+        collection = "tenant/with/slashes"
+        key = "oauth?state#fragment"
+        await store.put(collection=collection, key=key, value={"name": "Alice"})
+
+        strategy = AzureTablesSanitizationStrategy()
+        expected_pk = strategy.sanitize(collection)
+        expected_rk = strategy.sanitize(key)
+
+        async with TableServiceClient.from_connection_string(conn_str=azurite_connection_string) as service:
+            table = service.get_table_client(table_name=AZURITE_TEST_TABLE)
+            entity: dict[str, Any] = await table.get_entity(partition_key=expected_pk, row_key=expected_rk)  # pyright: ignore[reportUnknownMemberType]
+
+        assert _entity_value_payload(entity)["value"] == {"name": "Alice"}
+        assert await store.get(collection=collection, key=key) == {"name": "Alice"}
+
     async def test_auto_create_false_raises_when_table_missing(self, setup_azurite: None, azurite_connection_string: str):
         """auto_create=False must error when the table doesn't exist."""
         table_name = "kvstoretestautocreatefalse"
@@ -229,53 +268,6 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
             async with TableServiceClient.from_connection_string(conn_str=azurite_connection_string) as service:
                 tables = [t.name async for t in service.list_tables()]  # pyright: ignore[reportUnknownMemberType]
                 assert table_name in tables
-
-        await self._drop_table(azurite_connection_string, table_name)
-
-    async def test_cull_deletes_expired(self, setup_azurite: None, azurite_connection_string: str):
-        """_cull() removes entries whose ExpiresAt is in the past, leaves
-        un-TTLed and non-expired entries alone."""
-        table_name = "kvstoretestcull"
-        await self._drop_table(azurite_connection_string, table_name)
-
-        store = AzureTablesStore(
-            connection_string=azurite_connection_string,
-            table_name=table_name,
-        )
-        async with store:
-            # No TTL — should survive cull.
-            await store.put(collection="c", key="permanent", value={"v": 1})
-            # Long TTL — should survive.
-            await store.put(collection="c", key="long", value={"v": 2}, ttl=60)
-            # Already-expired row — should be removed without a timing wait.
-            expired_at = datetime.now(timezone.utc)
-            expired_entry = ManagedEntry(
-                value={"v": 3},
-                created_at=expired_at,
-                expires_at=expired_at,
-            )
-            await store._connected_table_client.upsert_entity(  # pyright: ignore[reportUnknownMemberType]
-                entity={
-                    "PartitionKey": "c",
-                    "RowKey": "short",
-                    "Value": store._serialization_adapter.dump_json(
-                        entry=expired_entry,
-                        key="short",
-                        collection="c",
-                    ),
-                    "ExpiresAt": EntityProperty(
-                        int(expired_at.timestamp()) - 1,
-                        EdmType.INT64,
-                    ),
-                },
-                mode=UpdateMode.REPLACE,
-            )
-
-            await store.cull()
-
-            assert await store.get(collection="c", key="permanent") == {"v": 1}
-            assert await store.get(collection="c", key="long") == {"v": 2}
-            assert await store.get(collection="c", key="short") is None
 
         await self._drop_table(azurite_connection_string, table_name)
 
