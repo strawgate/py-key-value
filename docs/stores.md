@@ -597,6 +597,22 @@ from key_value.aio.stores.valkey import ValkeyStore
 store = ValkeyStore(host="localhost", port=6379)
 ```
 
+For Valkey Cluster deployments, pass a GLIDE cluster configuration. The store
+will create the `GlideClusterClient` lazily on first use, so applications can
+configure the store before an async event loop is running:
+
+```python
+from glide_shared.config import GlideClusterClientConfiguration, NodeAddress
+
+from key_value.aio.stores.valkey import ValkeyStore
+
+cluster_store = ValkeyStore(
+    config=GlideClusterClientConfiguration(
+        addresses=[NodeAddress("valkey-cluster.example.com", 6379)]
+    )
+)
+```
+
 **Installation:**
 
 ```bash
@@ -614,6 +630,7 @@ pip install py-key-value-aio[valkey]
 - Redis-compatible
 - Open-source governance
 - Production-ready
+- Standalone and cluster-mode GLIDE clients
 - **Stable storage format**
 
 ---

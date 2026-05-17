@@ -93,6 +93,11 @@ Valkey-backed key-value store (Redis-compatible).
       members:
         - __init__
 
+Valkey Cluster deployments can be configured by passing a
+`GlideClusterClientConfiguration` to `ValkeyStore(config=...)`. The store
+creates the corresponding `GlideClusterClient` during async setup instead of
+requiring callers to create a connected client up front.
+
 ## Memcached Store
 
 Memcached-backed key-value store.

@@ -38,8 +38,19 @@ def _create_valkey_client_config(
     return GlideClientConfiguration(addresses=addresses, database_id=db, credentials=credentials)
 
 
-async def _create_valkey_client(config: GlideClientConfiguration | GlideClusterClientConfiguration) -> GlideClient:
+@overload
+async def _create_valkey_client(config: GlideClientConfiguration) -> GlideClient: ...
+
+
+@overload
+async def _create_valkey_client(config: GlideClusterClientConfiguration) -> GlideClusterClient: ...
+
+
+async def _create_valkey_client(config: GlideClientConfiguration | GlideClusterClientConfiguration) -> BaseClient:
     """Create a Valkey client from configuration."""
+    if isinstance(config, GlideClusterClientConfiguration):
+        return await GlideClusterClient.create(config=config)
+
     return await GlideClient.create(config=config)
 
 
@@ -72,6 +83,14 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
     def __init__(
         self,
         *,
+        config: GlideClientConfiguration | GlideClusterClientConfiguration,
+        default_collection: str | None = None,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        *,
         host: str = "localhost",
         port: int = 6379,
         db: int = 0,
@@ -84,6 +103,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
         self,
         *,
         client: BaseClient | None = None,
+        config: GlideClientConfiguration | GlideClusterClientConfiguration | None = None,
         default_collection: str | None = None,
         host: str = "localhost",
         port: int = 6379,
@@ -97,6 +117,9 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
             client: An existing Valkey client to use (GlideClient or GlideClusterClient).
                 If provided, the store will not manage the client's lifecycle (will not
                 close it). The caller is responsible for managing the client's lifecycle.
+            config: A GLIDE client configuration to connect lazily on first use.
+                Pass ``GlideClientConfiguration`` for standalone Valkey or
+                ``GlideClusterClientConfiguration`` for cluster-mode Valkey.
             default_collection: The default collection to use if no collection is provided.
             host: Valkey host. Defaults to localhost.
             port: Valkey port. Defaults to 6379.
@@ -105,13 +128,21 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
             password: Valkey password. Defaults to None.
 
         Note:
-            When using a cluster client, the host/port/db parameters are ignored.
-            You must provide a pre-configured GlideClusterClient instance.
+            When using ``config`` or an existing ``client``, the host/port/db
+            parameters are ignored.
         """
         client_provided = client is not None
 
+        if client is not None and config is not None:
+            msg = "client and config are mutually exclusive"
+            raise ValueError(msg)
+
         if client is not None:
             self._connected_client = client
+            self._client_config = None
+        elif config is not None:
+            self._client_config = config
+            self._connected_client = None
         else:
             self._client_config = _create_valkey_client_config(host=host, port=port, db=db, username=username, password=password)
             self._connected_client = None
