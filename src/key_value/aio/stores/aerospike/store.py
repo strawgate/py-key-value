@@ -54,10 +54,16 @@ def _put_aerospike_record(
     aerospike_key: tuple[str, str, str],
     bins: dict[str, Any],
     meta: dict[str, Any] | None = None,
+    policy: dict[str, Any] | None = None,
 ) -> None:
     """Put a record into Aerospike."""
     if meta:
-        client.put(aerospike_key, bins, meta=meta)  # pyright: ignore[reportUnknownMemberType]
+        if policy:
+            client.put(aerospike_key, bins, meta=meta, policy=policy)  # pyright: ignore[reportUnknownMemberType]
+        else:
+            client.put(aerospike_key, bins, meta=meta)  # pyright: ignore[reportUnknownMemberType]
+    elif policy:
+        client.put(aerospike_key, bins, policy=policy)  # pyright: ignore[reportUnknownMemberType]
     else:
         client.put(aerospike_key, bins)  # pyright: ignore[reportUnknownMemberType]
 
@@ -274,12 +280,12 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
 
         bins = {"value": json_value}
 
-        meta = None
+        policy = None
         if managed_entry.ttl is not None:
             # Aerospike TTL is in seconds
-            meta = {"ttl": int(managed_entry.ttl)}
+            policy = {"ttl": int(managed_entry.ttl)}
 
-        _put_aerospike_record(self._client, aerospike_key, bins, meta=meta)
+        _put_aerospike_record(self._client, aerospike_key, bins, policy=policy)
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:

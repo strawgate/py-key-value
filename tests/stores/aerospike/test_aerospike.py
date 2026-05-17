@@ -1,13 +1,15 @@
 import contextlib
 import sys
 from collections.abc import AsyncGenerator, Generator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
+from key_value.aio._utils.managed_entry import ManagedEntry
+from key_value.aio._utils.serialization import BasicSerializationAdapter
 from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
 from tests.conftest import should_skip_docker_tests
@@ -47,6 +49,39 @@ async def ping_aerospike(host: str, port: int) -> bool:
 
 class AerospikeFailedToStartError(Exception):
     pass
+
+
+async def test_put_managed_entry_sets_ttl_via_write_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+    from key_value.aio.stores.aerospike import AerospikeStore
+    from key_value.aio.stores.aerospike import store as aerospike_store_module
+
+    captured: dict[str, Any] = {}
+
+    def record_put_call(
+        client: Any,
+        aerospike_key: tuple[str, str, str],
+        bins: dict[str, Any],
+        meta: dict[str, Any] | None = None,
+        policy: dict[str, Any] | None = None,
+    ) -> None:
+        captured.update(client=client, aerospike_key=aerospike_key, bins=bins, meta=meta, policy=policy)
+
+    monkeypatch.setattr(aerospike_store_module, "_put_aerospike_record", record_put_call)
+    store = object.__new__(AerospikeStore)
+    store._namespace = "test"
+    store._set = "set"
+    store._client = cast("Any", object())
+    store._serialization_adapter = BasicSerializationAdapter()
+
+    await AerospikeStore._put_managed_entry(
+        store,
+        collection="collection",
+        key="key",
+        managed_entry=ManagedEntry.from_ttl(value={"value": "test"}, ttl=5),
+    )
+
+    assert captured["meta"] is None
+    assert 0 < captured["policy"]["ttl"] <= 5
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")

@@ -4,11 +4,11 @@ version = "0.4.4"
 description = "Async Key-Value Store - A pluggable interface for KV Stores"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["uv_build>=0.11.4"]
+requires = ["uv_build>=0.11.4,<0.12"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
@@ -95,6 +95,10 @@ addopts = [
 ]
 markers = [
     "skip_on_ci: Skip running the test when running on CI",
+]
+filterwarnings = [
+    "ignore:The @wait_container_is_ready decorator is deprecated.*:DeprecationWarning",
+    "ignore:enable_cleanup_closed ignored because.*:DeprecationWarning:aiohttp.connector",
 ]
 timeout = 10
 timeout_func_only = true

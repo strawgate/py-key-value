@@ -28,7 +28,7 @@ def try_import() -> Iterator[Callable[[], bool]]:
 
 def async_running_in_event_loop() -> bool:
     try:
-        asyncio.get_event_loop_policy().get_event_loop()
+        asyncio.get_running_loop()
     except RuntimeError:
         return False
     return True

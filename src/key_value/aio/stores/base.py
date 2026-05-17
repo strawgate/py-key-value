@@ -492,10 +492,12 @@ class BaseContextManagerStore(BaseStore, ABC):
         This override ensures the exit stack is entered before the store's _setup()
         method is called, allowing stores to register cleanup callbacks during setup.
         """
-        # Ensure exit stack is entered
         await self._ensure_exit_stack_entered()
-        # Call parent setup
-        await super().setup()
+        try:
+            await super().setup()
+        except Exception:
+            await self.close()
+            raise
 
 
 class BaseEnumerateCollectionsStore(BaseStore, AsyncEnumerateCollectionsProtocol, ABC):
