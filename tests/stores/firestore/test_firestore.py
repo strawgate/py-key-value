@@ -1,7 +1,7 @@
 import os
 import uuid
 import warnings
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Generator
 from contextlib import contextmanager
 from typing import Any
 
@@ -186,10 +186,9 @@ class TestFirestoreStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @override
     @pytest.fixture
-    async def store(self, setup_firestore: None, emulator_host: str, firestore_project: str) -> FirestoreStore:
-        # Set the emulator host environment variable for the store
-        os.environ["FIRESTORE_EMULATOR_HOST"] = emulator_host
-        return FirestoreStore(credentials=AnonymousCredentials(), project=firestore_project, default_collection="test")
+    async def store(self, setup_firestore: None, emulator_host: str, firestore_project: str) -> AsyncGenerator[FirestoreStore, None]:
+        with firestore_emulator_host(emulator_host):
+            yield FirestoreStore(credentials=AnonymousCredentials(), project=firestore_project, default_collection="test")
 
     @override
     @pytest.mark.skip(reason="Distributed cloud stores are unbounded")
