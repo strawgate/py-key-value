@@ -9,7 +9,6 @@ from elastic_transport import ApiResponseMeta, HttpHeaders, NodeConfig
 from elasticsearch import AsyncElasticsearch, BadRequestError
 from inline_snapshot import snapshot
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio._utils.managed_entry import ManagedEntry
@@ -23,7 +22,7 @@ from key_value.aio.stores.elasticsearch.store import (
     ElasticsearchV1CollectionSanitizationStrategy,
     ElasticsearchV1KeySanitizationStrategy,
 )
-from tests.conftest import should_skip_docker_tests
+from tests.conftest import run_container_with_log_wait, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 if TYPE_CHECKING:
@@ -160,8 +159,7 @@ class TestElasticsearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         container.with_env("xpack.security.enabled", "false")
         # Set memory limits via JVM options
         container.with_env("ES_JAVA_OPTS", "-Xms1g -Xmx1g")
-        container.waiting_for(LogMessageWaitStrategy("started").with_startup_timeout(120))
-        with container:
+        with run_container_with_log_wait(container, "started", timeout=120):
             yield container
 
     @pytest.fixture(scope="module")

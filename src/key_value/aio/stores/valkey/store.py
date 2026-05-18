@@ -8,12 +8,21 @@ from key_value.aio._utils.managed_entry import ManagedEntry
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
 
 try:
-    from glide.glide_client import BaseClient, GlideClient, GlideClusterClient
-    from glide_shared.commands.core_options import ExpirySet, ExpiryType
-    from glide_shared.config import GlideClientConfiguration, GlideClusterClientConfiguration, NodeAddress, ServerCredentials
+    from glide import (
+        ExpirySet,
+        ExpiryType,
+        GlideClient,
+        GlideClientConfiguration,
+        GlideClusterClient,
+        GlideClusterClientConfiguration,
+        NodeAddress,
+        ServerCredentials,
+    )
 except ImportError as e:
     msg = "ValkeyStore requires py-key-value-aio[valkey]"
     raise ImportError(msg) from e
+
+ValkeyClient = GlideClient | GlideClusterClient
 
 
 DEFAULT_PAGE_SIZE = 10000
@@ -43,12 +52,12 @@ async def _create_valkey_client(config: GlideClientConfiguration | GlideClusterC
     return await GlideClient.create(config=config)
 
 
-async def _valkey_mget(client: BaseClient, keys: list[str]) -> list[bytes | None]:
+async def _valkey_mget(client: ValkeyClient, keys: list[str]) -> list[bytes | None]:
     """Get multiple values from Valkey."""
     return await client.mget(keys=keys)  # pyright: ignore[reportArgumentType]
 
 
-async def _valkey_delete(client: BaseClient, keys: list[str]) -> int:
+async def _valkey_delete(client: ValkeyClient, keys: list[str]) -> int:
     """Delete one or more keys from Valkey."""
     return await client.delete(keys=keys)  # pyright: ignore[reportArgumentType]
 
@@ -59,7 +68,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
     Supports both standalone (GlideClient) and cluster (GlideClusterClient) deployments.
     """
 
-    _connected_client: BaseClient | None
+    _connected_client: ValkeyClient | None
     _client_config: GlideClientConfiguration | GlideClusterClientConfiguration | None
 
     @overload
@@ -83,7 +92,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
     def __init__(
         self,
         *,
-        client: BaseClient | None = None,
+        client: ValkeyClient | None = None,
         default_collection: str | None = None,
         host: str = "localhost",
         port: int = 6379,
@@ -137,7 +146,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
             self._exit_stack.push_async_callback(self._client.close)
 
     @property
-    def _client(self) -> BaseClient:
+    def _client(self) -> ValkeyClient:
         if self._connected_client is None:
             # This should never happen, makes the type checker happy though
             msg = "Client is not connected"

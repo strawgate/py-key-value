@@ -20,7 +20,7 @@ class TestValkeyClusterClientSupport:
         as a valid client type for ValkeyStore. It does not test runtime
         functionality against a live cluster.
         """
-        from glide.glide_client import GlideClusterClient
+        from glide import GlideClusterClient
 
         from key_value.aio.stores.valkey import ValkeyStore
 
@@ -39,7 +39,7 @@ class TestValkeyClusterClientSupport:
 
     async def test_cluster_config_type_accepted(self):
         """Verify that GlideClusterClientConfiguration is imported and usable."""
-        from glide_shared.config import GlideClusterClientConfiguration
+        from glide import GlideClusterClientConfiguration
 
         assert GlideClusterClientConfiguration is not None
 

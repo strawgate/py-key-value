@@ -1,5 +1,5 @@
 import pytest
-from testcontainers.vault import VaultContainer
+from testcontainers.core.container import DockerContainer
 from typing_extensions import override
 
 from key_value.aio._utils.wait import async_wait_for_true
@@ -44,18 +44,19 @@ class TestVaultStore(BaseStoreTests):
     @pytest.fixture(autouse=True, scope="module", params=VAULT_VERSIONS_TO_TEST)
     def vault_container(self, request: pytest.FixtureRequest):
         version = request.param
-        container = VaultContainer(image=f"hashicorp/vault:{version}")
+        container = DockerContainer(image=f"hashicorp/vault:{version}")
+        container.with_exposed_ports(VAULT_CONTAINER_PORT)
         container.with_env("VAULT_DEV_ROOT_TOKEN_ID", VAULT_TOKEN)
         container.with_env("VAULT_DEV_LISTEN_ADDRESS", "0.0.0.0:8200")
         with container:
             yield container
 
     @pytest.fixture(scope="module")
-    def vault_host(self, vault_container: VaultContainer) -> str:
+    def vault_host(self, vault_container: DockerContainer) -> str:
         return vault_container.get_container_host_ip()
 
     @pytest.fixture(scope="module")
-    def vault_port(self, vault_container: VaultContainer) -> int:
+    def vault_port(self, vault_container: DockerContainer) -> int:
         return int(vault_container.get_exposed_port(VAULT_CONTAINER_PORT))
 
     @pytest.fixture(scope="module")
@@ -63,7 +64,7 @@ class TestVaultStore(BaseStoreTests):
         return f"http://{vault_host}:{vault_port}"
 
     @pytest.fixture(autouse=True, scope="module")
-    async def setup_vault(self, vault_container: VaultContainer, vault_url: str) -> None:
+    async def setup_vault(self, vault_container: DockerContainer, vault_url: str) -> None:
         if not await async_wait_for_true(bool_fn=lambda: self.ping_vault(vault_url), tries=WAIT_FOR_VAULT_TIMEOUT, wait_time=1):
             msg = "Vault failed to start"
             raise VaultFailedToStartError(msg)
