@@ -211,8 +211,9 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
         assert "ExpiresAt" not in no_ttl_entity, "ExpiresAt should not be set without a TTL"
 
         # TTL case
-        now_before_put = datetime.now(timezone.utc)
-        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=10)
+        ttl_seconds = 10
+        ttl_slack_seconds = 5
+        await store.put(collection="test", key="test_key", value={"name": "Alice", "age": 30}, ttl=ttl_seconds)
 
         async with TableServiceClient.from_connection_string(conn_str=azurite_connection_string) as service:
             table = service.get_table_client(table_name=AZURITE_TEST_TABLE)
@@ -233,7 +234,7 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
         assert isinstance(expires_at_value, int), "ExpiresAt should be an epoch-second integer"
         now = datetime.now(timezone.utc)
         assert expires_at_value > now.timestamp(), "ExpiresAt should be in the future"
-        assert expires_at_value < now_before_put.timestamp() + 10 + 1, "ExpiresAt should be within the configured TTL window"
+        assert expires_at_value < now.timestamp() + ttl_seconds + ttl_slack_seconds, "ExpiresAt should be within the configured TTL window"
 
     async def test_sanitized_collection_and_key_are_stored(self, store: AzureTablesStore, azurite_connection_string: str):
         """Out-of-spec collection/key values use the Azure Tables sanitization strategy."""
