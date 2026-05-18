@@ -86,13 +86,13 @@ def test_azure_tables_sanitization_strategy_hashes_unsafe_values() -> None:
     assert strategy.sanitize("safe_key") == "safe_key"
     assert strategy.sanitize("space key") == "space key"
     assert strategy.sanitize("quote'key") == "quote'key"
-    assert strategy.sanitize("unicode-😀") == "unicode-😀"
+    assert strategy.sanitize("unicode-\U0001f600") == "unicode-\U0001f600"
     assert strategy.sanitize("a" * 256) == "a" * 256
-    assert strategy.sanitize("😀" * 256) == "😀" * 256
+    assert strategy.sanitize("\U0001f600" * 256) == "\U0001f600" * 256
 
     for unsafe in (
         "a" * 257,
-        "😀" * 257,
+        "\U0001f600" * 257,
         "unsafe/key",
         "unsafe\\key",
         "bad#key",
