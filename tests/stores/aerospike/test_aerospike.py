@@ -55,6 +55,7 @@ async def test_put_managed_entry_sets_ttl_via_write_policy(monkeypatch: pytest.M
     from key_value.aio.stores.aerospike import store as aerospike_store_module
 
     captured: dict[str, Any] = {}
+    expected_ttl = 5
 
     def record_put_call(
         client: Any,
@@ -65,7 +66,11 @@ async def test_put_managed_entry_sets_ttl_via_write_policy(monkeypatch: pytest.M
     ) -> None:
         captured.update(client=client, aerospike_key=aerospike_key, bins=bins, meta=meta, policy=policy)
 
+    def remaining_ttl(_: ManagedEntry) -> float:
+        return 4.2
+
     monkeypatch.setattr(aerospike_store_module, "_put_aerospike_record", record_put_call)
+    monkeypatch.setattr(ManagedEntry, "ttl", property(remaining_ttl))
     store = object.__new__(AerospikeStore)
     store._namespace = "test"
     store._set = "set"
@@ -76,11 +81,11 @@ async def test_put_managed_entry_sets_ttl_via_write_policy(monkeypatch: pytest.M
         store,
         collection="collection",
         key="key",
-        managed_entry=ManagedEntry.from_ttl(value={"value": "test"}, ttl=5),
+        managed_entry=ManagedEntry.from_ttl(value={"value": "test"}, ttl=expected_ttl),
     )
 
     assert captured["meta"] is None
-    assert 0 < captured["policy"]["ttl"] <= 5
+    assert captured["policy"]["ttl"] == expected_ttl
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")

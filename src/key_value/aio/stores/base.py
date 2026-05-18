@@ -495,8 +495,11 @@ class BaseContextManagerStore(BaseStore, ABC):
         await self._ensure_exit_stack_entered()
         try:
             await super().setup()
-        except Exception:
-            await self.close()
+        except Exception as setup_error:
+            try:
+                await self.close()
+            except Exception as close_error:
+                raise setup_error from close_error
             raise
 
 

@@ -1,3 +1,4 @@
+import math
 from typing import Any, overload
 
 from typing_extensions import override
@@ -283,7 +284,7 @@ class AerospikeStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManage
         policy = None
         if managed_entry.ttl is not None:
             # Aerospike TTL is in seconds
-            policy = {"ttl": int(managed_entry.ttl)}
+            policy = {"ttl": math.ceil(managed_entry.ttl)}
 
         _put_aerospike_record(self._client, aerospike_key, bins, policy=policy)
 
