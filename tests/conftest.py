@@ -5,6 +5,7 @@ import platform
 import subprocess
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -71,3 +72,25 @@ def should_run_docker_tests() -> bool:
 
 def should_skip_docker_tests() -> bool:
     return not should_run_docker_tests()
+
+
+@contextmanager
+def run_container_with_log_wait(container: Any, message: str, *, timeout: int | None = None) -> Iterator[Any]:
+    """Start a testcontainer after configuring the newest available log wait API."""
+    try:
+        from testcontainers.core.wait_strategies import LogMessageWaitStrategy
+    except ImportError:
+        wait_strategy_configured = False
+    else:
+        wait_strategy = LogMessageWaitStrategy(message)
+        if timeout is not None:
+            wait_strategy = wait_strategy.with_startup_timeout(timeout)
+        container.waiting_for(wait_strategy)
+        wait_strategy_configured = True
+
+    with container:
+        if not wait_strategy_configured:
+            from testcontainers.core.waiting_utils import wait_for_logs
+
+            wait_for_logs(container, message, timeout=timeout or 120)
+        yield container

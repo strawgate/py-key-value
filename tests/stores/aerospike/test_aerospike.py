@@ -5,14 +5,13 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio._utils.managed_entry import ManagedEntry
 from key_value.aio._utils.serialization import BasicSerializationAdapter
 from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
-from tests.conftest import should_skip_docker_tests
+from tests.conftest import run_container_with_log_wait, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 if TYPE_CHECKING:
@@ -94,8 +93,7 @@ class TestAerospikeStore(ContextManagerStoreTestMixin, BaseStoreTests):
         # NSUP_PERIOD enables TTL expiration (namespace supervisor runs every N seconds)
         container.with_env("DEFAULT_TTL", "86400")
         container.with_env("NSUP_PERIOD", "1")
-        container.waiting_for(LogMessageWaitStrategy("service ready: soon there will be cake!"))
-        with container:
+        with run_container_with_log_wait(container, "service ready: soon there will be cake!"):
             yield container
 
     @pytest.fixture(scope="module")

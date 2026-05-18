@@ -8,7 +8,6 @@ import pytest
 from dirty_equals import IsDatetime
 from inline_snapshot import snapshot
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from types_aiobotocore_dynamodb.client import DynamoDBClient
 from types_aiobotocore_dynamodb.type_defs import GetItemOutputTypeDef
 from typing_extensions import override
@@ -17,7 +16,7 @@ from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.errors import StoreSetupError
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.dynamodb import DynamoDBStore
-from tests.conftest import should_skip_docker_tests
+from tests.conftest import run_container_with_log_wait, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # DynamoDB test configuration
@@ -71,8 +70,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         version = request.param
         container = DockerContainer(image=f"amazon/dynamodb-local:{version}")
         container.with_exposed_ports(DYNAMODB_CONTAINER_PORT)
-        container.waiting_for(LogMessageWaitStrategy("Initializing DynamoDB Local"))
-        with container:
+        with run_container_with_log_wait(container, "Initializing DynamoDB Local"):
             yield container
 
     @pytest.fixture(scope="module")
