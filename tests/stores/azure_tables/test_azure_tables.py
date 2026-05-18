@@ -84,8 +84,24 @@ def test_azure_tables_sanitization_strategy_hashes_unsafe_values() -> None:
     strategy = AzureTablesSanitizationStrategy()
 
     assert strategy.sanitize("safe_key") == "safe_key"
+    assert strategy.sanitize("space key") == "space key"
+    assert strategy.sanitize("quote'key") == "quote'key"
+    assert strategy.sanitize("unicode-😀") == "unicode-😀"
+    assert strategy.sanitize("a" * 256) == "a" * 256
+    assert strategy.sanitize("😀" * 256) == "😀" * 256
 
-    for unsafe in ("unsafe/key", "bad\x1fkey", "bad\x7fkey", "bad\u0085key"):
+    for unsafe in (
+        "a" * 257,
+        "😀" * 257,
+        "unsafe/key",
+        "unsafe\\key",
+        "bad#key",
+        "bad?key",
+        "bad\x00key",
+        "bad\x1fkey",
+        "bad\x7fkey",
+        "bad\u009fkey",
+    ):
         sanitized = strategy.sanitize(unsafe)
         assert sanitized.startswith("H_")
         assert len(sanitized) == 66
