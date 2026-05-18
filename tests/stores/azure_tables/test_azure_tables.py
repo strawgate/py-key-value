@@ -1,4 +1,3 @@
-import contextlib
 import json
 import os
 from collections.abc import Generator
@@ -160,12 +159,11 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
             raise AzuriteFailedToStartError(msg)
 
     async def _drop_table(self, connection_string: str, table_name: str) -> None:
-        """Best-effort drop of a table, suppressing not-found errors."""
+        """Drop a table if it exists."""
         from azure.data.tables.aio import TableServiceClient
 
         async with TableServiceClient.from_connection_string(conn_str=connection_string) as service:
-            with contextlib.suppress(Exception):
-                await service.delete_table(table_name=table_name)  # pyright: ignore[reportUnknownMemberType]
+            await service.delete_table(table_name=table_name)  # pyright: ignore[reportUnknownMemberType]
 
     @override
     @pytest.fixture
