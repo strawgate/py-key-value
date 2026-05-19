@@ -203,7 +203,7 @@ class TestValkeyClusterClientSupport:
 
         async def cluster_create(cls: type[GlideClusterClient], config: GlideClusterClientConfiguration) -> GlideClusterClient:
             calls.append("cluster")
-            return GlideClusterClient(config)
+            return cast("GlideClusterClient", MagicMock(spec=GlideClusterClient))
 
         monkeypatch.setattr(GlideClient, "create", classmethod(standalone_create))
         monkeypatch.setattr(GlideClusterClient, "create", classmethod(cluster_create))
