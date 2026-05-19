@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import socket
 import sys
 from typing import TYPE_CHECKING, cast
@@ -26,6 +27,21 @@ VALKEY_CLUSTER_IMAGE = "valkey/valkey:8.0.0"
 VALKEY_CLUSTER_NODE_COUNT = 6
 VALKEY_CLUSTER_WAIT_TIMEOUT = 60
 VALKEY_CLUSTER_REQUEST_TIMEOUT_MS = 5000
+VALKEY_CLUSTER_PORT_START = 17000
+VALKEY_CLUSTER_PORT_BLOCK_SIZE = 100
+VALKEY_CLUSTER_PORT_BLOCK_COUNT = 70
+
+
+def _pytest_worker_index() -> int:
+    """Return the xdist worker index so parallel workers choose disjoint ports."""
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
+    if not worker.startswith("gw"):
+        return 0
+
+    try:
+        return int(worker[2:])
+    except ValueError:
+        return 0
 
 
 def _ports_are_available(ports: list[int]) -> bool:
@@ -48,7 +64,11 @@ def _ports_are_available(ports: list[int]) -> bool:
 
 def _find_free_port_block(*, node_count: int = VALKEY_CLUSTER_NODE_COUNT) -> list[int]:
     """Find a host/container port block for a single-container Valkey cluster."""
-    for base_port in range(17000, 24000, 100):
+    worker_count = max(int(os.environ.get("PYTEST_XDIST_WORKER_COUNT", "1")), 1)
+    worker_index = _pytest_worker_index() % worker_count
+
+    for block_index in range(worker_index, VALKEY_CLUSTER_PORT_BLOCK_COUNT, worker_count):
+        base_port = VALKEY_CLUSTER_PORT_START + (block_index * VALKEY_CLUSTER_PORT_BLOCK_SIZE)
         ports = list(range(base_port, base_port + node_count))
         bus_ports = [port + 10000 for port in ports]
         if _ports_are_available([*ports, *bus_ports]):
@@ -79,7 +99,14 @@ def _make_valkey_cluster_command(ports: list[int]) -> str:
         "--cluster-announce-bus-port $((p+10000)) "
         "> /tmp/valkey-$p.log 2>&1 & "
         "done",
-        "sleep 2",
+        f"for p in {port_args}; do "
+        "tries=0; "
+        "until valkey-cli -h 127.0.0.1 -p $p ping >/dev/null 2>&1; do "
+        "tries=$((tries+1)); "
+        "if [ $tries -ge 50 ]; then echo valkey node $p failed to start; exit 1; fi; "
+        "sleep 0.2; "
+        "done; "
+        "done",
         f"yes yes | valkey-cli --cluster create {cluster_nodes} --cluster-replicas 1",
         "echo CLUSTER_READY",
         "tail -f /tmp/valkey-*.log",
@@ -116,6 +143,31 @@ async def _ping_valkey_cluster(port: int) -> bool:
 
 class TestValkeyClusterClientSupport:
     """Tests for GlideClusterClient type compatibility with ValkeyStore."""
+
+    def test_find_free_port_block_uses_xdist_worker_partition(self, monkeypatch: pytest.MonkeyPatch):
+        """Verify parallel pytest workers use disjoint Valkey cluster port blocks."""
+        checked_ports: list[list[int]] = []
+
+        def ports_are_available(ports: list[int]) -> bool:
+            checked_ports.append(ports)
+            return True
+
+        monkeypatch.setenv("PYTEST_XDIST_WORKER", "gw2")
+        monkeypatch.setenv("PYTEST_XDIST_WORKER_COUNT", "4")
+        monkeypatch.setattr(sys.modules[__name__], "_ports_are_available", ports_are_available)
+
+        ports = _find_free_port_block()
+
+        assert ports == list(range(17200, 17206))
+        assert checked_ports == [list(range(17200, 17206)) + list(range(27200, 27206))]
+
+    def test_cluster_command_polls_nodes_before_cluster_create(self):
+        """Verify the cluster command waits for each node before clustering."""
+        command = _make_valkey_cluster_command([17000, 17001])
+
+        assert "sleep 2" not in command
+        assert "valkey-cli -h 127.0.0.1 -p $p ping" in command
+        assert command.index("valkey-cli -h 127.0.0.1 -p $p ping") < command.index("valkey-cli --cluster create")
 
     async def test_cluster_client_type_accepted(self):
         """Verify that ValkeyStore's type hints accept GlideClusterClient.
