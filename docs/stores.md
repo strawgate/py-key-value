@@ -498,6 +498,7 @@ Distributed stores provide network-based storage for multi-node applications.
 | Store | Stability | Description |
 | ----- | :-------: | :---------- |
 | Aerospike | Unstable | High-performance distributed NoSQL database |
+| Azure Tables | Unstable | Azure Table Storage key-value storage |
 | DynamoDB | Unstable | AWS DynamoDB key-value storage |
 | S3 | Unstable | AWS S3 object storage |
 | Elasticsearch | Unstable | Full-text search with key-value capabilities |
@@ -668,6 +669,49 @@ pip install py-key-value-aio[firestore]
 - Optional key and collection sanitization for Firestore ID constraints
 - Firestore sanitizers reserve `H_` and `S_` prefixes for keys and
   collections to prevent collisions
+- Stable storage format: **Unstable**
+
+---
+
+### AzureTablesStore
+
+Azure Table Storage integration for Azure-native applications.
+
+```python
+from key_value.aio.stores.azure_tables import (
+    AzureTablesSanitizationStrategy,
+    AzureTablesStore,
+)
+
+store = AzureTablesStore(
+    account_name="mystorageaccount",
+    credential=credential,
+    table_name="kvstore",
+    collection_sanitization_strategy=AzureTablesSanitizationStrategy(),
+    key_sanitization_strategy=AzureTablesSanitizationStrategy(),
+)
+```
+
+**Installation:**
+
+```bash
+pip install py-key-value-aio[azure-tables]
+```
+
+**Use Cases:**
+
+- Azure-native applications
+- Serverless / managed infrastructure
+- Low-cost persistent state
+- Managed Identity authentication
+- OAuth/session state on Azure Container Apps
+
+**Characteristics:**
+
+- Fully managed
+- Pay-per-use pricing
+- No native background TTL; entries are lazily expired on read
+- Optional PartitionKey/RowKey sanitization for Azure Tables limits
 - Stable storage format: **Unstable**
 
 ---

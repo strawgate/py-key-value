@@ -16,8 +16,9 @@ This monorepo contains:
 
 ## Why use this library?
 
-- **Multiple backends**: Aerospike, DynamoDB, S3, Elasticsearch, Firestore, Memcached,
-  MongoDB, Redis, RocksDB, Valkey, and In-memory, Disk, etc.
+- **Multiple backends**: Aerospike, Azure Tables, DynamoDB, S3,
+  Elasticsearch, Firestore, Memcached, MongoDB, Redis, RocksDB, Valkey, and
+  In-memory, Disk, etc.
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
 - **Adapters**: Pydantic model support, raise-on-missing behavior, etc
@@ -139,9 +140,11 @@ pip install py-key-value-aio[memory]
 pip install py-key-value-aio[disk]
 pip install py-key-value-aio[dynamodb]
 pip install py-key-value-aio[s3]
+pip install py-key-value-aio[azure-tables]
 pip install py-key-value-aio[elasticsearch]
 pip install py-key-value-aio[firestore]
-# or: aerospike, redis, mongodb, memcached, valkey, vault, registry, rocksdb, see below for all options
+# or: aerospike, redis, mongodb, memcached, valkey, vault, registry, rocksdb,
+# see below for all options
 ```
 
 ```python
@@ -198,7 +201,7 @@ categories:
 - **Local stores**: In-memory and disk-based storage (Memory, Disk, RocksDB, etc.)
 - **Secret stores**: Secure OS-level storage for sensitive data (Keyring, Vault)
 - **Distributed stores**: Network-based storage for multi-node apps (Redis,
-  DynamoDB, S3, MongoDB, etc.)
+  DynamoDB, S3, Azure Tables, MongoDB, etc.)
 
 Each store has a **stability rating** indicating likelihood of
 backwards-incompatible changes. Stable stores (Redis, Valkey, Disk, Keyring)
