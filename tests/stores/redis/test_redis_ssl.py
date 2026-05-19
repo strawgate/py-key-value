@@ -10,13 +10,12 @@ import pytest
 import redis.exceptions
 from redis.asyncio.client import Redis
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.waiting_utils import wait_for_logs
 from typing_extensions import override
 
 from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.redis import RedisStore
-from tests.conftest import should_skip_docker_tests
+from tests.conftest import run_container_with_log_wait, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 REDIS_DB = 14  # Use a different database from the non-SSL tests
@@ -183,8 +182,7 @@ class TestRedisSSLStore(ContextManagerStoreTestMixin, BaseStoreTests):
     def redis_ssl_container(self, ssl_certs: tuple[str, str, str]):
         cert_dir = str(Path(ssl_certs[0]).parent)
         container = _make_redis_ssl_container(cert_dir)
-        with container:
-            wait_for_logs(container, "Ready to accept connections", timeout=WAIT_FOR_REDIS_TIMEOUT)
+        with run_container_with_log_wait(container, "Ready to accept connections", timeout=WAIT_FOR_REDIS_TIMEOUT):
             yield container
 
     @pytest.fixture(scope="module")

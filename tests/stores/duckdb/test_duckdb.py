@@ -1,8 +1,16 @@
+import contextlib
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
+
+with contextlib.suppress(ImportError):
+    # DuckDB probes pandas at import time; finish pandas initialization first when it is installed.
+    import pandas as _pandas
+
+    _ = _pandas.__version__
+
 from duckdb import CatalogException, DuckDBPyConnection
 from inline_snapshot import snapshot
 from typing_extensions import override

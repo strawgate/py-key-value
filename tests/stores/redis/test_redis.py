@@ -5,7 +5,7 @@ import pytest
 from dirty_equals import IsDatetime
 from inline_snapshot import snapshot
 from redis.asyncio.client import Redis
-from testcontainers.redis import RedisContainer
+from testcontainers.core.container import DockerContainer
 from typing_extensions import override
 
 from key_value.aio._utils.wait import async_wait_for_true
@@ -38,19 +38,21 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="module", params=REDIS_VERSIONS_TO_TEST)
     def redis_container(self, request: pytest.FixtureRequest):
         version = request.param
-        with RedisContainer(image=f"redis:{version}") as container:
+        container = DockerContainer(image=f"redis:{version}")
+        container.with_exposed_ports(6379)
+        with container:
             yield container
 
     @pytest.fixture(scope="module")
-    def redis_host(self, redis_container: RedisContainer) -> str:
+    def redis_host(self, redis_container: DockerContainer) -> str:
         return redis_container.get_container_host_ip()
 
     @pytest.fixture(scope="module")
-    def redis_port(self, redis_container: RedisContainer) -> int:
+    def redis_port(self, redis_container: DockerContainer) -> int:
         return int(redis_container.get_exposed_port(6379))
 
     @pytest.fixture(autouse=True, scope="module")
-    async def setup_redis(self, redis_container: RedisContainer, redis_host: str, redis_port: int) -> None:
+    async def setup_redis(self, redis_container: DockerContainer, redis_host: str, redis_port: int) -> None:
         from key_value.aio.stores.redis.store import _create_redis_client
 
         async def ping_redis() -> bool:

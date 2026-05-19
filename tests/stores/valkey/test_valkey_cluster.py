@@ -124,7 +124,7 @@ class TestValkeyClusterClientSupport:
         as a valid client type for ValkeyStore. It does not test runtime
         functionality against a live cluster.
         """
-        from glide.glide_client import GlideClusterClient
+        from glide import GlideClusterClient
 
         from key_value.aio.stores.valkey import ValkeyStore
 
@@ -143,7 +143,7 @@ class TestValkeyClusterClientSupport:
 
     async def test_cluster_config_type_accepted(self):
         """Verify that ValkeyStore accepts a cluster configuration."""
-        from glide_shared.config import GlideClusterClientConfiguration, NodeAddress
+        from glide import GlideClusterClientConfiguration, NodeAddress
 
         from key_value.aio.stores.valkey import ValkeyStore
 
@@ -154,8 +154,7 @@ class TestValkeyClusterClientSupport:
 
     async def test_config_and_client_are_mutually_exclusive(self):
         """Verify that callers cannot provide both a client and config."""
-        from glide.glide_client import GlideClusterClient
-        from glide_shared.config import GlideClusterClientConfiguration, NodeAddress
+        from glide import GlideClusterClient, GlideClusterClientConfiguration, NodeAddress
 
         from key_value.aio.stores.valkey import ValkeyStore
 
@@ -167,8 +166,7 @@ class TestValkeyClusterClientSupport:
 
     async def test_standalone_config_creates_standalone_client(self, monkeypatch: pytest.MonkeyPatch):
         """Verify standalone configs still use GlideClient."""
-        from glide.glide_client import GlideClient, GlideClusterClient
-        from glide_shared.config import GlideClientConfiguration, GlideClusterClientConfiguration, NodeAddress
+        from glide import GlideClient, GlideClientConfiguration, GlideClusterClient, GlideClusterClientConfiguration, NodeAddress
 
         from key_value.aio.stores.valkey.store import _create_valkey_client
 
@@ -193,8 +191,7 @@ class TestValkeyClusterClientSupport:
 
     async def test_cluster_config_creates_cluster_client(self, monkeypatch: pytest.MonkeyPatch):
         """Verify cluster configs use GlideClusterClient instead of GlideClient."""
-        from glide.glide_client import GlideClient, GlideClusterClient
-        from glide_shared.config import GlideClientConfiguration, GlideClusterClientConfiguration, NodeAddress
+        from glide import GlideClient, GlideClientConfiguration, GlideClusterClient, GlideClusterClientConfiguration, NodeAddress
 
         from key_value.aio.stores.valkey.store import _create_valkey_client
 

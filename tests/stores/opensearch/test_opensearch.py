@@ -8,7 +8,6 @@ from dirty_equals import IsFloat, IsStr
 from inline_snapshot import snapshot
 from opensearchpy import AsyncOpenSearch
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio._utils.managed_entry import ManagedEntry
@@ -20,7 +19,7 @@ from key_value.aio.stores.opensearch.store import (
     OpenSearchV1CollectionSanitizationStrategy,
     OpenSearchV1KeySanitizationStrategy,
 )
-from tests.conftest import should_skip_docker_tests
+from tests.conftest import run_container_with_log_wait, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 TEST_SIZE_LIMIT = 1 * 1024 * 1024  # 1MB
@@ -97,8 +96,7 @@ class TestOpenSearchStore(ContextManagerStoreTestMixin, BaseStoreTests):
         container.with_env("discovery.type", "single-node")
         container.with_env("DISABLE_SECURITY_PLUGIN", "true")
         container.with_env("OPENSEARCH_INITIAL_ADMIN_PASSWORD", "TestPassword123!")
-        container.waiting_for(LogMessageWaitStrategy("started").with_startup_timeout(120))
-        with container:
+        with run_container_with_log_wait(container, "started", timeout=120):
             yield container
 
     @pytest.fixture(scope="module")

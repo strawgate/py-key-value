@@ -3,13 +3,12 @@ from collections.abc import Generator
 
 import pytest
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.s3 import S3Store
-from tests.conftest import should_skip_docker_tests
+from tests.conftest import run_container_with_log_wait, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # S3 test configuration (using LocalStack)
@@ -55,8 +54,7 @@ class TestS3Store(ContextManagerStoreTestMixin, BaseStoreTests):
         container = DockerContainer(image=f"localstack/localstack:{version}")
         container.with_exposed_ports(LOCALSTACK_CONTAINER_PORT)
         container.with_env("SERVICES", "s3")
-        container.waiting_for(LogMessageWaitStrategy("Ready."))
-        with container:
+        with run_container_with_log_wait(container, "Ready."):
             yield container
 
     @pytest.fixture(scope="module")

@@ -65,6 +65,11 @@ async def _describe_dynamodb_table(client: DynamoDBClient, table_name: str) -> b
         return True
 
 
+def _raise_dynamodb_table_missing(table_name: str) -> None:
+    msg = f"Table '{table_name}' does not exist. Either create the table manually or set auto_create=True."
+    raise ValueError(msg)
+
+
 async def _create_dynamodb_table(client: DynamoDBClient, table_name: str, *, table_config: dict[str, Any] | None = None) -> None:
     """Create a DynamoDB table with the standard schema.
 
@@ -150,10 +155,9 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     - key (sort key)
     """
 
-    _session: aioboto3.Session
+    _session: aioboto3.Session | None
     _table_name: str
     _endpoint_url: str | None
-    _raw_client: Any  # DynamoDB client from aioboto3
     _client: DynamoDBClient | None
     _table_config: dict[str, Any]
     _auto_create: bool
@@ -245,19 +249,18 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
         self._auto_create = auto_create
         client_provided = client is not None
 
-        if client:
+        if client is not None:
             self._client = client
-            self._raw_client = None
+            self._session = None
+            self._endpoint_url = None
         else:
-            session = _create_dynamodb_session(
+            self._session = _create_dynamodb_session(
                 region_name=region_name,
                 aws_access_key_id=aws_access_key_id,
                 aws_secret_access_key=aws_secret_access_key,
                 aws_session_token=aws_session_token,
             )
-
-            self._raw_client = _create_dynamodb_client_context(session, endpoint_url=endpoint_url)
-
+            self._endpoint_url = endpoint_url
             self._client = None
 
         super().__init__(
@@ -276,24 +279,32 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     async def _setup(self) -> None:
         """Setup the DynamoDB client and ensure table exists."""
         # Register client cleanup if we own the client
-        if not self._client_provided_by_user and self._raw_client is not None:
-            self._client = await self._exit_stack.enter_async_context(self._raw_client)
-
-        table_exists = await _describe_dynamodb_table(self._connected_client, self._table_name)
-
-        if not table_exists:
-            if not self._auto_create:
-                msg = f"Table '{self._table_name}' does not exist. Either create the table manually or set auto_create=True."
+        if not self._client_provided_by_user and self._client is None:
+            if self._session is None:
+                msg = "DynamoDB session not initialized"
                 raise ValueError(msg)
+            raw_client = _create_dynamodb_client_context(self._session, endpoint_url=self._endpoint_url)
+            self._client = await self._exit_stack.enter_async_context(raw_client)
 
-            await _create_dynamodb_table(self._connected_client, self._table_name, table_config=self._table_config)
+        try:
+            table_exists = await _describe_dynamodb_table(self._connected_client, self._table_name)
 
-        # Enable TTL on the table if not already enabled
-        ttl_status = await _describe_dynamodb_ttl(self._connected_client, self._table_name)
+            if not table_exists:
+                if not self._auto_create:
+                    _raise_dynamodb_table_missing(self._table_name)
 
-        # Only enable TTL if it's currently disabled
-        if ttl_status == "DISABLED":
-            await _enable_dynamodb_ttl(self._connected_client, self._table_name)
+                await _create_dynamodb_table(self._connected_client, self._table_name, table_config=self._table_config)
+
+            # Enable TTL on the table if not already enabled
+            ttl_status = await _describe_dynamodb_ttl(self._connected_client, self._table_name)
+
+            # Only enable TTL if it's currently disabled
+            if ttl_status == "DISABLED":
+                await _enable_dynamodb_ttl(self._connected_client, self._table_name)
+        except Exception:
+            if not self._client_provided_by_user:
+                self._client = None
+            raise
 
     @override
     async def _get_managed_entry(self, *, key: str, collection: str) -> ManagedEntry | None:

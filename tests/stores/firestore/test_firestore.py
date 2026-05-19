@@ -9,13 +9,12 @@ import pytest
 from dirty_equals import IsStr
 from inline_snapshot import snapshot
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.errors import InvalidKeyError
 from key_value.aio.stores.base import BaseStore
-from tests.conftest import should_skip_docker_tests
+from tests.conftest import run_container_with_log_wait, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 warnings.filterwarnings(
@@ -175,8 +174,7 @@ class TestFirestoreStore(ContextManagerStoreTestMixin, BaseStoreTests):
         container.with_exposed_ports(FIRESTORE_CONTAINER_PORT)
         container.with_env("CLOUDSDK_CORE_DISABLE_PROMPTS", "1")
         container.with_command(f"gcloud emulators firestore start --host-port=0.0.0.0:{FIRESTORE_CONTAINER_PORT} --quiet")
-        container.waiting_for(LogMessageWaitStrategy("Dev App Server is now running").with_startup_timeout(120))
-        with container:
+        with run_container_with_log_wait(container, "Dev App Server is now running", timeout=120):
             yield container
 
     @pytest.fixture(scope="module")

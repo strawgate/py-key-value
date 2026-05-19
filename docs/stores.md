@@ -562,7 +562,18 @@ High-performance in-memory store using Redis.
 from key_value.aio.stores.redis import RedisStore
 
 store = RedisStore(url="redis://localhost:6379/0")
+
+tls_store = RedisStore(
+    url="rediss://redis.example.com:6380/0",
+    ssl_ca_certs="/etc/ssl/certs/redis-ca.pem",
+)
 ```
+
+Redis TLS can be enabled with a `rediss://` URL or with `ssl=True` when using
+`host` and `port`. Pass `ssl_ca_certs` to verify the server certificate, and
+`ssl_certfile` plus `ssl_keyfile` for mutual TLS deployments. For development
+or test environments with self-signed certificates, `ssl_cert_reqs="none"` and
+`ssl_check_hostname=False` are available, but should not be used for production.
 
 **Installation:**
 
@@ -583,6 +594,7 @@ pip install py-key-value-aio[redis]
 - Production-ready
 - Rich feature set
 - Horizontal scaling support
+- SSL/TLS and mutual TLS connection options
 - **Stable storage format**
 
 ---

@@ -92,6 +92,14 @@ FastMCP users can plug in any store implementation:
    framework = YourFramework(
        cache=RedisStore(url="redis://localhost:6379/0")
    )
+
+   # Production with Redis TLS
+   framework = YourFramework(
+       cache=RedisStore(
+           url="rediss://redis.example.com:6380/0",
+           ssl_ca_certs="/etc/ssl/certs/redis-ca.pem",
+       )
+   )
    ```
 
 By depending on `py-key-value-aio` instead of a specific storage backend,

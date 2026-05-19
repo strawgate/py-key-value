@@ -5,7 +5,8 @@ import pytest
 from bson import ObjectId
 from dirty_equals import IsDatetime, IsFloat, IsInstance
 from inline_snapshot import snapshot
-from testcontainers.mongodb import MongoDbContainer
+from pymongo import AsyncMongoClient
+from testcontainers.core.container import DockerContainer
 from typing_extensions import override
 
 from key_value.aio._utils.managed_entry import ManagedEntry
@@ -15,7 +16,6 @@ from key_value.aio.stores.mongodb import MongoDBStore
 from key_value.aio.stores.mongodb.store import (
     MongoDBSerializationAdapter,
     MongoDBV1CollectionSanitizationStrategy,
-    _create_mongodb_client,
     _mongodb_drop_database,
 )
 from tests.conftest import should_skip_docker_tests
@@ -23,6 +23,9 @@ from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # MongoDB test configuration
 MONGODB_TEST_DB = "kv-store-adapter-tests"
+MONGODB_TEST_USERNAME = "test"
+MONGODB_TEST_PASSWORD = "test"
+MONGODB_CONTAINER_PORT = 27017
 
 WAIT_FOR_MONGODB_TIMEOUT = 60
 
@@ -33,12 +36,19 @@ MONGODB_VERSIONS_TO_TEST = [
 
 
 async def ping_mongodb(mongodb_url: str) -> bool:
+    client: AsyncMongoClient[dict[str, object]] | None = None
     try:
-        client = _create_mongodb_client(url=mongodb_url)
+        client = AsyncMongoClient(
+            mongodb_url,
+            connectTimeoutMS=1000,
+            serverSelectionTimeoutMS=1000,
+        )
         _ = await client.list_database_names()
-        await client.close()
     except Exception:
         return False
+    finally:
+        if client is not None:
+            await client.close()
 
     return True
 
@@ -83,17 +93,24 @@ class BaseMongoDBStoreTests(ContextManagerStoreTestMixin, BaseStoreTests):
     """Base class for MongoDB store tests."""
 
     @pytest.fixture(autouse=True, scope="module", params=MONGODB_VERSIONS_TO_TEST)
-    def mongodb_container(self, request: pytest.FixtureRequest) -> Generator[MongoDbContainer, None, None]:
+    def mongodb_container(self, request: pytest.FixtureRequest) -> Generator[DockerContainer, None, None]:
         version = request.param
-        with MongoDbContainer(image=f"mongo:{version}") as container:
+        container = DockerContainer(image=f"mongo:{version}")
+        container.with_exposed_ports(MONGODB_CONTAINER_PORT)
+        container.with_env("MONGO_INITDB_ROOT_USERNAME", MONGODB_TEST_USERNAME)
+        container.with_env("MONGO_INITDB_ROOT_PASSWORD", MONGODB_TEST_PASSWORD)
+        container.with_env("MONGO_DB", MONGODB_TEST_DB)
+        with container:
             yield container
 
     @pytest.fixture(scope="module")
-    def mongodb_url(self, mongodb_container: MongoDbContainer) -> str:
-        return mongodb_container.get_connection_url()
+    def mongodb_url(self, mongodb_container: DockerContainer) -> str:
+        host = mongodb_container.get_container_host_ip()
+        port = mongodb_container.get_exposed_port(MONGODB_CONTAINER_PORT)
+        return f"mongodb://{MONGODB_TEST_USERNAME}:{MONGODB_TEST_PASSWORD}@{host}:{port}"
 
     @pytest.fixture(autouse=True, scope="module")
-    async def setup_mongodb(self, mongodb_container: MongoDbContainer, mongodb_url: str) -> None:
+    async def setup_mongodb(self, mongodb_container: DockerContainer, mongodb_url: str) -> None:
         if not await async_wait_for_true(bool_fn=lambda: ping_mongodb(mongodb_url), tries=WAIT_FOR_MONGODB_TIMEOUT, wait_time=1):
             msg = "MongoDB failed to start"
             raise MongoDBFailedToStartError(msg)
