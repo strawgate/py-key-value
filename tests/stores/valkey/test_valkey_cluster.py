@@ -89,7 +89,7 @@ def _make_valkey_cluster_command(ports: list[int]) -> str:
 
 def _make_valkey_cluster_config(port: int):
     """Create a GLIDE cluster config seeded from a local cluster node."""
-    from glide_shared.config import GlideClusterClientConfiguration, NodeAddress
+    from glide import GlideClusterClientConfiguration, NodeAddress
 
     return GlideClusterClientConfiguration(
         addresses=[NodeAddress("127.0.0.1", port)],
@@ -159,7 +159,7 @@ class TestValkeyClusterClientSupport:
         from key_value.aio.stores.valkey import ValkeyStore
 
         config = GlideClusterClientConfiguration(addresses=[NodeAddress("localhost", 6379)])
-        client = GlideClusterClient(config)
+        client = MagicMock(spec=GlideClusterClient)
 
         with pytest.raises(ValueError, match="client and config are mutually exclusive"):
             ValkeyStore(client=client, config=config)  # pyright: ignore[reportCallIssue]
