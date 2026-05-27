@@ -16,8 +16,9 @@ This monorepo contains:
 
 ## Why use this library?
 
-- **Multiple backends**: Aerospike, Azure Tables, DynamoDB, S3,
-  Elasticsearch, Firestore, Memcached, MongoDB, Redis, RocksDB, Valkey, and
+- **Multiple backends**: Aerospike, Azure Tables, chDB, DuckDB, DynamoDB,
+  Elasticsearch, FileTree, Firestore, Keyring, Memcached, MongoDB, OpenSearch,
+  PostgreSQL, Redis, RocksDB, S3, Valkey, Vault, Windows Registry, and
   In-memory, Disk, etc.
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces

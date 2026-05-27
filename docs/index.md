@@ -8,8 +8,10 @@ type safety, and extensible wrappers.
 
 py-key-value is a Python framework that offers:
 
-- **Multiple backends**: DynamoDB, Elasticsearch, Memcached, MongoDB, Redis,
-  RocksDB, Valkey, and In-memory, Disk, etc.
+- **Multiple backends**: Aerospike, Azure Tables, chDB, DuckDB, DynamoDB,
+  Elasticsearch, FileTree, Firestore, Keyring, Memcached, MongoDB, OpenSearch,
+  PostgreSQL, Redis, RocksDB, S3, Valkey, Vault, Windows Registry, and
+  In-memory, Disk, etc.
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
 - **Adapters**: Pydantic model support, raise-on-missing behavior, etc.
@@ -42,8 +44,10 @@ pip install py-key-value-aio[redis]
 # DynamoDB support
 pip install py-key-value-aio[dynamodb]
 
-# All backends
-pip install py-key-value-aio[all]
+# Install multiple backends at once
+pip install py-key-value-aio[azure-tables,firestore,elasticsearch]
+# Other available extras: duckdb, memcached, mongodb, opensearch,
+# postgresql, rocksdb, s3, chdb, valkey, vault, keyring, aerospike
 ```
 
 ## Quick Example
