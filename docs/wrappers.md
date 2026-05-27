@@ -22,6 +22,9 @@ protocol, so they can be used anywhere a store can be used.
 | [TTLClampWrapper](#ttlclampwrapper) | Clamp the TTL to a given range |
 | [StatisticsWrapper](#statisticswrapper) | Track operation statistics for the store |
 | [TimeoutWrapper](#timeoutwrapper) | Add timeout protection to store operations |
+| [RoutingWrapper](#routingwrapper) | Route operations to different stores via a routing function |
+| [CollectionRoutingWrapper](#collectionroutingwrapper) | Route operations to stores based on a collection-to-store mapping |
+| [DefaultValueWrapper](#defaultvaluewrapper) | Return a default value when a key is not found |
 
 ## What Are Wrappers?
 
@@ -570,6 +573,124 @@ store = TimeoutWrapper(
 
 # Raises asyncio.TimeoutError if operation takes > 1 second
 user = await store.get(key="user:123", collection="users")
+```
+
+---
+
+### RoutingWrapper
+
+Routes operations to different stores based on a routing function. The routing
+function receives the collection name and returns the appropriate store to use.
+
+::: key_value.aio.wrappers.routing.RoutingWrapper
+    options:
+      show_source: false
+      members: true
+
+#### Use Cases
+
+- Directing different collections to different backends
+- Custom routing logic based on collection names
+- Multi-backend architectures with dynamic store selection
+
+#### Example
+
+```python
+from key_value.aio.stores.memory import MemoryStore
+from key_value.aio.stores.redis import RedisStore
+from key_value.aio.wrappers.routing import RoutingWrapper
+
+redis_store = RedisStore(url="redis://localhost:6379/0")
+memory_store = MemoryStore()
+
+def route_by_collection(collection: str | None):
+    if collection == "sessions":
+        return redis_store
+    return None
+
+store = RoutingWrapper(
+    routing_function=route_by_collection,
+    default_store=memory_store
+)
+
+# Operations on "sessions" go to Redis, everything else to memory
+await store.put(key="s1", value={"user": "alice"}, collection="sessions")
+await store.put(key="tmp", value={"data": "value"}, collection="cache")
+```
+
+---
+
+### CollectionRoutingWrapper
+
+Routes operations to stores based on a simple collection-name-to-store
+dictionary. This is a convenience wrapper built on top of `RoutingWrapper`.
+
+::: key_value.aio.wrappers.routing.CollectionRoutingWrapper
+    options:
+      show_source: false
+      members: true
+
+#### Use Cases
+
+- Directing specific collections to dedicated backends
+- Multi-tenant setups with per-tenant stores
+- Splitting hot and cold data across different storage systems
+
+#### Example
+
+```python
+from key_value.aio.stores.memory import MemoryStore
+from key_value.aio.stores.redis import RedisStore
+from key_value.aio.stores.disk import DiskStore
+from key_value.aio.wrappers.routing import CollectionRoutingWrapper
+
+store = CollectionRoutingWrapper(
+    collection_map={
+        "sessions": RedisStore(url="redis://localhost:6379/0"),
+        "users": DiskStore(directory="./users"),
+    },
+    default_store=MemoryStore()
+)
+
+# "sessions" go to Redis, "users" go to Disk, everything else to memory
+await store.put(key="s1", value={"user": "alice"}, collection="sessions")
+await store.put(key="u1", value={"name": "Alice"}, collection="users")
+await store.put(key="tmp", value={"data": "value"}, collection="cache")
+```
+
+---
+
+### DefaultValueWrapper
+
+Returns a default value when a key is not found, providing `dict.get(key, default)`
+behavior for the key-value store.
+
+::: key_value.aio.wrappers.default_value.DefaultValueWrapper
+    options:
+      show_source: false
+      members: true
+
+#### Use Cases
+
+- Providing sensible defaults for missing configuration
+- Avoiding None checks in application code
+- Initializing new users/entities with default state
+
+#### Example
+
+```python
+from key_value.aio.stores.memory import MemoryStore
+from key_value.aio.wrappers.default_value import DefaultValueWrapper
+
+store = DefaultValueWrapper(
+    key_value=MemoryStore(),
+    default_value={"theme": "light", "language": "en"},
+    default_ttl=3600
+)
+
+# Returns the default value instead of None for missing keys
+prefs = await store.get(key="user:new", collection="preferences")
+print(prefs)  # {"theme": "light", "language": "en"}
 ```
 
 ---

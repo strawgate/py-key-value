@@ -36,7 +36,7 @@ Local stores are stored in memory or on disk, local to the application.
 | Disk (Per-Collection) | Stable | Persistent storage with separate files per collection |
 | DuckDB | Unstable | In-process SQL OLAP database with native JSON storage |
 | chDB | Unstable | Embedded ClickHouse engine with SQL access to stored data |
-| FileTree (test) | Unstable | Directory-based storage with JSON files for visual inspection |
+| FileTree | Stable | Directory-based storage with JSON files for visual inspection |
 | Null (test) | N/A | No-op store for testing without side effects |
 | RocksDB | Unstable | High-performance embedded database |
 | Simple (test) | N/A | Simple in-memory store for testing |

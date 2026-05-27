@@ -33,8 +33,10 @@ pip install py-key-value-aio[mongodb]
 # Firestore support
 pip install py-key-value-aio[firestore]
 
-# All backends
-pip install py-key-value-aio[all]
+# Install multiple backends at once
+pip install py-key-value-aio[azure-tables,firestore,elasticsearch]
+# Other available extras: duckdb, memcached, mongodb, opensearch,
+# postgresql, rocksdb, s3, chdb, valkey, vault, keyring, aerospike
 ```
 
 ## Basic Usage
