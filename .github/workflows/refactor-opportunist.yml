@@ -1,7 +1,7 @@
-name: Bug Hunter
+name: Refactor Opportunist
 on:
   schedule:
-    - cron: "0 11 * * 1-5"
+    - cron: "0 14 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -12,8 +12,8 @@ permissions:
 
 jobs:
   run:
-    uses: elastic/ai-github-actions/.github/workflows/gh-aw-bug-hunter.lock.yml@main
+    uses: elastic/ai-github-actions/.github/workflows/gh-aw-refactor-opportunist.lock.yml@main
     with:
-      title-prefix: "[bug-hunter]"
+      title-prefix: "[refactor-opportunist]"
     secrets:
       COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}

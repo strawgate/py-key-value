@@ -1,19 +1,18 @@
-name: Bug Hunter
+name: Breaking Change Detector
 on:
   schedule:
-    - cron: "0 11 * * 1-5"
+    - cron: "0 13 * * 1-5"
   workflow_dispatch:
 
 permissions:
-  actions: read
   contents: read
   issues: write
   pull-requests: read
 
 jobs:
   run:
-    uses: elastic/ai-github-actions/.github/workflows/gh-aw-bug-hunter.lock.yml@main
+    uses: elastic/ai-github-actions/.github/workflows/gh-aw-breaking-change-detector.lock.yml@main
     with:
-      title-prefix: "[bug-hunter]"
+      title-prefix: "[breaking-change]"
     secrets:
       COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
