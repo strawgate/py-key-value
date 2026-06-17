@@ -5,6 +5,7 @@ from inline_snapshot import snapshot
 
 from key_value.aio._utils.managed_entry import ManagedEntry
 from key_value.aio._utils.serialization import BasicSerializationAdapter
+from key_value.aio.errors import DeserializationError
 
 FIXED_DATETIME_ONE = datetime(2025, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 FIXED_DATETIME_ONE_ISOFORMAT = FIXED_DATETIME_ONE.isoformat()
@@ -80,3 +81,13 @@ class TestBasicSerializationAdapter:
 
         assert adapter.load_dict(data=adapter.dump_dict(entry=TEST_ENTRY_TWO)) == snapshot(TEST_ENTRY_TWO)
         assert adapter.load_json(json_str=adapter.dump_json(entry=TEST_ENTRY_TWO)) == snapshot(TEST_ENTRY_TWO)
+
+    @pytest.mark.parametrize("field", ["created_at", "expires_at"])
+    def test_load_dict_rejects_empty_iso_datetime_fields(self, adapter: BasicSerializationAdapter, field: str) -> None:
+        with pytest.raises(DeserializationError):
+            adapter.load_dict(data={field: "", "value": {}})
+
+    @pytest.mark.parametrize("field", ["created_at", "expires_at"])
+    def test_load_dict_rejects_invalid_iso_datetime_string(self, adapter: BasicSerializationAdapter, field: str) -> None:
+        with pytest.raises(DeserializationError):
+            adapter.load_dict(data={field: "not-a-date", "value": {}})

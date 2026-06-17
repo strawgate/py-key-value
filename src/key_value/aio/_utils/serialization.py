@@ -74,14 +74,18 @@ class SerializationAdapter(ABC):
         managed_entry_proto: dict[str, Any] = {}
 
         if self._date_format == "isoformat":
-            if created_at := key_must_be(data, key="created_at", expected_type=str):
+            created_at = key_must_be(data, key="created_at", expected_type=str)
+            if created_at is not None:
                 managed_entry_proto["created_at"] = parse_datetime_str(created_at)
-            if expires_at := key_must_be(data, key="expires_at", expected_type=str):
+            expires_at = key_must_be(data, key="expires_at", expected_type=str)
+            if expires_at is not None:
                 managed_entry_proto["expires_at"] = parse_datetime_str(expires_at)
         elif self._date_format == "datetime":
-            if created_at := key_must_be(data, key="created_at", expected_type=datetime):
+            created_at = key_must_be(data, key="created_at", expected_type=datetime)
+            if created_at is not None:
                 managed_entry_proto["created_at"] = created_at
-            if expires_at := key_must_be(data, key="expires_at", expected_type=datetime):
+            expires_at = key_must_be(data, key="expires_at", expected_type=datetime)
+            if expires_at is not None:
                 managed_entry_proto["expires_at"] = expires_at
 
         if "value" not in data:
