@@ -60,6 +60,26 @@ class TestFileTreeStore(BaseStoreTests):
         assert await store.delete(collection="test", key="race_key") is False
         assert await store.get(collection="test", key="race_key") is None
 
+    async def test_get_returns_none_when_file_disappears_after_exists_check(
+        self,
+        store: FileTreeStore,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        """get should report a miss when another actor removes the file mid-read."""
+        await store.put(collection="test", key="race_key", value={"data": "value"})
+
+        original_exists = AsyncPath.exists
+
+        async def exists_then_external_removal(path: AsyncPath) -> bool:
+            result = await original_exists(path)
+            if Path(path).name == "race_key.json":
+                Path(path).unlink()
+            return result
+
+        monkeypatch.setattr(AsyncPath, "exists", exists_then_external_removal)
+
+        assert await store.get(collection="test", key="race_key") is None
+
 
 class TestFileTreeStorePathTraversal:
     """Test suite for FileTreeStore path traversal security."""
