@@ -270,7 +270,12 @@ class DiskCollectionInfo:
         if not await key_path.exists():
             return None
 
-        data_dict: dict[str, Any] = await read_file(file=key_path)
+        try:
+            data_dict: dict[str, Any] = await read_file(file=key_path)
+        except FileNotFoundError:
+            # Another actor removed the entry between the exists() check and the read.
+            # Report a miss, the same as delete_entry does when the file is already gone.
+            return None
 
         return self.serialization_adapter.load_dict(data=data_dict)
 
