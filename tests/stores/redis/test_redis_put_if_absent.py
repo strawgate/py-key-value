@@ -15,7 +15,7 @@ async def test_redis_set_if_absent_uses_atomic_set() -> None:
         cast("Redis", client),
         "collection::key",
         '{"value": 1}',
-        300,
+        0.5,
     )
 
     assert stored is True
@@ -23,5 +23,5 @@ async def test_redis_set_if_absent_uses_atomic_set() -> None:
         name="collection::key",
         value='{"value": 1}',
         nx=True,
-        ex=300,
+        px=500,
     )

@@ -1,3 +1,4 @@
+import math
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Literal, overload
@@ -173,10 +174,11 @@ async def _redis_set_if_absent(
     client: Redis,
     name: str,
     value: str,
-    ttl: int | None,
+    ttl: float | None,
 ) -> bool:
     """Set a value atomically when its key does not exist."""
-    result = await client.set(name=name, value=value, nx=True, ex=ttl)
+    ttl_ms = max(math.ceil(ttl * 1000), 1) if ttl is not None else None
+    result = await client.set(name=name, value=value, nx=True, px=ttl_ms)
     return bool(result)
 
 
@@ -390,12 +392,11 @@ class RedisStore(BasePutIfAbsentStore, BaseDestroyStore, BaseEnumerateKeysStore,
             key=key,
             collection=collection,
         )
-        ttl = max(int(managed_entry.ttl), 1) if managed_entry.ttl is not None else None
         return await _redis_set_if_absent(
             self._client,
             combo_key,
             json_value,
-            ttl,
+            managed_entry.ttl,
         )
 
     @override

@@ -352,7 +352,6 @@ class PutIfAbsentStoreTestMixin:
             value={"winner": 2},
         )
 
-    @pytest.mark.skipif(condition=not async_running_in_event_loop(), reason="Cannot run concurrent operations outside of event loop")
     async def test_put_if_absent_is_atomic(self, store: BaseStore):
         assert isinstance(store, AsyncPutIfAbsentProtocol)
 
