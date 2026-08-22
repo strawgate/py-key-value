@@ -1,6 +1,7 @@
 import sys
 from dataclasses import dataclass
 from datetime import datetime
+from threading import RLock
 from typing import Any
 
 from typing_extensions import override
@@ -13,6 +14,7 @@ from key_value.aio.stores.base import (
     BaseDestroyStore,
     BaseEnumerateCollectionsStore,
     BaseEnumerateKeysStore,
+    BasePutIfAbsentStore,
 )
 
 try:
@@ -64,30 +66,45 @@ class MemoryCollection:
         )
 
         self._serialization_adapter = BasicSerializationAdapter()
+        self._lock = RLock()
 
     def get(self, key: str) -> ManagedEntry | None:
-        managed_entry_str: MemoryCacheEntry | None = self._cache.get(key)
+        with self._lock:
+            managed_entry_str: MemoryCacheEntry | None = self._cache.get(key)
 
-        if managed_entry_str is None:
-            return None
+            if managed_entry_str is None:
+                return None
 
-        managed_entry: ManagedEntry = self._serialization_adapter.load_json(json_str=managed_entry_str.json_str)
+            managed_entry: ManagedEntry = self._serialization_adapter.load_json(json_str=managed_entry_str.json_str)
 
-        return managed_entry
+            return managed_entry
 
     def put(self, key: str, value: ManagedEntry) -> None:
-        json_str: str = self._serialization_adapter.dump_json(entry=value)
-        self._cache[key] = MemoryCacheEntry(json_str=json_str, expires_at=value.expires_at)
+        with self._lock:
+            json_str: str = self._serialization_adapter.dump_json(entry=value)
+            self._cache[key] = MemoryCacheEntry(json_str=json_str, expires_at=value.expires_at)
+
+    def put_if_absent(self, key: str, value: ManagedEntry) -> bool:
+        with self._lock:
+            existing = self.get(key)
+            if existing is not None and not existing.is_expired:
+                return False
+            self.put(key, value)
+            return True
 
     def delete(self, key: str) -> bool:
-        return self._cache.pop(key, None) is not None
+        with self._lock:
+            return self._cache.pop(key, None) is not None
 
     def keys(self, *, limit: int | None = None) -> list[str]:
-        limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
-        return list(self._cache.keys())[:limit]
+        with self._lock:
+            limit = min(limit or DEFAULT_PAGE_SIZE, PAGE_LIMIT)
+            return list(self._cache.keys())[:limit]
 
 
-class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseEnumerateKeysStore):
+class MemoryStore(
+    BasePutIfAbsentStore, BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseEnumerateKeysStore
+):
     """A fixed-size in-memory key-value store using TLRU (Time-aware Least Recently Used) cache."""
 
     max_entries_per_collection: int
@@ -172,6 +189,17 @@ class MemoryStore(BaseDestroyStore, BaseDestroyCollectionStore, BaseEnumerateCol
     ) -> None:
         collection_cache = self._get_collection_or_raise(collection)
         collection_cache.put(key=key, value=managed_entry)
+
+    @override
+    async def _put_managed_entry_if_absent(
+        self,
+        *,
+        key: str,
+        collection: str,
+        managed_entry: ManagedEntry,
+    ) -> bool:
+        collection_cache = self._get_collection_or_raise(collection)
+        return collection_cache.put_if_absent(key=key, value=managed_entry)
 
     @override
     async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:

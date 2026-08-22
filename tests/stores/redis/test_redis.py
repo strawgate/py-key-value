@@ -12,7 +12,11 @@ from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.redis import RedisStore
 from tests.conftest import should_skip_docker_tests
-from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
+from tests.stores.base import (
+    BaseStoreTests,
+    ContextManagerStoreTestMixin,
+    PutIfAbsentStoreTestMixin,
+)
 
 # Redis test configuration
 REDIS_DB = 15  # Use a separate database for tests
@@ -34,7 +38,11 @@ def get_client_from_store(store: RedisStore) -> Redis:
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
-class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
+class TestRedisStore(
+    ContextManagerStoreTestMixin,
+    PutIfAbsentStoreTestMixin,
+    BaseStoreTests,
+):
     @pytest.fixture(autouse=True, scope="module", params=REDIS_VERSIONS_TO_TEST)
     def redis_container(self, request: pytest.FixtureRequest):
         version = request.param

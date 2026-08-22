@@ -10,7 +10,13 @@ from key_value.aio._utils.compound import compound_key, get_keys_from_compound_k
 from key_value.aio._utils.managed_entry import ManagedEntry
 from key_value.aio._utils.serialization import BasicSerializationAdapter, SerializationAdapter
 from key_value.aio.errors import DeserializationError
-from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseEnumerateKeysStore, BaseStore
+from key_value.aio.stores.base import (
+    BaseContextManagerStore,
+    BaseDestroyStore,
+    BaseEnumerateKeysStore,
+    BasePutIfAbsentStore,
+    BaseStore,
+)
 
 try:
     from redis.asyncio import Redis
@@ -163,6 +169,17 @@ async def _redis_setex(client: Redis, name: str, time: int, value: str) -> None:
     _ = await client.setex(name=name, time=time, value=value)
 
 
+async def _redis_set_if_absent(
+    client: Redis,
+    name: str,
+    value: str,
+    ttl: int | None,
+) -> bool:
+    """Set a value atomically when its key does not exist."""
+    result = await client.set(name=name, value=value, nx=True, ex=ttl)
+    return bool(result)
+
+
 async def _redis_pipeline_execute(pipeline: Any) -> None:
     """Execute a Redis pipeline."""
     await pipeline.execute()
@@ -183,7 +200,7 @@ async def _redis_flushdb(client: Redis) -> bool:
     return await client.flushdb()  # pyright: ignore[reportUnknownMemberType]
 
 
-class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):
+class RedisStore(BasePutIfAbsentStore, BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):
     """Redis-based key-value store."""
 
     _client: Redis
@@ -358,6 +375,28 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             await _redis_setex(self._client, combo_key, ttl, json_value)
         else:
             await _redis_set(self._client, combo_key, json_value)
+
+    @override
+    async def _put_managed_entry_if_absent(
+        self,
+        *,
+        key: str,
+        collection: str,
+        managed_entry: ManagedEntry,
+    ) -> bool:
+        combo_key = compound_key(collection=collection, key=key)
+        json_value = self._adapter.dump_json(
+            entry=managed_entry,
+            key=key,
+            collection=collection,
+        )
+        ttl = max(int(managed_entry.ttl), 1) if managed_entry.ttl is not None else None
+        return await _redis_set_if_absent(
+            self._client,
+            combo_key,
+            json_value,
+            ttl,
+        )
 
     @override
     async def _put_managed_entries(

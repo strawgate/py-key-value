@@ -71,6 +71,7 @@ pip install py-key-value-aio[memory]
 - Extremely fast
 - No external dependencies
 - Thread-safe
+- Atomic `put_if_absent()` support
 
 ---
 
@@ -595,6 +596,7 @@ pip install py-key-value-aio[redis]
 - Production-ready
 - Rich feature set
 - Horizontal scaling support
+- Atomic `put_if_absent()` support
 - SSL/TLS and mutual TLS connection options
 - **Stable storage format**
 

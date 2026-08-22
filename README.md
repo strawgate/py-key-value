@@ -174,8 +174,8 @@ asyncio.run(main())
 
 - **Async**: `key_value.aio.protocols.AsyncKeyValue` — async
   `get/put/delete/ttl` and bulk variants; optional protocol segments for
-  culling, destroying stores/collections, and enumerating keys/collections
-  implemented by capable stores.
+  conditional writes, culling, destroying stores/collections, and enumerating
+  keys/collections implemented by capable stores.
 
 The protocols offer a simple interface for your application to interact with
 the store:
@@ -192,6 +192,22 @@ delete_many(keys: list[str], collection: str | None = None) -> int:
 
 ttl(key: str, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
 ttl_many(keys: list[str], collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
+```
+
+Stores with native atomic conditional writes implement
+`AsyncPutIfAbsentProtocol`. Use a runtime check before calling the optional
+method:
+
+```python
+from key_value.aio.protocols import AsyncPutIfAbsentProtocol
+
+if isinstance(store, AsyncPutIfAbsentProtocol):
+    stored = await store.put_if_absent(
+        key="request-123",
+        value={"status": "started"},
+        collection="idempotency",
+        ttl=300,
+    )
 ```
 
 ### Stores

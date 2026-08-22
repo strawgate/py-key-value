@@ -2,10 +2,10 @@ import pytest
 from typing_extensions import override
 
 from key_value.aio.stores.memory.store import MemoryStore
-from tests.stores.base import BaseStoreTests
+from tests.stores.base import BaseStoreTests, PutIfAbsentStoreTestMixin
 
 
-class TestMemoryStore(BaseStoreTests):
+class TestMemoryStore(PutIfAbsentStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self) -> MemoryStore:

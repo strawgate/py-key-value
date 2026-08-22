@@ -12,7 +12,10 @@ from dirty_equals import IsFloat
 from pydantic import AnyHttpUrl
 
 from key_value.aio.errors import InvalidTTLError, SerializationError
-from key_value.aio.protocols.key_value import AsyncKeyValueProtocol
+from key_value.aio.protocols.key_value import (
+    AsyncKeyValueProtocol,
+    AsyncPutIfAbsentProtocol,
+)
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
 from tests.conftest import async_running_in_event_loop
 from tests.shared.cases import (
@@ -269,6 +272,103 @@ class BaseStoreTests(ABC):
         values = [{"test": f"test_{i}"} for i in range(10)]
         await store.put_many(collection="test_collection", keys=keys, values=values)
         assert await store.delete_many(collection="test_collection", keys=keys) == 10
+
+
+class PutIfAbsentStoreTestMixin:
+    async def test_put_if_absent_stores_new_value(self, store: BaseStore):
+        assert isinstance(store, AsyncPutIfAbsentProtocol)
+
+        stored = await store.put_if_absent(
+            collection="test",
+            key="conditional",
+            value={"winner": 1},
+        )
+
+        assert stored is True
+        assert await store.get(collection="test", key="conditional") == {"winner": 1}
+
+    async def test_put_if_absent_preserves_existing_value(self, store: BaseStore):
+        assert isinstance(store, AsyncPutIfAbsentProtocol)
+        await store.put(
+            collection="test",
+            key="conditional",
+            value={"winner": 1},
+        )
+
+        stored = await store.put_if_absent(
+            collection="test",
+            key="conditional",
+            value={"winner": 2},
+        )
+
+        assert stored is False
+        assert await store.get(collection="test", key="conditional") == {"winner": 1}
+
+    async def test_put_if_absent_applies_ttl(self, store: BaseStore):
+        assert isinstance(store, AsyncPutIfAbsentProtocol)
+
+        stored = await store.put_if_absent(
+            collection="test",
+            key="conditional",
+            value={"winner": 1},
+            ttl=100,
+        )
+        value, ttl = await store.ttl(collection="test", key="conditional")
+
+        assert stored is True
+        assert value == {"winner": 1}
+        assert ttl == IsFloat(approx=100, delta=2)
+
+    async def test_put_if_absent_rejects_invalid_ttl(self, store: BaseStore):
+        assert isinstance(store, AsyncPutIfAbsentProtocol)
+
+        with pytest.raises(InvalidTTLError):
+            await store.put_if_absent(
+                collection="test",
+                key="conditional",
+                value={"winner": 1},
+                ttl=-1,
+            )
+
+    async def test_put_if_absent_accepts_expired_key(self, store: BaseStore):
+        assert isinstance(store, AsyncPutIfAbsentProtocol)
+        assert await store.put_if_absent(
+            collection="test",
+            key="conditional",
+            value={"winner": 1},
+            ttl=1,
+        )
+
+        for _ in range(20):
+            if await store.get(collection="test", key="conditional") is None:
+                break
+            await asyncio.sleep(0.1)
+        else:
+            pytest.fail("conditional entry did not expire")
+
+        assert await store.put_if_absent(
+            collection="test",
+            key="conditional",
+            value={"winner": 2},
+        )
+
+    @pytest.mark.skipif(condition=not async_running_in_event_loop(), reason="Cannot run concurrent operations outside of event loop")
+    async def test_put_if_absent_is_atomic(self, store: BaseStore):
+        assert isinstance(store, AsyncPutIfAbsentProtocol)
+
+        results = await asyncio.gather(
+            *(
+                store.put_if_absent(
+                    collection="test",
+                    key="conditional",
+                    value={"candidate": candidate},
+                )
+                for candidate in range(20)
+            )
+        )
+
+        assert results.count(True) == 1
+        assert results.count(False) == 19
 
 
 class ContextManagerStoreTestMixin:
