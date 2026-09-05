@@ -1,5 +1,11 @@
-from key_value.aio.protocols.key_value import AsyncKeyValue
+import pytest
+
+from key_value.aio.protocols.key_value import (
+    AsyncKeyValue,
+    AsyncPutIfAbsentProtocol,
+)
 from key_value.aio.stores.memory import MemoryStore
+from key_value.aio.stores.null import NullStore
 
 
 async def test_key_value_protocol():
@@ -15,3 +21,10 @@ async def test_key_value_protocol():
 
     assert await memory_store.get(collection="test", key="test") is None
     assert await memory_store.get(collection="test", key="test_2") == {"test": "test"}
+
+
+def test_put_if_absent_is_an_optional_protocol():
+    assert isinstance(MemoryStore(), AsyncPutIfAbsentProtocol)
+    with pytest.warns(UserWarning, match="configured store is unstable"):
+        null_store = NullStore()
+    assert not isinstance(null_store, AsyncPutIfAbsentProtocol)

@@ -1,3 +1,4 @@
+import math
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Literal, overload
@@ -10,7 +11,13 @@ from key_value.aio._utils.compound import compound_key, get_keys_from_compound_k
 from key_value.aio._utils.managed_entry import ManagedEntry
 from key_value.aio._utils.serialization import BasicSerializationAdapter, SerializationAdapter
 from key_value.aio.errors import DeserializationError
-from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyStore, BaseEnumerateKeysStore, BaseStore
+from key_value.aio.stores.base import (
+    BaseContextManagerStore,
+    BaseDestroyStore,
+    BaseEnumerateKeysStore,
+    BasePutIfAbsentStore,
+    BaseStore,
+)
 
 try:
     from redis.asyncio import Redis
@@ -153,14 +160,25 @@ async def _redis_mget(client: Redis, keys: list[str]) -> list[Any]:
     return await client.mget(keys=keys)
 
 
-async def _redis_set(client: Redis, name: str, value: str) -> None:
-    """Set a value in Redis without TTL."""
-    _ = await client.set(name=name, value=value)
+def _ttl_to_milliseconds(ttl: float | None) -> int | None:
+    """Preserve TTL precision while keeping Redis expiry positive."""
+    return max(math.ceil(ttl * 1000), 1) if ttl is not None else None
 
 
-async def _redis_setex(client: Redis, name: str, time: int, value: str) -> None:
-    """Set a value in Redis with TTL."""
-    _ = await client.setex(name=name, time=time, value=value)
+async def _redis_set(client: Redis, name: str, value: str, ttl: float | None = None) -> None:
+    """Set a value in Redis with an optional TTL."""
+    _ = await client.set(name=name, value=value, px=_ttl_to_milliseconds(ttl))
+
+
+async def _redis_set_if_absent(
+    client: Redis,
+    name: str,
+    value: str,
+    ttl: float | None,
+) -> bool:
+    """Set a value atomically when its key does not exist."""
+    result = await client.set(name=name, value=value, nx=True, px=_ttl_to_milliseconds(ttl))
+    return bool(result)
 
 
 async def _redis_pipeline_execute(pipeline: Any) -> None:
@@ -183,7 +201,7 @@ async def _redis_flushdb(client: Redis) -> bool:
     return await client.flushdb()  # pyright: ignore[reportUnknownMemberType]
 
 
-class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):
+class RedisStore(BasePutIfAbsentStore, BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerStore, BaseStore):
     """Redis-based key-value store."""
 
     _client: Redis
@@ -351,13 +369,28 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
         json_value: str = self._adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
-        if managed_entry.ttl is not None:
-            # Redis does not support <= 0 TTLs
-            ttl = max(int(managed_entry.ttl), 1)
+        await _redis_set(self._client, combo_key, json_value, managed_entry.ttl)
 
-            await _redis_setex(self._client, combo_key, ttl, json_value)
-        else:
-            await _redis_set(self._client, combo_key, json_value)
+    @override
+    async def _put_managed_entry_if_absent(
+        self,
+        *,
+        key: str,
+        collection: str,
+        managed_entry: ManagedEntry,
+    ) -> bool:
+        combo_key = compound_key(collection=collection, key=key)
+        json_value = self._adapter.dump_json(
+            entry=managed_entry,
+            key=key,
+            collection=collection,
+        )
+        return await _redis_set_if_absent(
+            self._client,
+            combo_key,
+            json_value,
+            managed_entry.ttl,
+        )
 
     @override
     async def _put_managed_entries(
@@ -384,8 +417,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
             return
 
-        # Convert TTL to integer seconds for Redis
-        ttl_seconds: int = max(int(ttl), 1)
+        ttl_ms = _ttl_to_milliseconds(ttl)
 
         # Use pipeline for bulk operations
         pipeline = self._client.pipeline()
@@ -394,7 +426,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             combo_key: str = compound_key(collection=collection, key=key)
             json_value = self._adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
-            pipeline.setex(name=combo_key, time=ttl_seconds, value=json_value)
+            pipeline.set(name=combo_key, value=json_value, px=ttl_ms)
 
         await _redis_pipeline_execute(pipeline)
 

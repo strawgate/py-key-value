@@ -125,6 +125,37 @@ class AsyncKeyValueProtocol(Protocol):
 
 
 @runtime_checkable
+class AsyncPutIfAbsentProtocol(Protocol):
+    """Protocol segment for atomic conditional writes."""
+
+    async def put_if_absent(
+        self,
+        key: str,
+        value: Mapping[str, Any],
+        *,
+        collection: str | None = None,
+        ttl: SupportsFloat | None = None,
+    ) -> bool:
+        """Store a value only when the key does not already exist.
+
+        The existence check and write must be one atomic operation. Expired
+        entries are treated as absent.
+
+        Args:
+            key: The key to store the value under.
+            value: The value to store.
+            collection: The collection to store the value in. If no collection
+                is provided, the default collection is used.
+            ttl: Optional time-to-live in seconds.
+
+        Returns:
+            True when the value was stored, or False when an unexpired value
+            already exists.
+        """
+        ...
+
+
+@runtime_checkable
 class AsyncCullProtocol(Protocol):
     async def cull(self) -> None:
         """Cull the store.

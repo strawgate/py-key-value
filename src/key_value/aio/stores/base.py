@@ -27,6 +27,7 @@ from key_value.aio.protocols.key_value import (
     AsyncEnumerateCollectionsProtocol,
     AsyncEnumerateKeysProtocol,
     AsyncKeyValueProtocol,
+    AsyncPutIfAbsentProtocol,
 )
 
 SEED_DATA_TYPE = Mapping[str, Mapping[str, Mapping[str, Any]]]
@@ -404,6 +405,47 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
             message="A configured store is unstable and may change in a backwards incompatible way. Use at your own risk.",
             category=UserWarning,
             stacklevel=2,
+        )
+
+
+class BasePutIfAbsentStore(BaseStore, AsyncPutIfAbsentProtocol, ABC):
+    """Base class for stores with native atomic conditional writes."""
+
+    @abstractmethod
+    async def _put_managed_entry_if_absent(
+        self,
+        *,
+        collection: str,
+        key: str,
+        managed_entry: ManagedEntry,
+    ) -> bool:
+        """Atomically store a managed entry only when its key is absent."""
+        ...
+
+    @bear_enforce
+    @override
+    async def put_if_absent(
+        self,
+        key: str,
+        value: Mapping[str, Any],
+        *,
+        collection: str | None = None,
+        ttl: SupportsFloat | None = None,
+    ) -> bool:
+        """Store a value only when the key does not already exist."""
+        collection = collection or self.default_collection
+        await self.setup_collection(collection=collection)
+
+        created_at, _, expires_at = prepare_entry_timestamps(ttl=ttl)
+        managed_entry = ManagedEntry(
+            value=value,
+            created_at=created_at,
+            expires_at=expires_at,
+        )
+        return await self._put_managed_entry_if_absent(
+            collection=collection,
+            key=key,
+            managed_entry=managed_entry,
         )
 
 
