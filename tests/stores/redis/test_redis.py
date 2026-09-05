@@ -1,8 +1,8 @@
 import json
-from typing import Any
+from typing import Any, Literal
 
 import pytest
-from dirty_equals import IsDatetime
+from dirty_equals import IsDatetime, IsInt
 from inline_snapshot import snapshot
 from redis.asyncio.client import Redis
 from testcontainers.core.container import DockerContainer
@@ -88,6 +88,29 @@ class TestRedisStore(
     @pytest.fixture
     def redis_client(self, store: RedisStore) -> Redis:
         return get_client_from_store(store=store)
+
+    @pytest.mark.parametrize("ttl", [None, 0.5, 1.9, 2.0])
+    @pytest.mark.parametrize("write_method", ["put", "put_many", "put_if_absent"])
+    async def test_writes_preserve_ttl_precision(
+        self,
+        store: RedisStore,
+        redis_client: Redis,
+        ttl: float | None,
+        write_method: Literal["put", "put_many", "put_if_absent"],
+    ):
+        if write_method == "put_many":
+            await store.put_many(collection="test", keys=["ttl_precision"], values=[{"value": 1}], ttl=ttl)
+        elif write_method == "put":
+            await store.put(collection="test", key="ttl_precision", value={"value": 1}, ttl=ttl)
+        else:
+            assert await store.put_if_absent(collection="test", key="ttl_precision", value={"value": 1}, ttl=ttl)
+
+        remaining_ms = await redis_client.pttl("test::ttl_precision")
+
+        if ttl is None:
+            assert remaining_ms == -1
+        else:
+            assert remaining_ms == IsInt(approx=int(ttl * 1000), delta=100)
 
     async def test_redis_url_connection(self, setup_redis: None, redis_host: str, redis_port: int):
         """Test Redis store creation with URL."""
