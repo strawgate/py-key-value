@@ -90,6 +90,12 @@ class TestFileTreeStore(BaseStoreTests):
     def _count_entry_files(data_directory: Path) -> int:
         return sum(1 for p in data_directory.rglob("*.json") if not p.name.endswith("-info.json"))
 
+    @staticmethod
+    def _the_collection_dir(data_directory: Path) -> Path:
+        collection_dirs = [p for p in data_directory.iterdir() if p.is_dir()]
+        assert len(collection_dirs) == 1
+        return collection_dirs[0]
+
     async def _wait_until_expired(self, store: FileTreeStore, *, collection: str, key: str) -> None:
         for _ in range(8):
             await asyncio.sleep(0.25)
@@ -201,6 +207,51 @@ class TestFileTreeStore(BaseStoreTests):
 
         assert external_file.exists()
 
+    @pytest.mark.skipif(os.name == "nt", reason="Symlinks require elevated privileges on Windows")
+    async def test_cull_skips_symlinked_key_file_outside_root(
+        self, store: FileTreeStore, per_test_temp_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """cull() must not read through a file symlink inside a legitimate collection to reach files outside the store root.
+
+        unlink() on a symlink removes only the link, never its target, so asserting the target still exists
+        would pass even if cull() read straight through the symlink first. Assert on the read itself instead.
+        """
+        await store.put(collection="test", key="real_key", value={"data": "value"})
+
+        external_file = tmp_path / "leaked.json"
+        external_file.write_text('{"version": 1, "value": {"secret": "data"}, "expires_at": "2000-01-01T00:00:00+00:00"}')
+
+        (self._the_collection_dir(per_test_temp_dir) / "escape_link.json").symlink_to(external_file)
+
+        original_read_file = filetree_store_module.read_file
+        read_paths: list[Path] = []
+
+        async def read_file_and_record(file: AsyncPath) -> dict[str, Any]:
+            # Resolve now, while the symlink still exists -- cull() may unlink it (the link, not the
+            # target) before this test's assertion runs, at which point resolving it can no longer
+            # recover what it used to point to.
+            read_paths.append(Path(file).resolve())
+            return await original_read_file(file)
+
+        monkeypatch.setattr(filetree_store_module, "read_file", read_file_and_record)
+
+        await store.cull()
+
+        assert external_file.resolve() not in read_paths
+
+    async def test_cull_skips_invalid_json_and_continues(self, store: FileTreeStore, per_test_temp_dir: Path):
+        """A file containing invalid JSON syntax (not just the wrong shape) must not stop the rest of the sweep."""
+        await store.put(collection="test", key="short_lived", value={"data": "value"}, ttl=1)
+        await self._wait_until_expired(store, collection="test", key="short_lived")
+
+        corrupt_file = self._the_collection_dir(per_test_temp_dir) / "corrupt.json"
+        corrupt_file.write_text("{invalid")
+
+        await store.cull()
+
+        assert corrupt_file.exists()
+        assert self._count_entry_files(per_test_temp_dir) == 1
+
     async def test_cull_does_not_delete_concurrently_replaced_entry(
         self, store: FileTreeStore, per_test_temp_dir: Path, monkeypatch: pytest.MonkeyPatch
     ):
@@ -208,20 +259,17 @@ class TestFileTreeStore(BaseStoreTests):
         await store.put(collection="test", key="racy", value={"data": "stale"}, ttl=1)
         await self._wait_until_expired(store, collection="test", key="racy")
 
-        original_stat = AsyncPath.stat
-        stat_calls_by_name: dict[str, int] = {}
+        original_read_file = filetree_store_module.read_file
 
-        async def stat_with_concurrent_replace(self_path: AsyncPath) -> os.stat_result:
-            name = Path(self_path).name
-            stat_calls_by_name[name] = stat_calls_by_name.get(name, 0) + 1
-            if name.startswith("racy") and stat_calls_by_name[name] == 2:
-                # cull() already read the stale value and is about to re-check the file before
-                # deleting it (its second stat() call on this path) -- replace it right now, as a
+        async def read_file_then_replace(file: AsyncPath) -> dict[str, Any]:
+            result = await original_read_file(file)
+            if Path(file).name.startswith("racy"):
+                # cull() has stat()'d and read the stale value; replace it right now, as a
                 # concurrent put() landing in that exact window would.
                 await store.put(collection="test", key="racy", value={"data": "fresh"}, ttl=100)
-            return await original_stat(self_path)
+            return result
 
-        monkeypatch.setattr(AsyncPath, "stat", stat_with_concurrent_replace)
+        monkeypatch.setattr(filetree_store_module, "read_file", read_file_then_replace)
 
         await store.cull()
 
@@ -232,13 +280,12 @@ class TestFileTreeStore(BaseStoreTests):
         await store.put(collection="test", key="short_lived", value={"data": "value"}, ttl=1)
         await self._wait_until_expired(store, collection="test", key="short_lived")
 
-        collection_dirs = [p for p in per_test_temp_dir.iterdir() if p.is_dir()]
-        assert len(collection_dirs) == 1
-        (collection_dirs[0] / "corrupt.json").write_text('{"not": "a managed entry"}')
+        corrupt_file = self._the_collection_dir(per_test_temp_dir) / "corrupt.json"
+        corrupt_file.write_text('{"not": "a managed entry"}')
 
         await store.cull()
 
-        assert (collection_dirs[0] / "corrupt.json").exists()
+        assert corrupt_file.exists()
         assert self._count_entry_files(per_test_temp_dir) == 1
 
 

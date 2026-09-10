@@ -610,26 +610,31 @@ class FileTreeStore(BaseCullStore):
     async def _cull(self) -> None:
         """Delete expired entries from disk.
 
-        Walks the data directory itself, rather than the in-memory or on-disk
-        collection index, so it reclaims space for every entry physically present
-        on disk -- including collections this store instance has never set up.
+        Walks the data directory itself rather than the collection index, so it also reclaims
+        space for collections this store instance has never set up.
         """
         async for collection_directory in self._get_data_directories():
             try:
                 await validate_path_within_directory(path=collection_directory, root_directory=self._data_directory)
             except PathSecurityError:
-                # A symlink under the data directory escapes the store root; don't follow it.
+                # A symlink escapes the store root; don't follow it.
                 continue
 
             async for file_path in iter_key_files(collection_directory):
                 try:
-                    data_dict: dict[str, Any] = await read_file(file=file_path)
-                    stat_at_read = await file_path.stat()
-                except FileNotFoundError:
+                    await validate_path_within_directory(path=file_path, root_directory=self._data_directory)
+                except PathSecurityError:
+                    # Same, for a symlinked file inside an otherwise-legitimate collection.
                     continue
 
                 try:
+                    # Stat before reading so it reflects what we're about to read, not whatever a
+                    # concurrent put() has since replaced this path with.
+                    stat_at_read = await file_path.stat()
+                    data_dict: dict[str, Any] = await read_file(file=file_path)
                     entry: ManagedEntry = self._serialization_adapter.load_dict(data=data_dict)
+                except FileNotFoundError:
+                    continue
                 except Exception as e:
                     # A file that doesn't parse as a ManagedEntry shouldn't stop the rest of the sweep.
                     logger.warning(
@@ -644,8 +649,7 @@ class FileTreeStore(BaseCullStore):
 
                 with contextlib.suppress(FileNotFoundError):
                     stat_before_unlink = await file_path.stat()
-                    # A concurrent put() atomically replaces this path (write-temp-then-rename), which
-                    # changes both identity markers. Skip deleting if the file was replaced since we
-                    # read it, so we never unlink a value that arrived after our expiry check.
-                    if (stat_before_unlink.st_ino, stat_before_unlink.st_mtime_ns) == (stat_at_read.st_ino, stat_at_read.st_mtime_ns):
+                    # Skip the delete if the file was replaced since we read it, so a concurrent
+                    # put() landing here can't have its fresh value deleted.
+                    if stat_before_unlink.st_mtime_ns == stat_at_read.st_mtime_ns:
                         await file_path.unlink()
