@@ -85,7 +85,7 @@ boto3 = [
 
 [[package]]
 name = "aiofile"
-version = "3.9.0"
+version = "3.8.8"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version < '3.11' and sys_platform != 'win32'",
@@ -94,9 +94,9 @@ resolution-markers = [
 dependencies = [
     { name = "caio", version = "0.9.24", source = { registry = "https://pypi.org/simple" } },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/67/e2/d7cb819de8df6b5c1968a2756c3cb4122d4fa2b8fc768b53b7c9e5edb646/aiofile-3.9.0.tar.gz", hash = "sha256:e5ad718bb148b265b6df1b3752c4d1d83024b93da9bd599df74b9d9ffcf7919b", size = 17943, upload-time = "2024-10-08T10:39:35.846Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/41/6d/e03ef9694346a55da965538f3e28461bd9fc71e21f997269d03b3cfc8755/aiofile-3.8.8.tar.gz", hash = "sha256:41f3dc40bd730459d58610476e82e5efb2f84ae6e9fa088a9545385d838b8a43", size = 19456, upload-time = "2023-08-22T12:48:38.88Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/50/25/da1f0b4dd970e52bf5a36c204c107e11a0c6d3ed195eba0bfbc664c312b2/aiofile-3.9.0-py3-none-any.whl", hash = "sha256:ce2f6c1571538cbdfa0143b04e16b208ecb0e9cb4148e528af8a640ed51cc8aa", size = 19539, upload-time = "2024-10-08T10:39:32.955Z" },
+    { url = "https://files.pythonhosted.org/packages/76/ea/b6aae3275bb0991c43fff401e7b8db198047b6f692e8954520ec7aed3652/aiofile-3.8.8-py3-none-any.whl", hash = "sha256:41e8845cce055779cd77713d949a339deb012eab605b857765e8f8e52a5ed811", size = 19866, upload-time = "2023-08-22T12:48:37.144Z" },
 ]
 
 [[package]]
@@ -2504,7 +2504,7 @@ elasticsearch = [
     { name = "elasticsearch" },
 ]
 filetree = [
-    { name = "aiofile", version = "3.9.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "aiofile", version = "3.8.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "aiofile", version = "3.12.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "anyio" },
 ]
@@ -2584,7 +2584,7 @@ requires-dist = [
     { name = "aioboto3", marker = "extra == 'dynamodb'", specifier = ">=13.3.0" },
     { name = "aioboto3", marker = "extra == 's3'", specifier = ">=13.3.0" },
     { name = "aiofile", marker = "python_full_version >= '3.11' and extra == 'filetree'", specifier = ">=3.12.3" },
-    { name = "aiofile", marker = "python_full_version < '3.11' and extra == 'filetree'", specifier = ">=3.5.0,<3.10" },
+    { name = "aiofile", marker = "python_full_version < '3.11' and extra == 'filetree'", specifier = ">=3.5.0,!=3.9.0,<3.10" },
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
     { name = "anyio", marker = "extra == 'filetree'", specifier = ">=4.4.0" },
