@@ -33,6 +33,27 @@ def get_client_from_store(store: RedisStore) -> Redis:
     return store._client
 
 
+class TestRedisStoreUsername:
+    """Regression tests for threading `username` through to the underlying Redis client.
+
+    These construct a client without connecting (redis-py connects lazily), so they don't need Docker.
+    """
+
+    def test_username_passed_through_host_port_path(self):
+        store = RedisStore(host="localhost", port=6379, db=0, username="alice")
+        connection_kwargs: dict[str, Any] = get_client_from_store(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            store=store
+        ).connection_pool.connection_kwargs
+        assert connection_kwargs.get("username") == "alice"
+
+    def test_username_passed_through_url_path(self):
+        store = RedisStore(url="redis://bob:secret@localhost:6379/0")
+        connection_kwargs: dict[str, Any] = get_client_from_store(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            store=store
+        ).connection_pool.connection_kwargs
+        assert connection_kwargs.get("username") == "bob"
+
+
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
 class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.fixture(autouse=True, scope="module", params=REDIS_VERSIONS_TO_TEST)
