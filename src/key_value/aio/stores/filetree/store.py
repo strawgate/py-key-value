@@ -1,6 +1,7 @@
 """FileTreeStore implementation using async filesystem operations."""
 
 import contextlib
+import logging
 import os
 import tempfile
 from collections.abc import AsyncGenerator
@@ -23,6 +24,8 @@ from key_value.aio.errors import PathSecurityError
 from key_value.aio.stores.base import (
     BaseCullStore,
 )
+
+logger = logging.getLogger(__name__)
 
 DIRECTORY_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
 
@@ -388,11 +391,14 @@ async def read_file(file: AsyncPath) -> dict[str, Any]:
 
 
 async def iter_key_files(directory: AsyncPath) -> AsyncGenerator[AsyncPath]:
-    """Yield each key file (`{key}.json`) directly inside a collection directory."""
+    """Yield each key file (`{key}.json`) directly inside a collection directory.
+
+    Collection metadata lives in a separate metadata directory as `{collection}-info.json`,
+    never as `info.json` inside the collection directory itself, so a key literally named
+    "info" is a normal key file here, not metadata.
+    """
     async for item_path in directory.iterdir():
         if not await item_path.is_file() or item_path.suffix != ".json":
-            continue
-        if item_path.stem == "info":
             continue
         yield item_path
 
@@ -609,14 +615,37 @@ class FileTreeStore(BaseCullStore):
         on disk -- including collections this store instance has never set up.
         """
         async for collection_directory in self._get_data_directories():
+            try:
+                await validate_path_within_directory(path=collection_directory, root_directory=self._data_directory)
+            except PathSecurityError:
+                # A symlink under the data directory escapes the store root; don't follow it.
+                continue
+
             async for file_path in iter_key_files(collection_directory):
                 try:
                     data_dict: dict[str, Any] = await read_file(file=file_path)
+                    stat_at_read = await file_path.stat()
                 except FileNotFoundError:
                     continue
 
-                entry: ManagedEntry = self._serialization_adapter.load_dict(data=data_dict)
+                try:
+                    entry: ManagedEntry = self._serialization_adapter.load_dict(data=data_dict)
+                except Exception as e:
+                    # A file that doesn't parse as a ManagedEntry shouldn't stop the rest of the sweep.
+                    logger.warning(
+                        "Skipping unparseable file during cull",
+                        extra={"file": str(file_path), "error": str(e)},
+                        exc_info=True,
+                    )
+                    continue
 
-                if entry.is_expired:
-                    with contextlib.suppress(FileNotFoundError):
+                if not entry.is_expired:
+                    continue
+
+                with contextlib.suppress(FileNotFoundError):
+                    stat_before_unlink = await file_path.stat()
+                    # A concurrent put() atomically replaces this path (write-temp-then-rename), which
+                    # changes both identity markers. Skip deleting if the file was replaced since we
+                    # read it, so we never unlink a value that arrived after our expiry check.
+                    if (stat_before_unlink.st_ino, stat_before_unlink.st_mtime_ns) == (stat_at_read.st_ino, stat_at_read.st_mtime_ns):
                         await file_path.unlink()

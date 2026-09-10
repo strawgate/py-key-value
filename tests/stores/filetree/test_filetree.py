@@ -175,6 +175,72 @@ class TestFileTreeStore(BaseStoreTests):
 
         assert self._count_entry_files(per_test_temp_dir) == 0
 
+    async def test_cull_removes_expired_entry_named_info(self, store: FileTreeStore, per_test_temp_dir: Path):
+        """A key literally named "info" is a normal key file, not collection metadata, so cull() must reap it too."""
+        await store.put(collection="test", key="info", value={"data": "value"}, ttl=1)
+        await self._wait_until_expired(store, collection="test", key="info")
+        assert self._count_entry_files(per_test_temp_dir) == 1
+
+        await store.cull()
+
+        assert self._count_entry_files(per_test_temp_dir) == 0
+
+    @pytest.mark.skipif(os.name == "nt", reason="Symlinks require elevated privileges on Windows")
+    async def test_cull_skips_symlinked_collection_directory_outside_root(
+        self, store: FileTreeStore, per_test_temp_dir: Path, tmp_path: Path
+    ):
+        """cull() must not follow a directory symlink under the data directory to reach files outside the store root."""
+        external_dir = tmp_path / "external"
+        external_dir.mkdir()
+        external_file = external_dir / "leaked.json"
+        external_file.write_text('{"version": 1, "value": {"secret": "data"}, "expires_at": "2000-01-01T00:00:00+00:00"}')
+
+        (per_test_temp_dir / "escape_link").symlink_to(external_dir)
+
+        await store.cull()
+
+        assert external_file.exists()
+
+    async def test_cull_does_not_delete_concurrently_replaced_entry(
+        self, store: FileTreeStore, per_test_temp_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """If a put() replaces an expired file between cull()'s read and its delete check, the fresh value must survive."""
+        await store.put(collection="test", key="racy", value={"data": "stale"}, ttl=1)
+        await self._wait_until_expired(store, collection="test", key="racy")
+
+        original_stat = AsyncPath.stat
+        stat_calls_by_name: dict[str, int] = {}
+
+        async def stat_with_concurrent_replace(self_path: AsyncPath) -> os.stat_result:
+            name = Path(self_path).name
+            stat_calls_by_name[name] = stat_calls_by_name.get(name, 0) + 1
+            if name.startswith("racy") and stat_calls_by_name[name] == 2:
+                # cull() already read the stale value and is about to re-check the file before
+                # deleting it (its second stat() call on this path) -- replace it right now, as a
+                # concurrent put() landing in that exact window would.
+                await store.put(collection="test", key="racy", value={"data": "fresh"}, ttl=100)
+            return await original_stat(self_path)
+
+        monkeypatch.setattr(AsyncPath, "stat", stat_with_concurrent_replace)
+
+        await store.cull()
+
+        assert await store.get(collection="test", key="racy") == {"data": "fresh"}
+
+    async def test_cull_skips_unparseable_entry_and_continues(self, store: FileTreeStore, per_test_temp_dir: Path):
+        """A single malformed .json file in a collection must not stop cull() from reaping other expired entries."""
+        await store.put(collection="test", key="short_lived", value={"data": "value"}, ttl=1)
+        await self._wait_until_expired(store, collection="test", key="short_lived")
+
+        collection_dirs = [p for p in per_test_temp_dir.iterdir() if p.is_dir()]
+        assert len(collection_dirs) == 1
+        (collection_dirs[0] / "corrupt.json").write_text('{"not": "a managed entry"}')
+
+        await store.cull()
+
+        assert (collection_dirs[0] / "corrupt.json").exists()
+        assert self._count_entry_files(per_test_temp_dir) == 1
+
 
 class TestFileTreeStorePathTraversal:
     """Test suite for FileTreeStore path traversal security."""
