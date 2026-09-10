@@ -1,10 +1,13 @@
 """Tests for FileTreeStore."""
 
+import asyncio
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 from anyio import Path as AsyncPath
+from cryptography.fernet import Fernet
 from typing_extensions import override
 
 from key_value.aio._utils.sanitization import PassthroughStrategy
@@ -15,6 +18,9 @@ from key_value.aio.stores.filetree import (
     FileTreeV1CollectionSanitizationStrategy,
     FileTreeV1KeySanitizationStrategy,
 )
+from key_value.aio.stores.filetree import store as filetree_store_module
+from key_value.aio.wrappers.compression import CompressionWrapper
+from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
 from tests.stores.base import BaseStoreTests
 
 
@@ -59,6 +65,115 @@ class TestFileTreeStore(BaseStoreTests):
 
         assert await store.delete(collection="test", key="race_key") is False
         assert await store.get(collection="test", key="race_key") is None
+
+    async def test_get_returns_none_when_file_disappears_before_read(
+        self,
+        store: FileTreeStore,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        """get should return None, not raise, when another actor deletes the file before the read completes."""
+        await store.put(collection="test", key="race_key", value={"data": "value"})
+
+        original_read_file = filetree_store_module.read_file
+
+        async def read_file_after_external_removal(file: AsyncPath) -> dict[str, Any]:
+            if Path(file).name == "race_key.json":
+                Path(file).unlink()
+                raise FileNotFoundError(Path(file))
+            return await original_read_file(file)
+
+        monkeypatch.setattr(filetree_store_module, "read_file", read_file_after_external_removal)
+
+        assert await store.get(collection="test", key="race_key") is None
+
+    @staticmethod
+    def _count_entry_files(data_directory: Path) -> int:
+        return sum(1 for p in data_directory.rglob("*.json") if not p.name.endswith("-info.json"))
+
+    async def _wait_until_expired(self, store: FileTreeStore, *, collection: str, key: str) -> None:
+        for _ in range(8):
+            await asyncio.sleep(0.25)
+            if await store.ttl(collection=collection, key=key) == (None, None):
+                return
+        pytest.fail("entry never expired")
+
+    async def test_cull_removes_expired_entries(self, store: FileTreeStore, per_test_temp_dir: Path):
+        """cull() should delete expired, write-once-never-reread entries from disk, and only those."""
+        await store.put(collection="test", key="short_lived", value={"data": "value"}, ttl=1)
+        await store.put(collection="test", key="long_lived", value={"data": "value"})
+        assert self._count_entry_files(per_test_temp_dir) == 2
+
+        await self._wait_until_expired(store, collection="test", key="short_lived")
+
+        # Expiry is only honored on read; the file is still on disk until cull() runs.
+        assert self._count_entry_files(per_test_temp_dir) == 2
+
+        await store.cull()
+
+        assert self._count_entry_files(per_test_temp_dir) == 1
+        assert await store.get(collection="test", key="long_lived") == {"data": "value"}
+
+    async def test_cull_does_not_depend_on_collection_metadata_index(self, store: FileTreeStore, per_test_temp_dir: Path):
+        """cull() must find expired entries by walking disk, not by trusting the collection metadata index.
+
+        The index only ever lists collections it knows about; deleting it (or a fresh process never having
+        seen it) does not mean the underlying key files are gone.
+        """
+        await store.put(collection="test", key="short_lived", value={"data": "value"}, ttl=1)
+        await self._wait_until_expired(store, collection="test", key="short_lived")
+
+        info_files = list(per_test_temp_dir.glob("*-info.json"))
+        assert info_files, "expected a collection info file to exist before removing it"
+        for info_file in info_files:
+            info_file.unlink()
+
+        assert self._count_entry_files(per_test_temp_dir) == 1
+
+        await store.cull()
+
+        assert self._count_entry_files(per_test_temp_dir) == 0
+
+    async def test_cull_works_through_encryption_and_compression_wrappers(self, store: FileTreeStore, per_test_temp_dir: Path):
+        """cull() reads expires_at directly off disk, so it must not care that `value` is encrypted/compressed.
+
+        Wrappers only transform the `value` payload before it reaches the store; created_at/expires_at are
+        always written in plaintext by the store's own ManagedEntry/serialization layer.
+        """
+        wrapped = CompressionWrapper(
+            key_value=FernetEncryptionWrapper(key_value=store, fernet=Fernet(key=Fernet.generate_key())),
+            min_size_to_compress=1,
+        )
+
+        await wrapped.put(collection="test", key="short_lived", value={"data": "x" * 2048}, ttl=1)
+        assert self._count_entry_files(per_test_temp_dir) == 1
+
+        await self._wait_until_expired(store, collection="test", key="short_lived")
+        assert self._count_entry_files(per_test_temp_dir) == 1
+
+        # cull() is an optional capability that wrappers don't proxy, so it's called on the underlying store.
+        await store.cull()
+
+        assert self._count_entry_files(per_test_temp_dir) == 0
+
+    async def test_cull_discovers_collections_untouched_by_this_instance(self, per_test_temp_dir: Path):
+        """cull() should reclaim space for collections this store instance has never read or written."""
+        writer = FileTreeStore(
+            data_directory=per_test_temp_dir,
+            key_sanitization_strategy=FileTreeV1KeySanitizationStrategy(directory=per_test_temp_dir),
+            collection_sanitization_strategy=FileTreeV1CollectionSanitizationStrategy(directory=per_test_temp_dir),
+        )
+        await writer.put(collection="test", key="short_lived", value={"data": "value"}, ttl=1)
+        await self._wait_until_expired(writer, collection="test", key="short_lived")
+        assert self._count_entry_files(per_test_temp_dir) == 1
+
+        reader = FileTreeStore(
+            data_directory=per_test_temp_dir,
+            key_sanitization_strategy=FileTreeV1KeySanitizationStrategy(directory=per_test_temp_dir),
+            collection_sanitization_strategy=FileTreeV1CollectionSanitizationStrategy(directory=per_test_temp_dir),
+        )
+        await reader.cull()
+
+        assert self._count_entry_files(per_test_temp_dir) == 0
 
 
 class TestFileTreeStorePathTraversal:

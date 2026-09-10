@@ -21,7 +21,7 @@ from key_value.aio._utils.serialization import BasicSerializationAdapter, Serial
 from key_value.aio._utils.time_to_live import now
 from key_value.aio.errors import PathSecurityError
 from key_value.aio.stores.base import (
-    BaseStore,
+    BaseCullStore,
 )
 
 DIRECTORY_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
@@ -253,11 +253,7 @@ class DiskCollectionInfo:
         await validate_path_within_directory(path=path, root_directory=self.root_directory)
 
     async def _list_file_paths(self) -> AsyncGenerator[AsyncPath]:
-        async for item_path in AsyncPath(self.directory).iterdir():
-            if not await item_path.is_file() or item_path.suffix != ".json":
-                continue
-            if item_path.stem == "info":
-                continue
+        async for item_path in iter_key_files(AsyncPath(self.directory)):
             yield item_path
 
     async def get_entry(self, *, key: str) -> ManagedEntry | None:
@@ -267,10 +263,10 @@ class DiskCollectionInfo:
         # Security validation
         await self._validate_path_security(path=key_path)
 
-        if not await key_path.exists():
+        try:
+            data_dict: dict[str, Any] = await read_file(file=key_path)
+        except FileNotFoundError:
             return None
-
-        data_dict: dict[str, Any] = await read_file(file=key_path)
 
         return self.serialization_adapter.load_dict(data=data_dict)
 
@@ -391,7 +387,17 @@ async def read_file(file: AsyncPath) -> dict[str, Any]:
         return load_from_json(json_str=body)
 
 
-class FileTreeStore(BaseStore):
+async def iter_key_files(directory: AsyncPath) -> AsyncGenerator[AsyncPath]:
+    """Yield each key file (`{key}.json`) directly inside a collection directory."""
+    async for item_path in directory.iterdir():
+        if not await item_path.is_file() or item_path.suffix != ".json":
+            continue
+        if item_path.stem == "info":
+            continue
+        yield item_path
+
+
+class FileTreeStore(BaseCullStore):
     """A file-tree based store using directories for collections and files for keys.
 
     This store uses the native filesystem:
@@ -425,8 +431,10 @@ class FileTreeStore(BaseStore):
         - No file locking: Concurrent writes to the same key from multiple processes may
           cause data loss (last write wins). Single-writer or external locking is recommended
           for multi-process scenarios.
-        - No built-in cleanup of expired entries. Expired entries are only filtered out when
-          read via get() or similar methods.
+        - Expired entries are filtered out when read via get() or similar methods, but the
+          underlying file is not removed until something reads the key or `cull()` is called.
+          Call `cull()` periodically (e.g. from a scheduled task) to reclaim disk space from
+          write-once, never-reread keys.
         - Performance may degrade with very large numbers of keys per collection due to
           filesystem directory entry limits.
     """
@@ -591,3 +599,24 @@ class FileTreeStore(BaseStore):
         collection_info: DiskCollectionInfo = self._collection_infos[collection]
 
         return await collection_info.delete_entry(key=key)
+
+    @override
+    async def _cull(self) -> None:
+        """Delete expired entries from disk.
+
+        Walks the data directory itself, rather than the in-memory or on-disk
+        collection index, so it reclaims space for every entry physically present
+        on disk -- including collections this store instance has never set up.
+        """
+        async for collection_directory in self._get_data_directories():
+            async for file_path in iter_key_files(collection_directory):
+                try:
+                    data_dict: dict[str, Any] = await read_file(file=file_path)
+                except FileNotFoundError:
+                    continue
+
+                entry: ManagedEntry = self._serialization_adapter.load_dict(data=data_dict)
+
+                if entry.is_expired:
+                    with contextlib.suppress(FileNotFoundError):
+                        await file_path.unlink()
