@@ -1,4 +1,5 @@
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from threading import RLock
@@ -8,6 +9,7 @@ from typing_extensions import override
 
 from key_value.aio._utils.managed_entry import ManagedEntry
 from key_value.aio._utils.serialization import BasicSerializationAdapter
+from key_value.aio._utils.time_to_live import now
 from key_value.aio.stores.base import (
     SEED_DATA_TYPE,
     BaseDestroyCollectionStore,
@@ -34,7 +36,13 @@ class MemoryCacheEntry:
 
 
 def _memory_cache_ttu(_key: Any, value: MemoryCacheEntry, _now: float) -> float:
-    """Calculate time-to-use for cache entries based on their expiration time."""
+    """Calculate time-to-use for cache entries based on their expiration time.
+
+    Returns a wall-clock epoch timestamp, so the cache must be constructed with a
+    matching `timer=time.time` -- TLRUCache's default `timer` is `time.monotonic`,
+    whose epoch is arbitrary (e.g. time since boot), which would compare a wall-clock
+    expires_at against a monotonic "now" and never actually expire anything.
+    """
     if value.expires_at is None:
         return float(sys.maxsize)
 
@@ -62,6 +70,7 @@ class MemoryCollection:
         self._cache = TLRUCache[str, MemoryCacheEntry](
             maxsize=max_entries if max_entries is not None else sys.maxsize,
             ttu=_memory_cache_ttu,
+            timer=time.time,
             getsizeof=_memory_cache_getsizeof,
         )
 
@@ -86,10 +95,12 @@ class MemoryCollection:
 
     def put_if_absent(self, key: str, value: ManagedEntry) -> bool:
         with self._lock:
-            existing = self.get(key)
-            if existing is not None and not existing.is_expired:
+            existing_entry: MemoryCacheEntry | None = self._cache.get(key)
+            if existing_entry is not None and (existing_entry.expires_at is None or existing_entry.expires_at > now()):
                 return False
-            self.put(key, value)
+
+            json_str: str = self._serialization_adapter.dump_json(entry=value)
+            self._cache[key] = MemoryCacheEntry(json_str=json_str, expires_at=value.expires_at)
             return True
 
     def delete(self, key: str) -> bool:
