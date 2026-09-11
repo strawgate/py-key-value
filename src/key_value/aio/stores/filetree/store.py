@@ -403,36 +403,6 @@ async def iter_key_files(directory: AsyncPath) -> AsyncGenerator[AsyncPath]:
         yield item_path
 
 
-async def iter_cullable_files(directory: AsyncPath, *, root_directory: AsyncPath) -> AsyncGenerator[AsyncPath]:
-    """Recursively yield every key file under `directory`, for use by cull().
-
-    A collection name may itself contain path separators (depending on the configured
-    sanitization strategy), which nests its key files arbitrarily deep, so a single level of
-    iteration isn't enough to find them all. Skips anything that escapes `root_directory` via a
-    symlink, and `-info.json` collection metadata files.
-    """
-    try:
-        await validate_path_within_directory(path=directory, root_directory=root_directory)
-    except PathSecurityError:
-        return
-
-    async for item_path in directory.iterdir():
-        if await item_path.is_dir():
-            async for nested_file in iter_cullable_files(item_path, root_directory=root_directory):
-                yield nested_file
-            continue
-
-        if not await item_path.is_file() or item_path.suffix != ".json" or item_path.name.endswith("-info.json"):
-            continue
-
-        try:
-            await validate_path_within_directory(path=item_path, root_directory=root_directory)
-        except PathSecurityError:
-            continue
-
-        yield item_path
-
-
 class FileTreeStore(BaseCullStore):
     """A file-tree based store using directories for collections and files for keys.
 
@@ -470,7 +440,9 @@ class FileTreeStore(BaseCullStore):
         - Expired entries are filtered out when read via get() or similar methods, but the
           underlying file is not removed until something reads the key or `cull()` is called.
           Call `cull()` periodically (e.g. from a scheduled task) to reclaim disk space from
-          write-once, never-reread keys.
+          write-once, never-reread keys. `cull()` only looks one directory level below the data
+          directory, so a collection name containing a path separator (only possible with a
+          permissive sanitization strategy like PassthroughStrategy) won't be swept.
         - Performance may degrade with very large numbers of keys per collection due to
           filesystem directory entry limits.
     """
@@ -536,6 +508,11 @@ class FileTreeStore(BaseCullStore):
             default_collection=default_collection,
             stable_api=True,
         )
+
+    async def _get_data_directories(self) -> AsyncGenerator[AsyncPath]:
+        async for directory in self._data_directory.iterdir():
+            if await directory.is_dir():
+                yield directory
 
     async def _get_metadata_entries(self) -> AsyncGenerator[AsyncPath]:
         async for entry in self._metadata_directory.iterdir():
@@ -636,34 +613,49 @@ class FileTreeStore(BaseCullStore):
         """Delete expired entries from disk.
 
         Walks the data directory itself rather than the collection index, so it also reclaims
-        space for collections this store instance has never set up.
+        space for collections this store instance has never set up. Collection names containing
+        path separators (only possible with a permissive sanitization strategy like
+        PassthroughStrategy) nest their key files deeper than this walks -- not covered here.
         """
-        async for file_path in iter_cullable_files(self._data_directory, root_directory=self._data_directory):
+        async for collection_directory in self._get_data_directories():
             try:
-                # Stat before reading so it reflects what we're about to read, not whatever a
-                # concurrent put() has since replaced this path with.
-                stat_at_read = await file_path.stat()
-                data_dict: dict[str, Any] = await read_file(file=file_path)
-                entry: ManagedEntry = self._serialization_adapter.load_dict(data=data_dict)
-            except FileNotFoundError:
-                continue
-            except Exception as e:
-                # A file that doesn't parse as a ManagedEntry shouldn't stop the rest of the sweep.
-                logger.warning(
-                    "Skipping unparseable file during cull",
-                    extra={"file": str(file_path), "error": str(e)},
-                    exc_info=True,
-                )
+                await validate_path_within_directory(path=collection_directory, root_directory=self._data_directory)
+            except PathSecurityError:
+                # A symlink escapes the store root; don't follow it.
                 continue
 
-            if not entry.is_expired:
-                continue
+            async for file_path in iter_key_files(collection_directory):
+                try:
+                    await validate_path_within_directory(path=file_path, root_directory=self._data_directory)
+                except PathSecurityError:
+                    # Same, for a symlinked file inside an otherwise-legitimate collection.
+                    continue
 
-            with contextlib.suppress(FileNotFoundError):
-                stat_before_unlink = await file_path.stat()
-                # Skip the delete if the file was replaced since we read it, so a concurrent
-                # put() landing here can't have its fresh value deleted. Compare both identity
-                # markers: mtime resolution alone could theoretically collide, and inode alone
-                # is 0 on some filesystems, so either one changing is enough to detect a replace.
-                if (stat_before_unlink.st_ino, stat_before_unlink.st_mtime_ns) == (stat_at_read.st_ino, stat_at_read.st_mtime_ns):
-                    await file_path.unlink()
+                try:
+                    # Stat before reading so it reflects what we're about to read, not whatever a
+                    # concurrent put() has since replaced this path with.
+                    stat_at_read = await file_path.stat()
+                    data_dict: dict[str, Any] = await read_file(file=file_path)
+                    entry: ManagedEntry = self._serialization_adapter.load_dict(data=data_dict)
+                except FileNotFoundError:
+                    continue
+                except Exception as e:
+                    # A file that doesn't parse as a ManagedEntry shouldn't stop the rest of the sweep.
+                    logger.warning(
+                        "Skipping unparseable file during cull",
+                        extra={"file": str(file_path), "error": str(e)},
+                        exc_info=True,
+                    )
+                    continue
+
+                if not entry.is_expired:
+                    continue
+
+                with contextlib.suppress(FileNotFoundError):
+                    stat_before_unlink = await file_path.stat()
+                    # Skip the delete if the file was replaced since we read it, so a concurrent
+                    # put() landing here can't have its fresh value deleted. Compare both identity
+                    # markers: mtime resolution alone could theoretically collide, and inode alone
+                    # is 0 on some filesystems, so either one changing is enough to detect a replace.
+                    if (stat_before_unlink.st_ino, stat_before_unlink.st_mtime_ns) == (stat_at_read.st_ino, stat_at_read.st_mtime_ns):
+                        await file_path.unlink()

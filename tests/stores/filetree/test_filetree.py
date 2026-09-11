@@ -181,45 +181,11 @@ class TestFileTreeStore(BaseStoreTests):
 
         assert self._count_entry_files(per_test_temp_dir) == 0
 
-    async def test_cull_removes_expired_entry_in_nested_collection_path(self, per_test_temp_dir: Path):
-        """A collection name containing path separators nests its key files; cull() must still find them.
-
-        Uses PassthroughStrategy since the default V1 strategies replace "/" with a safe character.
-        """
-        store = FileTreeStore(
-            data_directory=per_test_temp_dir,
-            key_sanitization_strategy=PassthroughStrategy(),
-            collection_sanitization_strategy=PassthroughStrategy(),
-        )
-        await store.put(collection="tenant/archive", key="short_lived", value={"data": "value"}, ttl=1)
-        await self._wait_until_expired(store, collection="tenant/archive", key="short_lived")
-        assert self._count_entry_files(per_test_temp_dir) == 1
-
-        await store.cull()
-
-        assert self._count_entry_files(per_test_temp_dir) == 0
-
     async def test_cull_removes_expired_entry_named_info(self, store: FileTreeStore, per_test_temp_dir: Path):
         """A key literally named "info" is a normal key file, not collection metadata, so cull() must reap it too."""
         await store.put(collection="test", key="info", value={"data": "value"}, ttl=1)
         await self._wait_until_expired(store, collection="test", key="info")
         assert self._count_entry_files(per_test_temp_dir) == 1
-
-        await store.cull()
-
-        assert self._count_entry_files(per_test_temp_dir) == 0
-
-    @pytest.mark.skipif(os.name == "nt", reason="Symlinks require elevated privileges on Windows")
-    async def test_cull_tolerates_a_symlink_cycle(self, store: FileTreeStore, per_test_temp_dir: Path):
-        """A symlink cycle inside the data directory must not crash or hang the recursive sweep.
-
-        The OS's own symlink-loop limit (ELOOP) bounds the recursion depth here, not any code in
-        this store -- this just checks that a cycle degrades gracefully rather than propagating.
-        """
-        await store.put(collection="test", key="short_lived", value={"data": "value"}, ttl=1)
-        await self._wait_until_expired(store, collection="test", key="short_lived")
-
-        (per_test_temp_dir / "loop").symlink_to(per_test_temp_dir, target_is_directory=True)
 
         await store.cull()
 
