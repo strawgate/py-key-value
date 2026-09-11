@@ -10,7 +10,7 @@ from key_value.aio._utils.beartype import bear_spray
 from key_value.aio._utils.compound import compound_key, get_keys_from_compound_keys
 from key_value.aio._utils.managed_entry import ManagedEntry
 from key_value.aio._utils.serialization import BasicSerializationAdapter, SerializationAdapter
-from key_value.aio.errors import DeserializationError
+from key_value.aio.errors import DeserializationError, InvalidTTLError
 from key_value.aio.stores.base import (
     BaseContextManagerStore,
     BaseDestroyStore,
@@ -162,7 +162,11 @@ async def _redis_mget(client: Redis, keys: list[str]) -> list[Any]:
 
 def _ttl_to_milliseconds(ttl: float | None) -> int | None:
     """Preserve TTL precision while keeping Redis expiry positive."""
-    return max(math.ceil(ttl * 1000), 1) if ttl is not None else None
+    if ttl is None:
+        return None
+    if not math.isfinite(ttl):
+        raise InvalidTTLError(ttl=ttl)
+    return max(math.ceil(ttl * 1000), 1)
 
 
 async def _redis_set(client: Redis, name: str, value: str, ttl: float | None = None) -> None:
@@ -357,6 +361,11 @@ class RedisStore(BasePutIfAbsentStore, BaseDestroyStore, BaseEnumerateKeysStore,
 
         return entries
 
+    def _combo_key_and_json_value(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> tuple[str, str]:
+        combo_key: str = compound_key(collection=collection, key=key)
+        json_value: str = self._adapter.dump_json(entry=managed_entry, key=key, collection=collection)
+        return combo_key, json_value
+
     @override
     async def _put_managed_entry(
         self,
@@ -365,9 +374,7 @@ class RedisStore(BasePutIfAbsentStore, BaseDestroyStore, BaseEnumerateKeysStore,
         collection: str,
         managed_entry: ManagedEntry,
     ) -> None:
-        combo_key: str = compound_key(collection=collection, key=key)
-
-        json_value: str = self._adapter.dump_json(entry=managed_entry, key=key, collection=collection)
+        combo_key, json_value = self._combo_key_and_json_value(key=key, collection=collection, managed_entry=managed_entry)
 
         await _redis_set(self._client, combo_key, json_value, managed_entry.ttl)
 
@@ -379,18 +386,8 @@ class RedisStore(BasePutIfAbsentStore, BaseDestroyStore, BaseEnumerateKeysStore,
         collection: str,
         managed_entry: ManagedEntry,
     ) -> bool:
-        combo_key = compound_key(collection=collection, key=key)
-        json_value = self._adapter.dump_json(
-            entry=managed_entry,
-            key=key,
-            collection=collection,
-        )
-        return await _redis_set_if_absent(
-            self._client,
-            combo_key,
-            json_value,
-            managed_entry.ttl,
-        )
+        combo_key, json_value = self._combo_key_and_json_value(key=key, collection=collection, managed_entry=managed_entry)
+        return await _redis_set_if_absent(self._client, combo_key, json_value, managed_entry.ttl)
 
     @override
     async def _put_managed_entries(

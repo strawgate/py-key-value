@@ -9,8 +9,10 @@ from testcontainers.core.container import DockerContainer
 from typing_extensions import override
 
 from key_value.aio._utils.wait import async_wait_for_true
+from key_value.aio.errors import InvalidTTLError
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.redis import RedisStore
+from key_value.aio.stores.redis.store import _ttl_to_milliseconds
 from tests.conftest import should_skip_docker_tests
 from tests.stores.base import (
     BaseStoreTests,
@@ -35,6 +37,18 @@ class RedisFailedToStartError(Exception):
 
 def get_client_from_store(store: RedisStore) -> Redis:
     return store._client
+
+
+class TestTtlToMilliseconds:
+    """Unit tests for _ttl_to_milliseconds; no Docker/Redis needed."""
+
+    def test_none_ttl_means_no_expiry(self):
+        assert _ttl_to_milliseconds(None) is None
+
+    @pytest.mark.parametrize("ttl", [float("inf"), float("nan"), float("-inf")])
+    def test_non_finite_ttl_raises_invalid_ttl_error(self, ttl: float):
+        with pytest.raises(InvalidTTLError):
+            _ttl_to_milliseconds(ttl)
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
@@ -89,7 +103,7 @@ class TestRedisStore(
     def redis_client(self, store: RedisStore) -> Redis:
         return get_client_from_store(store=store)
 
-    @pytest.mark.parametrize("ttl", [None, 0.5, 1.9, 2.0])
+    @pytest.mark.parametrize("ttl", [None, 0.5, 1.9, 2.5])
     @pytest.mark.parametrize("write_method", ["put", "put_many", "put_if_absent"])
     async def test_writes_preserve_ttl_precision(
         self,
