@@ -30,6 +30,10 @@ if isinstance(store, AsyncPutIfAbsentProtocol):
     )
 ```
 
+Wrappers always satisfy this `isinstance` check, since they forward the call
+if the underlying store supports it. If it doesn't, `put_if_absent()` raises
+`NotImplementedError` instead of the check being `False`.
+
 ::: key_value.aio.protocols.key_value.AsyncPutIfAbsentProtocol
     options:
       show_source: true
