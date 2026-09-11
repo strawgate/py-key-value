@@ -212,6 +212,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         host: str = "localhost",
         port: int = 6379,
         db: int = 0,
+        username: str | None = None,
         password: str | None = None,
         ssl: bool = False,
         ssl_ca_certs: str | None = None,
@@ -232,6 +233,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
         host: str = "localhost",
         port: int = 6379,
         db: int = 0,
+        username: str | None = None,
         password: str | None = None,
         ssl: bool = False,
         ssl_ca_certs: str | None = None,
@@ -252,6 +254,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             host: Redis host. Defaults to localhost.
             port: Redis port. Defaults to 6379.
             db: Redis database number. Defaults to 0.
+            username: Redis username. Defaults to None (Redis's "default" user).
             password: Redis password. Defaults to None.
             ssl: Enable SSL/TLS for the connection. Defaults to False. Not needed
                 when using a ``rediss://`` URL (SSL is inferred from the scheme).
@@ -287,6 +290,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
                 host=host,
                 port=port,
                 db=db,
+                username=username,
                 password=password,
                 ssl_enabled=ssl,
                 ssl_ca_certs=ssl_ca_certs,

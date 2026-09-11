@@ -1,6 +1,7 @@
 """FileTreeStore implementation using async filesystem operations."""
 
 import contextlib
+import logging
 import os
 import tempfile
 from collections.abc import AsyncGenerator
@@ -21,8 +22,10 @@ from key_value.aio._utils.serialization import BasicSerializationAdapter, Serial
 from key_value.aio._utils.time_to_live import now
 from key_value.aio.errors import PathSecurityError
 from key_value.aio.stores.base import (
-    BaseStore,
+    BaseCullStore,
 )
+
+logger = logging.getLogger(__name__)
 
 DIRECTORY_ALLOWED_CHARACTERS = ALPHANUMERIC_CHARACTERS + "_"
 
@@ -253,11 +256,7 @@ class DiskCollectionInfo:
         await validate_path_within_directory(path=path, root_directory=self.root_directory)
 
     async def _list_file_paths(self) -> AsyncGenerator[AsyncPath]:
-        async for item_path in AsyncPath(self.directory).iterdir():
-            if not await item_path.is_file() or item_path.suffix != ".json":
-                continue
-            if item_path.stem == "info":
-                continue
+        async for item_path in iter_key_files(AsyncPath(self.directory)):
             yield item_path
 
     async def get_entry(self, *, key: str) -> ManagedEntry | None:
@@ -267,10 +266,10 @@ class DiskCollectionInfo:
         # Security validation
         await self._validate_path_security(path=key_path)
 
-        if not await key_path.exists():
+        try:
+            data_dict: dict[str, Any] = await read_file(file=key_path)
+        except FileNotFoundError:
             return None
-
-        data_dict: dict[str, Any] = await read_file(file=key_path)
 
         return self.serialization_adapter.load_dict(data=data_dict)
 
@@ -391,7 +390,20 @@ async def read_file(file: AsyncPath) -> dict[str, Any]:
         return load_from_json(json_str=body)
 
 
-class FileTreeStore(BaseStore):
+async def iter_key_files(directory: AsyncPath) -> AsyncGenerator[AsyncPath]:
+    """Yield each key file (`{key}.json`) directly inside a collection directory.
+
+    Collection metadata lives in a separate metadata directory as `{collection}-info.json`,
+    never as `info.json` inside the collection directory itself, so a key literally named
+    "info" is a normal key file here, not metadata.
+    """
+    async for item_path in directory.iterdir():
+        if not await item_path.is_file() or item_path.suffix != ".json":
+            continue
+        yield item_path
+
+
+class FileTreeStore(BaseCullStore):
     """A file-tree based store using directories for collections and files for keys.
 
     This store uses the native filesystem:
@@ -425,8 +437,12 @@ class FileTreeStore(BaseStore):
         - No file locking: Concurrent writes to the same key from multiple processes may
           cause data loss (last write wins). Single-writer or external locking is recommended
           for multi-process scenarios.
-        - No built-in cleanup of expired entries. Expired entries are only filtered out when
-          read via get() or similar methods.
+        - Expired entries are filtered out when read via get() or similar methods, but the
+          underlying file is not removed until something reads the key or `cull()` is called.
+          Call `cull()` periodically (e.g. from a scheduled task) to reclaim disk space from
+          write-once, never-reread keys. `cull()` only looks one directory level below the data
+          directory, so a collection name containing a path separator (only possible with a
+          permissive sanitization strategy like PassthroughStrategy) won't be swept.
         - Performance may degrade with very large numbers of keys per collection due to
           filesystem directory entry limits.
     """
@@ -591,3 +607,55 @@ class FileTreeStore(BaseStore):
         collection_info: DiskCollectionInfo = self._collection_infos[collection]
 
         return await collection_info.delete_entry(key=key)
+
+    @override
+    async def _cull(self) -> None:
+        """Delete expired entries from disk.
+
+        Walks the data directory itself rather than the collection index, so it also reclaims
+        space for collections this store instance has never set up. Collection names containing
+        path separators (only possible with a permissive sanitization strategy like
+        PassthroughStrategy) nest their key files deeper than this walks -- not covered here.
+        """
+        async for collection_directory in self._get_data_directories():
+            try:
+                await validate_path_within_directory(path=collection_directory, root_directory=self._data_directory)
+            except PathSecurityError:
+                # A symlink escapes the store root; don't follow it.
+                continue
+
+            async for file_path in iter_key_files(collection_directory):
+                try:
+                    await validate_path_within_directory(path=file_path, root_directory=self._data_directory)
+                except PathSecurityError:
+                    # Same, for a symlinked file inside an otherwise-legitimate collection.
+                    continue
+
+                try:
+                    # Stat before reading so it reflects what we're about to read, not whatever a
+                    # concurrent put() has since replaced this path with.
+                    stat_at_read = await file_path.stat()
+                    data_dict: dict[str, Any] = await read_file(file=file_path)
+                    entry: ManagedEntry = self._serialization_adapter.load_dict(data=data_dict)
+                except FileNotFoundError:
+                    continue
+                except Exception as e:
+                    # A file that doesn't parse as a ManagedEntry shouldn't stop the rest of the sweep.
+                    logger.warning(
+                        "Skipping unparseable file during cull",
+                        extra={"file": str(file_path), "error": str(e)},
+                        exc_info=True,
+                    )
+                    continue
+
+                if not entry.is_expired:
+                    continue
+
+                with contextlib.suppress(FileNotFoundError):
+                    stat_before_unlink = await file_path.stat()
+                    # Skip the delete if the file was replaced since we read it, so a concurrent
+                    # put() landing here can't have its fresh value deleted. Compare both identity
+                    # markers: mtime resolution alone could theoretically collide, and inode alone
+                    # is 0 on some filesystems, so either one changing is enough to detect a replace.
+                    if (stat_before_unlink.st_ino, stat_before_unlink.st_mtime_ns) == (stat_at_read.st_ino, stat_at_read.st_mtime_ns):
+                        await file_path.unlink()
