@@ -316,19 +316,26 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
                 managed_entry=managed_entry,
             )
 
+    async def _prepare_write(
+        self, *, collection: str | None, value: Mapping[str, Any], ttl: SupportsFloat | None
+    ) -> tuple[str, ManagedEntry]:
+        """Resolve the collection, ensure it's set up, and build a ManagedEntry for a new write."""
+        resolved_collection = collection or self.default_collection
+        await self.setup_collection(collection=resolved_collection)
+
+        created_at, _, expires_at = prepare_entry_timestamps(ttl=ttl)
+        managed_entry = ManagedEntry(value=value, created_at=created_at, expires_at=expires_at)
+
+        return resolved_collection, managed_entry
+
     @bear_enforce
     @override
     async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
         """Store a key-value pair in the specified collection with optional TTL."""
-        collection = collection or self.default_collection
-        await self.setup_collection(collection=collection)
-
-        created_at, _, expires_at = prepare_entry_timestamps(ttl=ttl)
-
-        managed_entry: ManagedEntry = ManagedEntry(value=value, created_at=created_at, expires_at=expires_at)
+        resolved_collection, managed_entry = await self._prepare_write(collection=collection, value=value, ttl=ttl)
 
         await self._put_managed_entry(
-            collection=collection,
+            collection=resolved_collection,
             key=key,
             managed_entry=managed_entry,
         )
@@ -433,17 +440,10 @@ class BasePutIfAbsentStore(BaseStore, AsyncPutIfAbsentProtocol, ABC):
         ttl: SupportsFloat | None = None,
     ) -> bool:
         """Store a value only when the key does not already exist."""
-        collection = collection or self.default_collection
-        await self.setup_collection(collection=collection)
+        resolved_collection, managed_entry = await self._prepare_write(collection=collection, value=value, ttl=ttl)
 
-        created_at, _, expires_at = prepare_entry_timestamps(ttl=ttl)
-        managed_entry = ManagedEntry(
-            value=value,
-            created_at=created_at,
-            expires_at=expires_at,
-        )
         return await self._put_managed_entry_if_absent(
-            collection=collection,
+            collection=resolved_collection,
             key=key,
             managed_entry=managed_entry,
         )
