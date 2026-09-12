@@ -11,3 +11,9 @@ composability.
       show_source: true
       members: true
       show_root_heading: true
+      class AsyncKeyValue(AsyncKeyValueProtocol, Protocol):
+    """A protocol for key-value store operations.
+
+    Includes basic operations: get, put, delete, ttl
+    Includes bulk operations: get_many, put_many, delete_many, ttl_many.
+    """
