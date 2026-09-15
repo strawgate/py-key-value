@@ -17,13 +17,6 @@ jobs:
     if: >-
       startsWith(github.event.comment.body, '/ai') &&
       (github.event.issue.pull_request != null || github.event_name == 'pull_request_review_comment')
-    uses: elastic/ai-github-actions/.github/workflows/gh-aw-mention-in-pr.lock.yml@main
-    with:
-      setup-commands: make setup
-      messages-footer: |
-        ---
-        [From workflow: ${{ github.workflow }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-        Give us feedback! React with 🚀 if perfect, 👍 if helpful, 👎 if not.
+    uses: elastic/ai-github-actions/.github/workflows/gh-aw-mention-in-pr-no-sandbox.lock.yml@main
     secrets:
       COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
