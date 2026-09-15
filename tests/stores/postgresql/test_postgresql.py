@@ -122,3 +122,42 @@ class TestPostgreSQLStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override
     async def test_not_unbounded(self, store: BaseStore): ...
+
+    async def test_keys_empty(self, store: PostgreSQLStore):
+        """keys() on an empty collection returns an empty list."""
+        assert await store.keys(collection="test_collection") == []
+
+    async def test_keys_after_put(self, store: PostgreSQLStore):
+        """keys() returns keys that were put into the collection."""
+        await store.put(collection="test_collection", key="alpha", value={"v": 1})
+        await store.put(collection="test_collection", key="beta", value={"v": 2})
+        await store.put(collection="test_collection", key="gamma", value={"v": 3})
+
+        # _get_collection_keys sorts by key via ORDER BY.
+        assert await store.keys(collection="test_collection") == ["alpha", "beta", "gamma"]
+
+    async def test_keys_are_collection_scoped(self, store: PostgreSQLStore):
+        """keys() only returns keys from the requested collection."""
+        await store.put(collection="collection_a", key="a_key", value={"v": 1})
+        await store.put(collection="collection_b", key="b_key", value={"v": 2})
+
+        assert await store.keys(collection="collection_a") == ["a_key"]
+        assert await store.keys(collection="collection_b") == ["b_key"]
+
+    async def test_keys_respects_limit(self, store: PostgreSQLStore):
+        """keys() honors the limit parameter."""
+        for i in range(5):
+            await store.put(collection="test_collection", key=f"key_{i}", value={"v": i})
+
+        limited = await store.keys(collection="test_collection", limit=2)
+        assert len(limited) == 2
+        # With ORDER BY key, the first two are key_0 and key_1.
+        assert limited == ["key_0", "key_1"]
+
+    async def test_keys_after_delete(self, store: PostgreSQLStore):
+        """keys() reflects deletes."""
+        await store.put(collection="test_collection", key="keep", value={"v": 1})
+        await store.put(collection="test_collection", key="drop", value={"v": 2})
+        await store.delete(collection="test_collection", key="drop")
+
+        assert await store.keys(collection="test_collection") == ["keep"]
