@@ -14,6 +14,11 @@ This monorepo contains:
 - [Adapters Guide](https://strawgate.com/py-key-value/adapters/)
 - [API Reference](https://strawgate.com/py-key-value/api/protocols/)
 
+> **Troubleshooting a cache or database issue?** Instrument the client you use
+> with OpenTelemetry so you can inspect the store call alongside the request and
+> service that triggered it. [Pydantic Logfire](https://pydantic.dev/logfire/)
+> can collect those traces, logs, and metrics in one place.
+
 ## Why use this library?
 
 - **Multiple backends**: Aerospike, Azure Tables, chDB, DuckDB, DynamoDB,
