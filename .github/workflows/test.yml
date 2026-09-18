@@ -15,6 +15,9 @@ on:
       - '.github/workflows/claude-*.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   markdown_lint:
     runs-on: ubuntu-latest
@@ -24,6 +27,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: DavidAnson/markdownlint-cli2-action@v20
         with:
@@ -36,6 +41,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: "Install uv"
         uses: astral-sh/setup-uv@v6
@@ -75,6 +82,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: "Install uv"
         uses: astral-sh/setup-uv@v6
@@ -83,9 +92,9 @@ jobs:
         id: pytest-workers
         run: |
           if [ "$RUNNER_OS" == "Windows" ]; then
-            echo "count=2" >> $GITHUB_OUTPUT
+            echo "count=2" >> "$GITHUB_OUTPUT"
           else
-            echo "count=auto" >> $GITHUB_OUTPUT
+            echo "count=auto" >> "$GITHUB_OUTPUT"
           fi
         shell: bash
 
@@ -95,11 +104,38 @@ jobs:
       - name: "Test with latest dependencies"
         run: uv run pytest tests -vv -n ${{ steps.pytest-workers.outputs.count }}
 
+      - name: "Build"
+        run: uv build .
+
+  test_lowest_direct:
+    needs:
+      - markdown_lint
+      - static_analysis
+
+    # Docker-backed stores make this suite substantially slower than the locked
+    # dependency matrix on Linux. Give each Python version its own job and time
+    # budget instead of running a second full suite inside every OS job.
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@v6
+
       - name: "Install oldest dependencies"
         run: uv sync --group dev --python ${{ matrix.python-version }} --resolution lowest-direct
 
       - name: "Test with oldest dependencies"
-        run: uv run pytest tests -vv -n ${{ steps.pytest-workers.outputs.count }}
+        run: uv run pytest tests -vv -n auto
 
       - name: "Build"
         run: uv build .
@@ -110,6 +146,7 @@ jobs:
 
     timeout-minutes: 20
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
         platform:
@@ -127,6 +164,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: "Install uv"
         uses: astral-sh/setup-uv@v6
@@ -135,9 +174,9 @@ jobs:
         id: pytest-workers
         run: |
           if [ "$RUNNER_OS" == "Windows" ]; then
-            echo "count=2" >> $GITHUB_OUTPUT
+            echo "count=2" >> "$GITHUB_OUTPUT"
           else
-            echo "count=auto" >> $GITHUB_OUTPUT
+            echo "count=auto" >> "$GITHUB_OUTPUT"
           fi
         shell: bash
 
@@ -145,12 +184,6 @@ jobs:
         run: uv sync --locked --group dev --python ${{ matrix.python-version }}
 
       - name: "Test with latest dependencies"
-        run: uv run pytest tests -vv -n ${{ steps.pytest-workers.outputs.count }}
-
-      - name: "Install oldest dependencies"
-        run: uv sync --group dev --python ${{ matrix.python-version }} --resolution lowest-direct
-
-      - name: "Test with oldest dependencies"
         run: uv run pytest tests -vv -n ${{ steps.pytest-workers.outputs.count }}
 
       - name: "Build"
