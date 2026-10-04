@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from dirty_equals import IsDatetime
@@ -12,6 +13,22 @@ from key_value.aio.stores.disk.store import _disk_cache_clear
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 TEST_SIZE_LIMIT = 100 * 1024  # 100KB
+
+
+@pytest.mark.parametrize("populated", [False, True])
+async def test_supplied_cache_is_usable_and_remains_caller_owned(tmp_path: Path, populated: bool):
+    with Cache(directory=str(tmp_path)) as cache:
+        if populated:
+            _ = cache.set("existing", "value")
+
+        with patch.object(cache, "close", wraps=cache.close) as close_cache:
+            async with DiskStore(disk_cache=cache) as store:
+                await store.put("test_key", {"value": 1})
+                assert await store.get("test_key") == {"value": 1}
+
+            close_cache.assert_not_called()
+            _ = cache.set("still_open", "value")
+            assert cache.get("still_open") == "value"
 
 
 class TestDiskStore(ContextManagerStoreTestMixin, BaseStoreTests):
