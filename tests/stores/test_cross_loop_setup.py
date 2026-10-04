@@ -4,6 +4,7 @@ from concurrent.futures import Future
 from queue import Queue
 from threading import Event, Thread
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -81,11 +82,11 @@ class BlockingCollectionStore(MemoryStore):
 
 
 class BlockingSeedStore(BaseStore):
-    def __init__(self) -> None:
+    def __init__(self, *, seed: base.SEED_DATA_TYPE | None = None) -> None:
         self.entries: dict[tuple[str, str], ManagedEntry] = {}
         self.seed_started = Event()
         self.release_seed = Event()
-        super().__init__(seed={"shared": {"seeded": {"value": 1}}}, stable_api=True)
+        super().__init__(seed={"shared": {"seeded": {"value": 1}}} if seed is None else seed, stable_api=True)
 
     async def _get_managed_entry(self, *, collection: str, key: str) -> ManagedEntry | None:
         return self.entries.get((collection, key))
@@ -268,6 +269,19 @@ async def test_empty_collection_seed_uses_default_collection(
     assert await store.get("empty", collection="") == {"value": 1}
     if include_explicit_collection_seed:
         assert await store.get("explicit") == {"value": 2}
+
+
+async def test_seed_aliases_initialize_default_collection_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    store = BlockingSeedStore(seed={"": {"empty": {"value": 1}}, "default_collection": {"explicit": {"value": 2}}})
+    store.release_seed.set()
+    setup_collection = AsyncMock()
+    monkeypatch.setattr(store, "_setup_collection", setup_collection)
+
+    await store.setup()
+
+    setup_collection.assert_awaited_once_with(collection=store.default_collection)
+    assert await store.get("empty") == {"value": 1}
+    assert await store.get("explicit") == {"value": 2}
 
 
 async def test_seed_failure_is_terminal_for_the_store_instance() -> None:
