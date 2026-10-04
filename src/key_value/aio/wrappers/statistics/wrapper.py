@@ -99,6 +99,8 @@ class StatisticsWrapper(BaseWrapper):
     """Statistics wrapper around a KV Store that tracks operation statistics.
 
     Note: enumeration and destroy operations are not tracked by this wrapper.
+    Collection arguments pass through unchanged. Omitted or empty collection arguments
+    use the default collection label for statistics, regardless of the underlying store's default.
     """
 
     def __init__(self, key_value: AsyncKeyValue) -> None:
@@ -111,62 +113,62 @@ class StatisticsWrapper(BaseWrapper):
 
     @override
     async def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
-        collection = collection or DEFAULT_COLLECTION_NAME
+        statistics_collection = collection or DEFAULT_COLLECTION_NAME
 
         value = await self.key_value.get(collection=collection, key=key)
 
         if value is not None:
-            self.statistics.get_collection(collection=collection).get.increment_hit()
+            self.statistics.get_collection(collection=statistics_collection).get.increment_hit()
             return value
 
-        self.statistics.get_collection(collection=collection).get.increment_miss()
+        self.statistics.get_collection(collection=statistics_collection).get.increment_miss()
 
         return None
 
     @override
     async def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
-        collection = collection or DEFAULT_COLLECTION_NAME
+        statistics_collection = collection or DEFAULT_COLLECTION_NAME
 
         value, ttl = await self.key_value.ttl(collection=collection, key=key)
 
         if value is not None:
-            self.statistics.get_collection(collection=collection).ttl.increment_hit()
+            self.statistics.get_collection(collection=statistics_collection).ttl.increment_hit()
             return value, ttl
 
-        self.statistics.get_collection(collection=collection).ttl.increment_miss()
+        self.statistics.get_collection(collection=statistics_collection).ttl.increment_miss()
         return None, None
 
     @override
     async def put(self, key: str, value: Mapping[str, Any], *, collection: str | None = None, ttl: SupportsFloat | None = None) -> None:
-        collection = collection or DEFAULT_COLLECTION_NAME
+        statistics_collection = collection or DEFAULT_COLLECTION_NAME
 
         await self.key_value.put(collection=collection, key=key, value=value, ttl=ttl)
 
-        self.statistics.get_collection(collection=collection).put.increment()
+        self.statistics.get_collection(collection=statistics_collection).put.increment()
 
     @override
     async def delete(self, key: str, *, collection: str | None = None) -> bool:
-        collection = collection or DEFAULT_COLLECTION_NAME
+        statistics_collection = collection or DEFAULT_COLLECTION_NAME
 
         if await self.key_value.delete(collection=collection, key=key):
-            self.statistics.get_collection(collection=collection).delete.increment_hit()
+            self.statistics.get_collection(collection=statistics_collection).delete.increment_hit()
             return True
 
-        self.statistics.get_collection(collection=collection).delete.increment_miss()
+        self.statistics.get_collection(collection=statistics_collection).delete.increment_miss()
 
         return False
 
     @override
     async def get_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[dict[str, Any] | None]:
-        collection = collection or DEFAULT_COLLECTION_NAME
+        statistics_collection = collection or DEFAULT_COLLECTION_NAME
 
         results: list[dict[str, Any] | None] = await self.key_value.get_many(keys=keys, collection=collection)
 
         hits = len([result for result in results if result is not None])
         misses = len([result for result in results if result is None])
 
-        self.statistics.get_collection(collection=collection).get.increment_hit(increment=hits)
-        self.statistics.get_collection(collection=collection).get.increment_miss(increment=misses)
+        self.statistics.get_collection(collection=statistics_collection).get.increment_hit(increment=hits)
+        self.statistics.get_collection(collection=statistics_collection).get.increment_miss(increment=misses)
 
         return results
 
@@ -179,36 +181,36 @@ class StatisticsWrapper(BaseWrapper):
         collection: str | None = None,
         ttl: SupportsFloat | None = None,
     ) -> None:
-        collection = collection or DEFAULT_COLLECTION_NAME
+        statistics_collection = collection or DEFAULT_COLLECTION_NAME
 
         await self.key_value.put_many(keys=keys, values=values, collection=collection, ttl=ttl)
 
-        self.statistics.get_collection(collection=collection).put.increment(increment=len(keys))
+        self.statistics.get_collection(collection=statistics_collection).put.increment(increment=len(keys))
 
     @override
     async def delete_many(self, keys: Sequence[str], *, collection: str | None = None) -> int:
-        collection = collection or DEFAULT_COLLECTION_NAME
+        statistics_collection = collection or DEFAULT_COLLECTION_NAME
 
         deleted_count: int = await self.key_value.delete_many(keys=keys, collection=collection)
 
         hits = deleted_count
         misses = len(keys) - deleted_count
 
-        self.statistics.get_collection(collection=collection).delete.increment_hit(increment=hits)
-        self.statistics.get_collection(collection=collection).delete.increment_miss(increment=misses)
+        self.statistics.get_collection(collection=statistics_collection).delete.increment_hit(increment=hits)
+        self.statistics.get_collection(collection=statistics_collection).delete.increment_miss(increment=misses)
 
         return deleted_count
 
     @override
     async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[dict[str, Any] | None, float | None]]:
-        collection = collection or DEFAULT_COLLECTION_NAME
+        statistics_collection = collection or DEFAULT_COLLECTION_NAME
 
         results: list[tuple[dict[str, Any] | None, float | None]] = await self.key_value.ttl_many(keys=keys, collection=collection)
 
         hits = len([result for result in results if result[0] is not None])
         misses = len([result for result in results if result[0] is None])
 
-        self.statistics.get_collection(collection=collection).ttl.increment_hit(increment=hits)
-        self.statistics.get_collection(collection=collection).ttl.increment_miss(increment=misses)
+        self.statistics.get_collection(collection=statistics_collection).ttl.increment_hit(increment=hits)
+        self.statistics.get_collection(collection=statistics_collection).ttl.increment_miss(increment=misses)
 
         return results
