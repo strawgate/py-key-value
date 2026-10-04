@@ -13,7 +13,13 @@ from typing import overload
 from typing_extensions import override
 
 from key_value.aio._utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
-from key_value.aio.stores.base import BaseContextManagerStore, BaseDestroyCollectionStore, BaseEnumerateCollectionsStore, BaseStore
+from key_value.aio.stores.base import (
+    BaseContextManagerStore,
+    BaseDestroyCollectionStore,
+    BaseEnumerateCollectionsStore,
+    BaseEnumerateKeysStore,
+    BaseStore,
+)
 
 try:
     import asyncpg
@@ -140,7 +146,9 @@ def _postgresql_row_get_datetime(row: asyncpg.Record, key: str) -> datetime | No
     return row[key]
 
 
-class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore):
+class PostgreSQLStore(
+    BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDestroyCollectionStore, BaseContextManagerStore, BaseStore
+):
     """PostgreSQL-based key-value store using asyncpg.
 
     This store uses a single shared table with columns for collection, key, value (JSONB), and metadata.
@@ -492,6 +500,32 @@ class PostgreSQLStore(BaseEnumerateCollectionsStore, BaseDestroyCollectionStore,
         )
 
         return [_postgresql_row_get_str(row, "collection") for row in rows]
+
+    @override
+    async def _get_collection_keys(self, *, collection: str, limit: int | None = None) -> list[str]:
+        """List all keys in a collection.
+
+        Args:
+            collection: The collection to list keys from.
+            limit: Maximum number of keys to return.
+
+        Returns:
+            A list of keys in the collection.
+        """
+        if limit is None or limit <= 0:
+            limit = DEFAULT_PAGE_SIZE
+        limit = min(limit, PAGE_LIMIT)
+
+        pool = self._initialized_pool
+
+        rows = await _postgresql_fetch(
+            pool,
+            f"SELECT key FROM {self._table_name} WHERE collection = $1 ORDER BY key LIMIT $2",
+            collection,
+            limit,
+        )
+
+        return [_postgresql_row_get_str(row, "key") for row in rows]
 
     @override
     async def _delete_collection(self, *, collection: str) -> bool:
