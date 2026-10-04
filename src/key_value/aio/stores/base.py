@@ -217,7 +217,9 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
             with self._setup_state_lock:
                 if not backend_setup_complete:
                     self._setup_future = None
-            setup_future.cancel()
+            setup_future.set_exception(
+                StoreSetupError(message="Store setup was interrupted", extra_info={"store": self.__class__.__name__})
+            )
             if cleanup_error is not None:
                 raise setup_error from cleanup_error
             raise
@@ -267,7 +269,7 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         except BaseException:
             with self._setup_state_lock:
                 del self._setup_collection_futures[collection]
-            setup_future.cancel()
+            setup_future.set_exception(StoreSetupError(message="Collection setup was interrupted", extra_info={"collection": collection}))
             raise
         else:
             with self._setup_state_lock:

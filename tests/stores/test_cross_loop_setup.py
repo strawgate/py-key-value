@@ -1,6 +1,6 @@
 import asyncio
-import time
 from collections.abc import Coroutine
+from concurrent.futures import Future
 from queue import Queue
 from threading import Event, Thread
 from typing import Any
@@ -9,6 +9,7 @@ import pytest
 
 from key_value.aio._utils.managed_entry import ManagedEntry
 from key_value.aio.errors import StoreSetupError
+from key_value.aio.stores import base
 from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
 from key_value.aio.stores.memory import MemoryStore
 
@@ -112,12 +113,27 @@ class FailingSeedStore(BlockingSeedStore):
         raise ValueError(msg)
 
 
+@pytest.fixture
+def waiter_registered(monkeypatch: pytest.MonkeyPatch) -> Event:
+    registered = Event()
+    original_wrap_future = base.wrap_future
+
+    def observe_waiter(future: Future[None]) -> asyncio.Future[None]:
+        wrapped = original_wrap_future(future)
+        registered.set()
+        return wrapped
+
+    monkeypatch.setattr(base, "wrap_future", observe_waiter)
+    return registered
+
+
 def _run_concurrently(
     operation: Coroutine[Any, Any, None],
     second_operation: Coroutine[Any, Any, None],
     *,
     started: Event,
     release: Event,
+    waiter_registered: Event,
 ) -> list[BaseException]:
     errors: Queue[BaseException] = Queue()
 
@@ -129,14 +145,16 @@ def _run_concurrently(
 
     threads = [Thread(target=run, args=(operation,), daemon=True), Thread(target=run, args=(second_operation,), daemon=True)]
     threads[0].start()
-    assert started.wait(timeout=5)
-    threads[1].start()
-    time.sleep(0.05)
-    release.set()
-
-    for thread in threads:
-        thread.join(timeout=5)
-        assert not thread.is_alive()
+    try:
+        assert started.wait(timeout=5)
+        threads[1].start()
+        assert waiter_registered.wait(timeout=5)
+    finally:
+        release.set()
+        for thread in threads:
+            if thread.ident is not None:
+                thread.join(timeout=5)
+                assert not thread.is_alive()
 
     collected_errors: list[BaseException] = []
     while not errors.empty():
@@ -144,7 +162,7 @@ def _run_concurrently(
     return collected_errors
 
 
-def test_store_setup_is_coordinated_across_event_loops() -> None:
+def test_store_setup_is_coordinated_across_event_loops(waiter_registered: Event) -> None:
     store = BlockingSetupStore()
 
     errors = _run_concurrently(
@@ -152,13 +170,14 @@ def test_store_setup_is_coordinated_across_event_loops() -> None:
         store.setup(),
         started=store.setup_started,
         release=store.release_setup,
+        waiter_registered=waiter_registered,
     )
 
     assert errors == []
     assert store.setup_calls == 1
 
 
-def test_collection_setup_is_coordinated_across_event_loops() -> None:
+def test_collection_setup_is_coordinated_across_event_loops(waiter_registered: Event) -> None:
     store = BlockingCollectionStore()
 
     errors = _run_concurrently(
@@ -166,6 +185,7 @@ def test_collection_setup_is_coordinated_across_event_loops() -> None:
         store.setup_collection(collection="shared"),
         started=store.collection_setup_started,
         release=store.release_collection_setup,
+        waiter_registered=waiter_registered,
     )
 
     assert errors == []
@@ -243,3 +263,52 @@ async def test_seed_failure_is_terminal_for_the_store_instance() -> None:
         await store.setup()
 
     assert store.setup_calls == 1
+
+
+async def test_owner_cancellation_does_not_cancel_setup_waiter(waiter_registered: Event) -> None:
+    store = BlockingSetupStore()
+    owner = asyncio.create_task(store.setup())
+    assert await asyncio.to_thread(store.setup_started.wait, 5)
+    waiter = asyncio.create_task(store.setup())
+    assert await asyncio.to_thread(waiter_registered.wait, 5)
+
+    owner.cancel()
+    store.release_setup.set()
+    with pytest.raises(asyncio.CancelledError):
+        await owner
+    with pytest.raises(StoreSetupError, match="Store setup was interrupted"):
+        await waiter
+    assert not waiter.cancelled()
+    await store.setup()
+    assert store.setup_calls == 2
+
+
+async def test_seed_cancellation_is_a_terminal_setup_error() -> None:
+    store = BlockingSeedStore()
+    owner = asyncio.create_task(store.setup())
+    assert await asyncio.to_thread(store.seed_started.wait, 5)
+    owner.cancel()
+    store.release_seed.set()
+    with pytest.raises(asyncio.CancelledError):
+        await owner
+
+    with pytest.raises(StoreSetupError, match="Store setup was interrupted"):
+        await store.get(collection="shared", key="seeded")
+
+
+async def test_owner_cancellation_does_not_cancel_collection_waiter(waiter_registered: Event) -> None:
+    store = BlockingCollectionStore()
+    owner = asyncio.create_task(store.setup_collection(collection="shared"))
+    assert await asyncio.to_thread(store.collection_setup_started.wait, 5)
+    waiter = asyncio.create_task(store.setup_collection(collection="shared"))
+    assert await asyncio.to_thread(waiter_registered.wait, 5)
+
+    owner.cancel()
+    store.release_collection_setup.set()
+    with pytest.raises(asyncio.CancelledError):
+        await owner
+    with pytest.raises(StoreSetupError, match="Collection setup was interrupted"):
+        await waiter
+    assert not waiter.cancelled()
+    await store.setup_collection(collection="shared")
+    assert store.collection_setup_calls == 2
