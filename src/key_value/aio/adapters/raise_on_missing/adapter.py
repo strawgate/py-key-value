@@ -39,13 +39,10 @@ class RaiseOnMissingAdapter:
         """
         result = await self.key_value.get(key=key, collection=collection)
 
-        if result is not None:
-            return result
-
-        if raise_on_missing:
+        if result is None and raise_on_missing:
             raise MissingKeyError(operation="get", collection=collection, key=key)
 
-        return None
+        return result
 
     @overload
     async def get_many(
@@ -102,13 +99,10 @@ class RaiseOnMissingAdapter:
         """
         value, ttl = await self.key_value.ttl(key=key, collection=collection)
 
-        if value is not None:
-            return value, ttl
-
-        if raise_on_missing:
+        if value is None and raise_on_missing:
             raise MissingKeyError(operation="ttl", collection=collection, key=key)
 
-        return (None, None)
+        return value, ttl
 
     @overload
     async def ttl_many(
