@@ -5,7 +5,11 @@ import platform
 import subprocess
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
 from typing import Any
+
+import pytest
 
 logger = logging.getLogger(__name__)
 
@@ -94,3 +98,27 @@ def run_container_with_log_wait(container: Any, message: str, *, timeout: int | 
 
             wait_for_logs(container, message, timeout=timeout or 120)
         yield container
+
+
+class UnavailableAWSHandler(BaseHTTPRequestHandler):
+    def do_HEAD(self) -> None:
+        self.send_error(503)
+
+    def do_POST(self) -> None:
+        self.send_error(503)
+
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+        pass
+
+
+@pytest.fixture
+def unavailable_aws_endpoint() -> Iterator[str]:
+    """Serve a deterministic error while reserving the endpoint for the test."""
+    with ThreadingHTTPServer(("127.0.0.1", 0), UnavailableAWSHandler) as server:
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield f"http://127.0.0.1:{server.server_port}"
+        finally:
+            server.shutdown()
+            thread.join(timeout=5)

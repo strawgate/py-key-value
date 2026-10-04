@@ -10,17 +10,20 @@ from key_value.aio.stores.base import (
 )
 
 try:
-    import aioboto3
-    from aioboto3.session import Session
+    from aiobotocore.session import get_session
 except ImportError as e:
     msg = "DynamoDBStore requires py-key-value-aio[dynamodb]"
     raise ImportError(msg) from e
 
-# aioboto3 generates types at runtime, so we use AioBaseClient at runtime but DynamoDBClient during static type checking
+# aiobotocore generates client methods at runtime, so we use AioBaseClient at runtime but DynamoDBClient during static type checking
 if TYPE_CHECKING:
+    from aiobotocore.session import ClientCreatorContext
     from types_aiobotocore_dynamodb.client import DynamoDBClient
+
+    DynamoDBClientContext = ClientCreatorContext[DynamoDBClient]
 else:
     from aiobotocore.client import AioBaseClient as DynamoDBClient
+    from aiobotocore.session import ClientCreatorContext as DynamoDBClientContext
 
 DEFAULT_PAGE_SIZE = 1000
 PAGE_LIMIT = 1000
@@ -30,25 +33,23 @@ PAGE_LIMIT = 1000
 # These are module-level functions (not methods) so they are not exported with the store class
 
 
-def _create_dynamodb_session(
+def _create_dynamodb_client_context(
     *,
     region_name: str | None = None,
+    endpoint_url: str | None = None,
     aws_access_key_id: str | None = None,
     aws_secret_access_key: str | None = None,
     aws_session_token: str | None = None,
-) -> Session:
-    """Create an aioboto3 session for DynamoDB."""
-    return aioboto3.Session(
+) -> DynamoDBClientContext:
+    """Create a DynamoDB client context manager; the client exists only once the context is entered."""
+    return get_session().create_client(
+        "dynamodb",
         region_name=region_name,
+        endpoint_url=endpoint_url,
         aws_access_key_id=aws_access_key_id,
         aws_secret_access_key=aws_secret_access_key,
         aws_session_token=aws_session_token,
     )
-
-
-def _create_dynamodb_client_context(session: Session, *, endpoint_url: str | None = None) -> Any:
-    """Create a DynamoDB client context manager from a session."""
-    return session.client(service_name="dynamodb", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
 
 async def _describe_dynamodb_table(client: DynamoDBClient, table_name: str) -> bool:
@@ -155,9 +156,9 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     - key (sort key)
     """
 
-    _session: aioboto3.Session | None
+    # Settings for the client the store creates itself; each setup attempt needs a fresh client context.
+    _client_settings: dict[str, str | None]
     _table_name: str
-    _endpoint_url: str | None
     _client: DynamoDBClient | None
     _table_config: dict[str, Any]
     _auto_create: bool
@@ -251,16 +252,15 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
 
         if client is not None:
             self._client = client
-            self._session = None
-            self._endpoint_url = None
+            self._client_settings = {}
         else:
-            self._session = _create_dynamodb_session(
-                region_name=region_name,
-                aws_access_key_id=aws_access_key_id,
-                aws_secret_access_key=aws_secret_access_key,
-                aws_session_token=aws_session_token,
-            )
-            self._endpoint_url = endpoint_url
+            self._client_settings = {
+                "region_name": region_name,
+                "endpoint_url": endpoint_url,
+                "aws_access_key_id": aws_access_key_id,
+                "aws_secret_access_key": aws_secret_access_key,
+                "aws_session_token": aws_session_token,
+            }
             self._client = None
 
         super().__init__(
@@ -279,12 +279,8 @@ class DynamoDBStore(BaseContextManagerStore, BaseStore):
     async def _setup(self) -> None:
         """Setup the DynamoDB client and ensure table exists."""
         # Register client cleanup if we own the client
-        if not self._client_provided_by_user and self._client is None:
-            if self._session is None:
-                msg = "DynamoDB session not initialized"
-                raise ValueError(msg)
-            raw_client = _create_dynamodb_client_context(self._session, endpoint_url=self._endpoint_url)
-            self._client = await self._exit_stack.enter_async_context(raw_client)
+        if not self._client_provided_by_user:
+            self._client = await self._exit_stack.enter_async_context(_create_dynamodb_client_context(**self._client_settings))
 
         try:
             table_exists = await _describe_dynamodb_table(self._connected_client, self._table_name)

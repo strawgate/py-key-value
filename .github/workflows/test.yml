@@ -135,7 +135,8 @@ jobs:
         run: uv sync --group dev --python ${{ matrix.python-version }} --resolution lowest-direct
 
       - name: "Test with oldest dependencies"
-        run: uv run pytest tests -vv -n auto
+        # Test the already-synced lowest-direct environment without syncing again.
+        run: uv run --no-sync pytest tests -vv -n auto
 
       - name: "Build"
         run: uv build .

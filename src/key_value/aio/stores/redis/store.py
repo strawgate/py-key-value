@@ -148,6 +148,15 @@ async def _redis_get(client: Redis, name: str) -> Any:
     return await client.get(name=name)
 
 
+async def _close_redis_client(client: Redis) -> None:
+    """Close clients from both redis-py 4.x and newer releases."""
+    aclose = getattr(client, "aclose", None)
+    if aclose is not None:
+        await aclose()
+    else:
+        await client.close()
+
+
 async def _redis_mget(client: Redis, keys: list[str]) -> list[Any]:
     """Get multiple values from Redis."""
     return await client.mget(keys=keys)
@@ -434,7 +443,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
     async def _setup(self) -> None:
         """Register client cleanup if we own the client."""
         if not self._client_provided_by_user:
-            self._exit_stack.push_async_callback(self._client.aclose)
+            self._exit_stack.push_async_callback(_close_redis_client, self._client)
 
     @override
     async def _delete_store(self) -> bool:
