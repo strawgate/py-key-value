@@ -23,6 +23,7 @@ async def test_supplied_cache_is_usable_and_remains_caller_owned(tmp_path: Path,
 
         with patch.object(cache, "close", wraps=cache.close) as close_cache:
             async with DiskStore(disk_cache=cache) as store:
+                assert store._cache is cache
                 await store.put("test_key", {"value": 1})
                 assert await store.get("test_key") == {"value": 1}
 
