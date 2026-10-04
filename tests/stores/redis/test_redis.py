@@ -1,5 +1,9 @@
 import json
+import warnings
+from collections.abc import AsyncGenerator
+from pathlib import Path
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from dirty_equals import IsDatetime
@@ -53,6 +57,48 @@ class TestRedisStoreUsername:
             store=store
         ).connection_pool.connection_kwargs
         assert connection_kwargs.get("username") == "bob"
+
+
+class TestRedisStoreTTLCommands(ContextManagerStoreTestMixin):
+    @pytest.fixture
+    def per_test_temp_dir(self, tmp_path: Path) -> Path:
+        return tmp_path
+
+    @pytest.fixture
+    async def store(self) -> AsyncGenerator[RedisStore, None]:
+        client = Redis(host="localhost", decode_responses=True)
+        yield RedisStore(client=client)
+        await _close_redis_client(client)
+
+    async def test_put_uses_set_with_expiry(self, monkeypatch: pytest.MonkeyPatch, store: RedisStore):
+        client = get_client_from_store(store)
+        set_mock = AsyncMock(return_value=True)
+        monkeypatch.setattr(client, "set", set_mock)
+
+        await store.put(collection="test", key="single", value={"value": 1}, ttl=30)
+
+        set_mock.assert_awaited_once()
+        await_args = set_mock.await_args
+        assert await_args is not None
+        assert await_args.kwargs["name"] == "test::single"
+        assert await_args.kwargs["ex"] > 0
+
+    async def test_put_many_uses_set_with_expiry(self, monkeypatch: pytest.MonkeyPatch, store: RedisStore):
+        client = get_client_from_store(store)
+        pipeline = MagicMock()
+        pipeline.execute = AsyncMock(return_value=[])
+        monkeypatch.setattr(client, "pipeline", MagicMock(return_value=pipeline))
+
+        await store.put_many(
+            collection="test",
+            keys=["first", "second"],
+            values=[{"value": 1}, {"value": 2}],
+            ttl=30,
+        )
+
+        assert pipeline.set.call_count == 2
+        assert all(call.kwargs["ex"] > 0 for call in pipeline.set.call_args_list)
+        pipeline.execute.assert_awaited_once_with()
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
@@ -193,6 +239,26 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 "version": 1,
             }
         )
+
+    async def test_ttl_writes_do_not_use_deprecated_redis_commands(self, store: RedisStore, redis_client: Redis):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            await store.put(collection="test", key="single_ttl", value={"test": "single"}, ttl=30)
+            await store.put_many(
+                collection="test",
+                keys=["bulk_ttl_1", "bulk_ttl_2"],
+                values=[{"test": "bulk_1"}, {"test": "bulk_2"}],
+                ttl=30,
+            )
+
+        assert await store.get(collection="test", key="single_ttl") == {"test": "single"}
+        assert await store.get_many(collection="test", keys=["bulk_ttl_1", "bulk_ttl_2"]) == [
+            {"test": "bulk_1"},
+            {"test": "bulk_2"},
+        ]
+        assert await redis_client.ttl("test::single_ttl") > 0
+        assert await redis_client.ttl("test::bulk_ttl_1") > 0
+        assert await redis_client.ttl("test::bulk_ttl_2") > 0
 
     @pytest.mark.skip(reason="Distributed Caches are unbounded")
     @override

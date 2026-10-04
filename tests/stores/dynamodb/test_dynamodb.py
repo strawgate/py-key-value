@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import pytest
+from botocore.exceptions import ClientError
 from dirty_equals import IsDatetime
 from inline_snapshot import snapshot
 from testcontainers.core.container import DockerContainer
@@ -34,15 +35,15 @@ DYNAMODB_CONTAINER_PORT = 8000
 
 async def ping_dynamodb(endpoint_url: str) -> bool:
     """Check if DynamoDB Local is running."""
-    from key_value.aio.stores.dynamodb.store import _create_dynamodb_client_context, _create_dynamodb_session
+    from key_value.aio.stores.dynamodb.store import _create_dynamodb_client_context
 
     try:
-        session = _create_dynamodb_session(
+        async with _create_dynamodb_client_context(
+            endpoint_url=endpoint_url,
             aws_access_key_id="test",
             aws_secret_access_key="test",
             region_name="us-east-1",
-        )
-        async with _create_dynamodb_client_context(session, endpoint_url=endpoint_url) as client:
+        ) as client:
             await client.list_tables()
     except Exception:
         return False
@@ -52,6 +53,24 @@ async def ping_dynamodb(endpoint_url: str) -> bool:
 
 class DynamoDBFailedToStartError(Exception):
     pass
+
+
+async def test_dynamodb_setup_retries_with_fresh_client(monkeypatch: pytest.MonkeyPatch, unavailable_aws_endpoint: str) -> None:
+    """A failed setup must not leave the store holding a spent client context."""
+    monkeypatch.setenv("AWS_MAX_ATTEMPTS", "1")
+    store = DynamoDBStore(
+        table_name=DYNAMODB_TEST_TABLE,
+        endpoint_url=unavailable_aws_endpoint,
+        aws_access_key_id="test",
+        aws_secret_access_key="test",
+        region_name="us-east-1",
+    )
+
+    for _ in range(2):
+        with pytest.raises(StoreSetupError) as exc_info:
+            await store.setup()
+        assert isinstance(exc_info.value.__cause__, ClientError)
+        assert exc_info.value.__cause__.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 503
 
 
 def get_value_from_response(response: GetItemOutputTypeDef) -> dict[str, Any]:
@@ -94,7 +113,7 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
     @override
     @pytest.fixture
     async def store(self, setup_dynamodb: None, dynamodb_endpoint: str) -> DynamoDBStore:
-        from key_value.aio.stores.dynamodb.store import _create_dynamodb_client_context, _create_dynamodb_session
+        from key_value.aio.stores.dynamodb.store import _create_dynamodb_client_context
 
         store = DynamoDBStore(
             table_name=DYNAMODB_TEST_TABLE,
@@ -105,12 +124,12 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
         )
 
         # Clean up test table if it exists
-        session = _create_dynamodb_session(
+        async with _create_dynamodb_client_context(
+            endpoint_url=dynamodb_endpoint,
             aws_access_key_id="test",
             aws_secret_access_key="test",
             region_name="us-east-1",
-        )
-        async with _create_dynamodb_client_context(session, endpoint_url=dynamodb_endpoint) as client:
+        ) as client:
             with contextlib.suppress(Exception):
                 await client.delete_table(TableName=DYNAMODB_TEST_TABLE)
                 # Wait for table to be deleted
@@ -169,17 +188,17 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     async def test_table_config_sse_specification(self, setup_dynamodb: None, dynamodb_endpoint: str):
         """Test that SSESpecification can be passed via table_config."""
-        from key_value.aio.stores.dynamodb.store import _create_dynamodb_client_context, _create_dynamodb_session
+        from key_value.aio.stores.dynamodb.store import _create_dynamodb_client_context
 
         table_name = "kv-store-test-sse"
 
         # Clean up table if it exists
-        session = _create_dynamodb_session(
+        async with _create_dynamodb_client_context(
+            endpoint_url=dynamodb_endpoint,
             aws_access_key_id="test",
             aws_secret_access_key="test",
             region_name="us-east-1",
-        )
-        async with _create_dynamodb_client_context(session, endpoint_url=dynamodb_endpoint) as client:
+        ) as client:
             with contextlib.suppress(Exception):
                 await client.delete_table(TableName=table_name)
                 waiter = client.get_waiter("table_not_exists")
@@ -202,7 +221,12 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         async with store:
             # Verify table was created successfully
-            async with _create_dynamodb_client_context(session, endpoint_url=dynamodb_endpoint) as client:
+            async with _create_dynamodb_client_context(
+                endpoint_url=dynamodb_endpoint,
+                aws_access_key_id="test",
+                aws_secret_access_key="test",
+                region_name="us-east-1",
+            ) as client:
                 table_description = await client.describe_table(TableName=table_name)
 
                 # DynamoDB Local might not fully support SSE, but we can verify the store accepts the config
@@ -216,17 +240,17 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     async def test_auto_create_false_raises_error(self, setup_dynamodb: None, dynamodb_endpoint: str):
         """Test that auto_create=False raises error when table doesn't exist."""
-        from key_value.aio.stores.dynamodb.store import _create_dynamodb_client_context, _create_dynamodb_session
+        from key_value.aio.stores.dynamodb.store import _create_dynamodb_client_context
 
         table_name = "kv-store-test-nonexistent"
 
         # Clean up table if it exists to ensure it doesn't exist
-        session = _create_dynamodb_session(
+        async with _create_dynamodb_client_context(
+            endpoint_url=dynamodb_endpoint,
             aws_access_key_id="test",
             aws_secret_access_key="test",
             region_name="us-east-1",
-        )
-        async with _create_dynamodb_client_context(session, endpoint_url=dynamodb_endpoint) as client:
+        ) as client:
             with contextlib.suppress(Exception):
                 await client.delete_table(TableName=table_name)
                 waiter = client.get_waiter("table_not_exists")
@@ -249,17 +273,17 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     async def test_auto_create_true_creates_table(self, setup_dynamodb: None, dynamodb_endpoint: str):
         """Test that auto_create=True (default) creates table when it doesn't exist."""
-        from key_value.aio.stores.dynamodb.store import _create_dynamodb_client_context, _create_dynamodb_session
+        from key_value.aio.stores.dynamodb.store import _create_dynamodb_client_context
 
         table_name = "kv-store-test-autocreate"
 
         # Clean up table if it exists to ensure it doesn't exist
-        session = _create_dynamodb_session(
+        async with _create_dynamodb_client_context(
+            endpoint_url=dynamodb_endpoint,
             aws_access_key_id="test",
             aws_secret_access_key="test",
             region_name="us-east-1",
-        )
-        async with _create_dynamodb_client_context(session, endpoint_url=dynamodb_endpoint) as client:
+        ) as client:
             with contextlib.suppress(Exception):
                 await client.delete_table(TableName=table_name)
                 waiter = client.get_waiter("table_not_exists")
@@ -282,6 +306,11 @@ class TestDynamoDBStore(ContextManagerStoreTestMixin, BaseStoreTests):
             assert result == {"message": "autocreate test"}
 
             # Verify table was actually created
-            async with _create_dynamodb_client_context(session, endpoint_url=dynamodb_endpoint) as client:
+            async with _create_dynamodb_client_context(
+                endpoint_url=dynamodb_endpoint,
+                aws_access_key_id="test",
+                aws_secret_access_key="test",
+                region_name="us-east-1",
+            ) as client:
                 table_description = await client.describe_table(TableName=table_name)
                 assert table_description is not None

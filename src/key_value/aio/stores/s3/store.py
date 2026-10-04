@@ -18,42 +18,43 @@ MAX_COLLECTION_LENGTH = 500
 MAX_KEY_LENGTH = 500
 
 try:
-    import aioboto3
-    from aioboto3.session import Session
+    from aiobotocore.session import get_session
 except ImportError as e:
     msg = "S3Store requires py-key-value-aio[s3]"
     raise ImportError(msg) from e
 
-# aioboto3 generates types at runtime, so we use AioBaseClient at runtime but S3Client during static type checking
+# aiobotocore generates client methods at runtime, so we use AioBaseClient at runtime but S3Client during static type checking
 if TYPE_CHECKING:
+    from aiobotocore.session import ClientCreatorContext
     from types_aiobotocore_s3.client import S3Client
+
+    S3ClientContext = ClientCreatorContext[S3Client]
 else:
     from aiobotocore.client import AioBaseClient as S3Client
+    from aiobotocore.session import ClientCreatorContext as S3ClientContext
 
 
 # Private helper functions to encapsulate S3/boto3 client interactions with type ignore comments
 # These are module-level functions (not methods) so they are not exported with the store class
 
 
-def _create_s3_session(
+def _create_s3_client_context(
     *,
     region_name: str | None = None,
+    endpoint_url: str | None = None,
     aws_access_key_id: str | None = None,
     aws_secret_access_key: str | None = None,
     aws_session_token: str | None = None,
-) -> Session:
-    """Create an aioboto3 session for S3."""
-    return aioboto3.Session(
+) -> S3ClientContext:
+    """Create an S3 client context manager; the client exists only once the context is entered."""
+    return get_session().create_client(
+        "s3",
         region_name=region_name,
+        endpoint_url=endpoint_url,
         aws_access_key_id=aws_access_key_id,
         aws_secret_access_key=aws_secret_access_key,
         aws_session_token=aws_session_token,
     )
-
-
-def _create_s3_client_context(session: Session, *, endpoint_url: str | None = None) -> Any:
-    """Create an S3 client context manager from a session."""
-    return session.client(service_name="s3", endpoint_url=endpoint_url)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
 
 async def _head_s3_bucket(client: S3Client, bucket_name: str) -> None:
@@ -140,10 +141,10 @@ async def _head_s3_object(client: S3Client, bucket_name: str, key: str) -> bool:
             Key=key,
         )
     except ClientError as e:
-        error = e.response.get("Error", {})  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        metadata = e.response.get("ResponseMetadata", {})  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        error_code = error.get("Code", "")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        http_status = metadata.get("HTTPStatusCode", 0)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        error = e.response.get("Error", {})
+        metadata = e.response.get("ResponseMetadata", {})
+        error_code = error.get("Code", "")
+        http_status = metadata.get("HTTPStatusCode", 0)
 
         if error_code in ("404", "NoSuchKey") or http_status == HTTP_NOT_FOUND:
             return False
@@ -164,7 +165,7 @@ def _get_botocore_error_code(e: Exception) -> str:
 
     if not isinstance(e, ClientError):
         return ""
-    return e.response.get("Error", {}).get("Code", "")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    return e.response.get("Error", {}).get("Code", "")
 
 
 def _get_botocore_http_status(e: Exception) -> int:
@@ -173,7 +174,7 @@ def _get_botocore_http_status(e: Exception) -> int:
 
     if not isinstance(e, ClientError):
         return 0
-    return e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+    return e.response.get("ResponseMetadata", {}).get("HTTPStatusCode", 0)
 
 
 class S3KeySanitizationStrategy(SanitizationStrategy):
@@ -277,7 +278,8 @@ class S3Store(BaseContextManagerStore, BaseStore):
 
     _bucket_name: str
     _endpoint_url: str | None
-    _raw_client: Any
+    # Settings for the client the store creates itself; each setup attempt needs a fresh client context.
+    _client_settings: dict[str, str | None]
     _client: S3Client | None
 
     @overload
@@ -365,16 +367,15 @@ class S3Store(BaseContextManagerStore, BaseStore):
 
         if client:
             self._client = client
-            self._raw_client = None
+            self._client_settings = {}
         else:
-            session = _create_s3_session(
-                region_name=region_name,
-                aws_access_key_id=aws_access_key_id,
-                aws_secret_access_key=aws_secret_access_key,
-                aws_session_token=aws_session_token,
-            )
-
-            self._raw_client = _create_s3_client_context(session, endpoint_url=endpoint_url)
+            self._client_settings = {
+                "region_name": region_name,
+                "endpoint_url": endpoint_url,
+                "aws_access_key_id": aws_access_key_id,
+                "aws_secret_access_key": aws_secret_access_key,
+                "aws_session_token": aws_session_token,
+            }
             self._client = None
 
         super().__init__(
@@ -407,8 +408,8 @@ class S3Store(BaseContextManagerStore, BaseStore):
         HeadBucket operation to check for bucket existence and creates it if not found.
         """
         # Register client cleanup if we own the client
-        if not self._client_provided_by_user and self._raw_client is not None:
-            self._client = await self._exit_stack.enter_async_context(self._raw_client)
+        if not self._client_provided_by_user:
+            self._client = await self._exit_stack.enter_async_context(_create_s3_client_context(**self._client_settings))
 
         from botocore.exceptions import ClientError
 
