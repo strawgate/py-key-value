@@ -63,7 +63,8 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
         """Initialize a multi-disk store that creates one diskcache Cache instance per collection created by the caller.
 
         Args:
-            base_directory: The directory to use for the disk caches.
+            base_directory: The directory to use for the disk caches. The default factory requires
+                each collection's resolved directory to be a proper descendant of this directory.
             max_size: The maximum size of the disk caches.
             default_collection: The default collection to use if no collection is provided.
             auto_create: Whether to automatically create directories if they don't exist. Defaults to True.
@@ -82,7 +83,8 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
 
         Args:
             disk_cache_factory: A factory function that creates a diskcache Cache instance for a given collection.
-            base_directory: The directory to use for the disk caches.
+            base_directory: The directory to use for the disk caches. The default factory requires
+                each collection's resolved directory to be a proper descendant of this directory.
             max_size: The maximum size of the disk caches.
             default_collection: The default collection to use if no collection is provided.
             auto_create: Whether to automatically create directories if they don't exist. Defaults to True.
@@ -102,7 +104,11 @@ class MultiDiskStore(BaseContextManagerStore, BaseStore):
             """Create a default disk cache factory that creates a diskcache Cache instance for a given collection."""
             sanitized_collection: str = _sanitize_collection_for_filesystem(collection=collection)
 
-            cache_directory: Path = self._base_directory / sanitized_collection
+            cache_directory: Path = (self._base_directory / sanitized_collection).resolve()
+
+            if cache_directory == self._base_directory or not cache_directory.is_relative_to(self._base_directory):
+                msg = f"Collection '{collection}' must resolve to a directory within '{self._base_directory}'."
+                raise ValueError(msg)
 
             if not cache_directory.exists():
                 if not self._auto_create:
