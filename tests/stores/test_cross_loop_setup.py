@@ -9,7 +9,7 @@ import pytest
 
 from key_value.aio._utils.managed_entry import ManagedEntry
 from key_value.aio.errors import StoreSetupError
-from key_value.aio.stores.base import BaseStore
+from key_value.aio.stores.base import BaseContextManagerStore, BaseStore
 from key_value.aio.stores.memory import MemoryStore
 
 
@@ -24,6 +24,36 @@ class BlockingSetupStore(BaseStore):
         self.setup_calls += 1
         self.setup_started.set()
         await asyncio.to_thread(self.release_setup.wait)
+
+    async def _get_managed_entry(self, *, collection: str, key: str) -> ManagedEntry | None:
+        return None
+
+    async def _put_managed_entry(self, *, collection: str, key: str, managed_entry: ManagedEntry) -> None:
+        return None
+
+    async def _delete_managed_entry(self, *, key: str, collection: str) -> bool:
+        return False
+
+
+class BlockingContextManagerStore(BaseContextManagerStore):
+    def __init__(self) -> None:
+        self.setup_calls = 0
+        self.setup_started = Event()
+        self.release_setup = Event()
+        self.cleanup_called = Event()
+        super().__init__(stable_api=True)
+
+    async def _cleanup(self) -> None:
+        self.cleanup_called.set()
+
+    async def _setup(self) -> None:
+        self.setup_calls += 1
+        self._exit_stack.push_async_callback(self._cleanup)
+        self.setup_started.set()
+        await asyncio.to_thread(self.release_setup.wait)
+        if self.cleanup_called.is_set():
+            msg = "setup resources were closed while still in use"
+            raise RuntimeError(msg)
 
     async def _get_managed_entry(self, *, collection: str, key: str) -> ManagedEntry | None:
         return None
@@ -170,6 +200,24 @@ async def test_cancelled_waiter_does_not_cancel_setup() -> None:
     store.release_setup.set()
     await setup_task
     assert store.setup_calls == 1
+
+
+async def test_cancelled_waiter_does_not_close_setup_resources() -> None:
+    store = BlockingContextManagerStore()
+    setup_task = asyncio.create_task(store.setup())
+    assert await asyncio.to_thread(store.setup_started.wait, 5)
+
+    waiting_task = asyncio.create_task(store.setup())
+    await asyncio.sleep(0)
+    waiting_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiting_task
+
+    assert not store.cleanup_called.is_set()
+    store.release_setup.set()
+    await setup_task
+    await store.close()
+    assert store.cleanup_called.is_set()
 
 
 async def test_setup_waits_until_seed_data_is_ready() -> None:

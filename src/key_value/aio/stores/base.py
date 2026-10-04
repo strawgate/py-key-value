@@ -131,6 +131,9 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
     async def _setup(self) -> None:
         """Initialize the store (called once before first use)."""
 
+    async def _cleanup_failed_setup(self) -> None:
+        """Release resources owned by a failed setup attempt."""
+
     async def _setup_collection(self, *, collection: str) -> None:
         """Initialize the collection (called once before first use of the collection)."""
 
@@ -190,6 +193,11 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
             await self._seed_store()
         except Exception as e:
             setup_error = StoreSetupError(message=f"Failed to setup key value store: {e}", extra_info={"store": self.__class__.__name__})
+            cleanup_error: BaseException | None = None
+            try:
+                await self._cleanup_failed_setup()
+            except BaseException as error:
+                cleanup_error = error
             with self._setup_state_lock:
                 # A backend setup failure can be retried. Once setup succeeded,
                 # cleanup may close backend-specific state, so a seeding failure
@@ -197,12 +205,21 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
                 if not backend_setup_complete:
                     self._setup_future = None
             setup_future.set_exception(setup_error)
+            if cleanup_error is not None:
+                raise setup_error from cleanup_error
             raise setup_error from e
-        except BaseException:
+        except BaseException as setup_error:
+            cleanup_error = None
+            try:
+                await self._cleanup_failed_setup()
+            except BaseException as error:
+                cleanup_error = error
             with self._setup_state_lock:
                 if not backend_setup_complete:
                     self._setup_future = None
             setup_future.cancel()
+            if cleanup_error is not None:
+                raise setup_error from cleanup_error
             raise
         else:
             with self._setup_state_lock:
@@ -554,14 +571,11 @@ class BaseContextManagerStore(BaseStore, ABC):
         method is called, allowing stores to register cleanup callbacks during setup.
         """
         await self._ensure_exit_stack_entered()
-        try:
-            await super().setup()
-        except BaseException as setup_error:
-            try:
-                await self.close()
-            except BaseException as close_error:
-                raise setup_error from close_error
-            raise
+        await super().setup()
+
+    @override
+    async def _cleanup_failed_setup(self) -> None:
+        await self.close()
 
 
 class BaseEnumerateCollectionsStore(BaseStore, AsyncEnumerateCollectionsProtocol, ABC):
