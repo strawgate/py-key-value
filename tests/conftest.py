@@ -2,11 +2,14 @@ import asyncio
 import logging
 import os
 import platform
-import socket
 import subprocess
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
 from typing import Any
+
+import pytest
 
 logger = logging.getLogger(__name__)
 
@@ -97,9 +100,25 @@ def run_container_with_log_wait(container: Any, message: str, *, timeout: int | 
         yield container
 
 
-def closed_local_endpoint() -> str:
-    """Return a loopback URL whose port was just released, so connections to it are refused."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        port = sock.getsockname()[1]
-    return f"http://127.0.0.1:{port}"
+class UnavailableAWSHandler(BaseHTTPRequestHandler):
+    def do_HEAD(self) -> None:
+        self.send_error(503)
+
+    def do_POST(self) -> None:
+        self.send_error(503)
+
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+        pass
+
+
+@pytest.fixture
+def unavailable_aws_endpoint() -> Iterator[str]:
+    """Serve a deterministic error while reserving the endpoint for the test."""
+    with ThreadingHTTPServer(("127.0.0.1", 0), UnavailableAWSHandler) as server:
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            yield f"http://127.0.0.1:{server.server_port}"
+        finally:
+            server.shutdown()
+            thread.join(timeout=5)

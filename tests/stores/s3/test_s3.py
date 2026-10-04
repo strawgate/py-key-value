@@ -2,7 +2,7 @@ import contextlib
 from collections.abc import Generator
 
 import pytest
-from botocore.exceptions import EndpointConnectionError
+from botocore.exceptions import ClientError
 from testcontainers.core.container import DockerContainer
 from typing_extensions import override
 
@@ -10,7 +10,7 @@ from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.errors import StoreSetupError
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.s3 import S3Store
-from tests.conftest import closed_local_endpoint, run_container_with_log_wait, should_skip_docker_tests
+from tests.conftest import run_container_with_log_wait, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # S3 test configuration (using LocalStack)
@@ -48,12 +48,12 @@ class S3FailedToStartError(Exception):
     pass
 
 
-async def test_s3_setup_retries_with_fresh_client(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_s3_setup_retries_with_fresh_client(monkeypatch: pytest.MonkeyPatch, unavailable_aws_endpoint: str) -> None:
     """A failed setup must not leave the store holding a spent client context."""
     monkeypatch.setenv("AWS_MAX_ATTEMPTS", "1")
     store = S3Store(
         bucket_name=S3_TEST_BUCKET,
-        endpoint_url=closed_local_endpoint(),
+        endpoint_url=unavailable_aws_endpoint,
         aws_access_key_id="test",
         aws_secret_access_key="test",
         region_name="us-east-1",
@@ -62,7 +62,8 @@ async def test_s3_setup_retries_with_fresh_client(monkeypatch: pytest.MonkeyPatc
     for _ in range(2):
         with pytest.raises(StoreSetupError) as exc_info:
             await store.setup()
-        assert isinstance(exc_info.value.__cause__, EndpointConnectionError)
+        assert isinstance(exc_info.value.__cause__, ClientError)
+        assert exc_info.value.__cause__.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 503
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not available")

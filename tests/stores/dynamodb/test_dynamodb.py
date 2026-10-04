@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import pytest
-from botocore.exceptions import EndpointConnectionError
+from botocore.exceptions import ClientError
 from dirty_equals import IsDatetime
 from inline_snapshot import snapshot
 from testcontainers.core.container import DockerContainer
@@ -17,7 +17,7 @@ from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.errors import StoreSetupError
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.dynamodb import DynamoDBStore
-from tests.conftest import closed_local_endpoint, run_container_with_log_wait, should_skip_docker_tests
+from tests.conftest import run_container_with_log_wait, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # DynamoDB test configuration
@@ -55,12 +55,12 @@ class DynamoDBFailedToStartError(Exception):
     pass
 
 
-async def test_dynamodb_setup_retries_with_fresh_client(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_dynamodb_setup_retries_with_fresh_client(monkeypatch: pytest.MonkeyPatch, unavailable_aws_endpoint: str) -> None:
     """A failed setup must not leave the store holding a spent client context."""
     monkeypatch.setenv("AWS_MAX_ATTEMPTS", "1")
     store = DynamoDBStore(
         table_name=DYNAMODB_TEST_TABLE,
-        endpoint_url=closed_local_endpoint(),
+        endpoint_url=unavailable_aws_endpoint,
         aws_access_key_id="test",
         aws_secret_access_key="test",
         region_name="us-east-1",
@@ -69,7 +69,8 @@ async def test_dynamodb_setup_retries_with_fresh_client(monkeypatch: pytest.Monk
     for _ in range(2):
         with pytest.raises(StoreSetupError) as exc_info:
             await store.setup()
-        assert isinstance(exc_info.value.__cause__, EndpointConnectionError)
+        assert isinstance(exc_info.value.__cause__, ClientError)
+        assert exc_info.value.__cause__.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 503
 
 
 def get_value_from_response(response: GetItemOutputTypeDef) -> dict[str, Any]:
