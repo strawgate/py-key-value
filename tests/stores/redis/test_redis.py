@@ -1,5 +1,7 @@
 import json
 import warnings
+from collections.abc import AsyncGenerator
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -56,12 +58,21 @@ class TestRedisStoreUsername:
         assert connection_kwargs.get("username") == "bob"
 
 
-class TestRedisStoreTTLCommands:
-    async def test_put_uses_set_with_expiry(self, monkeypatch: pytest.MonkeyPatch):
+class TestRedisStoreTTLCommands(ContextManagerStoreTestMixin):
+    @pytest.fixture
+    def per_test_temp_dir(self, tmp_path: Path) -> Path:
+        return tmp_path
+
+    @pytest.fixture
+    async def store(self) -> AsyncGenerator[RedisStore, None]:
         client = Redis(host="localhost", decode_responses=True)
+        yield RedisStore(client=client)
+        await client.aclose()
+
+    async def test_put_uses_set_with_expiry(self, monkeypatch: pytest.MonkeyPatch, store: RedisStore):
+        client = get_client_from_store(store)
         set_mock = AsyncMock(return_value=True)
         monkeypatch.setattr(client, "set", set_mock)
-        store = RedisStore(client=client)
 
         await store.put(collection="test", key="single", value={"value": 1}, ttl=30)
 
@@ -70,14 +81,12 @@ class TestRedisStoreTTLCommands:
         assert await_args is not None
         assert await_args.kwargs["name"] == "test::single"
         assert await_args.kwargs["ex"] > 0
-        await client.aclose()
 
-    async def test_put_many_uses_set_with_expiry(self, monkeypatch: pytest.MonkeyPatch):
-        client = Redis(host="localhost", decode_responses=True)
+    async def test_put_many_uses_set_with_expiry(self, monkeypatch: pytest.MonkeyPatch, store: RedisStore):
+        client = get_client_from_store(store)
         pipeline = MagicMock()
         pipeline.execute = AsyncMock(return_value=[])
         monkeypatch.setattr(client, "pipeline", MagicMock(return_value=pipeline))
-        store = RedisStore(client=client)
 
         await store.put_many(
             collection="test",
@@ -89,7 +98,6 @@ class TestRedisStoreTTLCommands:
         assert pipeline.set.call_count == 2
         assert all(call.kwargs["ex"] > 0 for call in pipeline.set.call_args_list)
         pipeline.execute.assert_awaited_once_with()
-        await client.aclose()
 
 
 @pytest.mark.skipif(should_skip_docker_tests(), reason="Docker is not running")
