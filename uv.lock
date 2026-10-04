@@ -2584,7 +2584,7 @@ requires-dist = [
     { name = "aioboto3", marker = "extra == 'dynamodb'", specifier = ">=13.3.0" },
     { name = "aioboto3", marker = "extra == 's3'", specifier = ">=13.3.0" },
     { name = "aiofile", marker = "python_full_version >= '3.11' and extra == 'filetree'", specifier = ">=3.12.3" },
-    { name = "aiofile", marker = "python_full_version < '3.11' and extra == 'filetree'", specifier = ">=3.5.0,!=3.9.0,<3.10" },
+    { name = "aiofile", marker = "python_full_version < '3.11' and extra == 'filetree'", specifier = ">=3.8.8,!=3.9.0,<3.10" },
     { name = "aiohttp", marker = "extra == 'elasticsearch'", specifier = ">=3.12" },
     { name = "aiomcache", marker = "extra == 'memcached'", specifier = ">=0.8.0" },
     { name = "anyio", marker = "extra == 'filetree'", specifier = ">=4.4.0" },
