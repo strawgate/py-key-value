@@ -148,9 +148,17 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
     async def _seed_store(self) -> None:
         """Seed the store with the data from the seed."""
         for collection, items in self._seed.items():
-            await self.setup_collection(collection=collection)
+            await self._setup_collection(collection=collection)
+            with self._setup_state_lock:
+                self._setup_collection_complete[collection] = True
+
             for key, value in items.items():
-                await self.put(key=key, value=dict(value), collection=collection)
+                created_at, _, expires_at = prepare_entry_timestamps(ttl=None)
+                await self._put_managed_entry(
+                    key=key,
+                    collection=collection,
+                    managed_entry=ManagedEntry(value=dict(value), created_at=created_at, expires_at=expires_at),
+                )
 
     async def setup(self) -> None:
         """Initialize the store if not already initialized.
@@ -175,26 +183,30 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
             await shield(wrap_future(setup_future))
             return
 
+        backend_setup_complete = False
         try:
             await self._setup()
-            with self._setup_state_lock:
-                self._setup_complete = True
+            backend_setup_complete = True
             await self._seed_store()
         except Exception as e:
             setup_error = StoreSetupError(message=f"Failed to setup key value store: {e}", extra_info={"store": self.__class__.__name__})
             with self._setup_state_lock:
-                self._setup_complete = False
-                self._setup_future = None
+                # A backend setup failure can be retried. Once setup succeeded,
+                # cleanup may close backend-specific state, so a seeding failure
+                # remains terminal for this store instance.
+                if not backend_setup_complete:
+                    self._setup_future = None
             setup_future.set_exception(setup_error)
             raise setup_error from e
         except BaseException:
             with self._setup_state_lock:
-                self._setup_complete = False
-                self._setup_future = None
+                if not backend_setup_complete:
+                    self._setup_future = None
             setup_future.cancel()
             raise
         else:
             with self._setup_state_lock:
+                self._setup_complete = True
                 self._setup_future = None
             setup_future.set_result(None)
 
@@ -544,10 +556,10 @@ class BaseContextManagerStore(BaseStore, ABC):
         await self._ensure_exit_stack_entered()
         try:
             await super().setup()
-        except Exception as setup_error:
+        except BaseException as setup_error:
             try:
                 await self.close()
-            except Exception as close_error:
+            except BaseException as close_error:
                 raise setup_error from close_error
             raise
 
