@@ -35,7 +35,12 @@ def _sanitize_collection_for_filesystem(collection: str) -> str:
 class MultiDiskStore(BaseContextManagerStore, BaseStore):
     """A disk-based store that uses the diskcache library to store data. The MultiDiskStore by default creates
     one diskcache Cache instance per collection created by the caller but a custom factory function can be provided
-    to tightly control the creation of the diskcache Cache instances."""
+    to tightly control the creation of the diskcache Cache instances.
+
+    The default factory validates resolved collection paths during setup. Callers must keep
+    the base directory layout stable while caches are in use; concurrent external filesystem
+    changes are not coordinated by this store.
+    """
 
     _cache: dict[str, Cache]
 
