@@ -150,10 +150,14 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
 
     async def _seed_store(self) -> None:
         """Seed the store with the data from the seed."""
-        for collection, items in self._seed.items():
-            await self._setup_collection(collection=collection)
+        for seed_collection, items in self._seed.items():
+            collection = seed_collection or self.default_collection
             with self._setup_state_lock:
-                self._setup_collection_complete[collection] = True
+                collection_ready = self._setup_collection_complete[collection]
+            if not collection_ready:
+                await self._setup_collection(collection=collection)
+                with self._setup_state_lock:
+                    self._setup_collection_complete[collection] = True
 
             for key, value in items.items():
                 created_at, _, expires_at = prepare_entry_timestamps(ttl=None)

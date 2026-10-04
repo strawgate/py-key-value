@@ -254,6 +254,22 @@ async def test_setup_waits_until_seed_data_is_ready() -> None:
     assert await get_task == {"value": 1}
 
 
+@pytest.mark.parametrize("default_collection", [None, "custom"])
+@pytest.mark.parametrize("include_explicit_collection_seed", [False, True])
+async def test_empty_collection_seed_uses_default_collection(
+    default_collection: str | None, include_explicit_collection_seed: bool
+) -> None:
+    seed = {"": {"empty": {"value": 1}}}
+    if include_explicit_collection_seed:
+        seed[default_collection or "default_collection"] = {"explicit": {"value": 2}}
+    store = MemoryStore(default_collection=default_collection, seed=seed)
+
+    assert await store.get("empty") == {"value": 1}
+    assert await store.get("empty", collection="") == {"value": 1}
+    if include_explicit_collection_seed:
+        assert await store.get("explicit") == {"value": 2}
+
+
 async def test_seed_failure_is_terminal_for_the_store_instance() -> None:
     store = FailingSeedStore()
 
