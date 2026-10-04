@@ -15,6 +15,7 @@ from typing_extensions import override
 from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.redis import RedisStore
+from key_value.aio.stores.redis.store import _close_redis_client
 from tests.conftest import run_container_with_log_wait, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
@@ -216,7 +217,7 @@ class TestRedisSSLStore(ContextManagerStoreTestMixin, BaseStoreTests):
             except Exception:
                 return False
             finally:
-                await client.aclose()
+                await _close_redis_client(client)
 
         if not await async_wait_for_true(bool_fn=ping_redis, tries=WAIT_FOR_REDIS_TIMEOUT, wait_time=1):
             msg = "Redis with SSL/TLS failed to start"
@@ -274,6 +275,7 @@ class TestRedisSSLStore(ContextManagerStoreTestMixin, BaseStoreTests):
             db=REDIS_DB,
             ssl=True,
             ssl_cert_reqs="none",
+            ssl_check_hostname=False,
         )
         try:
             _ = await get_client_from_store(store=store).flushdb()  # pyright: ignore[reportUnknownMemberType]

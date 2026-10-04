@@ -135,8 +135,7 @@ jobs:
         run: uv sync --group dev --python ${{ matrix.python-version }} --resolution lowest-direct
 
       - name: "Test with oldest dependencies"
-        # Keep the lowest-direct environment selected above. A plain uv run
-        # switches resolution back to highest and silently replaces it.
+        # Test the already-synced lowest-direct environment without syncing again.
         run: uv run --no-sync pytest tests -vv -n auto
 
       - name: "Build"
