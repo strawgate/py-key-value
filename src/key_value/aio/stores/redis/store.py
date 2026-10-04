@@ -153,14 +153,9 @@ async def _redis_mget(client: Redis, keys: list[str]) -> list[Any]:
     return await client.mget(keys=keys)
 
 
-async def _redis_set(client: Redis, name: str, value: str) -> None:
-    """Set a value in Redis without TTL."""
-    _ = await client.set(name=name, value=value)
-
-
-async def _redis_setex(client: Redis, name: str, time: int, value: str) -> None:
-    """Set a value in Redis with TTL."""
-    _ = await client.setex(name=name, time=time, value=value)
+async def _redis_set(client: Redis, name: str, value: str, *, expires_in: int | None = None) -> None:
+    """Set a value in Redis with an optional TTL."""
+    _ = await client.set(name=name, value=value, ex=expires_in)
 
 
 async def _redis_pipeline_execute(pipeline: Any) -> None:
@@ -359,7 +354,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             # Redis does not support <= 0 TTLs
             ttl = max(int(managed_entry.ttl), 1)
 
-            await _redis_setex(self._client, combo_key, ttl, json_value)
+            await _redis_set(self._client, combo_key, json_value, expires_in=ttl)
         else:
             await _redis_set(self._client, combo_key, json_value)
 
@@ -398,7 +393,7 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
             combo_key: str = compound_key(collection=collection, key=key)
             json_value = self._adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
-            pipeline.setex(name=combo_key, time=ttl_seconds, value=json_value)
+            pipeline.set(name=combo_key, value=json_value, ex=ttl_seconds)
 
         await _redis_pipeline_execute(pipeline)
 
