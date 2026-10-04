@@ -25,7 +25,8 @@ class TTLClampWrapper(BaseWrapper):
             key_value: The store to wrap.
             min_ttl: The minimum TTL for puts into the store.
             max_ttl: The maximum TTL for puts into the store.
-            missing_ttl: The TTL to use for entries that do not have a TTL. Defaults to None.
+            missing_ttl: The TTL to use for entries that do not have a TTL, clamped to the same bounds.
+                Defaults to None, preserving entries without expiration.
         """
         self.key_value: AsyncKeyValue = key_value
         self.min_ttl: float = float(min_ttl)
@@ -42,7 +43,9 @@ class TTLClampWrapper(BaseWrapper):
 
     def _ttl_clamp(self, ttl: SupportsFloat | None) -> float | None:
         if ttl is None:
-            return self.missing_ttl
+            ttl = self.missing_ttl
+            if ttl is None:
+                return None
 
         ttl = prepare_ttl(t=ttl)
 

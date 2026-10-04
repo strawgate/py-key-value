@@ -260,9 +260,13 @@ class BasePydanticAdapter(Generic[T], ABC):
         return (None, None)
 
     async def ttl_many(self, keys: Sequence[str], *, collection: str | None = None) -> list[tuple[T | None, float | None]]:
-        """Batch get models with TTLs. Each element is (model|None, ttl_seconds|None)."""
+        """Batch get models with TTLs. Missing or invalid values return (None, None), as in ttl()."""
         collection = collection or self._default_collection
 
         entries: list[tuple[dict[str, Any] | None, float | None]] = await self._key_value.ttl_many(keys=keys, collection=collection)
 
-        return [(self._validate_model(value=entry) if entry is not None else None, ttl_info) for entry, ttl_info in entries]
+        results: list[tuple[T | None, float | None]] = []
+        for entry, ttl_info in entries:
+            model = self._validate_model(value=entry) if entry is not None else None
+            results.append((model, ttl_info) if model is not None else (None, None))
+        return results
