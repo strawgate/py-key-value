@@ -3,11 +3,13 @@ Base abstract class for managed key-value store implementations.
 """
 
 from abc import ABC, abstractmethod
-from asyncio.locks import Lock
+from asyncio import shield, wrap_future
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from concurrent.futures import Future
 from contextlib import AsyncExitStack
 from datetime import datetime
+from threading import Lock as ThreadLock
 from types import MappingProxyType, TracebackType
 from typing import Any, SupportsFloat
 
@@ -65,9 +67,10 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
     """
 
     _setup_complete: bool
-    _setup_lock: Lock
+    _setup_future: Future[None] | None
+    _setup_state_lock: ThreadLock
 
-    _setup_collection_locks: defaultdict[str, Lock]
+    _setup_collection_futures: dict[str, Future[None]]
     _setup_collection_complete: defaultdict[str, bool]
 
     _serialization_adapter: SerializationAdapter
@@ -104,8 +107,9 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         """
 
         self._setup_complete = False
-        self._setup_lock = Lock()
-        self._setup_collection_locks = defaultdict(Lock)
+        self._setup_future = None
+        self._setup_state_lock = ThreadLock()
+        self._setup_collection_futures = {}
         self._setup_collection_complete = defaultdict(bool)
 
         self._seed = _seed_to_frozen_seed_data(seed=seed or {})
@@ -151,34 +155,55 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
     async def setup(self) -> None:
         """Initialize the store if not already initialized.
 
-        This method is called automatically before any store operations and uses a lock to ensure
-        thread-safe lazy initialization. It can also be called manually to ensure the store is ready
-        before performing operations. The setup process includes calling the `_setup()` hook and
-        seeding the store with initial data if provided.
+        This method is called automatically before any store operations and coordinates lazy
+        initialization across threads and event loops. The setup process includes calling the
+        `_setup()` hook and seeding the store with initial data if provided.
 
         This method is idempotent - calling it multiple times has no additional effect after the first call.
         """
-        if not self._setup_complete:
-            async with self._setup_lock:
-                if not self._setup_complete:
-                    try:
-                        await self._setup()
-                    except Exception as e:
-                        raise StoreSetupError(
-                            message=f"Failed to setup key value store: {e}", extra_info={"store": self.__class__.__name__}
-                        ) from e
+        with self._setup_state_lock:
+            if self._setup_complete:
+                return
 
-                    self._setup_complete = True
+            setup_future = self._setup_future
+            should_initialize = setup_future is None
+            if should_initialize:
+                setup_future = Future[None]()
+                self._setup_future = setup_future
 
-                    await self._seed_store()
+        if not should_initialize:
+            await shield(wrap_future(setup_future))
+            return
+
+        try:
+            await self._setup()
+            with self._setup_state_lock:
+                self._setup_complete = True
+            await self._seed_store()
+        except Exception as e:
+            setup_error = StoreSetupError(message=f"Failed to setup key value store: {e}", extra_info={"store": self.__class__.__name__})
+            with self._setup_state_lock:
+                self._setup_complete = False
+                self._setup_future = None
+            setup_future.set_exception(setup_error)
+            raise setup_error from e
+        except BaseException:
+            with self._setup_state_lock:
+                self._setup_complete = False
+                self._setup_future = None
+            setup_future.cancel()
+            raise
+        else:
+            with self._setup_state_lock:
+                self._setup_future = None
+            setup_future.set_result(None)
 
     async def setup_collection(self, *, collection: str) -> None:
         """Initialize a specific collection if not already initialized.
 
-        This method is called automatically before any collection-specific operations and uses a per-collection
-        lock to ensure thread-safe lazy initialization. It can also be called manually to ensure a collection
-        is ready before performing operations on it. The setup process includes calling the `_setup_collection()`
-        hook for store-specific collection initialization.
+        This method is called automatically before any collection-specific operations and
+        coordinates lazy initialization across threads and event loops. The setup process includes
+        calling the `_setup_collection()` hook for store-specific collection initialization.
 
         This method is idempotent - calling it multiple times for the same collection has no additional effect
         after the first call.
@@ -188,14 +213,38 @@ class BaseStore(AsyncKeyValueProtocol, ABC):
         """
         await self.setup()
 
-        if not self._setup_collection_complete[collection]:
-            async with self._setup_collection_locks[collection]:
-                if not self._setup_collection_complete[collection]:
-                    try:
-                        await self._setup_collection(collection=collection)
-                    except Exception as e:
-                        raise StoreSetupError(message=f"Failed to setup collection: {e}", extra_info={"collection": collection}) from e
-                    self._setup_collection_complete[collection] = True
+        with self._setup_state_lock:
+            if self._setup_collection_complete[collection]:
+                return
+
+            setup_future = self._setup_collection_futures.get(collection)
+            should_initialize = setup_future is None
+            if should_initialize:
+                setup_future = Future[None]()
+                self._setup_collection_futures[collection] = setup_future
+
+        if not should_initialize:
+            await shield(wrap_future(setup_future))
+            return
+
+        try:
+            await self._setup_collection(collection=collection)
+        except Exception as e:
+            setup_error = StoreSetupError(message=f"Failed to setup collection: {e}", extra_info={"collection": collection})
+            with self._setup_state_lock:
+                del self._setup_collection_futures[collection]
+            setup_future.set_exception(setup_error)
+            raise setup_error from e
+        except BaseException:
+            with self._setup_state_lock:
+                del self._setup_collection_futures[collection]
+            setup_future.cancel()
+            raise
+        else:
+            with self._setup_state_lock:
+                self._setup_collection_complete[collection] = True
+                del self._setup_collection_futures[collection]
+            setup_future.set_result(None)
 
     @abstractmethod
     async def _get_managed_entry(self, *, collection: str, key: str) -> ManagedEntry | None:

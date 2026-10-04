@@ -3,6 +3,14 @@
 Stores are the core implementations of the `AsyncKeyValue` protocol. They provide
 the actual storage backend for your key-value data.
 
+## Concurrent Setup
+
+Lazy store and collection setup is coordinated across threads and event loops,
+so concurrent first use does not initialize the same resource twice. Individual
+client libraries can still impose their own thread or event-loop ownership
+requirements; check the backend's documentation before sharing a networked
+store between event loops.
+
 ## Store Categories
 
 Stores are organized into three categories based on their storage location and
@@ -70,7 +78,7 @@ pip install py-key-value-aio[memory]
 - No persistence (data lost on restart)
 - Extremely fast
 - No external dependencies
-- Thread-safe
+- Safe for concurrent async tasks; create separate instances for cross-thread use
 
 ---
 
