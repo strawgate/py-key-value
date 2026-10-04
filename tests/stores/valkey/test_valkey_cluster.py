@@ -8,11 +8,10 @@ from unittest.mock import MagicMock
 
 import pytest
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio._utils.wait import async_wait_for_true
-from tests.conftest import should_skip_docker_tests
+from tests.conftest import run_container_with_log_wait, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 if TYPE_CHECKING:
@@ -277,17 +276,13 @@ class TestValkeyClusterStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
     @pytest.fixture(autouse=True, scope="module")
     def valkey_cluster_container(self, valkey_cluster_ports: list[int]) -> Iterator[DockerContainer]:
-        container = (
-            DockerContainer(image=VALKEY_CLUSTER_IMAGE)
-            .with_command(_make_valkey_cluster_command(valkey_cluster_ports))
-            .waiting_for(LogMessageWaitStrategy("CLUSTER_READY").with_startup_timeout(VALKEY_CLUSTER_WAIT_TIMEOUT))
-        )
+        container = DockerContainer(image=VALKEY_CLUSTER_IMAGE).with_command(_make_valkey_cluster_command(valkey_cluster_ports))
 
         for port in valkey_cluster_ports:
             container.with_bind_ports(port, port)
             container.with_bind_ports(port + 10000, port + 10000)
 
-        with container:
+        with run_container_with_log_wait(container, "CLUSTER_READY", timeout=VALKEY_CLUSTER_WAIT_TIMEOUT):
             yield container
 
     @pytest.fixture(autouse=True, scope="module")

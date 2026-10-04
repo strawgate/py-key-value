@@ -10,14 +10,13 @@ from dirty_equals import IsDatetime
 from docker.errors import ImageNotFound
 from inline_snapshot import snapshot
 from testcontainers.core.container import DockerContainer
-from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from typing_extensions import override
 
 from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.errors import InvalidKeyError, StoreSetupError
 from key_value.aio.stores.azure_tables import AzureTablesSanitizationStrategy, AzureTablesStore
 from key_value.aio.stores.base import BaseStore
-from tests.conftest import should_skip_docker_tests
+from tests.conftest import run_container_with_log_wait, should_skip_docker_tests
 from tests.stores.base import BaseStoreTests, ContextManagerStoreTestMixin
 
 # ---------------------------------------------------------------------------
@@ -126,12 +125,10 @@ class TestAzureTablesStore(ContextManagerStoreTestMixin, BaseStoreTests):
         image = AZURITE_IMAGE_TEMPLATE.format(version=version)
         container = DockerContainer(image=image)
         container.with_exposed_ports(AZURITE_TABLE_PORT)
-        # Azurite logs once each service is ready; we only need Tables.
-        container.waiting_for(LogMessageWaitStrategy("Azurite Table service is successfully listening"))
         # Bind to 0.0.0.0 so the container's exposed port is reachable.
         container.with_command("azurite --tableHost 0.0.0.0 --skipApiVersionCheck")
         try:
-            with container:
+            with run_container_with_log_wait(container, "Azurite Table service is successfully listening"):
                 yield container
         except ImageNotFound as e:
             pytest.skip(f"Azurite container image is unavailable: {image}: {e}")
