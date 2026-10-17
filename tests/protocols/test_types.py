@@ -1,3 +1,5 @@
+import pytest
+
 from key_value.aio.protocols.key_value import AsyncKeyValue
 from key_value.aio.stores.memory import MemoryStore
 
@@ -15,3 +17,9 @@ async def test_key_value_protocol():
 
     assert await memory_store.get(collection="test", key="test") is None
     assert await memory_store.get(collection="test", key="test_2") == {"test": "test"}
+
+
+@pytest.mark.filterwarnings("error::DeprecationWarning")
+def test_key_value_protocol_is_runtime_checkable():
+    assert isinstance(MemoryStore(), AsyncKeyValue)
+    assert not isinstance(object(), AsyncKeyValue)
