@@ -7,17 +7,12 @@ on:
 permissions:
   contents: read
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   run:
     uses: elastic/ai-github-actions/.github/workflows/gh-aw-stale-issues.lock.yml@main
     with:
-      setup-commands: make setup
-      messages-footer: |
-        ---
-        [From workflow: ${{ github.workflow }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-        Give us feedback! React with 🚀 if perfect, 👍 if helpful, 👎 if not.
+      title-prefix: "[stale-issues]"
     secrets:
       COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}

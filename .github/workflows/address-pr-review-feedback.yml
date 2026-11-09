@@ -1,0 +1,60 @@
+name: Address PR Review Feedback
+on:
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: pr-address-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  actions: read
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  run:
+    if: >-
+      github.event.review.user.type == 'Bot' &&
+      github.event.pull_request.draft == false &&
+      !contains(github.event.pull_request.labels.*.name, 'no-address-pr-feedback')
+    uses: elastic/ai-github-actions/.github/workflows/gh-aw-pr-review-addresser.lock.yml@main
+    with:
+      allowed-bot-users: "coderabbitai[bot],github-actions[bot]"
+      additional-instructions: |
+        Focus on minor and straightforward fixes only. Address feedback that involves:
+        - Typos, naming, and formatting issues
+        - Missing or incorrect types
+        - Simple logic corrections with obvious fixes
+        - Import cleanup or unused variable removal
+        - Documentation or comment improvements
+        - Small refactors with clear intent (e.g. extract a constant, simplify a condition)
+
+        Do NOT attempt to fix feedback that involves:
+        - Architectural or design changes
+        - Complex logic rewrites or algorithm changes
+        - Subjective style preferences where reasonable people could disagree
+        - Changes requiring deep domain knowledge or broader context
+        - Performance optimizations that need benchmarking
+
+        When in doubt, reply to the review thread explaining why you're skipping
+        the change rather than making a potentially incorrect fix.
+
+        ## CI failures
+
+        After addressing review threads, also check the PR's CI status:
+
+        1. Look at the failing checks on the PR (use the GitHub API or gh CLI).
+        2. Read any bot comments on the PR — the PR Actions Detective agent posts
+           comments explaining what caused CI to fail and how to fix it. These
+           comments are your primary guide for fixing CI.
+        3. If CI is failing and the bot comment (or the check logs) point to a
+           clear, straightforward fix (e.g. a lint error, a type error, a failing
+           unit test, a missing import), apply the fix.
+        4. Apply the same scope rules as review feedback: fix simple, obvious CI
+           failures only. Do NOT attempt complex logic rewrites to make tests pass.
+        5. If you fix a CI failure, briefly describe what you changed and why in
+           your commit message.
+    secrets:
+      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
