@@ -448,7 +448,10 @@ pip install py-key-value-aio[keyring]
 On Linux, `keyring` talks to the Secret Service through the pure-Python
 `jeepney` library. The `keyring-linux` extra is now just an alias of `keyring`.
 If you use KWallet, install `dbus-python` yourself; it needs the system D-Bus
-development headers to build.
+development headers to build. Without `dbus-python`, keyring skips the KWallet
+backend and can select Secret Service instead, so secrets already stored in
+KWallet are not found (they stay in KWallet). Install `dbus-python` before you
+rebuild an environment that uses KWallet secrets.
 
 **Use Cases:**
 
