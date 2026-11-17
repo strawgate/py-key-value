@@ -139,3 +139,13 @@ A no-op store that doesn't persist anything, useful for testing.
       show_source: false
       members:
         - __init__
+
+## Custom Stores
+
+To write your own backend, subclass `BaseStore` and implement
+`_get_managed_entry`, `_put_managed_entry` and `_delete_managed_entry`. Import
+`ManagedEntry`, which these methods take and return, from the same module:
+
+```python
+from key_value.aio.stores.base import BaseStore, ManagedEntry
+```
