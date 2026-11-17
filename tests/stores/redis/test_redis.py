@@ -170,6 +170,14 @@ class TestRedisStore(ContextManagerStoreTestMixin, BaseStoreTests):
         result = await store.get(collection="test", key="client_test")
         assert result == {"test": "value"}
 
+    async def test_keys_enumerates_sparse_collection(self, store: RedisStore) -> None:
+        unrelated_keys = [f"item-{i}" for i in range(30_000)]
+        expected_keys = [f"item-{i}" for i in range(50)]
+        await store.put_many(keys=unrelated_keys, values=[{"v": 1}] * len(unrelated_keys), collection="other")
+        await store.put_many(keys=expected_keys, values=[{"v": 1}] * len(expected_keys), collection="small")
+
+        assert set(await store.keys(collection="small")) == set(expected_keys)
+
     async def test_redis_document_format(self, store: RedisStore, redis_client: Redis):
         """Test Redis store document format."""
         await store.put(collection="test", key="document_format_test_1", value={"test_1": "value_1"})

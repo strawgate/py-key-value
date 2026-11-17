@@ -429,10 +429,20 @@ class RedisStore(BaseDestroyStore, BaseEnumerateKeysStore, BaseContextManagerSto
 
         pattern = compound_key(collection=collection, key="*")
 
-        # redis.asyncio scan returns tuple(cursor, keys)
-        _cursor, keys = await _redis_scan(self._client, cursor=0, match=pattern, count=limit)
-
-        return get_keys_from_compound_keys(compound_keys=keys, collection=collection)
+        cursor = 0
+        keys: list[str] = []
+        seen: set[str] = set()
+        while True:
+            # SCAN may return an empty page with a nonzero cursor, or repeat keys.
+            cursor, page = await _redis_scan(self._client, cursor=cursor, match=pattern, count=limit)
+            for key in get_keys_from_compound_keys(compound_keys=page, collection=collection):
+                if key not in seen:
+                    seen.add(key)
+                    keys.append(key)
+                    if len(keys) >= limit:
+                        return keys
+            if cursor == 0:
+                return keys
 
     @override
     async def _setup(self) -> None:
