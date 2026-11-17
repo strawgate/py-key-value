@@ -7,6 +7,24 @@ from key_value.aio.wrappers.ttl_clamp import TTLClampWrapper
 from tests.stores.base import BaseStoreTests
 
 
+@pytest.mark.parametrize("bulk", [False, True])
+@pytest.mark.parametrize(("missing_ttl", "expected"), [(5, 50), (75, 75), (1000, 100), (None, None)])
+async def test_missing_ttl_fallback_respects_bounds_and_preserves_none(bulk: bool, missing_ttl: float | None, expected: float | None):
+    primary = MemoryStore()
+    wrapper = TTLClampWrapper(primary, min_ttl=50, max_ttl=100, missing_ttl=missing_ttl)
+    if bulk:
+        await wrapper.put_many(["key"], [{"value": 1}])
+    else:
+        await wrapper.put("key", {"value": 1})
+
+    value, ttl = await primary.ttl("key")
+    assert value == {"value": 1}
+    if expected is None:
+        assert ttl is None
+    else:
+        assert ttl == IsFloat(approx=expected)
+
+
 class TestTTLClampWrapper(BaseStoreTests):
     @override
     @pytest.fixture

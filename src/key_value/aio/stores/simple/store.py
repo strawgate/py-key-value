@@ -65,7 +65,7 @@ class SimpleStore(BaseEnumerateCollectionsStore, BaseEnumerateKeysStore, BaseDes
     async def _put_managed_entry(self, *, key: str, collection: str, managed_entry: ManagedEntry) -> None:
         combo_key: str = compound_key(collection=collection, key=key)
 
-        if len(self._data) >= self.max_entries:
+        if combo_key not in self._data and len(self._data) >= self.max_entries:
             _ = self._data.pop(next(iter(self._data)))
 
         self._data[combo_key] = SimpleStoreEntry(

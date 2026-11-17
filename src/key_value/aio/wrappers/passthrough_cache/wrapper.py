@@ -46,12 +46,13 @@ class PassthroughCacheWrapper(BaseWrapper):
 
     @override
     async def get(self, key: str, *, collection: str | None = None) -> dict[str, Any] | None:
-        if managed_entry := await self.cache_key_value.get(collection=collection, key=key):
-            return managed_entry
+        cached_entry = await self.cache_key_value.get(collection=collection, key=key)
+        if cached_entry is not None:
+            return cached_entry
 
         uncached_entry, ttl = await self.primary_key_value.ttl(collection=collection, key=key)
 
-        if not uncached_entry:
+        if uncached_entry is None:
             return None
 
         await self.cache_key_value.put(collection=collection, key=key, value=uncached_entry, ttl=ttl)
@@ -88,12 +89,12 @@ class PassthroughCacheWrapper(BaseWrapper):
     async def ttl(self, key: str, *, collection: str | None = None) -> tuple[dict[str, Any] | None, float | None]:
         cached_entry, ttl = await self.cache_key_value.ttl(collection=collection, key=key)
 
-        if cached_entry:
+        if cached_entry is not None:
             return cached_entry, ttl
 
         uncached_entry, ttl = await self.primary_key_value.ttl(collection=collection, key=key)
 
-        if not uncached_entry:
+        if uncached_entry is None:
             return (None, None)
 
         await self.cache_key_value.put(collection=collection, key=key, value=uncached_entry, ttl=ttl)

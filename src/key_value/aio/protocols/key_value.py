@@ -182,6 +182,7 @@ class AsyncDestroyCollectionProtocol(Protocol):
         ...
 
 
+@runtime_checkable
 class AsyncKeyValue(AsyncKeyValueProtocol, Protocol):
     """A protocol for key-value store operations.
 

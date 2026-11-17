@@ -14,9 +14,13 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
 ]
 dependencies = [
     "beartype>=0.20.0",
+    # Older beartype releases fail to import on Python 3.15.
+    "beartype>=0.23.0; python_version >= '3.15'",
     "typing-extensions>=4.15.0",
 ]
 
@@ -69,10 +73,12 @@ docs = [
 
 [dependency-groups]
 dev = [
-    "py-key-value-aio[memory,disk,filetree,redis,elasticsearch,opensearch,memcached,mongodb,vault,dynamodb,s3,azure-tables,rocksdb,duckdb,firestore,postgresql]",
-    "py-key-value-aio[chdb]; platform_system != 'Windows'",
-    "py-key-value-aio[valkey]; platform_system != 'Windows'",
-    "py-key-value-aio[aerospike]; platform_system != 'Windows'",
+    "py-key-value-aio[memory,disk,filetree,redis,elasticsearch,opensearch,memcached,mongodb,vault,dynamodb,s3,azure-tables,duckdb,firestore,postgresql]",
+    # chdb, rocksdict, valkey-glide and aerospike do not support Python 3.15 yet.
+    "py-key-value-aio[chdb]; platform_system != 'Windows' and python_version < '3.15'",
+    "py-key-value-aio[rocksdb]; python_version < '3.15'",
+    "py-key-value-aio[valkey]; platform_system != 'Windows' and python_version < '3.15'",
+    "py-key-value-aio[aerospike]; platform_system != 'Windows' and python_version < '3.15'",
     "py-key-value-aio[keyring]",
     "py-key-value-aio[pydantic]",
     "py-key-value-aio[wrappers-encryption]",
