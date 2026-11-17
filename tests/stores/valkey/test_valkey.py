@@ -148,11 +148,12 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         assert isinstance(store, ValkeyStore)
 
-        valkey_client = store._connected_client
-        assert valkey_client is not None
-
         # Check the server-side expiry rather than reading the values back, which could race the TTL.
         await store.put(collection="test", key="short", value={"v": 1}, ttl=0.5)
+
+        # The client connects lazily, so read it after the first operation.
+        valkey_client = store._connected_client
+        assert valkey_client is not None
         assert 0 < await valkey_client.pttl(key="test::short") <= 500
 
         await store.put_many(collection="test", keys=["short_many"], values=[{"v": 2}], ttl=0.5)
