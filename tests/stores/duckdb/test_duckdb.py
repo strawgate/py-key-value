@@ -204,16 +204,9 @@ class TestDuckDBStoreSpecific:
         await store.put(collection="test", key="key1", value={"data": "value"})
 
         # Verify the custom table exists and contains the data
-        tables = (
-            get_client_from_store(store)
-            .table(custom_table)
-            .filter(filter_expr="key = 'key1'")
-            .select("key", "collection")
-            .execute()
-            .fetchone()
-        )
+        tables = get_client_from_store(store).table(custom_table).filter(filter_expr="key = 'key1'").select("key", "collection").fetchall()
 
-        assert tables == snapshot(("key1", "test"))
+        assert tables == snapshot([("key1", "test")])
 
         # Verify default table doesn't exist
         with pytest.raises(CatalogException):

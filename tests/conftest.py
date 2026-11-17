@@ -1,4 +1,5 @@
 import asyncio
+import importlib.util
 import logging
 import os
 import platform
@@ -14,6 +15,19 @@ import pytest
 logger = logging.getLogger(__name__)
 
 logging.basicConfig(level=logging.INFO)
+
+# Some optional backends have no wheels for every supported platform or Python
+# version (e.g. Windows, or a newly released Python), so the dev dependency group
+# leaves them out there. Skip collecting their test modules when the backend
+# package is not installed rather than failing at import time.
+_OPTIONAL_BACKEND_TEST_MODULES = {
+    "aerospike": "stores/aerospike/*",
+    "chdb": "stores/chdb/*",
+    "glide": "stores/valkey/*",
+    "rocksdict": "stores/rocksdb/*",
+}
+
+collect_ignore_glob = [pattern for module, pattern in _OPTIONAL_BACKEND_TEST_MODULES.items() if importlib.util.find_spec(module) is None]
 
 
 @contextmanager
