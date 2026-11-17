@@ -17,7 +17,7 @@ from typing_extensions import Self, override
 
 from key_value.aio._utils.beartype import bear_enforce
 from key_value.aio._utils.constants import DEFAULT_COLLECTION_NAME
-from key_value.aio._utils.managed_entry import ManagedEntry
+from key_value.aio._utils.managed_entry import ManagedEntry as ManagedEntry  # public: used by custom BaseStore subclasses
 from key_value.aio._utils.sanitization import PassthroughStrategy, SanitizationStrategy
 from key_value.aio._utils.serialization import BasicSerializationAdapter, SerializationAdapter
 from key_value.aio._utils.time_to_live import prepare_entry_timestamps

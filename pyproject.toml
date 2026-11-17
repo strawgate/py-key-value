@@ -55,7 +55,9 @@ dynamodb = ["types-aiobotocore-lite[aiobotocore]>=2.16.0", "types-aiobotocore-dy
 s3 = ["types-aiobotocore-lite[aiobotocore]>=2.16.0", "types-aiobotocore-s3>=2.16.0"]
 azure-tables = ["azure-data-tables>=12.4.0", "azure-core>=1.29.0"]
 keyring = ["keyring>=25.6.0"]
-keyring-linux = ["keyring>=25.6.0", "dbus-python>=1.4.0"]
+# Kept as an alias of `keyring` for existing installs. It no longer pulls in dbus-python, which
+# needs system D-Bus headers to build; keyring uses the pure-Python jeepney on Linux instead.
+keyring-linux = ["keyring>=25.6.0"]
 pydantic = ["pydantic>=2.11.9"]
 aerospike = ["aerospike>=16.0.0"]
 rocksdb = ["rocksdict>=0.3.24"]

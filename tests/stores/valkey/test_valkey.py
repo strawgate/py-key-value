@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 import json
 
@@ -140,3 +141,43 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 "version": 1,
             }
         )
+
+    async def test_put_subsecond_ttl(self, store: BaseStore):
+        """A positive TTL under one second is accepted and expires on the server (#387)."""
+        from key_value.aio.stores.valkey import ValkeyStore
+
+        assert isinstance(store, ValkeyStore)
+
+        # Check the server-side expiry rather than reading the values back, which could race the TTL.
+        await store.put(collection="test", key="short", value={"v": 1}, ttl=0.5)
+
+        # The client connects lazily, so read it after the first operation.
+        valkey_client = store._connected_client
+        assert valkey_client is not None
+        assert 0 < await valkey_client.pttl(key="test::short") <= 500
+
+        await store.put_many(collection="test", keys=["short_many"], values=[{"v": 2}], ttl=0.5)
+        assert 0 < await valkey_client.pttl(key="test::short_many") <= 500
+
+        await asyncio.sleep(1.5)
+
+        assert await valkey_client.exists(keys=["test::short", "test::short_many"]) == 0
+
+
+@pytest.mark.parametrize(
+    ("ttl", "expected"),
+    [
+        (None, None),
+        (0.5, ["PX", "500"]),
+        (0.0001, ["PX", "1"]),
+        (-1.0, ["PX", "1"]),
+        (1.9, ["PX", "1900"]),
+        (60, ["PX", "60000"]),
+    ],
+)
+def test_expiry_from_ttl(ttl: float | None, expected: list[str] | None):
+    from key_value.aio.stores.valkey.store import _expiry_from_ttl
+
+    expiry = _expiry_from_ttl(ttl=ttl)
+
+    assert (expiry.get_cmd_args() if expiry is not None else None) == expected

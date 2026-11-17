@@ -1,3 +1,4 @@
+import math
 from collections.abc import Sequence
 from typing import overload
 
@@ -27,6 +28,18 @@ ValkeyClient = GlideClient | GlideClusterClient
 
 DEFAULT_PAGE_SIZE = 10000
 PAGE_LIMIT = 10000
+
+
+def _expiry_from_ttl(*, ttl: float | None) -> ExpirySet | None:
+    """Convert a remaining TTL in seconds to a Valkey expiry.
+
+    Uses millisecond precision so that sub-second TTLs are accepted (Valkey rejects an
+    expiry of 0 seconds). The value is rounded up and is at least 1 millisecond, so an
+    entry is never written without an expiry or with an invalid one.
+    """
+    if ttl is None:
+        return None
+    return ExpirySet(expiry_type=ExpiryType.MILLSEC, value=max(math.ceil(ttl * 1000), 1))
 
 
 # Private helper functions to encapsulate Valkey/Glide client creation with type ignore comments
@@ -229,7 +242,7 @@ class ValkeyStore(BaseContextManagerStore, BaseStore):
 
         json_value: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
-        expiry: ExpirySet | None = ExpirySet(expiry_type=ExpiryType.SEC, value=int(managed_entry.ttl)) if managed_entry.ttl else None
+        expiry: ExpirySet | None = _expiry_from_ttl(ttl=managed_entry.ttl)
 
         _ = await self._client.set(key=combo_key, value=json_value, expiry=expiry)
 

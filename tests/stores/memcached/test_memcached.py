@@ -13,7 +13,10 @@ from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.memcached import MemcachedStore, MemcachedV1KeySanitizationStrategy
 from key_value.aio.stores.memcached.store import (
+    MAX_ABSOLUTE_EXPTIME,
+    MAX_RELATIVE_EXPTIME,
     _create_memcached_client,
+    _exptime_from_ttl,
     _memcached_close,
     _memcached_flush_all,
     _memcached_stats,
@@ -148,3 +151,35 @@ class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
                 "version": 1,
             }
         )
+
+    async def test_put_ttl_over_30_days(self, store: MemcachedStore):
+        """A TTL over 30 days is stored and readable, not treated as an expired timestamp (#386)."""
+        thirty_one_days = 31 * 24 * 60 * 60
+
+        await store.put(collection="test", key="long_ttl", value={"v": 1}, ttl=thirty_one_days)
+        await store.put_many(collection="test", keys=["long_ttl_many"], values=[{"v": 2}], ttl=thirty_one_days)
+
+        assert await store.get(collection="test", key="long_ttl") == {"v": 1}
+        assert await store.get(collection="test", key="long_ttl_many") == {"v": 2}
+
+        _, ttl = await store.ttl(collection="test", key="long_ttl")
+        assert ttl is not None
+        assert ttl > thirty_one_days - 60
+
+
+@pytest.mark.parametrize(
+    ("ttl", "expected"),
+    [
+        (None, 0),
+        (0.5, 1),
+        (-5.0, 1),
+        (60.9, 60),
+        (float(MAX_RELATIVE_EXPTIME), MAX_RELATIVE_EXPTIME),
+        (MAX_RELATIVE_EXPTIME + 0.5, 1_000_000_000 + MAX_RELATIVE_EXPTIME + 1),
+        (40 * 365 * 24 * 60 * 60, MAX_ABSOLUTE_EXPTIME),
+        (MAX_RELATIVE_EXPTIME + 1.0, 1_000_000_000 + MAX_RELATIVE_EXPTIME + 1),
+        (31 * 24 * 60 * 60 + 0.25, 1_000_000_000 + 31 * 24 * 60 * 60 + 1),
+    ],
+)
+def test_exptime_from_ttl(ttl: float | None, expected: int):
+    assert _exptime_from_ttl(ttl=ttl, now=1_000_000_000.0) == expected
