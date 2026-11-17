@@ -148,18 +148,17 @@ class TestValkeyStore(ContextManagerStoreTestMixin, BaseStoreTests):
 
         assert isinstance(store, ValkeyStore)
 
-        await store.put(collection="test", key="short", value={"v": 1}, ttl=0.5)
-        await store.put_many(collection="test", keys=["short_many"], values=[{"v": 2}], ttl=0.5)
-
-        assert await store.get(collection="test", key="short") == {"v": 1}
-        assert await store.get(collection="test", key="short_many") == {"v": 2}
-
         valkey_client = store._connected_client
         assert valkey_client is not None
-        remaining_ms = await valkey_client.pttl(key="test::short")
-        assert 0 < remaining_ms <= 500
 
-        await asyncio.sleep(1)
+        # Check the server-side expiry rather than reading the values back, which could race the TTL.
+        await store.put(collection="test", key="short", value={"v": 1}, ttl=0.5)
+        assert 0 < await valkey_client.pttl(key="test::short") <= 500
+
+        await store.put_many(collection="test", keys=["short_many"], values=[{"v": 2}], ttl=0.5)
+        assert 0 < await valkey_client.pttl(key="test::short_many") <= 500
+
+        await asyncio.sleep(1.5)
 
         assert await valkey_client.exists(keys=["test::short", "test::short_many"]) == 0
 

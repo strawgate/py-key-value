@@ -13,6 +13,7 @@ from key_value.aio._utils.wait import async_wait_for_true
 from key_value.aio.stores.base import BaseStore
 from key_value.aio.stores.memcached import MemcachedStore, MemcachedV1KeySanitizationStrategy
 from key_value.aio.stores.memcached.store import (
+    MAX_ABSOLUTE_EXPTIME,
     MAX_RELATIVE_EXPTIME,
     _create_memcached_client,
     _exptime_from_ttl,
@@ -174,7 +175,8 @@ class TestMemcachedStore(ContextManagerStoreTestMixin, BaseStoreTests):
         (-5.0, 1),
         (60.9, 60),
         (float(MAX_RELATIVE_EXPTIME), MAX_RELATIVE_EXPTIME),
-        (MAX_RELATIVE_EXPTIME + 0.5, MAX_RELATIVE_EXPTIME),
+        (MAX_RELATIVE_EXPTIME + 0.5, 1_000_000_000 + MAX_RELATIVE_EXPTIME + 1),
+        (40 * 365 * 24 * 60 * 60, MAX_ABSOLUTE_EXPTIME),
         (MAX_RELATIVE_EXPTIME + 1.0, 1_000_000_000 + MAX_RELATIVE_EXPTIME + 1),
         (31 * 24 * 60 * 60 + 0.25, 1_000_000_000 + 31 * 24 * 60 * 60 + 1),
     ],

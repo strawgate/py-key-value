@@ -19,6 +19,8 @@ except ImportError as e:
 
 # Memcached treats an exptime above 30 days as an absolute Unix timestamp, not a duration.
 MAX_RELATIVE_EXPTIME = 60 * 60 * 24 * 30
+# Memcached parses exptime as a signed 32-bit integer, so absolute timestamps stop in January 2038.
+MAX_ABSOLUTE_EXPTIME = 2**31 - 1
 
 
 def _exptime_from_ttl(*, ttl: float | None, now: float) -> int:
@@ -27,14 +29,15 @@ def _exptime_from_ttl(*, ttl: float | None, now: float) -> int:
     Returns 0 (no expiration) when there is no TTL. A TTL up to 30 days is sent as a
     relative duration of at least 1 second, since 0 means no expiration. A longer TTL is
     sent as an absolute Unix timestamp, because Memcached reads any larger value that
-    way; that expiry is compared against the Memcached server's clock.
+    way; that expiry is compared against the Memcached server's clock. Absolute
+    timestamps are capped at the largest value Memcached accepts (2038-01-19); the
+    stored entry keeps its real expiry, which reads still check.
     """
     if ttl is None:
         return 0
-    relative = max(int(ttl), 1)
-    if relative <= MAX_RELATIVE_EXPTIME:
-        return relative
-    return math.ceil(now + ttl)
+    if ttl <= MAX_RELATIVE_EXPTIME:
+        return max(int(ttl), 1)
+    return min(math.ceil(now + ttl), MAX_ABSOLUTE_EXPTIME)
 
 
 # Module-level helper functions for Memcached client operations
