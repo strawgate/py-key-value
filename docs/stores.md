@@ -450,8 +450,8 @@ On Linux, `keyring` talks to the Secret Service through the pure-Python
 If you use KWallet, install `dbus-python` yourself; it needs the system D-Bus
 development headers to build. Without `dbus-python`, keyring skips the KWallet
 backend and can select Secret Service instead, so secrets already stored in
-KWallet are not found (they stay in KWallet). Install `dbus-python` before you
-rebuild an environment that uses KWallet secrets.
+KWallet are not found (they stay in KWallet). Add `dbus-python` to your own
+dependencies so a rebuilt environment that uses KWallet secrets still has it.
 
 **Use Cases:**
 
