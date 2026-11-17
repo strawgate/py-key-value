@@ -43,8 +43,10 @@ jobs:
           fi
         shell: bash
 
+      # --upgrade ignores the versions pinned in uv.lock and resolves the newest versions
+      # allowed by pyproject.toml. The later `uv run` uses that upgraded lock.
       - name: "Install latest dependencies (unpinned)"
-        run: uv sync --group dev --python ${{ matrix.python-version }}
+        run: uv sync --upgrade --group dev --python ${{ matrix.python-version }}
 
       - name: "Show installed versions"
         run: uv pip list
