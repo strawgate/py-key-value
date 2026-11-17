@@ -167,7 +167,7 @@ class DiskStore(BaseContextManagerStore, BaseStore):
         self._client_provided_by_user = client_provided
         self._auto_create = auto_create
 
-        if disk_cache:
+        if disk_cache is not None:
             self._cache = disk_cache
         elif directory:
             directory = Path(directory)
