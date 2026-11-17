@@ -1,3 +1,5 @@
+import math
+import time
 from collections.abc import Sequence
 from typing import Any, overload
 
@@ -13,6 +15,26 @@ try:
 except ImportError as e:
     msg = "MemcachedStore requires py-key-value-aio[memcached]"
     raise ImportError(msg) from e
+
+
+# Memcached treats an exptime above 30 days as an absolute Unix timestamp, not a duration.
+MAX_RELATIVE_EXPTIME = 60 * 60 * 24 * 30
+
+
+def _exptime_from_ttl(*, ttl: float | None, now: float) -> int:
+    """Convert a remaining TTL in seconds to a Memcached exptime.
+
+    Returns 0 (no expiration) when there is no TTL. A TTL up to 30 days is sent as a
+    relative duration of at least 1 second, since 0 means no expiration. A longer TTL is
+    sent as an absolute Unix timestamp, because Memcached reads any larger value that
+    way; that expiry is compared against the Memcached server's clock.
+    """
+    if ttl is None:
+        return 0
+    relative = max(int(ttl), 1)
+    if relative <= MAX_RELATIVE_EXPTIME:
+        return relative
+    return math.ceil(now + ttl)
 
 
 # Module-level helper functions for Memcached client operations
@@ -178,13 +200,7 @@ class MemcachedStore(BaseDestroyStore, BaseContextManagerStore, BaseStore):
     ) -> None:
         combo_key: str = self._sanitize_key(compound_key(collection=collection, key=key))
 
-        # Memcached treats 0 as no-expiration. Do not pass <= 0 (other than 0) to avoid permanence errors.
-        exptime: int
-
-        if managed_entry.ttl is None:  # noqa: SIM108
-            exptime = 0
-        else:
-            exptime = max(int(managed_entry.ttl), 1)
+        exptime: int = _exptime_from_ttl(ttl=managed_entry.ttl, now=time.time())
 
         json_value: str = self._serialization_adapter.dump_json(entry=managed_entry, key=key, collection=collection)
 
