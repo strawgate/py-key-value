@@ -1,5 +1,6 @@
 """FileTreeStore implementation using async filesystem operations."""
 
+import asyncio
 import contextlib
 import logging
 import os
@@ -11,8 +12,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from aiofile import async_open as aopen
 from anyio import Path as AsyncPath
+from anyio import to_thread
 from typing_extensions import Self, override
 
 from key_value.aio._utils.managed_entry import ManagedEntry, dump_to_json, load_from_json
@@ -133,6 +134,9 @@ async def write_file_atomic(file: AsyncPath, text: str) -> None:
     The temporary file is created in the same directory as the target file
     to ensure the rename operation is atomic (same filesystem).
 
+    The whole sequence (create, write, fsync, rename) runs in a single worker
+    thread so none of the blocking calls run on the event loop.
+
     Args:
         file: The target file path to write to.
         text: The text content to write.
@@ -141,30 +145,39 @@ async def write_file_atomic(file: AsyncPath, text: str) -> None:
         The parent directory must exist before calling this function.
         Directory creation is handled by the collection setup logic.
     """
-    # Get the directory of the target file
-    dir_path = file.parent
+    worker = asyncio.ensure_future(to_thread.run_sync(_write_file_atomic_sync, Path(file), text))
 
-    # Create a temporary file in the same directory (required for atomic rename)
-    fd, temp_path_str = tempfile.mkstemp(dir=str(dir_path), suffix=".tmp")
+    # The worker thread cannot be interrupted. If this task is cancelled, keep waiting for the
+    # worker to finish before propagating the cancellation, so a write that the caller considers
+    # cancelled cannot complete later and replace a newer value written to the same file.
+    cancelled: asyncio.CancelledError | None = None
+    while not worker.done():
+        try:
+            await asyncio.shield(worker)
+        except asyncio.CancelledError as e:  # noqa: PERF203 - only loops on repeated cancellation
+            if worker.cancelled():
+                raise
+            cancelled = e
+    if cancelled is not None:
+        if (error := worker.exception()) is not None:
+            logger.error("Atomic write to %s failed after the caller was cancelled", file, exc_info=error)
+        raise cancelled
+    worker.result()
+
+
+def _write_file_atomic_sync(file: Path, text: str) -> None:
+    # Create the temp file in the same directory so the rename is atomic (same filesystem).
+    fd, temp_path_str = tempfile.mkstemp(dir=str(file.parent), suffix=".tmp")
     temp_path = Path(temp_path_str)
-
-    # Close the fd immediately after mkstemp to avoid Windows file locking issues
-    # and to prevent double-close errors. We'll reopen with aopen for async writing.
-    os.close(fd)
-
     try:
-        # Write content to the temporary file
-        async with aopen(file_specifier=temp_path_str, mode="w", encoding="utf-8") as f:
-            await f.write(data=text)
+        with os.fdopen(fd, mode="w", encoding="utf-8") as f:
+            _ = f.write(text)
             # Flush Python buffers to OS and fsync to disk for durability
-            await f.flush()
-            os.fsync(f.file.fileno())
-
+            f.flush()
+            os.fsync(f.fileno())
         # Atomically replace the target file with the temporary file
-        temp_path.replace(Path(file))
+        _ = temp_path.replace(file)
     except BaseException:
-        # Clean up the temporary file on any error
-        # fd is already closed, so we just need to remove the temp file
         with contextlib.suppress(OSError):
             temp_path.unlink()
         raise
@@ -385,9 +398,13 @@ class DiskCollectionInfo:
 
 
 async def read_file(file: AsyncPath) -> dict[str, Any]:
-    async with aopen(file_specifier=Path(file), mode="r", encoding="utf-8") as f:
-        body: str = await f.read()
-        return load_from_json(json_str=body)
+    body: str = await to_thread.run_sync(_read_text_sync, Path(file))
+    return load_from_json(json_str=body)
+
+
+def _read_text_sync(file: Path) -> str:
+    with file.open(mode="r", encoding="utf-8") as f:
+        return f.read()
 
 
 async def iter_key_files(directory: AsyncPath) -> AsyncGenerator[AsyncPath]:

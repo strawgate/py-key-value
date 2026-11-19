@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -442,3 +443,37 @@ class TestFileTreeStoreAtomicWrites:
         # Verify the final value
         result = await store.get(collection="test", key="overwrite_test")
         assert result == {"version": 2}
+
+    async def test_cancelled_write_cannot_overwrite_later_write(self, store: FileTreeStore, monkeypatch: pytest.MonkeyPatch):
+        """A cancelled put must not finish in the background and clobber a later put to the same key."""
+        await store.put(collection="test", key="race", value={"version": 0})
+
+        entered = threading.Event()
+        release = threading.Event()
+        blocked_once = threading.Event()
+        real_fsync = os.fsync
+
+        def blocking_fsync(fd: int) -> None:
+            # Pause the first write (A) inside its worker thread, before the rename.
+            if not blocked_once.is_set():
+                blocked_once.set()
+                entered.set()
+                _ = release.wait(timeout=5)
+            real_fsync(fd)
+
+        monkeypatch.setattr(filetree_store_module.os, "fsync", blocking_fsync)
+
+        write_a = asyncio.create_task(store.put(collection="test", key="race", value={"version": 1}))
+        assert await asyncio.to_thread(entered.wait, 5), "first write never reached fsync"
+        _ = write_a.cancel()
+
+        # Unblock A shortly after cancellation, from outside the event loop.
+        asyncio.get_running_loop().call_later(0.2, release.set)
+        with pytest.raises(asyncio.CancelledError):
+            await write_a
+
+        await store.put(collection="test", key="race", value={"version": 2})
+        # Give a leaked worker thread time to finish its rename if one exists.
+        await asyncio.sleep(0.3)
+
+        assert await store.get(collection="test", key="race") == {"version": 2}
