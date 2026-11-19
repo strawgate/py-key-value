@@ -133,6 +133,9 @@ async def write_file_atomic(file: AsyncPath, text: str) -> None:
     The temporary file is created in the same directory as the target file
     to ensure the rename operation is atomic (same filesystem).
 
+    The whole sequence (create, write, fsync, rename) runs in a single worker
+    thread so none of the blocking calls run on the event loop.
+
     Args:
         file: The target file path to write to.
         text: The text content to write.
