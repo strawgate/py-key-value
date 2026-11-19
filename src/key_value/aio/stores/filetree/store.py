@@ -1,5 +1,6 @@
 """FileTreeStore implementation using async filesystem operations."""
 
+import asyncio
 import contextlib
 import logging
 import os
@@ -144,7 +145,22 @@ async def write_file_atomic(file: AsyncPath, text: str) -> None:
         The parent directory must exist before calling this function.
         Directory creation is handled by the collection setup logic.
     """
-    await to_thread.run_sync(_write_file_atomic_sync, Path(file), text)
+    worker = asyncio.ensure_future(to_thread.run_sync(_write_file_atomic_sync, Path(file), text))
+
+    # The worker thread cannot be interrupted. If this task is cancelled, keep waiting for the
+    # worker to finish before propagating the cancellation, so a write that the caller considers
+    # cancelled cannot complete later and replace a newer value written to the same file.
+    cancelled: asyncio.CancelledError | None = None
+    while not worker.done():
+        try:
+            await asyncio.shield(worker)
+        except asyncio.CancelledError as e:  # noqa: PERF203 - only loops on repeated cancellation
+            if worker.cancelled():
+                raise
+            cancelled = e
+    if cancelled is not None:
+        raise cancelled
+    worker.result()
 
 
 def _write_file_atomic_sync(file: Path, text: str) -> None:
