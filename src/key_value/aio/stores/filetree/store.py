@@ -159,6 +159,8 @@ async def write_file_atomic(file: AsyncPath, text: str) -> None:
                 raise
             cancelled = e
     if cancelled is not None:
+        if (error := worker.exception()) is not None:
+            logger.error("Atomic write to %s failed after the caller was cancelled", file, exc_info=error)
         raise cancelled
     worker.result()
 

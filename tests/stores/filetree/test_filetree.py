@@ -464,7 +464,7 @@ class TestFileTreeStoreAtomicWrites:
         monkeypatch.setattr(filetree_store_module.os, "fsync", blocking_fsync)
 
         write_a = asyncio.create_task(store.put(collection="test", key="race", value={"version": 1}))
-        _ = await asyncio.to_thread(entered.wait, 5)
+        assert await asyncio.to_thread(entered.wait, 5), "first write never reached fsync"
         _ = write_a.cancel()
 
         # Unblock A shortly after cancellation, from outside the event loop.
