@@ -23,8 +23,8 @@ This monorepo contains:
 
 - **Multiple backends**: Aerospike, Azure Tables, chDB, DuckDB, DynamoDB,
   Elasticsearch, FileTree, Firestore, Keyring, Memcached, MongoDB, OpenSearch,
-  PostgreSQL, Redis, RocksDB, S3, Valkey, Vault, Windows Registry, and
-  In-memory, Disk, etc.
+  PostgreSQL, Redis, RocksDB, S3, Upstash Redis, Valkey, Vault, Windows
+  Registry, and In-memory, Disk, etc.
 - **TTL support**: Automatic expiration handling across all store types
 - **Type-safe**: Full type hints with Protocol-based interfaces
 - **Adapters**: Pydantic model support, raise-on-missing behavior, etc
@@ -149,8 +149,8 @@ pip install py-key-value-aio[s3]
 pip install py-key-value-aio[azure-tables]
 pip install py-key-value-aio[elasticsearch]
 pip install py-key-value-aio[firestore]
-# or: aerospike, redis, mongodb, memcached, valkey, vault, registry, rocksdb,
-# see below for all options
+# or: aerospike, redis, upstash, mongodb, memcached, valkey, vault, registry,
+# rocksdb, see below for all options
 ```
 
 ```python
