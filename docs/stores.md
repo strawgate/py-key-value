@@ -523,6 +523,7 @@ Distributed stores provide network-based storage for multi-node applications.
 | MongoDB | Unstable | Document database used as key-value store |
 | OpenSearch | Unstable | OpenSearch search engine with key-value capabilities |
 | PostgreSQL | Unstable | PostgreSQL database with JSONB storage |
+| Upstash Redis | Unstable | Serverless Redis accessed over HTTP |
 | Redis | Stable | Popular in-memory data structure store |
 | Valkey | Stable | Open-source Redis fork |
 
@@ -613,6 +614,46 @@ pip install py-key-value-aio[redis]
 - Horizontal scaling support
 - SSL/TLS and mutual TLS connection options
 - **Stable storage format**
+
+---
+
+### UpstashRedisStore
+
+Serverless Redis over HTTP using
+[Upstash Redis](https://upstash.com/docs/redis/overall/getstarted) and the
+[upstash-redis](https://github.com/upstash/redis-py) client. Entries are stored
+in the same format as `RedisStore`.
+
+```python
+from key_value.aio.stores.upstash import UpstashRedisStore
+
+store = UpstashRedisStore(
+    url="https://your-database.upstash.io",
+    token="your-rest-token",
+)
+
+# Or with an existing client
+from upstash_redis.asyncio import Redis
+
+store = UpstashRedisStore(client=Redis.from_env())
+```
+
+**Installation:**
+
+```bash
+pip install py-key-value-aio[upstash]
+```
+
+**Use Cases:**
+
+- Serverless and edge functions
+- Environments without persistent TCP connections
+
+**Characteristics:**
+
+- HTTP-based, no connection pool to manage
+- Same key layout and value format as `RedisStore`
+- Stable storage format: **Unstable**
 
 ---
 

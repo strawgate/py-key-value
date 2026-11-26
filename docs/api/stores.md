@@ -105,6 +105,17 @@ MongoDB-backed key-value store.
       members:
         - __init__
 
+## Upstash Redis Store
+
+[Upstash Redis](https://upstash.com/docs/redis/overall/getstarted)-backed
+key-value store over HTTP.
+
+::: key_value.aio.stores.upstash.UpstashRedisStore
+    options:
+      show_source: false
+      members:
+        - __init__
+
 ## Valkey Store
 
 Valkey-backed key-value store (Redis-compatible).
