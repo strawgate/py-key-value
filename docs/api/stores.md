@@ -107,8 +107,7 @@ MongoDB-backed key-value store.
 
 ## Upstash Redis Store
 
-[Upstash Redis](https://upstash.com/docs/redis/overall/getstarted)-backed
-key-value store over HTTP.
+Upstash Redis-backed key-value store over HTTP.
 
 ::: key_value.aio.stores.upstash.UpstashRedisStore
     options:

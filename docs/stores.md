@@ -523,8 +523,8 @@ Distributed stores provide network-based storage for multi-node applications.
 | MongoDB | Unstable | Document database used as key-value store |
 | OpenSearch | Unstable | OpenSearch search engine with key-value capabilities |
 | PostgreSQL | Unstable | PostgreSQL database with JSONB storage |
-| Upstash Redis | Unstable | Serverless Redis accessed over HTTP |
 | Redis | Stable | Popular in-memory data structure store |
+| Upstash Redis | Unstable | Serverless Redis accessed over HTTP |
 | Valkey | Stable | Open-source Redis fork |
 
 ### AerospikeStore
